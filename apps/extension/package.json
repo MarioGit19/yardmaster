@@ -64,9 +64,14 @@
     "package": "node scripts/build.mjs --production && pnpm run icon && vsce package --no-dependencies --allow-missing-repository --skip-license --out dist/c-board.vsix",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@c-board/protocol": "workspace:*",
+    "ws": "^8.22.0"
+  },
   "devDependencies": {
     "@types/node": "^22",
     "@types/vscode": "1.93.0",
+    "@types/ws": "^8.18.2",
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2"
   }

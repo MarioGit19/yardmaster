@@ -44,3 +44,13 @@ export function serverOrigin(port: number): string {
 export function dashboardUrl(port: number): string {
   return `${serverOrigin(port)}/`;
 }
+
+/** The one-time link that signs the browser in (PRD §8); the plain dashboard without a token. */
+export function authUrl(port: number, token: string | null): string {
+  if (token === null) return dashboardUrl(port);
+  return `${serverOrigin(port)}/auth?t=${encodeURIComponent(token)}`;
+}
+
+export function editorSocketUrl(port: number): string {
+  return `ws://${SERVER_HOST}:${port}/ws/editor`;
+}

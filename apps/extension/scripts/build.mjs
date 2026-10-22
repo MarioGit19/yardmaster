@@ -17,7 +17,8 @@ await build({
   format: 'cjs',
   // VS Code 1.93 ships Electron 30 (Node 20).
   target: 'node20',
-  external: ['vscode'],
+  // ws's optional native helpers; it falls back to plain JS when they can't be loaded.
+  external: ['vscode', 'bufferutil', 'utf-8-validate'],
   sourcemap: !production,
   minify: production,
   logLevel: 'warning',

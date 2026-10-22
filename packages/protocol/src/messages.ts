@@ -44,6 +44,9 @@ function command<T extends string, P extends z.ZodType>(type: T, payload: P) {
 
 // Editor → server (`/ws/editor`)
 
+/** Close code sent to an editor socket when a newer connection for its window takes over. */
+export const EDITOR_CLOSE_REPLACED = 4001;
+
 export const EditorTerminal = z.object({
   terminalId: TerminalId,
   name: z.string().max(256),

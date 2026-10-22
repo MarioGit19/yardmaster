@@ -1,6 +1,6 @@
 import { realpath } from 'node:fs/promises';
 import { basename, resolve, sep } from 'node:path';
-import { accentIndexForProject, projectIdFromPath } from '@c-board/protocol';
+import { accentIndexForProject, type ProjectSource, projectIdFromPath } from '@c-board/protocol';
 import type { BoardStore } from '../store.js';
 
 export type PathResolver = (path: string) => Promise<string>;
@@ -25,13 +25,33 @@ export async function projectForCwd(
   }
   if (best) return best.id;
 
+  return ensureProject(store, path, 'hook', ts);
+}
+
+/**
+ * The project at exactly `path` (a resolved folder), created when missing. An editor
+ * opening a folder first seen through a hook promotes it to an `editor` project.
+ */
+export function ensureProject(
+  store: BoardStore,
+  path: string,
+  source: ProjectSource,
+  ts: number,
+): string {
   const id = projectIdFromPath(path);
+  const existing = store.state.projects[id];
+  if (existing) {
+    if (source === 'editor' && existing.source === 'hook') {
+      store.upsertProject({ ...existing, source });
+    }
+    return id;
+  }
   store.upsertProject({
     id,
     path,
     name: basename(path) || path,
     accent: accentIndexForProject(id),
-    source: 'hook',
+    source,
     git: null,
     createdAt: ts,
     lastActivityAt: ts,

@@ -8,6 +8,11 @@ import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
+import {
+  EditorGateway,
+  type EditorGatewayOptions,
+  registerEditorGateway,
+} from './editor-gateway.js';
 import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
 import { registerStatic } from './static.js';
@@ -45,6 +50,8 @@ export interface BuildOptions {
   transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
   /** Session registry discovery tuning, for tests. Not started in demo mode. */
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
+  /** Editor link tuning, for tests. */
+  editor?: Pick<EditorGatewayOptions, 'graceMs' | 'idleMs' | 'resolvePath'>;
 }
 
 declare module 'fastify' {
@@ -95,6 +102,7 @@ export async function buildServer(
   app.addHook('onClose', async () => {
     demo?.stop();
     await discovery?.stop();
+    await editorGateway.idle();
     await hookIngest.idle();
     await transcripts?.close();
     // Emit any changes made since the last microtask so they reach the database.
@@ -143,6 +151,15 @@ export async function buildServer(
   app.decorate('uiGateway', gateway);
   registerUiGateway(app, gateway);
   app.decorate('demo', demo);
+
+  const editorGateway = new EditorGateway({
+    store,
+    logger: logger.child({ component: 'editor-ws' }),
+    apply: demo === null,
+    ...options.editor,
+  });
+  app.decorate('editorGateway', editorGateway);
+  registerEditorGateway(app, editorGateway, token);
 
   const startedAt = Date.now();
   const hookStats: HookStats = { received: 0, lastAt: null };
