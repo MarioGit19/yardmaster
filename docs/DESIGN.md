@@ -279,7 +279,12 @@ The overview can be shown in different **layouts**. A layout is a different way 
 - **Keyboard.** Tab moves between projects (rooms or nodes) in attention-first order, arrow keys move between the actors inside one, Enter opens, Esc goes back. Every actor is a real focusable element with an accessible name such as "acme-shop, Claude, waiting for approval: Bash(pnpm test)".
 - **Motion levels.** Every layout defines Full, Reduced and Off (§3): Reduced keeps state readable through static poses, color and glows, with cross-fades instead of travel. Off moves nothing.
 - **Performance.** Every layout meets §7 and PRD §9 under `--demo-stress` (≥ 55 fps, no long tasks over 50 ms on the overview). Off-screen actors pause. Only one WebGL context exists at a time: Office and Grid unmount the ambient field and draw their own backdrop.
-- **Narrow screens.** At 390 px every layout stays usable: Office stacks rooms in one column, Grid shows its 2D map as a vertical list.
+- **Phones (390 px) and touch.** Every layout is designed for the phone, not just squeezed onto it:
+  - Office stacks rooms in one column (each room full width, characters at 56 px); the room view fills the screen with the actor list as a bottom sheet. Grid shows its 2D map as a vertical list of nodes on one trunk, and the cockpit becomes a swipeable stack of screens. Transit runs its lines top to bottom. Retro reflows to one frame per project in a single column (at least 40 characters wide).
+  - **Touch replaces hover:** tap a character, node, train or line to open the Actor inspector as a bottom sheet (Radix dialog on narrow screens, popover on desktop); hover-only details (name tags, tooltips, lane peeks) appear in that sheet. Long-press shows the name tag.
+  - **Gestures:** swipe between screens in the Grid cockpit and between tabs in the focus view; pinch and drag in the Grid 3D view (when shown on a tablet); pull down on a bottom sheet to close it; the system back gesture and the browser back button behave like Esc.
+  - Tap targets are at least 44 × 44 px, text never drops below 12 px, and nothing relies on keyboard shortcuts alone (⌘K is a button on phones).
+  - Phones also respect performance: the Office and Grid layouts cap animated characters and packets lower (half of desktop) and pause everything while the page is in the background.
 - **Assets.** All art is original inline SVG, CSS or code-drawn geometry. No third-party sprites, models, textures or fonts beyond the existing ones.
 
 ### 10.2 Minimal
@@ -369,7 +374,8 @@ This layout is allowed a stronger look than the rest of the app (neon on near-bl
 
 ### 10.7 Visual QA additions
 
-- [ ] Each layout has screenshots at 390 / 1440 / 1920 in dark and light, at rest and under demo activity.
+- [ ] Each layout has screenshots at 390 / 1440 / 1920 in dark and light, at rest and under demo activity, plus its enter view (room, cockpit) at 390.
+- [ ] On phones: every tap target ≥ 44 px, the inspector opens as a bottom sheet, nothing needs hover or a keyboard.
 - [ ] The same demo moment shows the same statuses in every layout (count the amber and rose cues).
 - [ ] Office: no character overlaps another station; nameplates truncate with a tooltip; the +N badge appears past 8.
 - [ ] Grid: labels never overlap at 1440 with 10 projects; nothing flashes faster than 3 Hz; the 2D map is complete without WebGL.

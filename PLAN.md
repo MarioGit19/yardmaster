@@ -446,11 +446,11 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 
 ## Phase 10 — Layouts: Minimal, Office, Grid, Transit, Retro
 
-Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Every layout must keep the same statuses, chrome and actions as Minimal.
+Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Every layout must keep the same statuses, chrome and actions as Minimal, and every layout must be designed for phones too (DESIGN.md §10.1 "Phones (390 px) and touch"): take 390 px screenshots and use touch emulation in e2e for each one.
 
 - [ ] **10.1 Layout framework and Actor inspector**
   - `selectSceneModel` (pure, unit tested): projects → actors (Claude session, subagent, terminal) with kind, state (crew states plus `serving`/`exited` for terminals, from a new `opsStateFor(terminal, executions)`), activity level, label, caption and links, attention-first order. A `layouts/` registry (`minimal`, `office`, `grid`, `transit`, `retro`), each a lazy-loaded overview component; the current overview becomes `minimal` with no visual change. The `cboard.layout` preference (via `createPreference`), the switcher in Settings → Appearance, ⌘K actions "Layout: …", `⌥1`…`⌥5`, and a cross-fade between layouts (`dur.slow`, instant at Off).
-  - `ActorInspector`: the shared popover from DESIGN.md §10.1 (Radix popover, anchored, keyboard reachable) with Open, Focus in Cursor, Ctrl+C and Allow/Deny. Deep links `/p/:projectId/s/:sessionId` (exists) and a new `/p/:projectId/t/:terminalId` that opens the focus view with that terminal's tab active. Wire the inspector into Minimal too (clicking a lane's crew/session orb).
+  - `ActorInspector`: the shared popover from DESIGN.md §10.1 (Radix popover, anchored, keyboard reachable; a bottom sheet on narrow screens and touch, with pull-down to close) with Open, Focus in Cursor, Ctrl+C and Allow/Deny. Deep links `/p/:projectId/s/:sessionId` (exists) and a new `/p/:projectId/t/:terminalId` that opens the focus view with that terminal's tab active. Wire the inspector into Minimal too (clicking a lane's crew/session orb).
   - Office, Grid, Transit and Retro start as placeholders ("coming soon" cards listing the scene model) so the switcher works end to end.
   - **Done when:** model and `opsStateFor` tests pass, switching layouts works from Settings, ⌘K and shortcuts, survives a reload, and the inspector's actions work in e2e on Minimal.
   - **Verify:** `pnpm --filter @c-board/web test && pnpm e2e && pnpm shots`
@@ -466,8 +466,8 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
   - **Verify:** `pnpm shots && pnpm e2e`
 
 - [ ] **10.4 Office: room view**
-  - Click or Enter on a room → zoom the building layer into it (transform only, `smooth`, ~500 ms), characters at 120 px with full props, and a side panel listing every actor with its caption and inspector actions. "Open workspace" cross-fades to the focus view; Esc zooms back out and restores focus on the room. Keyboard per DESIGN.md §10.1 (Tab between rooms, arrows between characters). Reduced: cross-fade instead of zoom.
-  - **Done when:** e2e enters a room, opens a terminal's inspector, opens the workspace, and returns with Esc to the same room; mid-zoom screenshots look right.
+  - Click or Enter on a room → zoom the building layer into it (transform only, `smooth`, ~500 ms), characters at 120 px with full props, and a side panel listing every actor with its caption and inspector actions. "Open workspace" cross-fades to the focus view; Esc zooms back out and restores focus on the room. Keyboard per DESIGN.md §10.1 (Tab between rooms, arrows between characters). Reduced: cross-fade instead of zoom. At 390 px the room fills the screen and the actor list is a bottom sheet.
+  - **Done when:** e2e (desktop and a touch-emulated phone) enters a room, opens a terminal's inspector, opens the workspace, and returns with Esc to the same room; mid-zoom screenshots look right.
   - **Verify:** `pnpm e2e && pnpm shots`
 
 - [ ] **10.5 Grid: 2D network map**
@@ -481,7 +481,7 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
   - **Verify:** `pnpm shots && pnpm e2e`
 
 - [ ] **10.7 Grid: dive and cockpit**
-  - Enter a node: camera flies along its pipeline (~900 ms, `ease.inOut`), other nodes fade into fog, then the phase-in (scanline sweep + brief chromatic split resolving, ~400 ms, no full-screen flash). The cockpit: the project's screens in an arc via CSS3D (Claude screen center with live messages and caption, terminal screens with live tails, ports and uptime, small git/ports/todo screens above). Click a screen → it flies to center and becomes interactive (one xterm at a time); "Open workspace" → focus view. Esc steps back (screen → arc → reverse dive). Keyboard reachable throughout.
+  - Enter a node: camera flies along its pipeline (~900 ms, `ease.inOut`), other nodes fade into fog, then the phase-in (scanline sweep + brief chromatic split resolving, ~400 ms, no full-screen flash). The cockpit: the project's screens in an arc via CSS3D (Claude screen center with live messages and caption, terminal screens with live tails, ports and uptime, small git/ports/todo screens above). Click a screen → it flies to center and becomes interactive (one xterm at a time); "Open workspace" → focus view. Esc steps back (screen → arc → reverse dive). Keyboard reachable throughout. On phones and tablets: pinch and drag in the 3D view, and the cockpit as a swipeable stack of screens (the 10.5 flat cockpit at 390 px).
   - **Done when:** e2e dives into a node, centers a terminal screen, sends a command and sees the echo, and backs out with Esc twice; mid-dive and cockpit screenshots look right.
   - **Verify:** `pnpm e2e && pnpm shots`
 
@@ -491,16 +491,16 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
   - **Verify:** `pnpm shots && pnpm e2e`
 
 - [ ] **10.9 Retro layout**
-  - The CRT console per DESIGN.md §10.6: box-drawing frames per project on a character grid, status tags, ASCII sparklines, blinking cursor on working items, typed captions, number shortcuts, scanlines, vignette and phosphor glow in CSS, the amber-phosphor option in Settings, and the paper variant for Daylight. Fits 20 projects at 1440 × 900.
-  - **Done when:** screenshots show aligned columns with 20 projects (`--demo-stress`) in both themes, and the number shortcuts work in e2e.
+  - The CRT console per DESIGN.md §10.6: box-drawing frames per project on a character grid, status tags, ASCII sparklines, blinking cursor on working items, typed captions, number shortcuts, scanlines, vignette and phosphor glow in CSS, the amber-phosphor option in Settings, and the paper variant for Daylight. Fits 20 projects at 1440 × 900. At 390 px: one frame per project in a single column, number shortcuts become tap targets.
+  - **Done when:** screenshots show aligned columns with 20 projects (`--demo-stress`) in both themes and at 390 px, and the number shortcuts work in e2e.
   - **Verify:** `pnpm shots && pnpm e2e`
 
 - [ ] **10.10 Layouts review pass**
-  - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.5 checks to the shots review. Fix what is found (up to 10 issues; add `10.10b` for the rest).
+  - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), a **phone pass** of every layout and enter view (Playwright iPhone device profile: touch, 390 px, tap targets ≥ 44 px, inspector as bottom sheet, back gesture), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.5 checks to the shots review. Fix what is found (up to 10 issues; add `10.10b` for the rest).
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
 
 - [ ] **[HUMAN] 10.11 Try the layouts**
-  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts, and write any feedback as new tasks below this one before ticking it.
+  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts (on your phone too, once 11.5 is done, or with your browser's phone emulation now), and write any feedback as new tasks below this one before ticking it.
 
 ## Phase 11 — Workspaces: open projects from the board, board terminals, phone access
 
