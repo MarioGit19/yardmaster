@@ -1,7 +1,8 @@
 import type { Project } from '@c-board/protocol';
-import { GitBranch, SquareTerminal } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { Link } from 'wouter';
 import { selectSessionsByProject, selectTerminalsByProject, useBoardList } from '../data/index.js';
+import { TerminalLane } from '../lanes/TerminalLane.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, projectTone, sessionStatusView, totalTokens } from '../status.js';
@@ -9,6 +10,9 @@ import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
+
+/** Lanes shown per card before the rest collapse into a count. */
+const MAX_LANES = 4;
 
 const BORDER = {
   wait: 'glow-st-wait',
@@ -23,27 +27,37 @@ const BORDER = {
 export function ProjectCard({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
-  const openTerminals = terminals.filter((t) => t.state === 'open');
+  const openTerminals = terminals
+    .filter((t) => t.state === 'open')
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
   const tone = projectTone(sessions, terminals);
   const live = sessions.filter((s) => s.status.kind !== 'ended');
 
+  const accent = `var(--accent-${project.accent})`;
+  const hiddenLanes = openTerminals.length - MAX_LANES;
+
+  // The name link stretches over the card; lanes sit above it so their controls stay usable.
+  // No overflow clipping: lane peeks hang below their lane.
   return (
-    <Link
-      href={projectHref(project.id)}
+    <article
       data-pod={project.id}
-      style={{ '--accent': `var(--accent-${project.accent})` } as React.CSSProperties}
+      style={{ '--accent': accent } as React.CSSProperties}
       className={cx(
-        'group relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
-        'transition-colors duration-150 ease-out hover:border-line-strong',
+        'group relative flex min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
+        'transition-colors duration-150 ease-out hover:border-line-strong has-[[data-open]]:z-10',
         'before:absolute before:inset-x-4 before:top-0 before:h-px before:bg-[var(--accent)] before:opacity-70',
         BORDER[tone],
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
         <ProjectAvatar project={project} />
-        <span className="min-w-0 flex-1 truncate font-medium text-title-sm text-text-1">
+        <Link
+          href={projectHref(project.id)}
+          title={project.name}
+          className="min-w-0 flex-1 truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
+        >
           {project.name}
-        </span>
+        </Link>
         {project.git?.branch && (
           <span className="hidden min-w-0 max-w-[45%] sm:flex">
             <Chip mono icon={<GitBranch />} title={project.git.branch}>
@@ -71,16 +85,23 @@ export function ProjectCard({ project }: { project: Project }) {
           );
         })}
       </ul>
-      <div className="mt-auto flex items-center gap-2 text-meta text-text-3">
-        <SquareTerminal className="size-3.5" strokeWidth={1.5} aria-hidden />
-        <span className="tabular">
-          {openTerminals.length} {openTerminals.length === 1 ? 'terminal' : 'terminals'}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-right font-mono" title={project.path}>
-          {project.path}
-        </span>
-      </div>
-    </Link>
+      {openTerminals.length > 0 ? (
+        <div className="lanes relative z-[1] mt-auto">
+          <ul aria-label="Terminals" className="flex flex-col">
+            {openTerminals.slice(0, MAX_LANES).map((terminal) => (
+              <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
+            ))}
+          </ul>
+          {hiddenLanes > 0 && (
+            <p className="mt-1 pl-[18px] text-meta text-text-3 tabular">
+              {hiddenLanes} more {hiddenLanes === 1 ? 'terminal' : 'terminals'}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-auto text-meta text-text-3">No open terminals</p>
+      )}
+    </article>
   );
 }
 

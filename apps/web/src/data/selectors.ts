@@ -62,3 +62,10 @@ export const selectPendingApprovals = (s: S): Approval[] =>
   Object.values(s.board.approvals)
     .filter((a) => a.state === 'pending')
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+
+export const selectPortsByTerminal =
+  (terminalId: string) =>
+  (s: S): PortBinding[] =>
+    Object.values(s.board.ports)
+      .filter((p) => p.terminalId === terminalId)
+      .sort((a, b) => a.port - b.port || a.id.localeCompare(b.id));

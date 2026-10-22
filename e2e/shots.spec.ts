@@ -126,3 +126,29 @@ test.describe('crew mascot', () => {
     await section.screenshot({ path: new URL('crew-sheet-reduced.png', OUT_DIR).pathname });
   });
 });
+
+// Terminal lanes on the overview once the sparklines have a few live samples, plus a peek.
+test.describe('terminal lanes', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('overview and peek', async ({ page }) => {
+        await openRoute(page, '/');
+        await expect(page.locator('[data-lane]').first()).toBeVisible();
+        await page.waitForTimeout(4000);
+        await page.screenshot({ path: new URL(`lanes-${theme}.png`, OUT_DIR).pathname });
+        const lane = page.locator('[data-lane][data-streaming]').first();
+        await lane.locator('[aria-expanded]').hover();
+        await expect(page.locator('[data-peek]')).toBeVisible();
+        await page.waitForTimeout(600);
+        const pod = page.locator('[data-pod]:has([data-open])');
+        const box = await pod.boundingBox();
+        if (!box) throw new Error('pod not visible');
+        await page.screenshot({
+          path: new URL(`lane-peek-${theme}.png`, OUT_DIR).pathname,
+          clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 140 },
+        });
+      });
+    });
+  }
+});

@@ -500,3 +500,90 @@
 :root[data-motion="reduced"] .crew-spark {
   opacity: 1;
 }
+
+/* Terminal lanes, DESIGN.md §4.3. Fixed tracks (name · command · sparkline · port · status) so
+   lanes line up across pods of the same width. */
+.lanes {
+  container-type: inline-size;
+}
+.lane-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 4rem 3.5rem 3rem;
+  column-gap: 8px;
+  align-items: center;
+  height: 28px;
+  overflow: hidden;
+}
+/* Narrow pods (phones) keep the command readable by slimming the other tracks. */
+@container (width < 22rem) {
+  .lane-row {
+    grid-template-columns: 4.75rem minmax(0, 1fr) 2.5rem 3.75rem 2.5rem;
+    column-gap: 6px;
+  }
+}
+
+/* Flow light: a comet along the bottom edge while the lane streams (transform only). */
+@keyframes lane-comet {
+  to {
+    transform: translateX(260%);
+  }
+}
+.lane-row::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lane-tint), transparent);
+  opacity: 0;
+  transform: translateX(-100%);
+  pointer-events: none;
+  transition: opacity 400ms var(--ease-out);
+}
+[data-streaming] > .lane-row::after {
+  opacity: 0.85;
+  animation: lane-comet 1.8s linear infinite;
+}
+
+/* The running dot pulses faster the more the lane writes. */
+@keyframes lane-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+.lane-dot {
+  position: relative;
+}
+.lane-dot[data-level]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: lane-pulse var(--lane-pulse, 1.6s) var(--ease-out) infinite;
+}
+.lane-dot[data-level="2"] {
+  --lane-pulse: 1.1s;
+}
+.lane-dot[data-level="3"] {
+  --lane-pulse: 0.75s;
+}
+
+/* Reduced: lanes keep their colors and a static comet glow, nothing travels or pulses. */
+[data-motion="reduced"] [data-streaming] > .lane-row::after {
+  animation: none;
+  width: 100%;
+  transform: none;
+  opacity: 0.5;
+}
+[data-motion="reduced"] .lane-dot[data-level]::after {
+  animation: none;
+  opacity: 0;
+}

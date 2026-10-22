@@ -45,6 +45,11 @@ export function useBoardList<T>(selector: (state: BoardStoreState) => T[]): T[] 
   return useStore(useBoardContext().store, useShallow(selector));
 }
 
+/** For selectors that build a flat object: re-renders only when a field changes. */
+export function useBoardShallow<T extends object>(selector: (state: BoardStoreState) => T): T {
+  return useStore(useBoardContext().store, useShallow(selector));
+}
+
 /**
  * Streams output of `streamId` (null = nothing) into `onChunk`, outside React state,
  * e.g. straight into an xterm instance. The latest `onChunk` is always used.
