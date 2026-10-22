@@ -4,6 +4,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } 
 import { pino } from 'pino';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
+import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { Persistence } from './persistence.js';
@@ -39,6 +40,8 @@ export interface BuildOptions {
   gateway?: Pick<UiGatewayOptions, 'patchIntervalMs' | 'maxBufferedBytes'>;
   /** Built web app to serve with an SPA fallback, e.g. `DEFAULT_WEB_ROOT`. Off by default. */
   webRoot?: string;
+  /** Transcript reader tuning, for tests. Not started in demo mode. */
+  transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
 }
 
 declare module 'fastify' {
@@ -51,6 +54,7 @@ declare module 'fastify' {
     /** Updated by the hook ingest; reported by `GET /api/status`. */
     hookStats: HookStats;
     hookIngest: HookIngest;
+    transcripts: TranscriptService | null;
   }
 }
 
@@ -87,6 +91,7 @@ export async function buildServer(
   app.addHook('onClose', async () => {
     demo?.stop();
     await hookIngest.idle();
+    await transcripts?.close();
     // Emit any changes made since the last microtask so they reach the database.
     store.flush();
     persistence.close();
@@ -106,8 +111,17 @@ export async function buildServer(
         onMessage: (message) => gateway.broadcast(message),
       })
     : null;
+  const transcripts = options.demo
+    ? null
+    : new TranscriptService({
+        store,
+        logger: logger.child({ component: 'transcripts' }),
+        ...options.transcripts,
+      });
+  app.decorate('transcripts', transcripts);
   const gateway: UiGateway = new UiGateway({
     store,
+    ...(transcripts ? { transcripts } : {}),
     dispatch: createActionDispatcher(options.actions ?? stubActionHandlers()),
     ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
     logger: logger.child({ component: 'ui-ws' }),

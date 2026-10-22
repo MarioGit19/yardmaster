@@ -5,12 +5,14 @@ import {
   makeMessage,
   type PatchOp,
   type ServerToUi,
+  type StreamId,
+  TRANSCRIPT_STREAM_PREFIX,
   type UiToServer,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { type ActionDispatcher, type ActionResult, NOT_IMPLEMENTED } from './actions.js';
-import type { OutputStreamId } from './output-buffers.js';
+import type { ReadResult } from './ring-buffer.js';
 import type { BoardStore } from './store.js';
 
 export const UI_WS_PATH = '/ws/ui';
@@ -21,8 +23,17 @@ export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 /** Largest UI → server message (characters). */
 export const MAX_UI_MESSAGE = 1024 * 1024;
 
+/** Buffered, seq-numbered stream data the gateway replays and forwards. */
+export interface StreamSource {
+  read(streamId: string, fromSeq?: number): ReadResult | undefined;
+  nextSeq(streamId: string): number;
+  onData(listener: (streamId: string, seq: number, chunk: string) => void): () => void;
+}
+
 export interface UiGatewayOptions {
   store: BoardStore;
+  /** Serves `transcript:<sessionId>` streams. */
+  transcripts?: StreamSource;
   dispatch: ActionDispatcher;
   /** Handles `approval.decide`. Defaults to `not_implemented`. */
   decideApproval?: (decision: ApprovalDecision) => ActionResult | Promise<ActionResult>;
@@ -36,7 +47,7 @@ type ServerMessage<T extends ServerToUi['type']> = Extract<ServerToUi, { type: T
 interface Client {
   socket: WebSocket;
   /** Live streams; `false` once live data was dropped and a resync marker sent. */
-  streams: Map<OutputStreamId, boolean>;
+  streams: Map<StreamId, boolean>;
   /** Pending ops that were already part of this client's snapshot. */
   skipOps: number;
 }
@@ -47,6 +58,7 @@ interface Client {
  */
 export class UiGateway {
   private readonly store: BoardStore;
+  private readonly transcripts: StreamSource | undefined;
   private readonly dispatch: ActionDispatcher;
   private readonly decideApproval: NonNullable<UiGatewayOptions['decideApproval']>;
   private readonly log: FastifyBaseLogger;
@@ -60,6 +72,7 @@ export class UiGateway {
 
   constructor(options: UiGatewayOptions) {
     this.store = options.store;
+    this.transcripts = options.transcripts;
     this.dispatch = options.dispatch;
     this.decideApproval =
       options.decideApproval ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
@@ -70,6 +83,11 @@ export class UiGateway {
       this.store.onPatch((ops) => this.queuePatch(ops)),
       this.store.output.onData((streamId, seq, chunk) => this.onData(streamId, seq, chunk)),
     );
+    if (this.transcripts) {
+      this.detach.push(
+        this.transcripts.onData((streamId, seq, chunk) => this.onData(streamId, seq, chunk)),
+      );
+    }
   }
 
   get clientCount(): number {
@@ -121,10 +139,10 @@ export class UiGateway {
     const message: UiToServer = decoded.message;
     switch (message.type) {
       case 'subscribe':
-        this.subscribe(client, message.payload.streamId as OutputStreamId, message.payload.fromSeq);
+        this.subscribe(client, message.payload.streamId, message.payload.fromSeq);
         return;
       case 'unsubscribe':
-        client.streams.delete(message.payload.streamId as OutputStreamId);
+        client.streams.delete(message.payload.streamId);
         return;
       case 'action': {
         const result = await this.dispatch(message.payload);
@@ -148,16 +166,16 @@ export class UiGateway {
     }
   }
 
-  private subscribe(client: Client, streamId: OutputStreamId, fromSeq = 0): void {
+  private subscribe(client: Client, streamId: StreamId, fromSeq = 0): void {
     // Replay and go live in one synchronous step, so no chunk falls in between.
     client.streams.set(streamId, true);
-    const replay = this.store.output.read(streamId, fromSeq);
+    const replay = this.source(streamId)?.read(streamId, fromSeq);
     for (const { seq, chunk } of replay?.chunks ?? []) {
       this.send(client, this.message('stream.data', { streamId, seq, chunk }));
     }
   }
 
-  private onData(streamId: OutputStreamId, seq: number, chunk: string): void {
+  private onData(streamId: StreamId, seq: number, chunk: string): void {
     let data: string | undefined;
     for (const client of this.clients) {
       if (client.streams.get(streamId) !== true) continue;
@@ -171,14 +189,19 @@ export class UiGateway {
   }
 
   /** Pauses every live stream of a congested client; it resumes by re-subscribing. */
-  private dropLive(client: Client, current: OutputStreamId, seq: number): void {
+  private dropLive(client: Client, current: StreamId, seq: number): void {
     for (const [streamId, live] of client.streams) {
       if (!live) continue;
       client.streams.set(streamId, false);
-      const fromSeq = streamId === current ? seq : this.store.output.nextSeq(streamId);
+      const fromSeq = streamId === current ? seq : (this.source(streamId)?.nextSeq(streamId) ?? 0);
       this.send(client, this.message('stream.resync', { streamId, fromSeq }));
     }
     this.log.warn({ bufferedAmount: client.socket.bufferedAmount }, 'ui client fell behind');
+  }
+
+  private source(streamId: StreamId): StreamSource | undefined {
+    if (streamId.startsWith(TRANSCRIPT_STREAM_PREFIX)) return this.transcripts;
+    return this.store.output;
   }
 
   private queuePatch(ops: PatchOp[]): void {

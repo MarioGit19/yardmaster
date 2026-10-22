@@ -143,8 +143,8 @@ export type ServerToEditor = z.infer<typeof ServerToEditor>;
 
 // Server → UI (`/ws/ui`)
 
-/** `exec:<execId>` or `term:<terminalId>`. */
-export const StreamId = z.string().regex(/^(exec|term):[^\s]{1,256}$/);
+/** `exec:<execId>`, `term:<terminalId>` or `transcript:<sessionId>` (chunks are `ChatMessage` JSON). */
+export const StreamId = z.string().regex(/^(exec|term|transcript):[^\s]{1,256}$/);
 export type StreamId = z.infer<typeof StreamId>;
 
 export const ToastLevel = z.enum(['info', 'success', 'warning', 'error']);

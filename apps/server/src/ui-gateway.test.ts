@@ -8,6 +8,7 @@ import { WebSocket } from 'ws';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { startServer } from './app.js';
 import type { ServerConfig } from './config.js';
+import { RingBuffer } from './ring-buffer.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
 import { BoardStore } from './store.js';
 import { generateToken } from './token.js';
@@ -440,5 +441,52 @@ describe('UiGateway backpressure', () => {
     store.flush();
     expect(socket.take()).toEqual([]);
     expect(gateway.clientCount).toBe(0);
+  });
+});
+
+describe('UiGateway transcript streams', () => {
+  it('replays and forwards transcript:<sessionId> streams from the transcript source', async () => {
+    const store = new BoardStore({ autoFlush: false });
+    const ring = new RingBuffer(1_000);
+    const listeners = new Set<(streamId: string, seq: number, chunk: string) => void>();
+    const transcripts = {
+      read: (streamId: string, fromSeq?: number) =>
+        streamId === 'transcript:s-1' ? ring.read(fromSeq) : undefined,
+      nextSeq: () => ring.nextSeq,
+      onData: (listener: (streamId: string, seq: number, chunk: string) => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    const push = (chunk: string) => {
+      const seq = ring.append(chunk);
+      for (const listener of listeners) listener('transcript:s-1', seq, chunk);
+    };
+    const gateway = new UiGateway({
+      store,
+      transcripts,
+      dispatch: createActionDispatcher(stubActionHandlers()),
+      logger: silent,
+    });
+    const socket = new FakeSocket();
+    gateway.connect(socket as never);
+    push('{"kind":"user"}');
+    socket.take();
+
+    socket.receive('subscribe', { streamId: 'transcript:s-1' });
+    await new Promise((resolve) => setImmediate(resolve));
+    push('{"kind":"assistant"}');
+    expect(
+      socket
+        .take()
+        .map((m) => (m.type === 'stream.data' ? [m.payload.streamId, m.payload.seq] : m.type)),
+    ).toEqual([
+      ['transcript:s-1', 0],
+      ['transcript:s-1', 1],
+    ]);
+
+    gateway.close();
+    push('{"kind":"late"}');
+    expect(listeners.size).toBe(0);
   });
 });
