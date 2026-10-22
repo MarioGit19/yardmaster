@@ -14,5 +14,6 @@
   "enabledPlugins": {
     "impeccable@impeccable": true,
     "context7@claude-plugins-official": true
-  }
+  },
+  "enabledMcpjsonServers": ["motion"]
 }

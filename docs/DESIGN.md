@@ -84,6 +84,13 @@ export const ease = { out: [0.16, 1, 0.3, 1], inOut: [0.65, 0, 0.35, 1] };
 6. **Errors:** a 2-frame horizontal glitch (±2px, 120 ms) plus a rose glow that stays until acknowledged.
 7. **Numbers:** counters animate with a spring on value change (a rolling digit ticker for HUD metrics).
 8. **Only animate `transform`, `opacity`, `filter`** (and canvas). Never animate width, height, top or left on hot paths. Use `layout` for size changes.
+9. **One token system.** Durations and easings come from `motion.ts` and its CSS mirror (`--dur-*`, `--ease-*`). Named exceptions (orb ripple 900 ms, sweeps 600 ms, pod dim 800 ms) are documented where they are defined.
+10. **Reduced means still.** Motion's `reducedMotion` does not reduce a whole `transform` string, so every transform-string animation goes through the `motion.ts` helper that keeps it still at Reduced. The motion level is applied before the first paint.
+11. **Keyboard is instant.** Indicators that glide on pointer clicks (tab underlines) snap when moved with the keyboard.
+
+### Third-party effects
+
+Visual effects may be adapted from React Bits (reference copy in `.claude/references/react-bits/`, fetched by `scripts/setup-skills.sh`) into `apps/web/src/fx/`. Rules: adapt to our tokens, status colors and motion levels; pause when hidden or off screen; no new dependencies (no `gsap`; `three` only inside the Grid layout chunk); an effect that uses WebGL replaces the ambient field while shown, so there is still one WebGL context; keep the upstream copyright notice in the file header and list the component in `THIRD_PARTY_NOTICES.md`. React Bits is MIT + Commons Clause: fine to ship inside c-board, never to publish the components on their own.
 
 ### Motion levels (Settings, default follows OS)
 

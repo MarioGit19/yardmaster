@@ -30,7 +30,7 @@ done_count() { grep -cE '^- \[x\] ' PLAN.md || true; }
 for bin in claude git pnpm node python3; do
   command -v "$bin" >/dev/null || { echo "✗ '$bin' not found on PATH"; exit 1; }
 done
-[ -f .claude/skills/SOURCES.txt ] || scripts/setup-skills.sh
+[ -f .claude/skills/motion/SKILL.md ] && [ -f .claude/references/SOURCES.txt ] || scripts/setup-skills.sh
 
 stalls=0
 for ((i = 1; i <= MAX_ITERS; i++)); do

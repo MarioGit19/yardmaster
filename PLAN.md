@@ -444,127 +444,200 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: The flag is a server setting (stored as `experimental.terminalReply`, `experimentalTerminalReply` in `/api/settings`, off by default), toggled under Settings → Experimental. A new action `session.replyInTerminal {sessionId, text}` (`terminal-reply.ts`) checks the flag and `terminalReplyBlock()` (protocol, shared with the UI), then goes through `terminal.sendText`, so it routes like the board's terminal input (the demo simulator in `--demo`). Errors: `terminal_reply_disabled`, `unknown_session`, `not_terminal_session`, `no_linked_terminal`, `session_busy`, `empty_reply`. The text is sent as one line: control characters, newlines included, become spaces, so nothing submits early or drives the TUI. The web app now shares server settings through `settings/boardSettings.ts`.
   - Note: The control sits on top of the terminal session's fork bar whenever the flag is on. Outside idle or waiting-for-input it stays visible but can't send, with a hint, so it doesn't flicker with the session status. The e2e test only toggles the control: sending waits on the demo's turn timing, so routing is covered by the server tests (unit plus a socket-to-socket test). The composer fork shot now picks a terminal session (parallel shots start board sessions). New shots: `composer-terminal-reply-*`. At load 35–45, `pnpm e2e` failed only the known `messages.spec` long-task test, `focus.spec` (both also fail on a clean `main`) and `onboarding.spec` (passes alone).
 
-## Phase 10 — Layouts: Minimal, Office, Grid, Transit, Retro
+## Phase 10 — Motion upgrade
 
-Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Every layout must keep the same statuses, chrome and actions as Minimal, and every layout must be designed for phones too (DESIGN.md §10.1 "Phones (390 px) and touch"): take 390 px screenshots and use touch emulation in e2e for each one.
+Comes from a motion audit of the built UI (screen recording plus code review, 2026-10-22). Goal: motion that reads as professional, rich and alive at a glance, is correct at every motion level, and is the base every layout in Phase 11 builds on. For every task: use `animate` + `apple-design` (and the `motion` skill and the Motion docs MCP for Motion APIs), run `pnpm motion:record` (from 10.1) and **Read the contact sheets** before ticking, then run `review-animations` (read its SKILL.md) on what you changed. DESIGN.md wins over skill advice.
 
-- [ ] **10.1 Layout framework and Actor inspector**
+- [ ] **10.1 Motion recorder**
+  - `pnpm motion:record [scenario]` (`e2e/motion/record.ts`, run with the repo's Playwright on full Chromium): boots `--demo` with a throwaway home (reuse `e2e/board.ts`), records a 1440×900 dark video at motion Full, and runs a scripted walkthrough. Scenarios: `overview` (entrance, 8 s of activity, pod hover, lane peek), `focus` (pod → focus → Esc), `chrome` (⌘K, Attention Center, toasts, Pulse expand), `crew` (`/#/_tokens` character sheet), `phone` (390 px, touch), `all`. With ffmpeg it writes contact sheets (`artifacts/motion/<scenario>-<moment>.png`: entrances and transitions at 10–15 fps tiled, activity at 2 fps) plus the `.webm`; without ffmpeg, a burst of screenshots. Prints which sheet covers which moment. Later phases add their scenarios (each layout, room enter, Grid dive).
+  - Add to CLAUDE.md: animation tasks must run it and look at the sheets.
+  - **Done when:** `pnpm motion:record all` produces the sheets, and the README of `e2e/motion/` says how to read them.
+  - **Verify:** `pnpm motion:record overview && ls artifacts/motion`
+
+- [ ] **10.2 Motion correctness and accessibility**
+  - **Reduced motion leaks:** Motion's `reducedMotion` only reduces `x`/`y`/`scale`-style keys, not a whole `transform` string. Add a helper (in `motion.ts`, next to `slide`) that returns a still transform at Reduced, use it at `claude/MessageList.tsx` (jump pill), `claude/Composer.tsx` (send icon), `onboarding/OnboardingWizard.tsx` and `lanes/TerminalLane.tsx` (peek), and add a unit test that fails on any `transform:` animate target in `apps/web/src` that bypasses the helper.
+  - **Motion level before first paint:** set `data-motion` synchronously in `main.tsx` (like `applyInitialTheme`), so Reduced/Off users never see a Full first frame.
+  - **Lane comet and running dot:** speed changes now swap `animation-duration`, which teleports the comet mid-cycle. Drive both with WAAPI (`element.animate` once, then `updatePlaybackRate()` eased toward the level's rate, like `PodActivity`'s `approach()`).
+  - **NumberTicker wrap:** 9 → 0 rolls backwards through every digit. Use a strip `0–9,0` and roll forward into the trailing 0, then reset invisibly (and decreasing values roll down). Use NumberTicker also for the Attention Center "Needs you" count and the Pulse rail's event count.
+  - **Keyboard-driven tabs:** the terminal and focus tab indicators glide (`layoutId`) on ArrowLeft/Right. Keep the glide for pointer clicks, snap instantly for keyboard navigation.
+  - **Tooltips:** no entrance animation in Radix's `instant-open` state.
+  - **Done when:** the new unit tests pass, and contact sheets at Full and Reduced show the fixes (no movement at Reduced; comet speed changes smoothly).
+  - **Verify:** `pnpm --filter @c-board/web test && pnpm motion:record overview`
+
+- [ ] **10.3 One motion token system**
+  - Mirror `motion.ts` in CSS: `--dur-fast/base/slow` and `--ease-out/in-out` generated from (or tested against) the TS values, so they can't drift; replace the raw CSS durations (120/150/160/200/220/400/420/600/800/900 ms) with tokens or documented named exceptions (orb ripple 900 ms, sweep 600 ms, dim 800 ms per DESIGN.md). Set Tailwind `@theme` `--default-transition-duration` and `--default-transition-timing-function` to the tokens, and replace `duration-150`/`duration-200` with token utilities. Replace hard-coded Motion timings (`ToolCard.tsx` check draw, `CrewMascot.tsx` blink and puff, `poses.ts` `'easeOut'`, `TerminalLane.tsx` `PEEK_IN_S`, `FocusView.tsx` delay) with tokens.
+  - **Toasts:** override Sonner's 400 ms `ease` transitions with the tokens (enter `dur.base` ease-out, exit `dur.fast`), keeping its interruptible transitions.
+  - Shorten the caption shimmer to about 450 ms so a quick tool burst doesn't restart it mid-sweep; continuous loops (progress, skeleton) use `linear` (feel-check against the recording; keep `ease-in-out` if it reads better and note why).
+  - **Done when:** a test asserts CSS and TS tokens match, `grep` finds no raw `duration-150|duration-200` or `'easeOut'`, and the recording shows no visual regressions.
+  - **Verify:** `pnpm --filter @c-board/web test && pnpm motion:record all`
+
+- [ ] **10.4 Motion performance leftovers**
+  - `pulse/PulseRail.tsx`: resolve token colors once per theme change, not with `getComputedStyle` inside `draw()`.
+  - `.pod-ring-light`: `will-change: transform` only while `[data-activity-border="spin"]`. The ring spin moves to a WAAPI rotation with `updatePlaybackRate()` (compositor), keeping the eased speed.
+  - Pod spotlight: cache the rect on `pointerenter` (and on resize), not `getBoundingClientRect()` per `pointermove`.
+  - Crew mascot loops inside the SVG repaint every frame: profile 30 mascots; move the hottest loops (typing arms, scrolling, flicker) onto HTML wrappers or a single transform per part where possible, and halve the 8 Hz typing rate when more than 10 crew are on screen.
+  - CSS loops (`orb-breathe`, `lane-comet`, `lane-pulse`, `pod-breathe`, `shimmer-sweep`) pause off screen with the same `useInView` gate the crew uses.
+  - `applyTheme(document.documentElement, …)` in `Sparkline.tsx` and `ClaudeOrb.tsx` runs only when the theme actually changes. The ambient attention sampler caches the waiting pod's rect and updates on resize/scroll instead of every 250 ms.
+  - **Done when:** the `perf-stress` FPS and long-task tests still pass (≥ 55 fps, no long tasks over 50 ms), and a Performance trace of the overview shows less main-thread time than before (record both numbers under this task).
+  - **Verify:** `pnpm e2e --grep @perf`
+
+- [ ] **10.5 Make the activity visible at a glance**
+  - The recording showed a board that is correct but too quiet: tiny orbs, small mascots, flat sparklines, an ambient field you barely see. Raise the signal without adding noise:
+  - Crew mascot everywhere DESIGN.md §4.11 asks: 24 px in each session row (next to or replacing the orb, with the orb as its antenna), and 120 px in the focus header with full props and the `done` sparkle. Wire the watching monitor's flicker to the terminal output rate. The waiting pose turns toward the viewer.
+  - Show the orb's tool-name chip in session rows when the row is wide enough (≥ 360 px), sliding out per DESIGN.md §4.2.
+  - Sparklines: taller (24 px), a soft area fill under the line in the lane's color (gradient to transparent), and a bright head dot on the newest sample while streaming.
+  - Ambient field: tune `uEnergy` mapping so a busy board is clearly brighter and faster than an idle one (compare idle demo vs `--demo-stress` side by side in the contact sheets), within the max-luminance rule.
+  - HUD: a one-time amber ripple on the Waiting counter whenever the count goes up (DESIGN.md §3 rule 4), and a short rose flash ring on the Errors counter when it goes up.
+  - Pulse rail collapsed: a 4 px dot in the event's tone runs along the rail's top hairline per event, so the feed keeps talking while minimised.
+  - **Done when:** side-by-side contact sheets (before vs after, idle vs busy) show clearly readable activity from a 1440 overview, and the 30-mascot FPS test still passes.
+  - **Verify:** `pnpm motion:record all && pnpm e2e`
+
+- [ ] **10.6 Choreograph the in-between moments**
+  - **Focus view arrival:** after the morph, each column settles with opacity plus a 4 px rise (`smooth`, no stagger), the Claude panel's skeleton cross-fades into the transcript, and xterm panes fade in when their renderer mounts instead of popping.
+  - **Pod reorder:** the pod moving up is raised above its neighbours with a subtle shadow and travels on `smooth` while the others glide aside, so cards never visibly overlap mid-flight.
+  - **Approvals resolving:** the outcome line slides in like `LiveCaption`; Allow draws a check (reuse the todo check, 320 ms); the card collapses its height via `layout` before exiting; Deny gets a short neutral fade; Expire lets the countdown ring finish.
+  - **Tool cards:** the running dot pulses (`lane-pulse`); success pops the check (scale .6 → 1, `snappy`); failure plays the 2-frame glitch plus rose (DESIGN.md §3 rule 6).
+  - **Turn finished in the focus view:** mount the `DoneSweep` on the focus header (plus the 120 px mascot's `done`).
+  - **Sessions in the focus view:** a shared `layoutId` highlight pill slides between session rows; new sessions enter with a fade-rise and `layout`; switching sessions cross-fades the transcript.
+  - **Lanes:** key the lane caption by command text, so a new command slides in like session captions.
+  - **Routes and rail:** overview ↔ settings cross-fade (`dur.base`); the Pulse rail collapses with a cross-fade instead of snapping.
+  - **Done when:** each moment has a contact sheet frame sequence that reads smoothly (no pops, no overlaps), and Reduced shows cross-fades only.
+  - **Verify:** `pnpm motion:record all && pnpm e2e`
+
+- [ ] **10.7 Signature effects library (React Bits, adapted)**
+  - Create `apps/web/src/fx/` for effects adapted from React Bits (reference copy in `.claude/references/react-bits/`, from `scripts/setup-skills.sh`). Adapt, don't paste: TypeScript strict, our tokens and status colors, motion levels (static at Reduced, nothing at Off), pause when hidden or off screen, no new dependencies (skip components that need `gsap`; `three` is allowed only inside the Grid layout's chunk), and the one-WebGL-context rule (an effect that uses WebGL replaces the ambient field while it is shown, never runs beside it). Each file keeps React Bits' copyright notice in a header comment, and a root `THIRD_PARTY_NOTICES.md` lists every adapted component with its license (MIT + Commons Clause: fine inside c-board, but the components must never be published on their own).
+  - Build the ones the layouts and phone screens need, each with a showcase on `/#/_tokens`:
+    - `DecryptedText` (captions that resolve in Grid and Retro), `GlitchText` (error titles in Grid), `SplitFlapText` (status changes in Retro and Transit station boards), `ShinyText` only if it beats the existing caption sweep.
+    - Backgrounds: `FaultyTerminal` or `CRTWarp` (Retro), `GridScan` or `RippleGrid` (Grid 2D map), `LightTunnel` (the Grid dive's travel effect), `DarkVeil` and `SoftAurora` as alternative ambient styles for Minimal (Settings → Appearance → Ambient: Nebula (current) / Veil / Aurora / None).
+    - Phone interactions: `SwipeRow` (swipe an approval right to Allow, left to Deny), `HoldButton` (hold to kill a terminal or interrupt Claude), `SpringCheck` and `StatusMark` if they beat what exists.
+  - **Done when:** the showcase renders every effect at Full, Reduced and Off, `THIRD_PARTY_NOTICES.md` lists them, `pnpm check` passes, and the 30-mascot and stress FPS tests still pass with an alternative ambient style on.
+  - **Verify:** `pnpm check && pnpm shots && pnpm e2e`
+
+- [ ] **10.8 Motion review pass**
+  - Run `pnpm motion:record all`, `review-animations` on the whole motion surface, the `improve-animations` audit (read its SKILL.md; write its plans as follow-up tasks `10.8b…` below this one instead of a `plans/` folder), and the `motion` skill's best-practices check. Fix up to 10 issues; leave the rest as follow-up tasks.
+  - **Verify:** `pnpm check && pnpm motion:record all`
+
+## Phase 11 — Layouts: Minimal, Office, Grid, Transit, Retro
+
+Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Reuse the Phase 10 motion work: `pnpm motion:record` gets a scenario per layout (and its enter view), and effects come from `apps/web/src/fx/` (10.7): `LightTunnel` and `DecryptedText` for the Grid dive and cockpit, `GlitchText` for Grid errors, `FaultyTerminal`/`CRTWarp`, `DecryptedText` and `SplitFlapText` for Retro, `SplitFlapText` for Transit station boards, `SwipeRow` and `HoldButton` on phones. Every layout must keep the same statuses, chrome and actions as Minimal, and every layout must be designed for phones too (DESIGN.md §10.1 "Phones (390 px) and touch"): take 390 px screenshots and use touch emulation in e2e for each one.
+
+- [ ] **11.1 Layout framework and Actor inspector**
   - `selectSceneModel` (pure, unit tested): projects → actors (Claude session, subagent, terminal) with kind, state (crew states plus `serving`/`exited` for terminals, from a new `opsStateFor(terminal, executions)`), activity level, label, caption and links, attention-first order. A `layouts/` registry (`minimal`, `office`, `grid`, `transit`, `retro`), each a lazy-loaded overview component; the current overview becomes `minimal` with no visual change. The `cboard.layout` preference (via `createPreference`), the switcher in Settings → Appearance, ⌘K actions "Layout: …", `⌥1`…`⌥5`, and a cross-fade between layouts (`dur.slow`, instant at Off).
   - `ActorInspector`: the shared popover from DESIGN.md §10.1 (Radix popover, anchored, keyboard reachable; a bottom sheet on narrow screens and touch, with pull-down to close) with Open, Focus in Cursor, Ctrl+C and Allow/Deny. Deep links `/p/:projectId/s/:sessionId` (exists) and a new `/p/:projectId/t/:terminalId` that opens the focus view with that terminal's tab active. Wire the inspector into Minimal too (clicking a lane's crew/session orb).
   - Office, Grid, Transit and Retro start as placeholders ("coming soon" cards listing the scene model) so the switcher works end to end.
   - **Done when:** model and `opsStateFor` tests pass, switching layouts works from Settings, ⌘K and shortcuts, survives a reload, and the inspector's actions work in e2e on Minimal.
   - **Verify:** `pnpm --filter @c-board/web test && pnpm e2e && pnpm shots`
 
-- [ ] **10.2 Office: art kit and ops crew**
+- [ ] **11.2 Office: art kit and ops crew**
   - Original SVG components per DESIGN.md §10.3: room shell (back wall, floor, door with nameplate and door light, ceiling light, window), desk + monitor, side desk, server rack (LED rows driven by a 0..1 rate prop), workbench + progress screen, couch, bookshelf, whiteboard (todo lines with draw-in checks, plus a drawing pose for a crew member standing at it), port sign, plant. `OpsMascot`: the crew's sibling (rectangular visor, headset) with the states idle, running, serving, done, error, waiting as Motion variants and CSS keyframes, reusing `CrewMascot`'s part structure, sizes (24/56/120), randomized idles and pausing rules. Add an "office kit" sheet to `/#/_tokens` showing every prop and every ops state at every size, in dark and light. Run `review-animations` on the ops crew.
   - **Done when:** the kit sheet screenshots show every ops state clearly distinguishable at 56 px in both themes, and ops state tests pass.
   - **Verify:** `pnpm --filter @c-board/web test && pnpm shots`
 
-- [ ] **10.3 Office: building overview**
+- [ ] **11.3 Office: building overview**
   - The building per DESIGN.md §10.3: rooms on floors (responsive columns, attention-first, `layout` re-order), one room per project with stations laid out from the scene model, characters at their stations (crew at desks, mini crew at the side desk, ops crew at racks/benches/couch, the bookshelf and whiteboard trips from DESIGN.md §10.3, max 8 plus a "+N" badge), door light, ceiling light following activity (dim after 5 min), whiteboard and port sign. Characters **walk** between stations on state changes (600–900 ms, leg swing; cross-fade at Reduced). Hover name tags with live captions; click a character → `ActorInspector`. Night/Daylight building backdrops; the ambient field is unmounted in this layout.
   - **Done when:** the overview reads correctly in demo mode at 390/1440/1920 in dark and light (screenshots), the same demo moment shows the same amber/rose cues as Minimal (e2e compares counts), and characters pause offscreen.
   - **Verify:** `pnpm shots && pnpm e2e`
 
-- [ ] **10.4 Office: room view**
+- [ ] **11.4 Office: room view**
   - Click or Enter on a room → zoom the building layer into it (transform only, `smooth`, ~500 ms), characters at 120 px with full props, and a side panel listing every actor with its caption and inspector actions. "Open workspace" cross-fades to the focus view; Esc zooms back out and restores focus on the room. Keyboard per DESIGN.md §10.1 (Tab between rooms, arrows between characters). Reduced: cross-fade instead of zoom. At 390 px the room fills the screen and the actor list is a bottom sheet.
   - **Done when:** e2e (desktop and a touch-emulated phone) enters a room, opens a terminal's inspector, opens the workspace, and returns with Esc to the same room; mid-zoom screenshots look right.
   - **Verify:** `pnpm e2e && pnpm shots`
 
-- [ ] **10.5 Grid: 2D network map**
+- [ ] **11.5 Grid: 2D network map**
   - The SVG version of the Grid layout per DESIGN.md §10.4 "2D map": core, nodes on a ring (attention-first clockwise), straight pipelines, satellites per actor, CSS-animated packets driven by activity (rate ∝ throughput, tool-family bursts, green return pulse on turn done), amber beacon and pulse for waiting, rose glitch for errors, crisp labels. `--grid-*` tokens (bg, neon, fog) for dark and light. Narrow (390 px): a vertical list of nodes on one trunk. Click a satellite → `ActorInspector`; Enter on a node → a flat cockpit (DESIGN.md §10.4 step 3, laid out as a 2D arc of screens) with a cross-fade. This is the Grid layout at Reduced motion, without WebGL and on narrow screens.
   - **Done when:** the map and flat cockpit render in demo at all widths and themes, packets visibly follow activity, and nothing flashes faster than 3 Hz.
   - **Verify:** `pnpm shots && pnpm e2e`
 
-- [ ] **10.6 Grid: 3D network**
-  - Add `three` (current stable; check with Context7 and npm) to `apps/web`, loaded only in the Grid chunk. `GridRenderer` (imperative class, subscribes to the scene model): perspective floor grid with horizon fog, the core, hexagonal nodes with status edge light and activity height, satellites with sub-pipes, curved tube pipelines, instanced packets (max 400), amber beacons, rose glitch, scanline overlay. Labels and captions via `CSS3DRenderer` (or projected DOM), never canvas text. Camera: slow idle orbit that stops on hover, drag to rotate, clamped zoom, double-click to reset. One WebGL context (ambient field unmounted), DPR ≤ 1.5, paused when hidden or offstage. Falls back to the 10.5 map when WebGL is unavailable or the motion level is Reduced/Off.
+- [ ] **11.6 Grid: 3D network**
+  - Add `three` (current stable; check with Context7 and npm) to `apps/web`, loaded only in the Grid chunk. `GridRenderer` (imperative class, subscribes to the scene model): perspective floor grid with horizon fog, the core, hexagonal nodes with status edge light and activity height, satellites with sub-pipes, curved tube pipelines, instanced packets (max 400), amber beacons, rose glitch, scanline overlay. Labels and captions via `CSS3DRenderer` (or projected DOM), never canvas text. Camera: slow idle orbit that stops on hover, drag to rotate, clamped zoom, double-click to reset. One WebGL context (ambient field unmounted), DPR ≤ 1.5, paused when hidden or offstage. Falls back to the 11.5 map when WebGL is unavailable or the motion level is Reduced/Off.
   - **Done when:** the 3D overview renders in demo at 1440/1920 in both themes, `--demo-stress` keeps ≥ 55 fps on it (Playwright FPS sample), and disabling WebGL in the test shows the 2D map.
   - **Verify:** `pnpm shots && pnpm e2e`
 
-- [ ] **10.7 Grid: dive and cockpit**
-  - Enter a node: camera flies along its pipeline (~900 ms, `ease.inOut`), other nodes fade into fog, then the phase-in (scanline sweep + brief chromatic split resolving, ~400 ms, no full-screen flash). The cockpit: the project's screens in an arc via CSS3D (Claude screen center with live messages and caption, terminal screens with live tails, ports and uptime, small git/ports/todo screens above). Click a screen → it flies to center and becomes interactive (one xterm at a time); "Open workspace" → focus view. Esc steps back (screen → arc → reverse dive). Keyboard reachable throughout. On phones and tablets: pinch and drag in the 3D view, and the cockpit as a swipeable stack of screens (the 10.5 flat cockpit at 390 px).
+- [ ] **11.7 Grid: dive and cockpit**
+  - Enter a node: camera flies along its pipeline (~900 ms, `ease.inOut`), other nodes fade into fog, then the phase-in (scanline sweep + brief chromatic split resolving, ~400 ms, no full-screen flash). The cockpit: the project's screens in an arc via CSS3D (Claude screen center with live messages and caption, terminal screens with live tails, ports and uptime, small git/ports/todo screens above). Click a screen → it flies to center and becomes interactive (one xterm at a time); "Open workspace" → focus view. Esc steps back (screen → arc → reverse dive). Keyboard reachable throughout. On phones and tablets: pinch and drag in the 3D view, and the cockpit as a swipeable stack of screens (the 11.5 flat cockpit at 390 px).
   - **Done when:** e2e dives into a node, centers a terminal screen, sends a command and sees the echo, and backs out with Esc twice; mid-dive and cockpit screenshots look right.
   - **Verify:** `pnpm e2e && pnpm shots`
 
-- [ ] **10.8 Transit layout**
+- [ ] **11.8 Transit layout**
   - The metro map per DESIGN.md §10.5: one line per project over the last 60 minutes, trains per actor (glide, park, amber doors, rose stop), stations from the activity history the Pulse rail uses (turn done, exit ✓/×, commit, crash), subagent branch lines, horizontal time scroll with "now" pinned, station merging when crowded, click a train → `ActorInspector`, vertical lines at 390 px. SVG, transforms only.
   - **Done when:** the map reads correctly in demo at 390/1440/1920 in both themes, and an e2e test clicks a station and lands on its event.
   - **Verify:** `pnpm shots && pnpm e2e`
 
-- [ ] **10.9 Retro layout**
+- [ ] **11.9 Retro layout**
   - The CRT console per DESIGN.md §10.6: box-drawing frames per project on a character grid, status tags, ASCII sparklines, blinking cursor on working items, typed captions, number shortcuts, scanlines, vignette and phosphor glow in CSS, the amber-phosphor option in Settings, and the paper variant for Daylight. Fits 20 projects at 1440 × 900. At 390 px: one frame per project in a single column, number shortcuts become tap targets.
   - **Done when:** screenshots show aligned columns with 20 projects (`--demo-stress`) in both themes and at 390 px, and the number shortcuts work in e2e.
   - **Verify:** `pnpm shots && pnpm e2e`
 
-- [ ] **10.10 Layouts review pass**
-  - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), a **phone pass** of every layout and enter view (Playwright iPhone device profile: touch, 390 px, tap targets ≥ 44 px, inspector as bottom sheet, back gesture), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.5 checks to the shots review. Fix what is found (up to 10 issues; add `10.10b` for the rest).
+- [ ] **11.10 Layouts review pass**
+  - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), a **phone pass** of every layout and enter view (Playwright iPhone device profile: touch, 390 px, tap targets ≥ 44 px, inspector as bottom sheet, back gesture), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.7 checks to the shots review. Fix what is found (up to 10 issues; add `11.10b` for the rest).
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
 
-- [ ] **[HUMAN] 10.11 Try the layouts**
-  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts (on your phone too, once 11.5 is done, or with your browser's phone emulation now), and write any feedback as new tasks below this one before ticking it.
+- [ ] **[HUMAN] 11.11 Try the layouts**
+  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts (on your phone too, once 12.5 is done, or with your browser's phone emulation now), and write any feedback as new tasks below this one before ticking it.
 
-## Phase 11 — Workspaces: open projects from the board, board terminals, phone access
+## Phase 12 — Workspaces: open projects from the board, board terminals, phone access
 
 Goal: start work from the board (or a phone) on a project that isn't open anywhere yet. Spec: PRD F25–F27 and §8 items 10–12. The overview stays focused: only **active** projects appear on it; the library is reached through the picker.
 
-- [ ] **11.1 Project library and active-only overview**
+- [ ] **12.1 Project library and active-only overview**
   - Server setting `library.roots` (a list of folders, empty by default; onboarding and Settings suggest `~/Desktop`). `ProjectLibrary`: lists only the **top-level directories** of each root (no recursion, no file contents, no hidden folders, no files), marks git repos (`.git` exists), and merges recents from persisted projects (last active time). Every path is `realpath`-checked to be inside a root, so symlinks can't escape. `GET /api/library` behind the auth guard. A macOS permission error (`EPERM` on Desktop) returns a clear message: allow access under System Settings → Privacy & Security → Files and Folders.
   - Active-only overview: a project is **active** while it has a connected editor window, a live terminal, a live Claude session, or activity in the last `library.idleHideMin` minutes (default 30), or the user opened it from the board. Inactive projects leave the overview (exit animation in every layout) but stay in the picker's recents and ⌘K. Pinned projects (a pin toggle on the pod menu) always stay.
   - **Done when:** tests with temp dirs cover files ignored, hidden ignored, symlink escape refused, a path outside the roots refused, EPERM handled, and the active/inactive rule; nothing under a root is read except directory names and `.git` existence.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm --filter @c-board/web test`
 
-- [ ] **11.2 Open-project picker and launch sheet**
+- [ ] **12.2 Open-project picker and launch sheet**
   - An "Open project" button in the HUD and project rail, ⌘K "Open project…" (`⌘O`): a searchable list of library folders (git badge, branch for repos, recents first, fuzzy search), designed for phone widths too. Choosing one opens a **launch sheet**: *Open in Cursor*, *New Claude session* (prompt field, model and permission mode), and *New terminal* (with a command field, and the project's recent commands as one-tap chips, such as `pnpm dev`). Several can be ticked at once ("Cursor + pnpm dev + Claude"), and the sheet remembers the last choice per project. The project joins the overview with the normal enter animation and lands in the focus view.
   - **Done when:** e2e (demo mode with a synthetic library) opens a project from the picker, starts a Claude session and a terminal in it, and sees both in the focus view; screenshots at 390 and 1440.
   - **Verify:** `pnpm e2e && pnpm shots`
 
-- [ ] **11.3 Launch actions on the server**
-  - `project.openInEditor {path}`: `execFile` the editor CLI (`cursor`, falling back to `code`; configurable path in Settings; `doctor` reports which was found) with the folder as one argument, after the library path check. The pod shows "Opening in Cursor…" until the window's extension connects (timeout with a hint). `session.start` accepts any library project (reuses `SessionRunner`). `terminal.create` routes to the editor when its window is connected, otherwise to board terminals (11.4). Every launch is refused for paths outside `library.roots`.
+- [ ] **12.3 Launch actions on the server**
+  - `project.openInEditor {path}`: `execFile` the editor CLI (`cursor`, falling back to `code`; configurable path in Settings; `doctor` reports which was found) with the folder as one argument, after the library path check. The pod shows "Opening in Cursor…" until the window's extension connects (timeout with a hint). `session.start` accepts any library project (reuses `SessionRunner`). `terminal.create` routes to the editor when its window is connected, otherwise to board terminals (12.4). Every launch is refused for paths outside `library.roots`.
   - **Done when:** routing and path-guard tests pass (the CLI is mocked; tests never launch an editor).
   - **Verify:** `pnpm --filter @c-board/server test`
 
-- [ ] **11.4 Board-owned terminals (node-pty)**
+- [ ] **12.4 Board-owned terminals (node-pty)**
   - PRD F19. `node-pty` as an **optional** dependency (prebuilt binaries; if it fails to load, `doctor` says so and *New terminal* without an editor is disabled with an explanation). `PtyManager`: spawns the user's `$SHELL -l` in the project folder, optional initial command, resize, input, kill, exit codes, ring buffers like editor terminals, process and port scanning attached, max 16 terminals. Board terminals are fully interactive in xterm (keystrokes go straight to the pty, so TUIs work), marked with a "board" origin icon, and they survive UI reconnects but not a server stop (the UI says so before stopping).
   - **Done when:** tests spawn a real pty running `/bin/sh` with synthetic commands (echo, exit codes, Ctrl+C, resize) and an e2e test types into a board terminal in demo mode.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm e2e`
 
-- [ ] **11.5 Phone access over Tailscale**
+- [ ] **12.5 Phone access over Tailscale**
   - Opt-in setting `remote.allowedHosts` (exact host names such as `my-mac.tailnet-name.ts.net`; only `*.ts.net` names are accepted from the UI). The server still binds `127.0.0.1`; `tailscale serve` forwards to it. Host and Origin checks accept the listed hosts over HTTPS only. **Pairing:** Settings → Phone shows a QR code with a one-time pairing code (valid 5 min, single use) instead of the raw token; scanning it on the phone sets the session cookie. A list of paired devices with *revoke*. A phone pass over the overview (every layout), picker, launch sheet, focus view (tabs), Attention Center and composer at 390 px. Docs: a short "Use it from your phone" guide (install Tailscale on both devices, `tailscale serve`, add the host, scan the QR).
   - **Done when:** security tests cover an unlisted host refused, plain HTTP refused for remote hosts, pairing code expiry and single use, and revoke; phone screenshots of every screen look right.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm shots`
 
-- [ ] **[HUMAN] 11.6 Try workspaces and phone access**
+- [ ] **[HUMAN] 12.6 Try workspaces and phone access**
   - Add your projects folder in Settings, open a project that isn't open anywhere (Cursor, Claude, and a terminal), then set up Tailscale and pair your phone. Write any feedback as tasks below, then tick this.
 
-## Phase 12 — Quality, docs, release
+## Phase 13 — Quality, docs, release
 
-- [x] **12.1 Performance pass** (committed as 10.1)
+- [x] **13.1 Performance pass** (committed as 10.1)
   - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each, and 4 Claude sessions doing roughly 5 tool calls per second), with every activity animation running. Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
   - **Verify:** `pnpm e2e --grep @perf`
-  - Note: Ran before the layouts phase existed. 10.10 re-checks every layout under `--demo-stress`.
+  - Note: Ran before the layouts phase existed. 11.10 re-checks every layout under `--demo-stress`.
   - Note: Numbers (an M-series Mac, `e2e/stress.spec.ts`, 1440×900, motion Full, 10 s rAF sampling). Before: overview 52 fps with 54 long tasks; focus view (log firehose tab open) 33 fps with 3 long tasks (up to 82 ms) on the headless shell. After: overview 60.0 fps, focus 59.8–60.0 fps, no long tasks over 50 ms. Main thread in the focus view went from about 62% to 33% busy.
   - Note: Fixes: the overview subscribed to whole project objects for a count, so every activity patch re-rendered the pod grid, whose `layout` slots then re-measured every pod (about 20×/s each); it now reads a count, and the slots measure only on a reorder (`layoutDependency`). The overview under the focus view now reads a frozen board (`FrozenBoard`) that catches up when it is shown again; before, its pods restyled and repainted under the blur many times a second.
   - Note: The stress tests run in their own `perf-stress` project on full Chromium (`channel: 'chromium'`), which renders with the GPU. The default headless shell uses SwiftShader (software WebGL), where the WebGL terminal and the shaders stall compositor commits; that says nothing about the PRD §9 machine. Server CPU (PRD §9) is not measured by this test.
   - Note: Flaky under parallel load on main before this task, too: `onboarding.spec` (extension step), `attention.spec` (keyboard approval) and the `composer` shots. They pass when run alone.
 
-- [ ] **12.2 Accessibility pass**
+- [ ] **13.2 Accessibility pass**
   - Add `@axe-core/playwright` checks on every route and every layout (Minimal, Office, Grid, Transit, Retro), the picker and the phone screens (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
   - **Verify:** `pnpm e2e --grep @a11y`
 
-- [ ] **12.3 Security review**
+- [ ] **13.3 Security review**
   - Audit against PRD §8: Host and Origin checks, the token on every route, the library path guard, remote hosts and pairing (PRD §8 items 10–12), `execFile`-only usage (`grep -rn "exec(" apps` returns nothing unsafe), no raw HTML rendering, no credential-file reads (`grep -rn "credentials" apps packages`), the hook script being silent, and the installer's backups. Fix the findings and list them under this task.
   - **Verify:** `pnpm check`
 
-- [ ] **12.4 Visual polish sweep**
-  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `12.4b` below this one.
+- [ ] **13.4 Visual polish sweep**
+  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `13.4b` below this one.
   - **Verify:** `pnpm shots`
 
-- [ ] **12.5 README and docs**
+- [ ] **13.5 README and docs**
   - Write a public README: hero screenshot or GIF (captured from demo mode only), one shot per layout, features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `c-board hooks install`, install the vsix), adding a projects folder, phone access, privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`c-board hooks uninstall`, remove the extension, `rm -rf ~/.c-board`), troubleshooting (`c-board doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
   - **Verify:** `scripts/privacy-check.sh && pnpm check`
 
-- [ ] **12.6 Release packaging**
+- [ ] **13.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry, so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Add a CHANGELOG.
   - **Verify:** `pnpm build && node apps/server/dist/cli.js doctor`
 
-- [ ] **[HUMAN] 12.7 Real-world acceptance**
+- [ ] **[HUMAN] 13.7 Real-world acceptance**
   - Use c-board for a day with your real projects. File issues or add tasks below for anything off. Decide on a license and the open questions in PRD §13.

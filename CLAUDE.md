@@ -28,11 +28,12 @@ Installed for this project: the plugins in `.claude/settings.json`, and the skil
 |---|---|
 | Any library API you aren't 100% sure of (Motion 14, Vite 8, Tailwind 4, xterm 6, zod 4, Fastify 5, Agent SDK, VS Code API) | **Context7** MCP: resolve the library, then fetch docs for the exact version in `package.json`. Our stack is newer than your training data. |
 | Building any UI component or view | `frontend-design` + `emil-design-eng` |
-| Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth |
+| Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth. For Motion APIs use the `motion` skill and the **Motion docs MCP** (`search-motion-docs`, in `.mcp.json`) or Context7. Then run `pnpm motion:record <scenario>` (once 10.1 exists) and Read the contact sheets in `artifacts/motion/` |
+| A visual effect (text effect, background, shader, micro-interaction) | Check `.claude/references/react-bits/` first (React Bits, MIT + Commons Clause). Adapt into `apps/web/src/fx/` per DESIGN.md §3 "Third-party effects"; never import from the reference folder |
 | After finishing a UI task | `review-animations` on the motion you added, plus an `impeccable` critique of the screen. Fix what they flag, if it doesn't contradict DESIGN.md. |
 | Charts, sparklines, stat tiles, HUD counters | `dataviz` |
-| Performance work (12.1, 10.10) or a janky animation | `animation-performance` + `react-best-practices` |
-| Polish, a11y and audit tasks (12.2, 12.4) | `web-design-guidelines` + `impeccable` audit/polish |
+| Performance work (10.4, 11.10, 13.1) or a janky animation | `animation-performance` + `react-best-practices` |
+| Polish, a11y and audit tasks (13.2, 13.4) | `web-design-guidelines` + `impeccable` audit/polish |
 | Edge-case hardening of data-heavy components | `break-ui` |
 | Looking for places that should animate but don't | `find-animation-opportunities` (proposes only; you implement what fits DESIGN.md) |
 
