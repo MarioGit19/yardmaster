@@ -46,7 +46,9 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     const root = rootRef.current;
     if (!root) return;
     const measure = () => {
-      const { width, height } = root.getBoundingClientRect();
+      // Layout size, not the painted box: a scaling ancestor (the focus morph) mustn't squash it.
+      const width = root.offsetWidth;
+      const height = root.offsetHeight;
       setSize((prev) =>
         prev && prev.width === width && prev.height === height ? prev : { width, height },
       );

@@ -1,5 +1,8 @@
 import type { ClaudeSession } from '@c-board/protocol';
+import { motion } from 'motion/react';
 import { selectApproval, useBoard } from '../data/index.js';
+import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
+import { spring } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
 import { formatCount, totalTokens } from '../status.js';
@@ -36,15 +39,22 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
 
   return (
     <li data-session={session.id} className="flex min-w-0 items-center gap-3">
-      <ClaudeOrb
-        state={orbStateFor(session.status)}
-        size={28}
-        accent={accent}
-        tool={tool}
-        subagents={subagents}
-        countdown={countdown}
-        showToolLabel={false}
-      />
+      <motion.span
+        layoutId={sharedId.orb(session.id)}
+        layoutDependency={POD_LAYOUT_DEPENDENCY}
+        transition={spring.smooth}
+        className="flex shrink-0"
+      >
+        <ClaudeOrb
+          state={orbStateFor(session.status)}
+          size={28}
+          accent={accent}
+          tool={tool}
+          subagents={subagents}
+          countdown={countdown}
+          showToolLabel={false}
+        />
+      </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
           <p

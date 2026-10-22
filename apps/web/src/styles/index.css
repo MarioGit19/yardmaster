@@ -693,3 +693,89 @@
   animation: none;
   opacity: 0;
 }
+
+/* Focus view, DESIGN.md §4.6. The overview behind it holds still while it's covered. */
+[data-offstage] *,
+[data-offstage] *::before,
+[data-offstage] *::after {
+  animation-play-state: paused;
+}
+[data-reconnecting] .focus-layer {
+  opacity: 0.6;
+}
+.focus-card::before {
+  content: "";
+  position: absolute;
+  inset-inline: 16px;
+  top: 0;
+  height: 1px;
+  background: var(--accent, transparent);
+  opacity: 0.7;
+}
+.focus-col {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px;
+}
+
+/* Resize handles: a hairline that brightens, with a grip on hover, focus or drag. */
+.focus-handle {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.focus-handle:focus-visible {
+  box-shadow: none;
+}
+.focus-handle-line {
+  width: 1px;
+  height: 100%;
+  background: var(--line);
+  transition: background-color 150ms var(--ease-out);
+}
+.focus-handle-grip {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 32px;
+  margin-top: -16px;
+  border-radius: 9999px;
+  background: var(--text-3);
+  opacity: 0;
+  transform: scaleY(0.6);
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .focus-handle:hover .focus-handle-line {
+    background: var(--line-strong);
+  }
+  .focus-handle:hover .focus-handle-grip {
+    opacity: 1;
+    transform: none;
+  }
+}
+.focus-handle[data-dragging] .focus-handle-line,
+.focus-handle:focus-visible .focus-handle-line {
+  background: var(--line-strong);
+}
+.focus-handle[data-dragging] .focus-handle-grip,
+.focus-handle:focus-visible .focus-handle-grip {
+  opacity: 1;
+  transform: none;
+}
+.focus-handle:focus-visible .focus-handle-grip {
+  box-shadow: var(--focus-ring);
+}
+.focus-handle[data-dragging] .focus-handle-grip {
+  background: var(--text-2);
+}
+:root[data-motion="reduced"] .focus-handle-grip {
+  transform: none;
+}

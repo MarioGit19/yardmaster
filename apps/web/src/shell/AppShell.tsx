@@ -11,11 +11,13 @@ export interface AppShellProps {
   children: ReactNode;
   /** Right sheet slot (Attention Center, settings sheet). */
   sheet?: ReactNode;
+  /** A layer over the main area (the focus view), outside its scroll. */
+  stage?: ReactNode;
   /** Bottom rail slot (Pulse). */
   pulse?: ReactNode;
 }
 
-export function AppShell({ children, sheet, pulse }: AppShellProps) {
+export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
   const narrow = useMediaQuery(NARROW_QUERY);
   const rail = usePreference(railPreference);
   const collapsed = narrow || rail === 'collapsed';
@@ -54,16 +56,19 @@ export function AppShell({ children, sheet, pulse }: AppShellProps) {
       )}
       <div className="flex min-h-0 flex-1">
         <ProjectRail collapsed={collapsed} onToggle={narrow ? undefined : toggleRail} />
-        <main
-          id="main"
-          tabIndex={-1}
-          className={cx(
-            'min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-200',
-            reconnecting && 'opacity-60',
-          )}
-        >
-          {children}
-        </main>
+        <div data-reconnecting={reconnecting || undefined} className="relative flex min-w-0 flex-1">
+          <main
+            id="main"
+            tabIndex={-1}
+            className={cx(
+              'min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-200',
+              reconnecting && 'opacity-60',
+            )}
+          >
+            {children}
+          </main>
+          {stage}
+        </div>
         {sheet}
       </div>
       {pulse}

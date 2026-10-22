@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { createContext, type RefObject, useContext, useEffect, useRef, useState } from 'react';
 import { type FrameCallback, frameScheduler, type Scheduler } from './scheduler.js';
 
 export interface UseFrameOptions {
@@ -25,6 +25,12 @@ export function useFrame(
   }, [active, scheduler]);
 }
 
+/**
+ * True inside content that is mounted but covered (the overview under the focus view): it counts
+ * as off screen, so its orbs, sparklines and mascots stop drawing.
+ */
+export const OffstageContext = createContext(false);
+
 type ViewListener = (visible: boolean) => void;
 
 const listeners = new Map<Element, Set<ViewListener>>();
@@ -48,6 +54,7 @@ function sharedObserver(): IntersectionObserver {
  * IntersectionObserver support everything counts as visible.
  */
 export function useInView(ref: RefObject<Element | null>): boolean {
+  const offstage = useContext(OffstageContext);
   const [visible, setVisible] = useState(typeof IntersectionObserver === 'undefined');
 
   useEffect(() => {
@@ -70,5 +77,5 @@ export function useInView(ref: RefObject<Element | null>): boolean {
     };
   }, [ref]);
 
-  return visible;
+  return visible && !offstage;
 }

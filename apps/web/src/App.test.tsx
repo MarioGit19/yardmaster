@@ -2,7 +2,7 @@
 import { MotionGlobalConfig } from 'motion/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Router } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { AppRoutes } from './App.js';
@@ -50,7 +50,9 @@ function render(path: string, { hydrated = true } = {}) {
   return { store, location };
 }
 
-const heading = () => container.querySelector('main h1')?.textContent;
+const heading = () =>
+  (container.querySelector('[data-focus] h1') ?? container.querySelector('main h1'))?.textContent;
+const backdrop = () => container.querySelector('main > div');
 const railItems = () =>
   Array.from(
     container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Projects"] [data-rail-item]'),
@@ -81,14 +83,59 @@ describe('routes', () => {
   it('renders the project focus view', () => {
     render('/p/p-orbit');
     expect(heading()).toBe('orbit-api');
-    expect(container.textContent).toContain('Rate limiter');
-    expect(container.textContent).toContain('Pick a session');
+    // Without a session in the route the Claude panel shows the project's live one.
+    const claude = container.querySelector('[data-focus] section[aria-label="Claude"]');
+    expect(claude?.querySelector('h2')?.textContent).toBe('Rate limiter');
+    // The overview stays behind it, inert and hidden from assistive tech.
+    expect(backdrop()?.hasAttribute('inert')).toBe(true);
+    expect(backdrop()?.getAttribute('aria-hidden')).toBe('true');
+    expect(backdrop()?.querySelector('[data-pod="p-orbit"]')).not.toBeNull();
+  });
+
+  it('lands keyboard focus on the project heading', () => {
+    render('/p/p-orbit');
+    expect(document.activeElement?.textContent).toBe('orbit-api');
+  });
+
+  it('goes back to the overview with Escape', () => {
+    const { location } = render('/');
+    expect(backdrop()?.hasAttribute('inert')).toBe(false);
+    act(() => location.navigate('/p/p-zen'));
+    expect(heading()).toBe('zen-notes');
+    press('Escape');
+    expect(location.history.at(-1)).toBe('/');
+    expect(backdrop()?.hasAttribute('inert')).toBe(false);
+  });
+
+  it('leaves Escape to text fields and the Attention Center', () => {
+    const { location } = render('/p/p-zen');
+    const input = document.createElement('input');
+    container.append(input);
+    act(() => input.focus());
+    press('Escape');
+    expect(location.history.at(-1)).toBe('/p/p-zen');
+    input.remove();
+  });
+
+  it('resizes a column from the keyboard and remembers it per project', async () => {
+    localStorage.clear();
+    render('/p/p-orbit');
+    const handle = container.querySelector<HTMLElement>('[role="separator"][data-resize="left"]');
+    expect(handle?.getAttribute('aria-valuenow')).toBe('280');
+    act(() => handle?.focus());
+    press('ArrowRight');
+    await vi.waitFor(() => expect(handle?.getAttribute('aria-valuenow')).toBe('296'));
+    expect(JSON.parse(localStorage.getItem('cboard.focus.p-orbit') ?? '{}')).toEqual({
+      left: 296,
+      right: 420,
+    });
+    expect(localStorage.getItem('cboard.focus.p-zen')).toBeNull();
   });
 
   it('renders a session inside its project', () => {
     render('/p/p-acme/s/s-1');
     expect(heading()).toBe('acme-shop');
-    const current = container.querySelector('main a[aria-current="page"]');
+    const current = container.querySelector('[data-focus] a[aria-current="page"]');
     expect(current?.getAttribute('href')).toBe('/p/p-acme/s/s-1');
     expect(container.textContent).toContain('Refactoring the cart totals.');
   });

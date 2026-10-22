@@ -1,12 +1,15 @@
 import type { ClaudeSession, Project, Terminal } from '@c-board/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
+import { motion } from 'motion/react';
 import { type PointerEvent, useRef } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { miniCrewCount } from '../crew/model.js';
 import { selectSessionsByProject, selectTerminalsByProject, useBoardList } from '../data/index.js';
+import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
+import { spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { projectTone, toneLabel } from '../status.js';
@@ -54,6 +57,12 @@ export function ProjectPod({ project }: { project: Project }) {
 
   // The spotlight follows the pointer by transform on its own layer: no style recalc below it.
   const spotRef = useRef<HTMLDivElement>(null);
+  // While it morphs back from the focus view, the pod flies over its neighbours.
+  const podRef = useRef<HTMLElement>(null);
+  const raise = (on: boolean) => {
+    const slot = podRef.current?.parentElement;
+    if (slot) slot.style.zIndex = on ? '20' : '';
+  };
   const onPointerMove = (e: PointerEvent<HTMLElement>) => {
     const spot = spotRef.current;
     if (!spot || e.pointerType !== 'mouse') return;
@@ -65,13 +74,20 @@ export function ProjectPod({ project }: { project: Project }) {
 
   // The name link stretches over the pod; rows and lanes sit above it so their controls stay
   // usable. No overflow clipping on the pod itself: lane peeks hang below their lane.
+  // The pod, its header and its orbs morph into the focus view (`focus/shared.ts`).
   return (
-    <article
+    <motion.article
+      layoutId={sharedId.container(project.id)}
+      layoutDependency={POD_LAYOUT_DEPENDENCY}
+      transition={spring.smooth}
+      onLayoutAnimationStart={() => raise(true)}
+      onLayoutAnimationComplete={() => raise(false)}
+      ref={podRef}
       data-pod={project.id}
       data-tone={tone}
       aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
       onPointerMove={onPointerMove}
-      style={{ '--accent': accent } as React.CSSProperties}
+      style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
       className={cx(
         'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
         'transition-[border-color] duration-150 ease-out hover:border-line-strong',
@@ -89,7 +105,12 @@ export function ProjectPod({ project }: { project: Project }) {
         />
       </div>
 
-      <header className="flex min-w-0 items-center gap-3">
+      <motion.header
+        layoutId={sharedId.header(project.id)}
+        layoutDependency={POD_LAYOUT_DEPENDENCY}
+        transition={spring.smooth}
+        className="flex min-w-0 items-center gap-3"
+      >
         <ProjectAvatar project={project} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Link
@@ -102,7 +123,7 @@ export function ProjectPod({ project }: { project: Project }) {
           <GitLine git={project.git} />
         </div>
         <PodCrew sessions={live.slice(0, MAX_CREW)} terminals={terminals} accent={accent} />
-      </header>
+      </motion.header>
 
       {live.length > 0 ? (
         <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
@@ -135,7 +156,7 @@ export function ProjectPod({ project }: { project: Project }) {
       ) : (
         <p className="mt-auto text-meta text-text-3">No open terminals</p>
       )}
-    </article>
+    </motion.article>
   );
 }
 

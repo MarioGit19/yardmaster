@@ -233,3 +233,32 @@ test.describe('hud', () => {
     });
   });
 });
+
+// The pod-to-focus morph mid-flight in both directions, and a resize handle being dragged.
+test.describe('focus view', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('transition', async ({ page }) => {
+        await openRoute(page, '/');
+        const pod = page.locator('[data-pod]').first();
+        await expect(pod).toBeVisible();
+        await page.waitForTimeout(800);
+        const shot = (name: string) =>
+          page.screenshot({ path: new URL(`${name}-${theme}.png`, OUT_DIR).pathname });
+        await pod.locator('header a').click();
+        await page.waitForTimeout(140);
+        await shot('focus-enter-mid');
+        await page.waitForTimeout(900);
+        const handle = page.locator('[role="separator"][data-resize="right"]');
+        await handle.hover();
+        await page.waitForTimeout(250);
+        await shot('focus-handle-hover');
+        await page.mouse.move(600, 600);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(140);
+        await shot('focus-exit-mid');
+      });
+    });
+  }
+});

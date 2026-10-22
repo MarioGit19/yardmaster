@@ -75,6 +75,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
       onPointerLeave={() => hover(false)}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {
+          // Closing the peek is all Escape does here (the focus view would close otherwise).
+          e.preventDefault();
           setPinned(false);
           setFocused(false);
         }
