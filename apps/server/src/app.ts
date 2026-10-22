@@ -65,7 +65,7 @@ export interface BuildOptions {
   /** Transcript reader tuning, for tests. Not started in demo mode. */
   transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
   /** Board session runner tuning (tests inject a mocked `query`). Not started in demo mode. */
-  runner?: Pick<SessionRunnerOptions, 'query' | 'newId' | 'draftIntervalMs'>;
+  runner?: Pick<SessionRunnerOptions, 'query' | 'newId' | 'draftIntervalMs' | 'approvalTimeoutMs'>;
   /** Session registry discovery tuning, for tests. Not started in demo mode. */
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
   /** Editor link tuning, for tests. */
@@ -180,6 +180,8 @@ export async function buildServer(
         store,
         transcripts,
         logger: logger.child({ component: 'runner' }),
+        onActivity: recordActivity,
+        onMessage: (message) => gateway.broadcast(message),
         ...options.runner,
       });
   app.decorate('sessionRunner', runner);
@@ -237,7 +239,11 @@ export async function buildServer(
     store,
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
-    ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
+    ...(demo
+      ? { decideApproval: demo.decideApproval.bind(demo) }
+      : runner
+        ? { decideApproval: runner.decideApproval.bind(runner) }
+        : {}),
     ...(runner ? { sendToSession: runner.send.bind(runner) } : {}),
     recentActivity: () =>
       persistence.listActivity({ since: Date.now() - PULSE_WINDOW_MS, limit: MAX_ACTIVITY_BATCH }),

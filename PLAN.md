@@ -394,10 +394,11 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: New sessions get their id up front (`sessionId` option), so the store and transcript stream exist before the SDK answers. SDK messages feed the transcript stream through `TranscriptService.claim/feed/release` (the file isn't tailed while the runner owns the session; tailing resumes from the file's end after close). Prompts are echoed into the transcript by the runner, since the SDK doesn't echo them.
   - Note: Partial text streams into a new optional `ClaudeSession.draft` field (throttled to 50 ms, cleared when the block's assistant message lands). The UI doesn't render it yet: that's 8.3. `session.resume` gained an optional `projectId` so the history browser can resume sessions the board hasn't seen live. A non-fork resume of a live terminal session is refused (`session_live`); `send` to a stopped board session resumes it first.
 
-- [ ] **8.2 Approvals via canUseTool**
+- [x] **8.2 Approvals via canUseTool**
   - The `canUseTool` callback creates an `Approval` (tool, input, suggestions, blockedPath) and awaits the UI decision, honouring `signal` abort. Decisions: allow once, always (returns `updatedPermissions` from `suggestions`), or deny with a message. There's a configurable timeout (default none for board sessions). Add `approval.new` and `approval.resolved` messages.
   - **Done when:** tests cover allow, always, deny, abort and concurrent approvals.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `approval.new`/`approval.resolved` already existed in the protocol; `Approval` gained optional `suggestions` and `blockedPath`. When the SDK sets `suppressAlwaysAllowRule`, suggestions are dropped, so "Always" acts as allow once. Aborts, timeouts (`approvalTimeoutMs`, default none) and closed sessions resolve as `expired` and deny the call. A session with several pending approvals points its `waiting_permission` status at the oldest one. Resolved approvals leave the store after 60 s, like demo ones. Hook approvals (away mode) don't route through `approval.decide` yet.
 
 - [ ] **8.3 Composer and board-session UX**
   - Claude panel composer: multiline (Enter sends, Shift+Enter adds a newline), model pill, permission-mode pill, interrupt (Esc) and send button with a "sending" morph. "New session" in a project. Board sessions get a distinct badge from terminal sessions. For terminal-origin sessions the composer shows "Resume here (fork)", which uses `forkSession` and warns if the original is still live.

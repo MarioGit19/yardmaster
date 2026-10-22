@@ -362,7 +362,8 @@ describe('/ws/ui messages', () => {
     expect((await client.nextOf('action.result')).payload).toEqual({
       id: 'ap-1',
       ok: false,
-      error: 'not_implemented',
+      // Routed to the session runner, which holds no such approval.
+      error: 'unknown_approval',
     });
     expect(client.socket.readyState).toBe(WebSocket.OPEN);
   });

@@ -1,15 +1,22 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type Options, query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { ClaudeSession, Project } from '@c-board/protocol';
+import {
+  type Options,
+  type PermissionUpdate,
+  query,
+  type SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk';
+import type { ActivityEvent, ClaudeSession, Project, ServerToUi } from '@c-board/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
 import {
   MessageQueue,
   NOT_RUNNING,
+  RESOLVED_APPROVAL_TTL_MS,
   SESSION_LIVE,
   SessionRunner,
+  UNKNOWN_APPROVAL,
   UNKNOWN_PROJECT,
   UNKNOWN_SESSION,
 } from './runner.js';
@@ -94,7 +101,7 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function setup(options: { draftIntervalMs?: number } = {}) {
+function setup(options: { draftIntervalMs?: number; approvalTimeoutMs?: number } = {}) {
   const store = new BoardStore();
   store.upsertProject(PROJECT);
   const transcripts = new TranscriptService({
@@ -105,10 +112,17 @@ function setup(options: { draftIntervalMs?: number } = {}) {
     claudeConfigDir: join(dir, 'claude'),
   });
   let n = 0;
+  const messages: ServerToUi[] = [];
+  const events: ActivityEvent[] = [];
   const runner = new SessionRunner({
     store,
     transcripts,
     logger,
+    onMessage: (message) => messages.push(message),
+    onActivity: (event) => events.push(event),
+    ...(options.approvalTimeoutMs !== undefined
+      ? { approvalTimeoutMs: options.approvalTimeoutMs }
+      : {}),
     newId: () => {
       const id = n === 0 ? SESSION_A : `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
       n += 1;
@@ -121,7 +135,7 @@ function setup(options: { draftIntervalMs?: number } = {}) {
     await runner.closeAll();
     await transcripts.close();
   });
-  return { store, transcripts, runner };
+  return { store, transcripts, runner, messages, events };
 }
 
 const session = (store: BoardStore, id: string): ClaudeSession => {
@@ -628,6 +642,272 @@ describe('SessionRunner actions', () => {
     expect(
       await actions['session.resume']({ kind: 'session.resume', sessionId: 'missing' }),
     ).toEqual({ ok: false, error: UNKNOWN_SESSION });
+  });
+});
+
+describe('SessionRunner approvals', () => {
+  type Ask = NonNullable<Options['canUseTool']>;
+  const ALWAYS: PermissionUpdate[] = [
+    {
+      type: 'addRules',
+      rules: [{ toolName: 'Bash', ruleContent: 'pnpm test:*' }],
+      behavior: 'allow',
+      destination: 'localSettings',
+    },
+  ];
+
+  /** Starts a session and returns its `canUseTool`, plus a way to ask it. */
+  async function started(options: { approvalTimeoutMs?: number } = {}) {
+    const ctx = setup(options);
+    await ctx.runner.startSession({ projectId: PROJECT.id, prompt: 'Run the tests' });
+    const q = queries.at(-1);
+    const canUseTool = q?.options.canUseTool as Ask;
+    expect(canUseTool).toBeTypeOf('function');
+    const ask = (
+      tool: string,
+      input: Record<string, unknown>,
+      extra: Partial<Parameters<Ask>[2]> = {},
+    ) => {
+      const controller = new AbortController();
+      const promise = canUseTool(tool, input, {
+        signal: controller.signal,
+        toolUseID: `toolu_${tool}`,
+        requestId: `req_${tool}`,
+        ...extra,
+      });
+      return { promise, controller };
+    };
+    const pending = () =>
+      Object.values(ctx.store.state.approvals).filter((a) => a.state === 'pending');
+    return { ...ctx, q, ask, pending };
+  }
+
+  it('turns a permission request into a pending approval and allows it once', async () => {
+    const { store, runner, messages, events, q, ask, pending } = await started();
+    q?.emit(
+      assistant('a1', [
+        { type: 'tool_use', id: 'toolu_Bash', name: 'Bash', input: { command: 'pnpm test' } },
+      ]),
+    );
+    await settle();
+    const { promise } = ask('Bash', { command: 'pnpm test' }, { suggestions: [...ALWAYS] });
+
+    const [approval] = pending();
+    expect(approval).toMatchObject({
+      sessionId: SESSION_A,
+      source: 'sdk',
+      tool: 'Bash',
+      input: { command: 'pnpm test' },
+      toolUseId: 'toolu_Bash',
+      suggestions: ALWAYS,
+      blockedPath: null,
+      expiresAt: null,
+      state: 'pending',
+    });
+    if (!approval) throw new Error('no approval');
+    expect(session(store, SESSION_A).status).toEqual({
+      kind: 'waiting_permission',
+      approvalId: approval.id,
+    });
+    // The SDK's own requires_action notice doesn't drop the approval id.
+    q?.emit(state('requires_action'));
+    await settle();
+    expect(session(store, SESSION_A).status).toMatchObject({ approvalId: approval.id });
+    expect(messages).toEqual([
+      expect.objectContaining({ type: 'approval.new', payload: { approval } }),
+    ]);
+
+    expect(runner.decideApproval({ approvalId: approval.id, decision: 'allow' })).toEqual({
+      ok: true,
+    });
+    expect(await promise).toEqual({
+      behavior: 'allow',
+      updatedInput: { command: 'pnpm test' },
+      toolUseID: 'toolu_Bash',
+    });
+    expect(store.state.approvals[approval.id]).toMatchObject({ state: 'allowed', reason: null });
+    expect(session(store, SESSION_A).status).toEqual({
+      kind: 'tool',
+      tool: 'Bash',
+      toolUseId: 'toolu_Bash',
+    });
+    expect(messages[1]).toMatchObject({
+      type: 'approval.resolved',
+      payload: { approvalId: approval.id, state: 'allowed', reason: null },
+    });
+    expect(events.map((e) => [e.kind, e.sessionId, e.projectId, e.summary])).toEqual([
+      ['permission.request', SESSION_A, PROJECT.id, 'Bash needs approval'],
+      ['permission.decision', SESSION_A, PROJECT.id, 'Bash allowed'],
+    ]);
+
+    // Deciding twice is refused; the SDK already has its answer.
+    expect(runner.decideApproval({ approvalId: approval.id, decision: 'deny' })).toEqual({
+      ok: false,
+      error: UNKNOWN_APPROVAL,
+    });
+  });
+
+  it('returns the suggestions as updatedPermissions on always allow', async () => {
+    const { runner, ask, pending } = await started();
+    const { promise } = ask(
+      'Bash',
+      { command: 'pnpm test' },
+      { suggestions: [...ALWAYS], blockedPath: '/home/dev/shared' },
+    );
+    const [approval] = pending();
+    expect(approval?.blockedPath).toBe('/home/dev/shared');
+    runner.decideApproval({ approvalId: approval?.id ?? '', decision: 'allowAlways' });
+    expect(await promise).toEqual({
+      behavior: 'allow',
+      updatedInput: { command: 'pnpm test' },
+      updatedPermissions: ALWAYS,
+      toolUseID: 'toolu_Bash',
+    });
+  });
+
+  it('never offers always allow when the SDK suppresses it', async () => {
+    const { runner, ask, pending } = await started();
+    const { promise } = ask(
+      'Bash',
+      { command: 'rm -rf dist' },
+      { suggestions: [...ALWAYS], suppressAlwaysAllowRule: true },
+    );
+    const [approval] = pending();
+    expect(approval?.suggestions).toEqual([]);
+    runner.decideApproval({ approvalId: approval?.id ?? '', decision: 'allowAlways' });
+    expect(await promise).not.toHaveProperty('updatedPermissions');
+  });
+
+  it('denies with the user message, or a default one', async () => {
+    const { store, runner, messages, ask, pending } = await started();
+    const first = ask('Bash', { command: 'git push --force' });
+    const firstId = pending()[0]?.id ?? '';
+    runner.decideApproval({
+      approvalId: firstId,
+      decision: 'deny',
+      reason: 'Push to a branch instead',
+    });
+    expect(await first.promise).toEqual({
+      behavior: 'deny',
+      message: 'Push to a branch instead',
+      toolUseID: 'toolu_Bash',
+    });
+    expect(store.state.approvals[firstId]).toMatchObject({
+      state: 'denied',
+      reason: 'Push to a branch instead',
+    });
+    expect(messages.at(-1)).toMatchObject({
+      type: 'approval.resolved',
+      payload: { approvalId: firstId, state: 'denied', reason: 'Push to a branch instead' },
+    });
+    expect(session(store, SESSION_A).status).toEqual({ kind: 'working' });
+
+    const second = ask('Write', { file_path: '/home/dev/acme-shop/.env' });
+    runner.decideApproval({ approvalId: pending()[0]?.id ?? '', decision: 'deny' });
+    expect(await second.promise).toMatchObject({
+      behavior: 'deny',
+      message: expect.stringContaining('denied'),
+    });
+  });
+
+  it('expires the approval when the SDK aborts the request', async () => {
+    const { store, runner, messages, ask, pending } = await started();
+    const { promise, controller } = ask('Bash', { command: 'pnpm build' });
+    const id = pending()[0]?.id ?? '';
+    controller.abort();
+    expect(await promise).toMatchObject({ behavior: 'deny' });
+    expect(store.state.approvals[id]).toMatchObject({ state: 'expired', reason: 'Cancelled' });
+    expect(messages.at(-1)).toMatchObject({
+      type: 'approval.resolved',
+      payload: { approvalId: id, state: 'expired' },
+    });
+    expect(session(store, SESSION_A).status).toEqual({ kind: 'working' });
+    expect(runner.decideApproval({ approvalId: id, decision: 'allow' })).toEqual({
+      ok: false,
+      error: UNKNOWN_APPROVAL,
+    });
+
+    // Already aborted: answered at once, nothing is shown.
+    const late = new AbortController();
+    late.abort();
+    const canUseTool = queries[0]?.options.canUseTool as Ask;
+    expect(
+      await canUseTool(
+        'Bash',
+        {},
+        { signal: late.signal, toolUseID: 'toolu_late', requestId: 'req_late' },
+      ),
+    ).toMatchObject({ behavior: 'deny' });
+    expect(pending()).toEqual([]);
+  });
+
+  it('expires pending approvals when the session closes', async () => {
+    const { store, runner, ask, pending } = await started();
+    const { promise } = ask('Bash', { command: 'pnpm test' });
+    const id = pending()[0]?.id ?? '';
+    await runner.close(SESSION_A);
+    expect(await promise).toMatchObject({ behavior: 'deny' });
+    expect(store.state.approvals[id]).toMatchObject({ state: 'expired' });
+    expect(session(store, SESSION_A).status.kind).toBe('ended');
+  });
+
+  it('waits indefinitely by default and expires after a configured timeout', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const plain = await started();
+      plain.ask('Bash', { command: 'pnpm test' });
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000);
+      expect(plain.pending()).toHaveLength(1);
+
+      const timed = await started({ approvalTimeoutMs: 30_000 });
+      const { promise } = timed.ask('Bash', { command: 'pnpm test' });
+      const approval = timed.pending()[0];
+      expect(approval?.expiresAt).toBe((approval?.createdAt ?? 0) + 30_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await promise).toMatchObject({ behavior: 'deny', message: 'Approval timed out.' });
+      expect(timed.store.state.approvals[approval?.id ?? '']).toMatchObject({
+        state: 'expired',
+        reason: 'Timed out',
+      });
+
+      // Resolved approvals linger for the UI, then leave the store.
+      await vi.advanceTimersByTimeAsync(RESOLVED_APPROVAL_TTL_MS);
+      expect(timed.store.state.approvals).toEqual({});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps concurrent approvals apart and waits on the oldest', async () => {
+    const { store, runner, ask, pending } = await started();
+    const test = ask('Bash', { command: 'pnpm test' });
+    const write = ask('Write', { file_path: '/home/dev/acme-shop/src/cart.ts' });
+    const [first, second] = pending();
+    expect(first?.tool).toBe('Bash');
+    expect(second?.tool).toBe('Write');
+    expect(first?.id).not.toBe(second?.id);
+    expect(session(store, SESSION_A).status).toEqual({
+      kind: 'waiting_permission',
+      approvalId: first?.id,
+    });
+
+    runner.decideApproval({ approvalId: second?.id ?? '', decision: 'deny', reason: 'Not yet' });
+    expect(await write.promise).toMatchObject({ behavior: 'deny', message: 'Not yet' });
+    expect(session(store, SESSION_A).status).toEqual({
+      kind: 'waiting_permission',
+      approvalId: first?.id,
+    });
+
+    runner.decideApproval({ approvalId: first?.id ?? '', decision: 'allow' });
+    expect(await test.promise).toMatchObject({
+      behavior: 'allow',
+      updatedInput: { command: 'pnpm test' },
+    });
+    expect(session(store, SESSION_A).status).toEqual({
+      kind: 'tool',
+      tool: 'Bash',
+      toolUseId: 'toolu_Bash',
+    });
   });
 });
 

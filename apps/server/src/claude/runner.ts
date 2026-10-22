@@ -1,15 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  CanUseTool,
   Options,
+  PermissionResult,
+  PermissionUpdate,
   Query,
   SDKMessage,
   SDKUserMessage,
   PermissionMode as SdkPermissionMode,
 } from '@anthropic-ai/claude-agent-sdk';
 import {
+  type ActivityEvent,
+  type ActivityKind,
+  type Approval,
+  type ApprovalDecision,
   type ClaudeSession,
+  makeMessage,
   type PermissionMode,
   PermissionMode as PermissionModeSchema,
+  PermissionSuggestion,
+  type ServerToUi,
   type SessionStatus,
   toolFamily,
 } from '@c-board/protocol';
@@ -43,6 +53,11 @@ export interface SessionRunnerOptions {
   now?: () => number;
   /** How often streaming text reaches the store. */
   draftIntervalMs?: number;
+  /** Approval notices for UI clients (`approval.new`, `approval.resolved`). */
+  onMessage?: (message: ServerToUi) => void;
+  onActivity?: (event: ActivityEvent) => void;
+  /** Pending approvals expire (deny) after this long. `null`, the default: they wait. */
+  approvalTimeoutMs?: number | null;
 }
 
 export interface StartSessionInput {
@@ -65,11 +80,16 @@ export const UNKNOWN_PROJECT = 'unknown_project';
 export const UNKNOWN_SESSION = 'unknown_session';
 export const SESSION_LIVE = 'session_live';
 export const NOT_RUNNING = 'session_not_running';
+export const UNKNOWN_APPROVAL = 'unknown_approval';
 
 export const DRAFT_INTERVAL_MS = 50;
 const DRAFT_MAX = 100_000;
 const TITLE_MAX = 120;
 const TEXT_MAX = 4_000;
+const REASON_MAX = 1_000;
+/** Resolved approvals stay in the store this long, so the UI can show the outcome. */
+export const RESOLVED_APPROVAL_TTL_MS = 60_000;
+const DENY_MESSAGE = 'The user denied this action from c-board.';
 
 /** An async queue the SDK reads user messages from (streaming-input mode). */
 export class MessageQueue<T> implements AsyncIterable<T> {
@@ -120,6 +140,16 @@ interface Run {
   draft: string | null;
   draftTimer: NodeJS.Timeout | null;
   done: Promise<void>;
+}
+
+interface PendingApproval {
+  approval: Approval;
+  runId: string;
+  /** Returned as `updatedPermissions` on "Always allow". */
+  suggestions: PermissionUpdate[];
+  resolve: (result: PermissionResult) => void;
+  timer: NodeJS.Timeout | null;
+  dispose: () => void;
 }
 
 // Only the fields the runner reads; SDK messages are parsed defensively like transcript lines.
@@ -180,6 +210,10 @@ export class SessionRunner {
   private readonly now: () => number;
   private readonly draftIntervalMs: number;
   private readonly runs = new Map<string, Run>();
+  private readonly approvals = new Map<string, PendingApproval>();
+  private readonly onMessage: (message: ServerToUi) => void;
+  private readonly onActivity: ((event: ActivityEvent) => void) | undefined;
+  private readonly approvalTimeoutMs: number | null;
 
   constructor(options: SessionRunnerOptions) {
     this.store = options.store;
@@ -196,6 +230,9 @@ export class SessionRunner {
     this.newId = options.newId ?? randomUUID;
     this.now = options.now ?? Date.now;
     this.draftIntervalMs = options.draftIntervalMs ?? DRAFT_INTERVAL_MS;
+    this.onMessage = options.onMessage ?? (() => {});
+    this.onActivity = options.onActivity;
+    this.approvalTimeoutMs = options.approvalTimeoutMs ?? null;
   }
 
   isLive(sessionId: string): boolean {
@@ -324,6 +361,31 @@ export class SessionRunner {
     await Promise.all([...this.runs.keys()].map((id) => this.close(id)));
   }
 
+  /** Handles a UI `approval.decide` for a board session's pending approval. */
+  decideApproval(decision: ApprovalDecision): ActionResult {
+    const pending = this.approvals.get(decision.approvalId);
+    if (!pending) return { ok: false, error: UNKNOWN_APPROVAL };
+    const { approval, suggestions } = pending;
+    const input = isRecord(approval.input) ? approval.input : {};
+    if (decision.decision === 'deny') {
+      const reason = clipText(decision.reason, REASON_MAX);
+      this.settleApproval(pending, 'denied', reason, {
+        behavior: 'deny',
+        message: reason ?? DENY_MESSAGE,
+        ...toolUse(approval),
+      });
+    } else {
+      const always = decision.decision === 'allowAlways' && suggestions.length > 0;
+      this.settleApproval(pending, 'allowed', null, {
+        behavior: 'allow',
+        updatedInput: input,
+        ...(always ? { updatedPermissions: suggestions } : {}),
+        ...toolUse(approval),
+      });
+    }
+    return { ok: true };
+  }
+
   /** UI action handlers for board sessions. */
   actions(): Pick<
     ActionHandlers,
@@ -365,7 +427,7 @@ export class SessionRunner {
     const query = queryFn({
       prompt: input,
       // `settingSources` stays unset: user, project and local settings load like the CLI.
-      options: { ...options, includePartialMessages: true },
+      options: { ...options, includePartialMessages: true, canUseTool: this.canUseTool(id) },
     });
     const run: Run = {
       id,
@@ -379,6 +441,148 @@ export class SessionRunner {
     };
     this.runs.set(id, run);
     run.done = this.consume(run);
+  }
+
+  /**
+   * The SDK asks before each tool call the session's rules don't settle. The request becomes
+   * a pending `Approval` the board decides; the SDK aborting it (interrupt, close) expires it.
+   */
+  private canUseTool(runId: string): CanUseTool {
+    return (toolName, input, options) => {
+      const { signal } = options;
+      const deny = (message: string): PermissionResult => ({
+        behavior: 'deny',
+        message,
+        toolUseID: options.toolUseID,
+      });
+      if (signal.aborted || !this.runs.has(runId)) return Promise.resolve(deny('Cancelled.'));
+
+      const ts = this.now();
+      // Suggestions that would grant more than this one call are never offered.
+      const suggestions = options.suppressAlwaysAllowRule
+        ? []
+        : (options.suggestions ?? []).filter((s) => PermissionSuggestion.safeParse(s).success);
+      const approval: Approval = {
+        id: this.newId(),
+        sessionId: runId,
+        source: 'sdk',
+        tool: toolName,
+        input,
+        toolUseId: options.toolUseID || null,
+        suggestions: suggestions as PermissionSuggestion[],
+        blockedPath: options.blockedPath ?? null,
+        createdAt: ts,
+        expiresAt: this.approvalTimeoutMs === null ? null : ts + this.approvalTimeoutMs,
+        state: 'pending',
+        decidedAt: null,
+        reason: null,
+      };
+
+      return new Promise<PermissionResult>((resolve) => {
+        const onAbort = () =>
+          this.settleApproval(pending, 'expired', 'Cancelled', deny('Cancelled.'));
+        const pending: PendingApproval = {
+          approval,
+          runId,
+          suggestions,
+          resolve,
+          timer: null,
+          dispose: () => signal.removeEventListener('abort', onAbort),
+        };
+        this.approvals.set(approval.id, pending);
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (this.approvalTimeoutMs !== null) {
+          pending.timer = setTimeout(
+            () => this.settleApproval(pending, 'expired', 'Timed out', deny('Approval timed out.')),
+            this.approvalTimeoutMs,
+          );
+        }
+
+        this.store.upsertApproval(approval);
+        this.refreshApprovalStatus(runId, ts);
+        this.onMessage(makeMessage('approval.new', { approval }, { ts }));
+        this.activity('permission.request', runId, `${toolName} needs approval`, {
+          tool_name: toolName,
+          approval_id: approval.id,
+        });
+      });
+    };
+  }
+
+  private settleApproval(
+    pending: PendingApproval,
+    state: 'allowed' | 'denied' | 'expired',
+    reason: string | null,
+    result: PermissionResult,
+  ): void {
+    const { approval, runId } = pending;
+    if (this.approvals.get(approval.id) !== pending) return;
+    this.approvals.delete(approval.id);
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.dispose();
+    const ts = this.now();
+    this.store.resolveApproval(approval.id, state, reason, ts);
+    this.onMessage(makeMessage('approval.resolved', { approvalId: approval.id, state, reason }));
+    this.activity('permission.decision', runId, `${approval.tool} ${state}`, {
+      approval_id: approval.id,
+      decision: state,
+    });
+    setTimeout(() => this.store.removeApproval(approval.id), RESOLVED_APPROVAL_TTL_MS).unref();
+    this.refreshApprovalStatus(runId, ts, state === 'allowed' ? approval : null);
+    pending.resolve(result);
+  }
+
+  /**
+   * A session waiting on approvals points at its oldest pending one. Once none is left it
+   * goes back to the allowed tool, or to working after a denial.
+   */
+  private refreshApprovalStatus(runId: string, ts: number, allowed: Approval | null = null): void {
+    if (!this.runs.has(runId)) return;
+    const current = this.status(runId);
+    if (!current || current.kind === 'ended') return;
+    let oldest: Approval | null = null;
+    for (const { approval, runId: owner } of this.approvals.values()) {
+      if (owner === runId && (oldest === null || approval.createdAt < oldest.createdAt)) {
+        oldest = approval;
+      }
+    }
+    if (oldest) {
+      if (current.kind !== 'waiting_permission' || current.approvalId !== oldest.id) {
+        this.store.setSessionStatus(
+          runId,
+          { kind: 'waiting_permission', approvalId: oldest.id },
+          ts,
+        );
+      }
+    } else if (current.kind === 'waiting_permission') {
+      this.store.setSessionStatus(
+        runId,
+        allowed
+          ? { kind: 'tool', tool: allowed.tool, toolUseId: allowed.toolUseId }
+          : { kind: 'working' },
+        ts,
+      );
+    }
+  }
+
+  private activity(
+    kind: ActivityKind,
+    sessionId: string,
+    summary: string,
+    data: Record<string, unknown>,
+  ): void {
+    if (!this.onActivity) return;
+    this.onActivity({
+      id: this.newId(),
+      ts: this.now(),
+      kind,
+      projectId: this.store.state.sessions[sessionId]?.projectId ?? null,
+      sessionId,
+      terminalId: null,
+      execId: null,
+      summary,
+      data,
+    });
   }
 
   private async consume(run: Run): Promise<void> {
@@ -400,6 +604,14 @@ export class SessionRunner {
     run.input.end();
     this.setDraft(run, null);
     this.runs.delete(run.id);
+    for (const pending of [...this.approvals.values()]) {
+      if (pending.runId !== run.id) continue;
+      this.settleApproval(pending, 'expired', 'Session ended', {
+        behavior: 'deny',
+        message: 'The session ended before the user decided.',
+        ...toolUse(pending.approval),
+      });
+    }
     this.transcripts?.release(run.id);
     const ts = this.now();
     if (failure !== null || (!run.closing && this.status(run.id)?.kind !== 'idle')) {
@@ -621,6 +833,14 @@ export class SessionRunner {
   private status(id: string): ClaudeSession['status'] | undefined {
     return this.store.state.sessions[id]?.status;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toolUse(approval: Approval): { toolUseID?: string } {
+  return approval.toolUseId ? { toolUseID: approval.toolUseId } : {};
 }
 
 function isLiveStatus(status: SessionStatus): boolean {

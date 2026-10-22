@@ -306,6 +306,10 @@ export type ApprovalSource = z.infer<typeof ApprovalSource>;
 export const ApprovalState = z.enum(['pending', 'allowed', 'denied', 'expired']);
 export type ApprovalState = z.infer<typeof ApprovalState>;
 
+/** An SDK `PermissionUpdate` offered for "Always allow"; kept opaque beyond its type. */
+export const PermissionSuggestion = z.looseObject({ type: z.string().min(1).max(64) });
+export type PermissionSuggestion = z.infer<typeof PermissionSuggestion>;
+
 export const Approval = z.object({
   id: ApprovalId,
   sessionId: SessionId,
@@ -313,6 +317,10 @@ export const Approval = z.object({
   tool: z.string().min(1),
   input: z.unknown(),
   toolUseId: z.string().nullable(),
+  /** SDK approvals: what "Always allow" would add. Empty or absent: allow once only. */
+  suggestions: z.array(PermissionSuggestion).max(64).optional(),
+  /** The path outside the allowed directories that triggered the request, if any. */
+  blockedPath: z.string().max(4_096).nullable().optional(),
   createdAt: Timestamp,
   expiresAt: Timestamp.nullable(),
   state: ApprovalState,
