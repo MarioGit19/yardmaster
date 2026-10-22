@@ -1,0 +1,212 @@
+import { useEffect, useRef, useState } from 'react';
+import { useBoardStore } from '../data/index.js';
+import { useMotionLevel } from '../motion.js';
+import { projectHref } from '../routes.js';
+import { useTheme } from '../theme/theme.js';
+import { ambientOverride } from './debug.js';
+import { grainUrl } from './grain.js';
+import { createFieldRenderer, FIELD_PALETTES } from './renderer.js';
+import {
+  activeSessionCount,
+  approach,
+  attentionProjectId,
+  DEFAULT_ATTENTION_POINT,
+  energyFrom,
+  frameDue,
+  runningExecutionCount,
+  ThroughputMeter,
+  totalOutputBytes,
+  viewportPoint,
+} from './signal.js';
+
+const FPS = 30;
+/** Fraction of the device pixel ratio the shader renders at. */
+const RESOLUTION = 0.5;
+const SAMPLE_MS = 250;
+/** Smoothing time constants, ms: the room drifts, it never snaps. */
+const TAU = { energy: 1400, attention: 900, position: 450 };
+
+interface Target {
+  energy: number;
+  attention: number;
+  x: number;
+  y: number;
+}
+
+/** The on-screen element of the waiting project: its pod first, else its rail link. */
+function attentionElement(projectId: string): Element | null {
+  return (
+    document.querySelector(`[data-pod="${CSS.escape(projectId)}"]`) ??
+    document.querySelector(`a[href="#${CSS.escape(projectHref(projectId))}"]`)
+  );
+}
+
+/**
+ * The full-viewport background, DESIGN.md §4.1. Full motion runs a WebGL shader (0.5× DPR,
+ * 30 fps, paused while hidden); Reduced and Off, or no WebGL, show a static CSS field whose
+ * energy and attention only cross-fade.
+ */
+export function AmbientField() {
+  const level = useMotionLevel();
+  const { theme } = useTheme();
+  const store = useBoardStore();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const target = useRef<Target>({ energy: 0, attention: 0, ...DEFAULT_ATTENTION_POINT });
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const [webglFailed, setWebglFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [grain, setGrain] = useState<string | null>(null);
+  const useWebgl = level === 'full' && !webglFailed;
+
+  useEffect(() => {
+    let live = true;
+    void grainUrl().then((url) => live && setGrain(url));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Samples the board a few times a second into `target` and the CSS field's variables.
+  useEffect(() => {
+    const meter = new ThroughputMeter();
+    const sample = () => {
+      const { board } = store.getState();
+      const override = ambientOverride.get();
+      const rate = meter.sample(totalOutputBytes(board), performance.now());
+      const energy =
+        override.energy ??
+        energyFrom(activeSessionCount(board), runningExecutionCount(board), rate);
+      const projectId = attentionProjectId(board);
+      const element = projectId === null ? null : attentionElement(projectId);
+      const point = element
+        ? viewportPoint(element.getBoundingClientRect(), {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          })
+        : DEFAULT_ATTENTION_POINT;
+      const attention = (override.attention ?? projectId !== null) ? 1 : 0;
+      target.current = { energy, attention, ...point };
+
+      // Written only on change, so a steady board never invalidates the field's styles.
+      const style = rootRef.current?.style;
+      const write = (name: string, value: string) => {
+        if (style && style.getPropertyValue(name) !== value) style.setProperty(name, value);
+      };
+      write('--ambient-energy', energy.toFixed(2));
+      write('--ambient-attention', String(attention));
+      write('--ambient-x', `${(point.x * 100).toFixed(1)}%`);
+      write('--ambient-y', `${(point.y * 100).toFixed(1)}%`);
+    };
+    sample();
+    const timer = setInterval(() => {
+      if (!document.hidden) sample();
+    }, SAMPLE_MS);
+    const unsubscribe = ambientOverride.subscribe(sample);
+    window.addEventListener('resize', sample);
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+      window.removeEventListener('resize', sample);
+    };
+  }, [store]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!useWebgl || !canvas) return;
+    const renderer = createFieldRenderer(canvas);
+    if (!renderer) {
+      setWebglFailed(true);
+      return;
+    }
+
+    const current = { ...target.current };
+    let time = 0;
+    let lastFrameAt: number | null = null;
+    let raf = 0;
+    let shown = false;
+
+    const frame = (now: number) => {
+      raf = requestAnimationFrame(frame);
+      if (!frameDue(lastFrameAt, now, FPS)) return;
+      // Clamped so a long stall (a busy main thread) never lurches the field forward.
+      const dt = lastFrameAt === null ? 0 : Math.min(100, now - lastFrameAt);
+      lastFrameAt = now;
+      const goal = target.current;
+      current.energy = approach(current.energy, goal.energy, dt, TAU.energy);
+      current.attention = approach(current.attention, goal.attention, dt, TAU.attention);
+      current.x = approach(current.x, goal.x, dt, TAU.position);
+      current.y = approach(current.y, goal.y, dt, TAU.position);
+      // Integrating speed (not scaling time) keeps the flow continuous as energy changes.
+      time += (dt / 1000) * (0.018 + 0.07 * current.energy);
+      const scale = (window.devicePixelRatio || 1) * RESOLUTION;
+      renderer.draw({
+        width: Math.max(1, Math.round(window.innerWidth * scale)),
+        height: Math.max(1, Math.round(window.innerHeight * scale)),
+        time,
+        energy: current.energy,
+        attention: current.attention,
+        attentionX: current.x,
+        attentionY: current.y,
+        palette: FIELD_PALETTES[themeRef.current],
+      });
+      if (!shown) {
+        shown = true;
+        setReady(true);
+      }
+    };
+
+    const start = () => {
+      if (raf || document.hidden) return;
+      lastFrameAt = null;
+      raf = requestAnimationFrame(frame);
+    };
+    const stop = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+    const onLost = (event: Event) => {
+      event.preventDefault();
+      stop();
+      setWebglFailed(true);
+    };
+
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    canvas.addEventListener('webglcontextlost', onLost);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+      canvas.removeEventListener('webglcontextlost', onLost);
+      renderer.dispose();
+      setReady(false);
+    };
+  }, [useWebgl]);
+
+  return (
+    <div
+      ref={rootRef}
+      aria-hidden
+      data-ambient={useWebgl ? 'webgl' : 'css'}
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+    >
+      <div className="ambient-css absolute inset-0" />
+      <div className="ambient-attention absolute inset-0" />
+      {useWebgl && (
+        <canvas
+          ref={canvasRef}
+          data-ready={ready || undefined}
+          className="ambient-canvas absolute inset-0 size-full"
+        />
+      )}
+      {grain && (
+        <div
+          className="ambient-grain absolute inset-0"
+          style={{ backgroundImage: `url(${grain})` }}
+        />
+      )}
+    </div>
+  );
+}

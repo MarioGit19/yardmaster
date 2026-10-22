@@ -41,6 +41,13 @@
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.04);
   --glass-shimmer: rgb(255 255 255 / 0.04);
+
+  /* Ambient field (DESIGN.md §4.1): the static CSS composition, matching the shader palette. */
+  --field-deep: rgb(18 28 72 / 0.55);
+  --field-violet: rgb(34 19 74 / 0.5);
+  --field-floor: rgb(18 28 72 / 0.22);
+  --field-amber: rgb(58 37 8 / 0.7);
+
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
 }
@@ -68,4 +75,9 @@
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.8);
   --glass-shimmer: rgb(255 255 255 / 0.7);
+
+  --field-deep: rgb(221 227 246 / 0.7);
+  --field-violet: rgb(233 224 244 / 0.7);
+  --field-floor: rgb(221 227 246 / 0.3);
+  --field-amber: rgb(248 226 189 / 0.75);
 }

@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { ambientOverride, useAmbientOverride } from '../ambient/debug.js';
 import {
   dur,
   MOTION_SETTINGS,
@@ -187,6 +188,53 @@ function SpringDemo({ name }: { name: keyof typeof spring }) {
 
 const SPRING_NAMES = Object.keys(spring) as (keyof typeof spring)[];
 
+/** Debug controls for the ambient field behind this page; "Live" hands it back to the board. */
+function AmbientControls({ level }: { level: string }) {
+  const { energy, attention } = useAmbientOverride();
+  const live = energy === null && attention === null;
+  return (
+    <div className="space-y-3">
+      <label className="flex items-center gap-4">
+        <span className="w-16 font-mono text-label text-text-2">energy</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={energy ?? 0}
+          aria-label="Ambient energy"
+          onChange={(event) => ambientOverride.set({ energy: Number(event.target.value) })}
+          className="h-6 flex-1 accent-[var(--st-work)]"
+        />
+        <span className="w-10 text-right font-mono text-meta tabular text-text-3">
+          {energy === null ? 'live' : energy.toFixed(2)}
+        </span>
+      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          aria-pressed={attention === true}
+          onClick={() => ambientOverride.set({ attention: attention !== true })}
+          className="rounded-control border border-line bg-bg-0 px-3 py-1.5 text-body-sm text-text-2 hover:border-line-strong aria-pressed:border-st-wait aria-pressed:text-text-1"
+        >
+          Attention bloom
+        </button>
+        <button
+          type="button"
+          disabled={live}
+          onClick={() => ambientOverride.set({ energy: null, attention: null })}
+          className="rounded-control border border-line bg-bg-0 px-3 py-1.5 text-body-sm text-text-2 hover:border-line-strong disabled:opacity-50"
+        >
+          Live
+        </button>
+        <span className="ml-auto font-mono text-meta text-text-3">
+          {level === 'full' ? 'shader · 30 fps · 0.5× DPR' : 'static field'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function TokenPreview() {
   const { setting, theme, setTheme } = useTheme();
   const motionSetting = usePreference(motionPreference);
@@ -320,6 +368,10 @@ export default function TokenPreview() {
               </span>
             </div>
           </div>
+        </Section>
+
+        <Section title="Ambient field">
+          <AmbientControls level={level} />
         </Section>
 
         <Section title="Motion">

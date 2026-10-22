@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
+import { AmbientField } from './ambient/AmbientField.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { MotionRoot } from './MotionRoot.js';
 import { routes } from './routes.js';
@@ -55,6 +56,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
   useTheme();
   return (
     <MotionRoot>
+      <AmbientField />
       <TooltipProvider>
         <Router hook={locationHook}>
           <AppRoutes />

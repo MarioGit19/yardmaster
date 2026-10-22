@@ -246,10 +246,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after implementing, **look at the screenshots** (Read the PNGs), and fix anything that fails the DESIGN.md §9 checklist before ticking.
 
-- [ ] **7.1 Ambient field**
+- [x] **7.1 Ambient field**
   - `AmbientField`: a WebGL fragment shader per DESIGN.md §4.1 with `uEnergy`/`uAttention` uniforms derived from the store, 0.5× DPR, a 30 fps cap, pause when hidden, a CSS fallback, motion-level aware, and a grain overlay.
   - **Done when:** it renders in demo mode, energy visibly responds (a debug slider is available in `/#/_tokens`), and Reduced mode is static.
   - **Verify:** `pnpm --filter @c-board/web build && pnpm shots`
+  - Note: mounted once in `App` (so `/#/_tokens` gets it too). Reduced/Off and no-WebGL use the static CSS field; energy and attention only cross-fade it. Throughput is derived from `Execution.outputBytes` deltas sampled at 4 Hz. Pods carry `data-pod` so the amber bloom finds the waiting project (falling back to its rail link).
 
 - [ ] **7.2 Shared animation scheduler and ClaudeOrb**
   - A single rAF scheduler (`useFrame(cb, {visible})`) with IntersectionObserver gating. `ClaudeOrb` on canvas implements every state in DESIGN.md §4.2, including tool-family particle colors, subagent satellites, the waiting ripple and countdown ring, and the error glitch. Add a showcase on `/#/_tokens` with every state side by side.

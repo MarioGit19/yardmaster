@@ -30,6 +30,7 @@ export function ProjectCard({ project }: { project: Project }) {
   return (
     <Link
       href={projectHref(project.id)}
+      data-pod={project.id}
       style={{ '--accent': `var(--accent-${project.accent})` } as React.CSSProperties}
       className={cx(
         'group relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-panel border border-line bg-bg-1 p-4 shadow-raised',

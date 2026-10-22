@@ -30,6 +30,11 @@ export function useBoardClient(): BoardClient {
   return useBoardContext().client;
 }
 
+/** The raw store, for consumers that read it outside React renders (e.g. a canvas loop). */
+export function useBoardStore(): BoardStore {
+  return useBoardContext().store;
+}
+
 /** For selectors that return stored values (entities, connection, flags). */
 export function useBoard<T>(selector: (state: BoardStoreState) => T): T {
   return useStore(useBoardContext().store, selector);
