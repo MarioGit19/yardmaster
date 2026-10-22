@@ -36,3 +36,5 @@ loop/.state/
 apps/web/public/favicon.png
 apps/web/public/apple-touch-icon.png
 apps/extension/media/
+
+.early.coverage
