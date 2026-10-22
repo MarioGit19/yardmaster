@@ -48,11 +48,12 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/protocol test`
   - Note: The `PatchOp` schema (`set`/`merge`/`delete` at a path) lives in `patch.ts` now, because `patch {ops}` needs it. 1.4 adds `applyPatch` and the collector next to it. Server commands require an envelope `id` for `cmd.result`. The UI `action` payload is a union on `kind` (terminal, session, project and settings actions). Stream ids are `exec:<id>` or `term:<id>`. `decode` takes an optional `maxLength`.
 
-- [ ] **1.3 Hook payload schemas**
+- [x] **1.3 Hook payload schemas**
   - Permissive (`.passthrough()`) zod schemas for the hook events listed in PRD §6.1, with common fields `session_id`, `transcript_path`, `cwd`, `permission_mode` and `hook_event_name`, plus event-specific fields. Add `normalizeHookEvent(raw, claudePid?) → ActivityEvent`.
   - Add synthetic fixtures in `packages/protocol/fixtures/hooks/*.json`, using fake paths such as `/home/dev/acme-shop` and fake UUIDs.
   - **Done when:** every fixture parses and normalizes. Unknown events normalize to the `unknown` kind without throwing.
   - **Verify:** `pnpm --filter @c-board/protocol test`
+  - Note: Event-specific fields are all optional (StopFailure/PostCompact shapes were not re-verified against the hooks reference). A known event with a malformed field normalizes to `unknown`. `normalizeHookEvent` takes an optional third `{ now, id }` argument for deterministic tests.
 
 - [ ] **1.4 Patch format**
   - A minimal patch op set for `BoardState` (`set`, `merge`, `delete` at a path of ids), plus `applyPatch(state, ops)` (immutable, structural sharing) and a `diffCollector` that records ops when the store mutates.

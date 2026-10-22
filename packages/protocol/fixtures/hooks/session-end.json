@@ -1,0 +1,8 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "default",
+  "hook_event_name": "SessionEnd",
+  "reason": "prompt_input_exit"
+}

@@ -1,0 +1,14 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "acceptEdits",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/home/dev/acme-shop/src/cart.ts",
+    "old_string": "a",
+    "new_string": "b"
+  },
+  "tool_use_id": "toolu_02AbCdEfGhIjKlMnOpQrStUv"
+}
