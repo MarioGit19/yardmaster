@@ -444,35 +444,94 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: The flag is a server setting (stored as `experimental.terminalReply`, `experimentalTerminalReply` in `/api/settings`, off by default), toggled under Settings → Experimental. A new action `session.replyInTerminal {sessionId, text}` (`terminal-reply.ts`) checks the flag and `terminalReplyBlock()` (protocol, shared with the UI), then goes through `terminal.sendText`, so it routes like the board's terminal input (the demo simulator in `--demo`). Errors: `terminal_reply_disabled`, `unknown_session`, `not_terminal_session`, `no_linked_terminal`, `session_busy`, `empty_reply`. The text is sent as one line: control characters, newlines included, become spaces, so nothing submits early or drives the TUI. The web app now shares server settings through `settings/boardSettings.ts`.
   - Note: The control sits on top of the terminal session's fork bar whenever the flag is on. Outside idle or waiting-for-input it stays visible but can't send, with a hint, so it doesn't flicker with the session status. The e2e test only toggles the control: sending waits on the demo's turn timing, so routing is covered by the server tests (unit plus a socket-to-socket test). The composer fork shot now picks a terminal session (parallel shots start board sessions). New shots: `composer-terminal-reply-*`. At load 35–45, `pnpm e2e` failed only the known `messages.spec` long-task test, `focus.spec` (both also fail on a clean `main`) and `onboarding.spec` (passes alone).
 
-## Phase 10 — Quality, docs, release
+## Phase 10 — Layouts: Minimal, Office, Grid, Transit, Retro
 
-- [x] **10.1 Performance pass**
+Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Every layout must keep the same statuses, chrome and actions as Minimal.
+
+- [ ] **10.1 Layout framework and Actor inspector**
+  - `selectSceneModel` (pure, unit tested): projects → actors (Claude session, subagent, terminal) with kind, state (crew states plus `serving`/`exited` for terminals, from a new `opsStateFor(terminal, executions)`), activity level, label, caption and links, attention-first order. A `layouts/` registry (`minimal`, `office`, `grid`, `transit`, `retro`), each a lazy-loaded overview component; the current overview becomes `minimal` with no visual change. The `cboard.layout` preference (via `createPreference`), the switcher in Settings → Appearance, ⌘K actions "Layout: …", `⌥1`…`⌥5`, and a cross-fade between layouts (`dur.slow`, instant at Off).
+  - `ActorInspector`: the shared popover from DESIGN.md §10.1 (Radix popover, anchored, keyboard reachable) with Open, Focus in Cursor, Ctrl+C and Allow/Deny. Deep links `/p/:projectId/s/:sessionId` (exists) and a new `/p/:projectId/t/:terminalId` that opens the focus view with that terminal's tab active. Wire the inspector into Minimal too (clicking a lane's crew/session orb).
+  - Office, Grid, Transit and Retro start as placeholders ("coming soon" cards listing the scene model) so the switcher works end to end.
+  - **Done when:** model and `opsStateFor` tests pass, switching layouts works from Settings, ⌘K and shortcuts, survives a reload, and the inspector's actions work in e2e on Minimal.
+  - **Verify:** `pnpm --filter @c-board/web test && pnpm e2e && pnpm shots`
+
+- [ ] **10.2 Office: art kit and ops crew**
+  - Original SVG components per DESIGN.md §10.3: room shell (back wall, floor, door with nameplate and door light, ceiling light, window), desk + monitor, side desk, server rack (LED rows driven by a 0..1 rate prop), workbench + progress screen, couch, bookshelf, whiteboard (todo lines with draw-in checks, plus a drawing pose for a crew member standing at it), port sign, plant. `OpsMascot`: the crew's sibling (rectangular visor, headset) with the states idle, running, serving, done, error, waiting as Motion variants and CSS keyframes, reusing `CrewMascot`'s part structure, sizes (24/56/120), randomized idles and pausing rules. Add an "office kit" sheet to `/#/_tokens` showing every prop and every ops state at every size, in dark and light. Run `review-animations` on the ops crew.
+  - **Done when:** the kit sheet screenshots show every ops state clearly distinguishable at 56 px in both themes, and ops state tests pass.
+  - **Verify:** `pnpm --filter @c-board/web test && pnpm shots`
+
+- [ ] **10.3 Office: building overview**
+  - The building per DESIGN.md §10.3: rooms on floors (responsive columns, attention-first, `layout` re-order), one room per project with stations laid out from the scene model, characters at their stations (crew at desks, mini crew at the side desk, ops crew at racks/benches/couch, the bookshelf and whiteboard trips from DESIGN.md §10.3, max 8 plus a "+N" badge), door light, ceiling light following activity (dim after 5 min), whiteboard and port sign. Characters **walk** between stations on state changes (600–900 ms, leg swing; cross-fade at Reduced). Hover name tags with live captions; click a character → `ActorInspector`. Night/Daylight building backdrops; the ambient field is unmounted in this layout.
+  - **Done when:** the overview reads correctly in demo mode at 390/1440/1920 in dark and light (screenshots), the same demo moment shows the same amber/rose cues as Minimal (e2e compares counts), and characters pause offscreen.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **10.4 Office: room view**
+  - Click or Enter on a room → zoom the building layer into it (transform only, `smooth`, ~500 ms), characters at 120 px with full props, and a side panel listing every actor with its caption and inspector actions. "Open workspace" cross-fades to the focus view; Esc zooms back out and restores focus on the room. Keyboard per DESIGN.md §10.1 (Tab between rooms, arrows between characters). Reduced: cross-fade instead of zoom.
+  - **Done when:** e2e enters a room, opens a terminal's inspector, opens the workspace, and returns with Esc to the same room; mid-zoom screenshots look right.
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **10.5 Grid: 2D network map**
+  - The SVG version of the Grid layout per DESIGN.md §10.4 "2D map": core, nodes on a ring (attention-first clockwise), straight pipelines, satellites per actor, CSS-animated packets driven by activity (rate ∝ throughput, tool-family bursts, green return pulse on turn done), amber beacon and pulse for waiting, rose glitch for errors, crisp labels. `--grid-*` tokens (bg, neon, fog) for dark and light. Narrow (390 px): a vertical list of nodes on one trunk. Click a satellite → `ActorInspector`; Enter on a node → a flat cockpit (DESIGN.md §10.4 step 3, laid out as a 2D arc of screens) with a cross-fade. This is the Grid layout at Reduced motion, without WebGL and on narrow screens.
+  - **Done when:** the map and flat cockpit render in demo at all widths and themes, packets visibly follow activity, and nothing flashes faster than 3 Hz.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **10.6 Grid: 3D network**
+  - Add `three` (current stable; check with Context7 and npm) to `apps/web`, loaded only in the Grid chunk. `GridRenderer` (imperative class, subscribes to the scene model): perspective floor grid with horizon fog, the core, hexagonal nodes with status edge light and activity height, satellites with sub-pipes, curved tube pipelines, instanced packets (max 400), amber beacons, rose glitch, scanline overlay. Labels and captions via `CSS3DRenderer` (or projected DOM), never canvas text. Camera: slow idle orbit that stops on hover, drag to rotate, clamped zoom, double-click to reset. One WebGL context (ambient field unmounted), DPR ≤ 1.5, paused when hidden or offstage. Falls back to the 10.5 map when WebGL is unavailable or the motion level is Reduced/Off.
+  - **Done when:** the 3D overview renders in demo at 1440/1920 in both themes, `--demo-stress` keeps ≥ 55 fps on it (Playwright FPS sample), and disabling WebGL in the test shows the 2D map.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **10.7 Grid: dive and cockpit**
+  - Enter a node: camera flies along its pipeline (~900 ms, `ease.inOut`), other nodes fade into fog, then the phase-in (scanline sweep + brief chromatic split resolving, ~400 ms, no full-screen flash). The cockpit: the project's screens in an arc via CSS3D (Claude screen center with live messages and caption, terminal screens with live tails, ports and uptime, small git/ports/todo screens above). Click a screen → it flies to center and becomes interactive (one xterm at a time); "Open workspace" → focus view. Esc steps back (screen → arc → reverse dive). Keyboard reachable throughout.
+  - **Done when:** e2e dives into a node, centers a terminal screen, sends a command and sees the echo, and backs out with Esc twice; mid-dive and cockpit screenshots look right.
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **10.8 Transit layout**
+  - The metro map per DESIGN.md §10.5: one line per project over the last 60 minutes, trains per actor (glide, park, amber doors, rose stop), stations from the activity history the Pulse rail uses (turn done, exit ✓/×, commit, crash), subagent branch lines, horizontal time scroll with "now" pinned, station merging when crowded, click a train → `ActorInspector`, vertical lines at 390 px. SVG, transforms only.
+  - **Done when:** the map reads correctly in demo at 390/1440/1920 in both themes, and an e2e test clicks a station and lands on its event.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **10.9 Retro layout**
+  - The CRT console per DESIGN.md §10.6: box-drawing frames per project on a character grid, status tags, ASCII sparklines, blinking cursor on working items, typed captions, number shortcuts, scanlines, vignette and phosphor glow in CSS, the amber-phosphor option in Settings, and the paper variant for Daylight. Fits 20 projects at 1440 × 900.
+  - **Done when:** screenshots show aligned columns with 20 projects (`--demo-stress`) in both themes, and the number shortcuts work in e2e.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **10.10 Layouts review pass**
+  - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.5 checks to the shots review. Fix what is found (up to 10 issues; add `10.10b` for the rest).
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
+
+- [ ] **[HUMAN] 10.11 Try the layouts**
+  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts, and write any feedback as new tasks below this one before ticking it.
+
+## Phase 11 — Quality, docs, release
+
+- [x] **11.1 Performance pass** (committed as 10.1)
   - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each, and 4 Claude sessions doing roughly 5 tool calls per second), with every activity animation running. Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
   - **Verify:** `pnpm e2e --grep @perf`
+  - Note: Ran before the layouts phase existed. 10.10 re-checks every layout under `--demo-stress`.
   - Note: Numbers (an M-series Mac, `e2e/stress.spec.ts`, 1440×900, motion Full, 10 s rAF sampling). Before: overview 52 fps with 54 long tasks; focus view (log firehose tab open) 33 fps with 3 long tasks (up to 82 ms) on the headless shell. After: overview 60.0 fps, focus 59.8–60.0 fps, no long tasks over 50 ms. Main thread in the focus view went from about 62% to 33% busy.
   - Note: Fixes: the overview subscribed to whole project objects for a count, so every activity patch re-rendered the pod grid, whose `layout` slots then re-measured every pod (about 20×/s each); it now reads a count, and the slots measure only on a reorder (`layoutDependency`). The overview under the focus view now reads a frozen board (`FrozenBoard`) that catches up when it is shown again; before, its pods restyled and repainted under the blur many times a second.
   - Note: The stress tests run in their own `perf-stress` project on full Chromium (`channel: 'chromium'`), which renders with the GPU. The default headless shell uses SwiftShader (software WebGL), where the WebGL terminal and the shaders stall compositor commits; that says nothing about the PRD §9 machine. Server CPU (PRD §9) is not measured by this test.
   - Note: Flaky under parallel load on main before this task, too: `onboarding.spec` (extension step), `attention.spec` (keyboard approval) and the `composer` shots. They pass when run alone.
 
-- [ ] **10.2 Accessibility pass**
-  - Add `@axe-core/playwright` checks on every route (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
+- [ ] **11.2 Accessibility pass**
+  - Add `@axe-core/playwright` checks on every route and every layout (Minimal, Office, Grid, Transit, Retro) (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
   - **Verify:** `pnpm e2e --grep @a11y`
 
-- [ ] **10.3 Security review**
+- [ ] **11.3 Security review**
   - Audit against PRD §8: Host and Origin checks, the token on every route, `execFile`-only usage (`grep -rn "exec(" apps` returns nothing unsafe), no raw HTML rendering, no credential-file reads (`grep -rn "credentials" apps packages`), the hook script being silent, and the installer's backups. Fix the findings and list them under this task.
   - **Verify:** `pnpm check`
 
-- [ ] **10.4 Visual polish sweep**
-  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `10.4b` below this one.
+- [ ] **11.4 Visual polish sweep**
+  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `11.4b` below this one.
   - **Verify:** `pnpm shots`
 
-- [ ] **10.5 README and docs**
-  - Write a public README: hero screenshot or GIF (captured from demo mode only), features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `c-board hooks install`, install the vsix), privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`c-board hooks uninstall`, remove the extension, `rm -rf ~/.c-board`), troubleshooting (`c-board doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
+- [ ] **11.5 README and docs**
+  - Write a public README: hero screenshot or GIF (captured from demo mode only), one shot per layout, features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `c-board hooks install`, install the vsix), privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`c-board hooks uninstall`, remove the extension, `rm -rf ~/.c-board`), troubleshooting (`c-board doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
   - **Verify:** `scripts/privacy-check.sh && pnpm check`
 
-- [ ] **10.6 Release packaging**
+- [ ] **11.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry, so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Add a CHANGELOG.
   - **Verify:** `pnpm build && node apps/server/dist/cli.js doctor`
 
-- [ ] **[HUMAN] 10.7 Real-world acceptance**
+- [ ] **[HUMAN] 11.7 Real-world acceptance**
   - Use c-board for a day with your real projects. File issues or add tasks below for anything off. Decide on a license and the open questions in PRD §13.

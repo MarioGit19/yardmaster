@@ -12,6 +12,8 @@ A dark, calm, deep-space control room. Projects are **pods** floating on a softl
 
 Three words: **calm, precise, alive.** Never noisy or gamer-RGB. Think Linear × Vercel × a planetarium.
 
+Observatory is the **Minimal** layout, the default. The overview can also be shown as **Office** or **Grid** (§10). Everything in §1–§9 applies to all layouts unless §10 says otherwise.
+
 ## 2. Design tokens (CSS custom properties, Tailwind v4 `@theme`)
 
 ### Color, dark "Night" (default)
@@ -230,7 +232,7 @@ Every project has a small original character, the **crew member**, that acts out
 
 ## 7. Performance rules (hard)
 
-- One WebGL context (ambient). Orbs and sparklines share **one** `requestAnimationFrame` scheduler and draw only when visible (IntersectionObserver).
+- One WebGL context at a time (the ambient field, or the Grid layout's renderer, §10.4). Orbs and sparklines share **one** `requestAnimationFrame` scheduler and draw only when visible (IntersectionObserver).
 - xterm instances mount only in the focus view, with the WebGL addon and a fallback to canvas/DOM. Inactive tabs dispose their renderer but keep the buffer in the store.
 - Lists over 50 items are virtualized (`@tanstack/react-virtual`).
 - Store updates are batched. Components subscribe to narrow selectors. Overview re-renders are capped by the 30 Hz patch coalescing.
@@ -254,3 +256,122 @@ Every project has a small original character, the **crew member**, that acts out
 - [ ] Motion at Reduced level has no movement other than cross-fades.
 - [ ] Nothing overflows. Long project names, commands and branches truncate with a tooltip.
 - [ ] Empty, loading, error and disconnected states all exist and look designed.
+
+## 10. Layouts
+
+The overview can be shown in different **layouts**. A layout is a different way of *seeing* the same board: the same projects, sessions, terminals, statuses and actions, drawn as a different world. Layout is a separate choice from the color theme (Night/Daylight) and the motion level, and all three combine.
+
+| Layout | Idea | One-line pitch |
+|---|---|---|
+| **Minimal** (default) | The current Observatory overview (§1–§4): pods on the ambient field | Calm, dense, fastest to scan |
+| **Office** | Each project is an office room in a cut-away building. Every running thing is a character at a station | You see your crew at work |
+| **Grid** | A dark neon network. Projects are nodes fed by pipelines carrying data packets. Enter a node and its screens phase in around you | Mission control from the future |
+| **Transit** | A metro map. Each project is a line, every session and terminal is a train running on it | The whole day's traffic in one diagram |
+| **Retro** | A green-phosphor CRT text console, all characters and box drawing | Maximum density, pure nostalgia |
+
+### 10.1 What every layout shares (the contract)
+
+- **One data model.** Layouts render a scene-neutral model (`selectSceneModel`): projects, each with **actors** (Claude session, subagent, terminal), each actor with a kind, a state (the §4.11 crew states, plus `serving` and `exited` for terminals), an activity level (§4.10), a label, a live caption and its links. No layout reads the store any other way, so state semantics can't drift between layouts.
+- **Same meaning, same colors.** Status colors and shapes mean the same in every layout: amber is waiting, rose is error, `--st-work` is working, and every status also has a non-color cue (§8).
+- **Same chrome.** HUD, project rail, Pulse rail, Attention Center, ⌘K, toasts and settings stay on top of every layout, unchanged.
+- **Same destinations.** Clicking any actor opens the **Actor inspector**, a shared popover: what it is (kind, name, project), state and live caption, the last 6 output lines or the last assistant line, ports, uptime and tokens, plus actions: *Open* (focus view with that session or terminal selected), *Focus in Cursor*, *Ctrl+C* for a running terminal, and *Allow / Deny* when it's waiting. Opening a project always lands in the standard focus view (§4.6). Layouts only change the overview and the transition into the focus view.
+- **Switching.** Settings → Appearance → Layout, the ⌘K action "Layout: Minimal / Office / Grid / Transit / Retro", and `⌥1` … `⌥5`. The choice persists per browser (`cboard.layout`). A switch cross-fades the old scene out and the new one in (`dur.slow`). Each layout is a lazy-loaded chunk with a skeleton while it loads.
+- **Keyboard.** Tab moves between projects (rooms or nodes) in attention-first order, arrow keys move between the actors inside one, Enter opens, Esc goes back. Every actor is a real focusable element with an accessible name such as "acme-shop, Claude, waiting for approval: Bash(pnpm test)".
+- **Motion levels.** Every layout defines Full, Reduced and Off (§3): Reduced keeps state readable through static poses, color and glows, with cross-fades instead of travel. Off moves nothing.
+- **Performance.** Every layout meets §7 and PRD §9 under `--demo-stress` (≥ 55 fps, no long tasks over 50 ms on the overview). Off-screen actors pause. Only one WebGL context exists at a time: Office and Grid unmount the ambient field and draw their own backdrop.
+- **Narrow screens.** At 390 px every layout stays usable: Office stacks rooms in one column, Grid shows its 2D map as a vertical list.
+- **Assets.** All art is original inline SVG, CSS or code-drawn geometry. No third-party sprites, models, textures or fonts beyond the existing ones.
+
+### 10.2 Minimal
+
+The current overview, unchanged (§4.3 pods, §4.4 HUD, §4.10 activity). It's the reference: anything a user can see or do in Minimal must be reachable in the other layouts too.
+
+### 10.3 Office
+
+**Concept.** A cut-away building seen from the front, like a dollhouse: floors of office rooms with the front wall removed. Each project is one room. Everyone in the room is a character that acts out what its process is doing. It reads like a small company you run.
+
+**The building.** Rooms sit on a grid of floors (3–4 rooms per floor at 1440 px, 4–5 at 1920 px, 1 at 390 px), ordered attention-first like pods, and re-ordering rooms animates with `layout` + `smooth`. A thin roof line and a ground floor frame the stack. In Night the building sits against a dark sky and lit rooms glow warm. In Daylight the walls are light and the windows are bright.
+
+**A room.** Same footprint for every room so the grid stays even:
+- **Door and nameplate** (left wall): project avatar, name, branch and dirty count. A small **door light** above it is off, amber when something in the room waits for you (it pulses with the §3 rule 4 ripple), or rose on an error.
+- **Ceiling light**: brightness follows the room's activity level. After 5 min with no activity the light dims, like the 70 % pod dim.
+- **Whiteboard**: the main session's TodoWrite list (up to 3 lines, checks draw in), or the last turn's summary when there's no list.
+- **Port sign** by the door: the room's listening ports as small chips.
+- **Stations**: places where characters work. A **desk with a monitor** for each Claude session, a **side desk** for subagents, a **server rack** for each long-running terminal (a dev server, anything with a listening port or running over 30 s), a **workbench** for one-shot commands, and a **couch** for idle terminal shells. Two shared stations give the crew somewhere to go: a **bookshelf** (a Claude session that is reading or searching for more than a few seconds walks over to it) and the **whiteboard** (a session in plan mode, or writing its todo list, stands at the whiteboard drawing).
+- At most 8 characters are drawn per room. More shows a "+N" badge on the door that opens the room view.
+
+**Characters.**
+- **Claude sessions** are the crew mascot (§4.11) at 56 px, seated at a desk. The monitor shows the tool-family color and a glyph of the current action (✎ ⌕ ▶ …). All §4.11 states apply: typing at the keyboard, reading with the page prop, thinking with the "…" bubble, standing up to raise a hand when waiting.
+- **Subagents** are mini crew at the side desk. They pop in when the subagent starts and walk out of the door when it ends.
+- **Terminals** are the **ops crew**: a sibling of the crew mascot with the same body proportions but a rectangular visor, a small headset instead of the antenna orb, and the terminal's status color on the visor. States:
+
+| Ops state | Trigger | Acting |
+|---|---|---|
+| idle | shell with nothing running | on the couch, slow breathing, random blinks; asleep with a "z" after 5 min |
+| running | a one-shot command is running | at the workbench, typing then watching a small progress screen whose lines scroll with output rate |
+| serving | a long-running command (dev server) | standing at the server rack; the rack's LEDs blink with the output rate, and the ports show on the rack |
+| done | the command exited 0 | small thumbs-up with a check sparkle, then walks to the couch |
+| error | the command exited non-zero or crashed | the rack or bench sparks once, ×-eyes for 600 ms, then a worried look; a rose exit badge stays above until acknowledged |
+| waiting | a Claude prompt in this terminal needs input (linked session waiting) | turns to the viewer and raises a hand, amber "!" |
+
+- **Moving between stations.** When a character's station changes (couch → rack, desk → door), it walks there: translate along the floor over 600–900 ms with a leg swing, no path-finding, never through another character's station (stations are laid out so straight lines work). At Reduced it cross-fades to the new station instead.
+- Idle variety is randomized per character (§4.11), so a building of characters never moves in sync.
+
+**Interactions.**
+- Hover a character: a small name tag with its live caption ("pnpm dev · :3000 · streaming").
+- Click a character: the Actor inspector (§10.1), anchored to the character.
+- Click a room (anywhere but a character), or Enter on it: the **room view**. The camera zooms into the room (scale and translate of the building layer, `smooth`, about 500 ms), the room fills the stage, characters grow to 120 px with full props, and a side panel lists every actor with its caption. From there, *Open workspace* goes to the focus view with a cross-fade, and Esc zooms back out to the building.
+
+**Look.** Flat vector with soft shading: walls in `--bg-1`/`--bg-2`, furniture in `--bg-2`/`--bg-3` with 1 px `--line` outlines, accent only on the project's door, nameplate and the main session's visor. Warm ceiling light in Night is the one indulgence (a radial glow at low opacity). No pixel art, no outlines heavier than 1 px.
+
+### 10.4 Grid
+
+**Concept.** A dark, precise neon world: an infinite perspective floor grid, a central **core** (you), and each project as a **node** connected to the core by a glowing **pipeline**. Data packets travel along the pipelines when work happens, so the busiest parts of your world are literally the brightest and fastest. Entering a node dives you down its pipeline into the project, where its screens phase in around you.
+
+This layout is allowed a stronger look than the rest of the app (neon on near-black, scanlines), but the §1 rule still holds: it encodes real activity and is never noisy. One neon hue (`--grid-neon`, a cool cyan) is used for structure, status colors keep their meanings, and nothing flashes more than 3 times a second (WCAG 2.3.1). No full-screen flashes.
+
+**Overview (3D).**
+- **Floor and sky:** a perspective grid fading into fog at the horizon, near-black (`--grid-bg`), with a very faint scanline overlay (3 %).
+- **Core:** a small faceted shape at the center that brightens with total activity (the same energy as the ambient field, §4.1).
+- **Nodes:** each project is a hexagonal monolith on a ring around the core, ordered attention-first clockwise from the front. Its height grows slightly with activity, its edge light takes the priority status color, and its label (name, branch, live caption of the busiest actor) is crisp DOM text floating above it.
+- **Satellites:** each actor orbits its node as a small shape: Claude sessions as bright spheres (the ClaudeOrb's colors), terminals as small cubes, subagents as tiny spheres around their parent. Each satellite has a short sub-pipe to its node.
+- **Pipelines:** curved tubes from the core to each node and from each node to its satellites. **Packets** (small light pulses) travel along them: terminal output emits packets at a rate proportional to its throughput (capped), each Claude tool call fires a short burst in its tool-family color, a finished turn sends one green pulse back to the core. Packets are instanced (max 400 at once).
+- **Attention:** a waiting node raises an amber beacon (a soft vertical beam) and its pipeline pulses amber toward it every 2.4 s. An error makes a pipeline segment glitch rose once, then stay rose until acknowledged.
+- **Camera:** a slow idle orbit drift (one revolution per ~3 min) that stops while the pointer is over the scene. Drag to rotate, scroll to zoom (clamped), double-click to reset.
+- Hover a node: its pipeline and label brighten and a tooltip shows counts. Click a satellite: the Actor inspector.
+
+**Entering a project (the dive).** Click a node or press Enter on it:
+1. The camera flies along the node's pipeline into the node (about 900 ms, `ease.inOut`), other nodes fade back into the fog.
+2. **Phase-in:** a horizontal scanline sweep passes over the view and the project's screens resolve from a brief chromatic split into sharp panels (about 400 ms).
+3. **The cockpit:** the project's screens float in a gentle arc around the viewer: the **Claude screen** in the middle (live messages and caption), **terminal screens** to the sides (live tail of each terminal, ports and uptime in the title bar), and small screens above for git, ports and the todo list. Screens are real DOM placed in 3D with CSS3D, so text is sharp and selectable.
+4. Click a screen: it flies to the center and becomes fully interactive (one xterm mounted at a time). *Open workspace* goes to the standard focus view. Esc steps back: from a centered screen to the arc, then the reverse dive out to the network.
+
+**2D map (fallback).** The same network drawn as a flat SVG diagram (core in the middle, nodes on a ring, straight pipelines with CSS-animated packets), used when WebGL is unavailable, at Reduced motion (no packets travel; pipelines just light up), and at 390 px (a vertical list of nodes on one trunk pipeline). Entering a node cross-fades to the cockpit laid out flat.
+
+**Tech.** `three` with its `CSS3DRenderer` addon, driven imperatively by one `GridRenderer` class that subscribes to the scene model (no per-frame React renders). One WebGL context, DPR capped at 1.5, render loop paused when hidden or offstage, and the loop idles at a low rate when nothing moves.
+
+### 10.5 Transit
+
+**Concept.** A metro map in the style of a classic transit diagram: clean, flat, 45° angles, thick colored lines on a light-grey (Daylight) or deep-navy (Night) ground. Each **project is a line** in its project accent color. The line runs left to right across the last 60 minutes, so the map is also a timeline.
+- **Trains:** every Claude session and terminal is a small rounded train on its project's line, at the "now" end. A working train glides forward with a soft motion trail, an idle one is parked at the platform, a waiting one has amber doors that pulse, an errored one is rose and stopped with a "!" marker.
+- **Stations:** notable events become stations along the line: a turn finished (small white stop), a command exited (✓ or ×), a commit (a larger interchange circle), a crash (rose stop). Hover shows the event, click jumps to it (like the Pulse rail, §4.7).
+- **Interchanges:** when a subagent runs, a short branch line forks off and rejoins when it ends.
+- The map scrolls horizontally through time; "now" is pinned at the right. New stations appear with a quick scale-in. Clicking a train opens the Actor inspector; clicking a line's name opens the project.
+- Reduced: trains don't glide, they move between positions with a cross-fade. 390 px: the lines run top to bottom.
+
+### 10.6 Retro
+
+**Concept.** A 1980s green-phosphor terminal. Everything is text: box-drawing frames per project, `[RUN]` `[WAIT]` `[ERR]` tags, ASCII sparklines (`▁▂▃▅▇`), a blinking block cursor on whatever is working, and the live caption typed out character by character. It's the densest layout (fits 20+ projects on one screen) and works over any connection.
+- Look: Geist Mono only, one phosphor hue for text (`--retro-fg`, green by default; amber phosphor as an option), status shown with tag text **and** the status colors at reduced saturation, a faint scanline and a gentle screen curvature vignette at the edges (CSS only), a subtle phosphor glow on text (text-shadow).
+- Motion: the cursor blinks at 1 Hz on working items only, captions type in, new lines scroll up. Nothing else moves. Reduced: no typing, no blink. Off: static.
+- Keyboard-first: every project and actor has a number shortcut shown in the frame (`[3]`), Enter opens, Esc goes back.
+- Daylight variant: dark text on a warm paper background, like a line printer, with no glow.
+
+### 10.7 Visual QA additions
+
+- [ ] Each layout has screenshots at 390 / 1440 / 1920 in dark and light, at rest and under demo activity.
+- [ ] The same demo moment shows the same statuses in every layout (count the amber and rose cues).
+- [ ] Office: no character overlaps another station; nameplates truncate with a tooltip; the +N badge appears past 8.
+- [ ] Grid: labels never overlap at 1440 with 10 projects; nothing flashes faster than 3 Hz; the 2D map is complete without WebGL.
+- [ ] Transit: lines never cross labels; a busy hour stays readable (stations merge into a count when closer than 12 px).
+- [ ] Retro: every frame aligns on the character grid; nothing breaks the monospace columns.

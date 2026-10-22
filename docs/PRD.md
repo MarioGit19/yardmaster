@@ -100,6 +100,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - F16 Pulse timeline: a cross-project activity stream with filters.
 - F17 Session history browser per project (SDK `listSessions`), with "resume in board" or "resume in Cursor terminal".
 - F18 Daily stats: sessions, tokens and tool calls per project (from transcripts).
+- F24 **Layouts** (DESIGN.md §10): the overview can be shown as **Minimal** (default, the pod grid), **Office** (each project is an office room and every session and terminal is a character at a station, working or idling with its state) **Grid** (a neon network of projects fed by pipelines; entering a project dives into it and its screens phase in), **Transit** (a metro map where each project is a line and every session and terminal a train) or **Retro** (a dense green-phosphor text console). Same data, statuses and actions in every layout; click any character, node or screen to see where it is and act on it.
 
 **Could**
 - F19 Board-owned terminals (node-pty) for projects with no editor window open.
@@ -149,6 +150,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 | Terminal render | `@xterm/xterm` 6 + addons fit, webgl, search | |
 | State | zustand 5 | |
 | UI bits | cmdk, Radix primitives (tooltip/dialog/popover), lucide-react, sonner, react-markdown + shiki, `diff` | |
+| 3D (Grid layout only) | `three` + its `CSS3DRenderer` addon | Lazy-loaded with the Grid layout; one WebGL context; 2D SVG fallback. |
 | Fonts | Geist + Geist Mono (`@fontsource-variable/*`) | Self-hosted, no Google calls. |
 | Extension | `@types/vscode` **1.93.0**, `engines.vscode ^1.93.0`, esbuild bundle, `@vscode/vsce` | 1.93 is where the shell-integration execution API became stable. Cursor 3.5 ships VS Code 1.105, so it's covered. |
 
@@ -272,6 +274,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 - **M1 Observe (MVP):** server, protocol, hooks, extension mirroring, overview, focus view with terminals and transcript (read-only). Demo mode.
 - **M2 Act:** terminal actions, headless SDK sessions, approvals, ⌘K, Attention Center.
 - **M3 Wow plus polish:** ambient shader, orbs, Pulse timeline, git panel, stats, onboarding, docs and GIFs, performance and accessibility pass.
+- **M3.5 Layouts:** Office and Grid layouts with the shared Actor inspector.
 - **M4 Stretch:** away mode, terminal reply, board-owned PTYs, launch profiles.
 
 ## 13. Open questions
