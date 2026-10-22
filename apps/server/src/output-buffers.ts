@@ -35,6 +35,8 @@ export class OutputBuffers {
   private readonly terminalBytes: number;
   private readonly rings = new Map<OutputStreamId, RingBuffer>();
   private readonly strippers = new Map<string, OscStripper>();
+  /** Whether a terminal's stream ends at the start of a line (unknown counts as yes). */
+  private readonly atLineStart = new Map<string, boolean>();
   private readonly listeners = new Set<StreamDataListener>();
 
   constructor(options: OutputBuffersOptions = {}) {
@@ -59,6 +61,17 @@ export class OutputBuffers {
     return this.write(execId, terminalId, stripper?.flush() ?? '');
   }
 
+  /**
+   * Writes a line into the terminal's stream only (not into any execution's), on a line of its
+   * own. Used for the command header a real terminal shows before each run's output.
+   */
+  appendTerminalLine(terminalId: string, line: string): void {
+    const streamId = terminalStreamId(terminalId);
+    const chunk = `${this.atLineStart.get(terminalId) === false ? '\r\n' : ''}${line}\r\n`;
+    this.emit(streamId, this.ring(streamId, this.terminalBytes).append(chunk), chunk);
+    this.atLineStart.set(terminalId, true);
+  }
+
   read(streamId: OutputStreamId, fromSeq?: number): ReadResult | undefined {
     return this.rings.get(streamId)?.read(fromSeq);
   }
@@ -79,6 +92,7 @@ export class OutputBuffers {
 
   deleteTerminal(terminalId: string): void {
     this.rings.delete(terminalStreamId(terminalId));
+    this.atLineStart.delete(terminalId);
   }
 
   /** Subscribes to every appended chunk; returns an unsubscribe function. */
@@ -93,6 +107,7 @@ export class OutputBuffers {
       this.emit(execStreamId(execId), execRing.append(chunk), chunk);
       const termRing = this.ring(terminalStreamId(terminalId), this.terminalBytes);
       this.emit(terminalStreamId(terminalId), termRing.append(chunk), chunk);
+      this.atLineStart.set(terminalId, chunk.endsWith('\n'));
     }
     return { chunk, bytes: Buffer.byteLength(chunk, 'utf8'), truncated: execRing.truncated };
   }

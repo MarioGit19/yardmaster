@@ -151,13 +151,18 @@ for (const viewport of [
 test('stacked tabs at 390', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { card } = await openFirstPod(page);
-  const tabs = card.getByRole('tab');
-  await expect(tabs).toHaveText(['Sessions', 'Claude', 'Terminals']);
-  await expect(card.getByRole('tab', { name: 'Claude' })).toHaveAttribute('aria-selected', 'true');
+  // The view's own tabs; the terminal stack inside has tabs of its own.
+  const panels = card.getByRole('tablist', { name: 'Focus view panels' });
+  await expect(panels.getByRole('tab')).toHaveText(['Sessions', 'Claude', 'Terminals']);
+  await expect(panels.getByRole('tab', { name: 'Claude' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(card.locator('[role="separator"]')).toHaveCount(0);
-  await card.getByRole('tab', { name: 'Terminals' }).click();
-  await expect(card.getByRole('tabpanel')).toHaveCount(1);
-  await expect(card.getByRole('tabpanel')).toContainText('Terminals');
+  await panels.getByRole('tab', { name: 'Terminals' }).click();
+  await expect(card.locator('[id^="focus-panel-"]:visible')).toHaveCount(1);
+  await expect(card.locator('#focus-panel-terminals')).toContainText('Terminals');
+  await expect(card.locator('#focus-panel-terminals [data-terminal-stack]')).toBeVisible();
   const box = await card.boundingBox();
   expect(box?.x).toBeGreaterThanOrEqual(16);
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390 - 16);

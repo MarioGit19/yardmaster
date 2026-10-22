@@ -43,6 +43,8 @@ export interface BoardClientOptions {
 export const BASE_DELAY_MS = 500;
 export const MAX_DELAY_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 15_000;
+/** Per open stream, how much recent output a late listener gets replayed (UTF-16 units). */
+export const STREAM_HISTORY_CHARS = 2_000_000;
 
 /**
  * Delay before retry number `attempt` (1-based): exponential from `base`, capped at
@@ -76,6 +78,9 @@ interface StreamEntry {
   nextSeq: number;
   /** Nothing delivered yet, so the first chunk can't be a gap. */
   fresh: boolean;
+  /** Recent chunks, replayed to listeners that join an already open stream. */
+  history: { seq: number; chunk: string }[];
+  historyChars: number;
 }
 
 interface Pending {
@@ -157,9 +162,13 @@ export class BoardClient {
   subscribeStream(streamId: StreamId, listener: ChunkListener): () => void {
     let entry = this.streams.get(streamId);
     if (!entry) {
-      entry = { listeners: new Set(), nextSeq: 0, fresh: true };
+      entry = { listeners: new Set(), nextSeq: 0, fresh: true, history: [], historyChars: 0 };
       this.streams.set(streamId, entry);
       this.sendSubscribe(streamId, entry);
+    } else {
+      // The server only replays to a new socket subscription; catch this listener up locally.
+      for (const { seq, chunk } of entry.history)
+        this.deliver(listener, chunk, { seq, gap: false });
     }
     entry.listeners.add(listener);
     return () => {
@@ -320,12 +329,23 @@ export class BoardClient {
     const gap = !entry.fresh && seq > entry.nextSeq;
     entry.fresh = false;
     entry.nextSeq = seq + 1;
-    for (const listener of entry.listeners) {
-      try {
-        listener(chunk, { seq, gap });
-      } catch (error) {
-        this.log.warn('stream listener failed', error);
-      }
+    if (gap) {
+      entry.history = [];
+      entry.historyChars = 0;
+    }
+    entry.history.push({ seq, chunk });
+    entry.historyChars += chunk.length;
+    while (entry.historyChars > STREAM_HISTORY_CHARS && entry.history.length > 1) {
+      entry.historyChars -= entry.history.shift()?.chunk.length ?? 0;
+    }
+    for (const listener of entry.listeners) this.deliver(listener, chunk, { seq, gap });
+  }
+
+  private deliver(listener: ChunkListener, chunk: string, info: ChunkInfo): void {
+    try {
+      listener(chunk, info);
+    } catch (error) {
+      this.log.warn('stream listener failed', error);
     }
   }
 

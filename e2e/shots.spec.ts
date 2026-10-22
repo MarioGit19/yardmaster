@@ -262,3 +262,54 @@ test.describe('focus view', () => {
     });
   }
 });
+
+// The terminal stack: a tab with typed output and a failed command, the 2×2 grid, the
+// interactive-app card, search and the maximized stack.
+test.describe('terminal stack', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('stack', async ({ page }) => {
+        await openRoute(page, '/');
+        await openRoute(page, await firstProjectRoute(page));
+        const stack = page.locator('[data-terminal-stack]');
+        const shot = (name: string) =>
+          page.screenshot({
+            path: new URL(`${name}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+
+        await stack.getByRole('tab', { name: /^zsh\b/ }).click();
+        const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+        for (const command of ['git status -sb', 'ls', 'pnpm typecheck']) {
+          await input.fill(command);
+          await input.press('Enter');
+          await expect(input).toHaveValue('');
+        }
+        await input.fill('pnpm');
+        await page.waitForTimeout(900);
+        await shot('terminals-tab');
+
+        await stack.getByRole('button', { name: 'Search output' }).click();
+        await stack.getByRole('searchbox').fill('error');
+        await page.waitForTimeout(300);
+        await shot('terminals-search');
+        await stack.getByRole('searchbox').press('Escape');
+
+        await stack.getByRole('tab', { name: /^claude\b/ }).click();
+        await expect(stack.locator('[data-interactive]')).toBeVisible({ timeout: 10_000 });
+        await page.waitForTimeout(300);
+        await shot('terminals-interactive');
+
+        await stack.getByRole('tab', { name: /^next dev\b/ }).click();
+        await stack.getByRole('button', { name: 'Show up to four terminals' }).click();
+        await page.waitForTimeout(900);
+        await shot('terminals-grid');
+
+        await stack.getByRole('button', { name: 'Maximize terminals' }).click();
+        await page.waitForTimeout(900);
+        await shot('terminals-maximized');
+      });
+    });
+  }
+});

@@ -187,6 +187,8 @@ export class BoardStore {
       interactive: false,
     };
     this.put('executions', execution.id, execution);
+    const header = commandHeader(execution.commandLine);
+    if (header !== null) this.output.appendTerminalLine(terminal.id, header);
 
     const ids = [...terminal.executionIds, execution.id];
     const excess = ids.length - this.maxExecutions;
@@ -383,4 +385,19 @@ function shallowEqual(a: object, b: object): boolean {
   const ak = Object.keys(a);
   if (ak.length !== Object.keys(b).length) return false;
   return ak.every((key) => Object.is((a as never)[key], (b as never)[key]));
+}
+
+const MAX_HEADER_CHARS = 2_000;
+
+/**
+ * The `$ command` line a terminal shows above a run's output (VS Code's execution stream has
+ * only the output). Control characters are flattened so a command can't restyle the view.
+ */
+export function commandHeader(commandLine: string): string | null {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point.
+  const command = commandLine.replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').trim();
+  if (command === '') return null;
+  const shown =
+    command.length > MAX_HEADER_CHARS ? `${command.slice(0, MAX_HEADER_CHARS)}…` : command;
+  return `\x1b[2m$\x1b[22m \x1b[1m${shown}\x1b[22m`;
 }

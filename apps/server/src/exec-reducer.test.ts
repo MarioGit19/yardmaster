@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyExecEvent, type ExecEvent } from './exec-reducer.js';
-import { BoardStore } from './store.js';
+import { BoardStore, commandHeader } from './store.js';
 
 const T0 = 1_700_000_000_000;
 
@@ -45,7 +45,10 @@ describe('applyExecEvent', () => {
       outputBytes: Buffer.byteLength('building…\n'),
     });
     expect(store.output.read('exec:e1')?.chunks).toEqual([{ seq: 0, chunk: 'building…\n' }]);
-    expect(store.output.read('term:term-1')?.chunks).toEqual([{ seq: 0, chunk: 'building…\n' }]);
+    expect(store.output.read('term:term-1')?.chunks).toEqual([
+      { seq: 0, chunk: `${commandHeader('pnpm build')}\r\n` },
+      { seq: 1, chunk: 'building…\n' },
+    ]);
   });
 
   it('strips OSC 633 markers that reach the output', () => {

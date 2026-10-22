@@ -17,7 +17,8 @@ import {
   type ToolActivity,
   toolFamily,
 } from '@c-board/protocol';
-import type { ActionResult } from '../actions.js';
+import type { ActionHandlers, ActionResult } from '../actions.js';
+import { NOTHING_TO_RERUN, type TerminalActionKind } from '../editor-actions.js';
 import type { BoardStore } from '../store.js';
 import {
   DEMO_CHANGED_FILES,
@@ -31,7 +32,14 @@ import {
   type DemoTerminal,
   type DemoTool,
 } from './content.js';
-import { claudeBanner, DEV_SERVERS, type DevServerKind, jestRun, SHELL_COMMANDS } from './logs.js';
+import {
+  claudeBanner,
+  DEV_SERVERS,
+  type DevServerKind,
+  jestRun,
+  SHELL_COMMANDS,
+  typedCommand,
+} from './logs.js';
 import { Rng } from './rng.js';
 
 /** PRD F12: a permission request roughly every 45 s. */
@@ -43,6 +51,8 @@ const STATS_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const RESOLVED_APPROVAL_TTL_MS = 60_000;
 const MAX_SUBAGENTS = 6;
+/** SIGINT: what a shell reports for a command stopped with Ctrl+C. */
+const INTERRUPTED_EXIT = 130;
 
 export interface DemoSimulatorOptions {
   store: BoardStore;
@@ -158,6 +168,44 @@ export class DemoSimulator {
     const reason = decision.decision === 'deny' ? (decision.reason ?? null) : null;
     this.resolveApproval(session, decision.decision === 'deny' ? 'denied' : 'allowed', reason);
     return { ok: true };
+  }
+
+  /**
+   * Terminal actions from the board, played out on the demo terminals as a shell would: typed
+   * commands run and echo, Ctrl+C stops what is running, and a rerun runs the command again.
+   * Creating and closing terminals still needs a real editor.
+   */
+  terminalActions(): Pick<ActionHandlers, TerminalActionKind> {
+    const offline = (): ActionResult => ({ ok: false, error: 'editor_offline' });
+    return {
+      'terminal.sendText': ({ terminalId, text, execute }) => {
+        const terminal = this.openTerminal(terminalId);
+        if (!terminal.ok) return terminal;
+        this.sendText(terminal.ctx, text, execute);
+        return { ok: true };
+      },
+      'terminal.interrupt': ({ terminalId }) => {
+        const terminal = this.openTerminal(terminalId);
+        if (!terminal.ok) return terminal;
+        this.interrupt(terminal.ctx);
+        return { ok: true };
+      },
+      'terminal.rerun': ({ execId }) => {
+        const execution = this.store.state.executions[execId];
+        if (!execution) return { ok: false, error: 'unknown_execution' };
+        const terminal = this.openTerminal(execution.terminalId);
+        if (!terminal.ok) return terminal;
+        if (execution.commandLine.trim() === '') return { ok: false, error: NOTHING_TO_RERUN };
+        this.rerun(terminal.ctx, execution.commandLine);
+        return { ok: true };
+      },
+      'terminal.focus': ({ terminalId }) => {
+        const terminal = this.openTerminal(terminalId);
+        return terminal.ok ? { ok: true } : terminal;
+      },
+      'terminal.create': offline,
+      'terminal.close': offline,
+    };
   }
 
   // Setup
@@ -338,6 +386,68 @@ export class DemoSimulator {
       this.endExec(terminal, execId, command.exitCode ?? 0);
       this.after(this.rng.int(15_000, 50_000), () => this.runShellCommand(terminal));
     });
+  }
+
+  // Board input
+
+  private openTerminal(
+    terminalId: string,
+  ): { ok: true; ctx: TerminalCtx } | { ok: false; error: string } {
+    const ctx = this.running ? this.terminals.find((t) => t.id === terminalId) : undefined;
+    if (!ctx) return { ok: false, error: 'unknown_terminal' };
+    if (this.store.state.terminals[terminalId]?.state !== 'open') {
+      return { ok: false, error: 'terminal_closed' };
+    }
+    return { ok: true, ctx };
+  }
+
+  private sendText(terminal: TerminalCtx, text: string, execute: boolean): void {
+    // A running program gets the input, and the pty echoes it into its output.
+    if (terminal.execId) {
+      this.write(terminal, terminal.execId, execute ? `${text}\r\n` : text);
+      return;
+    }
+    // At the prompt, only a submitted line does anything visible.
+    const command = text.split(/\r?\n/)[0]?.trim() ?? '';
+    if (execute && command !== '') this.runTyped(terminal, command);
+  }
+
+  private runTyped(terminal: TerminalCtx, commandLine: string): void {
+    const { output, exitCode } = typedCommand(commandLine, this.rng, terminal.project.def);
+    const execId = this.startExec(terminal, commandLine);
+    this.after(this.rng.int(80, 240), () => {
+      if (output !== '') this.write(terminal, execId, output);
+      this.endExec(terminal, execId, exitCode);
+    });
+  }
+
+  private interrupt(terminal: TerminalCtx): void {
+    const execId = terminal.execId;
+    if (!execId) return;
+    const { kind } = terminal.def;
+    if (kind === 'claude') {
+      // Claude Code asks for a second Ctrl+C before it exits; the session carries on.
+      this.write(terminal, execId, `\r\n${'\x1b[2m'}Press Ctrl-C again to exit${'\x1b[22m'}\r\n`);
+      return;
+    }
+    this.write(terminal, execId, '^C\r\n');
+    this.endExec(terminal, execId, INTERRUPTED_EXIT);
+    terminal.execId = null;
+    terminal.childPid = null;
+    this.unbindPort(terminal);
+  }
+
+  private rerun(terminal: TerminalCtx, commandLine: string): void {
+    const { kind } = terminal.def;
+    if (terminal.execId) return;
+    if (
+      (kind === 'next' || kind === 'vite' || kind === 'rails') &&
+      DEV_SERVERS[kind].command === commandLine
+    ) {
+      this.bootDevServer(terminal, kind);
+      return;
+    }
+    this.runTyped(terminal, commandLine);
   }
 
   // Claude sessions

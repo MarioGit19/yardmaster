@@ -9,7 +9,7 @@ import {
 } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { execStreamId, terminalStreamId } from './output-buffers.js';
-import { BoardStore, type BoardStoreOptions } from './store.js';
+import { BoardStore, type BoardStoreOptions, commandHeader } from './store.js';
 
 const ESC = '\x1b';
 const T0 = 1_760_000_000_000;
@@ -164,7 +164,9 @@ describe('BoardStore mutators', () => {
         ?.chunks.map((c) => c.chunk)
         .join('');
     expect(text(execStreamId('e-1'))).toBe(`${ESC}[32mPASS${ESC}[0m\né`);
-    expect(text(terminalStreamId('t-1'))).toBe(`${ESC}[32mPASS${ESC}[0m\né`);
+    expect(text(terminalStreamId('t-1'))).toBe(
+      `${commandHeader('pnpm test')}\r\n${ESC}[32mPASS${ESC}[0m\né`,
+    );
     expect(BoardState.safeParse(store.state).success).toBe(true);
   });
 
@@ -408,6 +410,17 @@ describe('BoardStore patch emission', () => {
   });
 });
 
+describe('commandHeader', () => {
+  it('shows the command after a dim prompt, flattening control characters', () => {
+    expect(commandHeader('pnpm test')).toBe(`${ESC}[2m$${ESC}[22m ${ESC}[1mpnpm test${ESC}[22m`);
+    expect(commandHeader(`echo a\nb${ESC}[31m`)).toBe(
+      `${ESC}[2m$${ESC}[22m ${ESC}[1mecho a b [31m${ESC}[22m`,
+    );
+    expect(commandHeader('  \n ')).toBeNull();
+    expect(commandHeader('x'.repeat(3_000))).toContain(`${'x'.repeat(2_000)}…`);
+  });
+});
+
 describe('OutputBuffers live data', () => {
   it('streams stripped chunks with per-stream seqs', () => {
     const { store } = seeded();
@@ -430,10 +443,13 @@ describe('OutputBuffers live data', () => {
     });
     store.appendExecOutput('e-2', 'two');
     expect(seen).toEqual([
+      ['term:t-1', 0, `${commandHeader('a')}\r\n`],
       ['exec:e-1', 0, 'one'],
-      ['term:t-1', 0, 'one'],
+      ['term:t-1', 1, 'one'],
+      // 'one' left the cursor mid-line, so the next header starts a line of its own.
+      ['term:t-1', 2, `\r\n${commandHeader('b')}\r\n`],
       ['exec:e-2', 0, 'two'],
-      ['term:t-1', 1, 'two'],
+      ['term:t-1', 3, 'two'],
     ]);
   });
 });

@@ -195,6 +195,8 @@ export async function buildServer(
       router: editorRouter,
       send: editorGateway.sendCommand.bind(editorGateway),
     }),
+    // Demo windows have no socket, so the simulator plays the editor's part.
+    ...demo?.terminalActions(),
   };
 
   const gateway: UiGateway = new UiGateway({

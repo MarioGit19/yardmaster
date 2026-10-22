@@ -272,3 +272,43 @@ export function claudeBanner(project: DemoProject, model: string): string {
 function hex(rng: Rng): string {
   return rng.hex(7);
 }
+
+export interface TypedCommandResult {
+  output: string;
+  exitCode: number;
+}
+
+/**
+ * What a demo shell prints for a command typed from the board: `echo`, `pwd`, `true`, `false`,
+ * `exit N` and the scripted shell commands; anything else is "command not found".
+ */
+export function typedCommand(
+  commandLine: string,
+  rng: Rng,
+  project: DemoProject,
+): TypedCommandResult {
+  const command = commandLine.trim();
+  const [name = '', ...args] = command.split(/\s+/);
+  const scripted = SHELL_COMMANDS.find((c) => c.command === command);
+  if (scripted) return { output: scripted.output(rng, project), exitCode: scripted.exitCode ?? 0 };
+  switch (name) {
+    case 'echo':
+      return { output: lines(unquote(command.slice(name.length).trim())), exitCode: 0 };
+    case 'pwd':
+      return { output: lines(project.path), exitCode: 0 };
+    case 'true':
+      return { output: '', exitCode: 0 };
+    case 'false':
+      return { output: '', exitCode: 1 };
+    case 'exit': {
+      const code = Number.parseInt(args[0] ?? '0', 10);
+      return { output: '', exitCode: Number.isFinite(code) ? code & 0xff : 0 };
+    }
+    default:
+      return { output: lines(`zsh: command not found: ${name}`), exitCode: 127 };
+  }
+}
+
+function unquote(text: string): string {
+  return text.replace(/^(['"])(.*)\1$/s, '$2');
+}

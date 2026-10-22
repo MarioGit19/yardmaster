@@ -9,7 +9,13 @@ import {
   type UiToServer,
 } from '@c-board/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BoardClient, backoffDelay, type ChunkInfo, type SocketLike } from './client.js';
+import {
+  BoardClient,
+  backoffDelay,
+  type ChunkInfo,
+  type SocketLike,
+  STREAM_HISTORY_CHARS,
+} from './client.js';
 import { selectProjects, selectTerminalsByProject } from './selectors.js';
 import { createBoardStore } from './store.js';
 
@@ -412,6 +418,45 @@ describe('BoardClient streams', () => {
     client.subscribeStream(S, (_chunk, info) => infos.push(info));
     last().receive(data(S, 40, 'late'));
     expect(infos).toEqual([{ seq: 40, gap: false }]);
+  });
+
+  it('catches a late listener up from recent history, starting after the last gap', () => {
+    const { client, connect, last } = setup();
+    client.start();
+    connect();
+    const stop = client.subscribeStream(S, () => {});
+    last().receive(data(S, 0, 'a'));
+    last().receive(data(S, 1, 'b'));
+
+    const late: [string, ChunkInfo][] = [];
+    client.subscribeStream(S, (chunk, info) => late.push([chunk, info]));
+    expect(late).toEqual([
+      ['a', { seq: 0, gap: false }],
+      ['b', { seq: 1, gap: false }],
+    ]);
+    last().receive(data(S, 2, 'c'));
+    expect(late.map(([chunk]) => chunk)).toEqual(['a', 'b', 'c']);
+    // Only one server subscription, so no second replay arrives.
+    expect(last().subscribes()).toEqual([{ streamId: S }]);
+
+    // Output lost to a gap isn't papered over for the next listener.
+    last().receive(data(S, 9, 'j'));
+    const later: string[] = [];
+    client.subscribeStream(S, (chunk) => later.push(chunk));
+    expect(later).toEqual(['j']);
+    stop();
+  });
+
+  it('keeps a bounded history', () => {
+    const { client, connect, last } = setup();
+    client.start();
+    connect();
+    client.subscribeStream(S, () => {});
+    const big = 'x'.repeat(STREAM_HISTORY_CHARS / 2);
+    for (let seq = 0; seq < 4; seq++) last().receive(data(S, seq, big));
+    const seqs: number[] = [];
+    client.subscribeStream(S, (_chunk, info) => seqs.push(info.seq));
+    expect(seqs).toEqual([2, 3]);
   });
 
   it('shares one server subscription between listeners and unsubscribes after the last', () => {

@@ -1,11 +1,12 @@
 import type { Terminal } from '@c-board/protocol';
-import { Check, ChevronRight, X } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNow } from '../anim/clock.js';
 import { selectPortsByTerminal, useBoardList, useBoardShallow } from '../data/index.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease } from '../motion.js';
 import { cx } from '../ui/cx.js';
+import { ExitBadge } from '../ui/ExitBadge.js';
 import { formatUptime, laneView, selectLaneExecution, uptimePeriod } from './lane.js';
 import { PortChip } from './PortChip.js';
 import { Sparkline } from './Sparkline.js';
@@ -129,27 +130,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
         <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-meta tabular text-text-3">
           <AnimatePresence initial={false} mode="popLayout">
             {view.exit ? (
-              <motion.span
-                key={view.exit.key}
-                role="img"
-                aria-label={view.exit.code === 0 ? 'Exited 0' : `Exit code ${view.exit.code}`}
-                title={view.exit.code === 0 ? 'Exited 0' : `Exit code ${view.exit.code}`}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
-                transition={spring.snappy}
-                className={cx(
-                  'inline-flex h-5 items-center gap-0.5 rounded-chip px-1',
-                  view.exit.code === 0 ? 'text-st-ok' : 'bg-st-err-glow text-st-err',
-                )}
-              >
-                {view.exit.code === 0 ? (
-                  <Check aria-hidden className="size-3" strokeWidth={2.25} />
-                ) : (
-                  <X aria-hidden className="size-3" strokeWidth={2.25} />
-                )}
-                {view.exit.code}
-              </motion.span>
+              <ExitBadge key={view.exit.key} code={view.exit.code} />
             ) : (
               <motion.span
                 key="state"

@@ -1,4 +1,4 @@
-import type { ClaudeSession, GitFileStatus, Project, Terminal } from '@c-board/protocol';
+import type { ClaudeSession, GitFileStatus, Project } from '@c-board/protocol';
 import { ArrowDown, ArrowLeft, ArrowUp, GitBranch, GitCommitHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -13,7 +13,6 @@ import {
   useBoard,
   useBoardList,
 } from '../data/index.js';
-import { TerminalLane } from '../lanes/TerminalLane.js';
 import { dur, ease, spring } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
@@ -22,6 +21,7 @@ import { useMediaQuery } from '../prefs.js';
 import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import { TerminalStack } from '../terminal/TerminalStack.js';
 import { buttonClass } from '../ui/Button.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
@@ -109,7 +109,15 @@ function ProjectFocus({
     />
   );
   const claudeColumn = <ClaudeColumn session={session} missing={Boolean(sessionId && !session)} />;
-  const terminalsColumn = <TerminalsColumn terminals={terminals} accent={accent} />;
+  const [maximized, setMaximized] = useState(false);
+  const terminalsColumn = (
+    <TerminalStack
+      projectId={project.id}
+      terminals={terminals}
+      deferRenderers={shared}
+      {...(tabs ? {} : { maximized, onMaximizedChange: setMaximized })}
+    />
+  );
 
   return (
     <motion.div
@@ -172,6 +180,7 @@ function ProjectFocus({
             left={sessionsColumn}
             center={claudeColumn}
             right={terminalsColumn}
+            rightMaximized={maximized}
           />
         )}
       </motion.div>
@@ -495,54 +504,6 @@ function ClaudeColumn({ session, missing }: { session?: ClaudeSession; missing: 
         </p>
       )}
     </div>
-  );
-}
-
-/** Interim terminal stack; 7.7 replaces it with xterm tabs. */
-function TerminalsColumn({
-  terminals,
-  accent,
-}: {
-  terminals: readonly Terminal[];
-  accent: string;
-}) {
-  const open = terminals
-    .filter((t) => t.state === 'open')
-    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-  const closed = terminals.filter((t) => t.state === 'closed');
-  return (
-    <>
-      <ColumnHeading meta={open.length || undefined}>Terminals</ColumnHeading>
-      {open.length === 0 && closed.length === 0 && (
-        <p className="text-body-sm text-text-3">No terminals</p>
-      )}
-      {open.length > 0 && (
-        <div className="lanes relative">
-          <ul aria-label="Open terminals" className="flex flex-col">
-            {open.map((terminal) => (
-              <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
-            ))}
-          </ul>
-        </div>
-      )}
-      {closed.length > 0 && (
-        <ul aria-label="Closed terminals" className="mt-4 flex flex-col gap-1.5">
-          {closed.map((t) => (
-            <li key={t.id} className="flex min-w-0 items-center gap-2 text-body-sm">
-              <span className="min-w-0 flex-1 truncate text-text-3" title={t.name}>
-                {t.name}
-              </span>
-              <StatusDot
-                tone={t.exitCode ? 'err' : 'idle'}
-                label={t.exitCode ? `Exited ${t.exitCode}` : 'Closed'}
-                showLabel
-                className="text-meta text-text-3"
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
   );
 }
 

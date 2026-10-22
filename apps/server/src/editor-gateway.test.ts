@@ -7,6 +7,7 @@ import { startServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { EDITOR_WS_PATH } from './editor-gateway.js';
 import { TOKEN_HEADER } from './security.js';
+import { commandHeader } from './store.js';
 import { generateToken } from './token.js';
 
 const config: ServerConfig = {
@@ -395,9 +396,13 @@ describe('/ws/editor', () => {
       send(socket, 'exec.data', { execId: 'exec-2', seq: 0, chunk: 'second\n' });
       await waitFor(() => app.store.output.has('exec:exec-2'));
 
+      // Each run starts with the command line, as in the editor's terminal.
+      const header = `${commandHeader('pnpm test')}\r\n`;
       expect(app.store.output.read('term:term-1')?.chunks).toEqual([
-        { seq: 0, chunk: 'first\n' },
-        { seq: 1, chunk: 'second\n' },
+        { seq: 0, chunk: header },
+        { seq: 1, chunk: 'first\n' },
+        { seq: 2, chunk: header },
+        { seq: 3, chunk: 'second\n' },
       ]);
       expect(app.store.output.read('exec:exec-2')?.chunks).toEqual([{ seq: 0, chunk: 'second\n' }]);
     });

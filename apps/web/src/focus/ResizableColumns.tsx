@@ -31,6 +31,8 @@ export interface ResizableColumnsProps {
   center: ReactNode;
   right: ReactNode;
   labels: Record<SideColumn | 'center', string>;
+  /** The right column covers the others (the maximized terminal stack). */
+  rightMaximized?: boolean;
 }
 
 /**
@@ -43,6 +45,7 @@ export function ResizableColumns({
   center,
   right,
   labels,
+  rightMaximized = false,
 }: ResizableColumnsProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -80,9 +83,9 @@ export function ResizableColumns({
     <motion.div
       ref={rootRef}
       style={{ gridTemplateColumns: columns }}
-      className="grid min-h-0 flex-1"
+      className="relative grid min-h-0 flex-1"
     >
-      <section id={ids.left} aria-label={labels.left} className="focus-col">
+      <section id={ids.left} aria-label={labels.left} className="focus-col" inert={rightMaximized}>
         {left}
       </section>
       <Handle
@@ -94,7 +97,7 @@ export function ResizableColumns({
         width={width}
         onCommit={commit}
       />
-      <section aria-label={labels.center} className="focus-col">
+      <section aria-label={labels.center} className="focus-col" inert={rightMaximized}>
         {center}
       </section>
       <Handle
@@ -106,7 +109,11 @@ export function ResizableColumns({
         width={width}
         onCommit={commit}
       />
-      <section id={ids.right} aria-label={labels.right} className="focus-col">
+      <section
+        id={ids.right}
+        aria-label={labels.right}
+        className={cx('focus-col', rightMaximized && 'focus-col-max')}
+      >
         {right}
       </section>
     </motion.div>

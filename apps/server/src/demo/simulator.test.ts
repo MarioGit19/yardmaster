@@ -227,6 +227,88 @@ describe('DemoSimulator', () => {
     }
   });
 
+  describe('terminal actions', () => {
+    const execsOf = (store: BoardStore, terminalId: string) =>
+      (store.state.terminals[terminalId]?.executionIds ?? []).map(
+        (id) => store.state.executions[id],
+      );
+    const outputOf = (store: BoardStore, execId: string | undefined) =>
+      store.output
+        .read(`exec:${execId}`, 0)
+        ?.chunks.map((c) => c.chunk)
+        .join('') ?? '';
+
+    it('runs a typed command and echoes its output', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(500);
+      const actions = sim.terminalActions();
+      const shell = 'demo-term-acme-shop-3';
+
+      const result = await actions['terminal.sendText']({
+        kind: 'terminal.sendText',
+        terminalId: shell,
+        text: 'echo "hello from the board"',
+        execute: true,
+      });
+      expect(result).toEqual({ ok: true });
+      advance(500);
+      const typed = execsOf(store, shell).find((e) => e?.commandLine.startsWith('echo'));
+      expect(typed?.exitCode).toBe(0);
+      expect(outputOf(store, typed?.id)).toBe('hello from the board\r\n');
+
+      await actions['terminal.sendText']({
+        kind: 'terminal.sendText',
+        terminalId: shell,
+        text: 'false',
+        execute: true,
+      });
+      advance(500);
+      expect(execsOf(store, shell).at(-1)).toMatchObject({ commandLine: 'false', exitCode: 1 });
+      sim.stop();
+    });
+
+    it('stops a dev server on Ctrl+C and reruns it', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(5_000);
+      const actions = sim.terminalActions();
+      const dev = 'demo-term-acme-shop-1';
+      const server = execsOf(store, dev).at(-1);
+      expect(server?.endedAt).toBeNull();
+
+      await actions['terminal.interrupt']({ kind: 'terminal.interrupt', terminalId: dev });
+      expect(store.state.executions[server?.id ?? '']?.exitCode).toBe(130);
+      expect(outputOf(store, server?.id)).toContain('^C');
+      expect(Object.values(store.state.ports).some((p) => p.terminalId === dev)).toBe(false);
+
+      await actions['terminal.rerun']({ kind: 'terminal.rerun', execId: server?.id ?? '' });
+      advance(3_000);
+      const rerun = execsOf(store, dev).at(-1);
+      expect(rerun?.id).not.toBe(server?.id);
+      expect(rerun).toMatchObject({ commandLine: server?.commandLine, endedAt: null });
+      sim.stop();
+    });
+
+    it('rejects unknown terminals and leaves creation to a real editor', async () => {
+      const { sim } = run();
+      sim.start();
+      const actions = sim.terminalActions();
+      expect(
+        await actions['terminal.sendText']({
+          kind: 'terminal.sendText',
+          terminalId: 'nope',
+          text: 'ls',
+          execute: true,
+        }),
+      ).toEqual({ ok: false, error: 'unknown_terminal' });
+      expect(
+        await actions['terminal.create']({ kind: 'terminal.create', projectId: 'a1b2c3d4e5f6' }),
+      ).toEqual({ ok: false, error: 'editor_offline' });
+      sim.stop();
+    });
+  });
+
   it('is reproducible for a seed and stops cleanly', () => {
     const a = run({ seed: 7 });
     a.sim.start();

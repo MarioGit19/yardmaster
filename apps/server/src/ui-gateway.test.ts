@@ -10,7 +10,7 @@ import { startServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { RingBuffer } from './ring-buffer.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
-import { BoardStore } from './store.js';
+import { BoardStore, commandHeader } from './store.js';
 import { generateToken } from './token.js';
 import { UI_WS_PATH, UiGateway } from './ui-gateway.js';
 
@@ -263,9 +263,16 @@ describe('/ws/ui streams', () => {
     client.send('subscribe', { streamId: 'term:term-1' });
     client.send('subscribe', { streamId: 'exec:other' });
     await new Promise((resolve) => setTimeout(resolve, 20));
+    // The replay: the run's command line.
+    const header = await client.nextOf('stream.data');
+    expect(header.payload).toEqual({
+      streamId: 'term:term-1',
+      seq: 0,
+      chunk: `${commandHeader('pnpm dev')}\r\n`,
+    });
     store.appendExecOutput('exec-1', 'hello\n');
     const data = await client.nextOf('stream.data');
-    expect(data.payload).toEqual({ streamId: 'term:term-1', seq: 0, chunk: 'hello\n' });
+    expect(data.payload).toEqual({ streamId: 'term:term-1', seq: 1, chunk: 'hello\n' });
 
     client.send('unsubscribe', { streamId: 'term:term-1' });
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -396,7 +403,7 @@ describe('UiGateway backpressure', () => {
       }),
       expect.objectContaining({
         type: 'stream.resync',
-        payload: { streamId: 'term:term-1', fromSeq: 1 },
+        payload: { streamId: 'term:term-1', fromSeq: 2 },
       }),
     ]);
 
