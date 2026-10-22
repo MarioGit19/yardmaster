@@ -16,6 +16,7 @@ import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
+import { createDemoQuery } from './demo/demo-query.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
@@ -64,7 +65,7 @@ export interface BuildOptions {
   webRoot?: string;
   /** Transcript reader tuning, for tests. Not started in demo mode. */
   transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
-  /** Board session runner tuning (tests inject a mocked `query`). Not started in demo mode. */
+  /** Board session runner tuning (tests inject a mocked `query`). Demo mode uses a scripted one. */
   runner?: Pick<SessionRunnerOptions, 'query' | 'newId' | 'draftIntervalMs' | 'approvalTimeoutMs'>;
   /** Session registry discovery tuning, for tests. Not started in demo mode. */
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
@@ -90,7 +91,7 @@ declare module 'fastify' {
     hookStats: HookStats;
     hookIngest: HookIngest;
     transcripts: TranscriptService | null;
-    sessionRunner: SessionRunner | null;
+    sessionRunner: SessionRunner;
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
     sessionLinker: SessionLinker | null;
@@ -136,7 +137,7 @@ export async function buildServer(
     processScanner?.stop();
     sessionLinker?.stop();
     gitScanner?.stop();
-    await runner?.closeAll();
+    await runner.closeAll();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -174,16 +175,19 @@ export async function buildServer(
         ...options.transcripts,
       });
   app.decorate('transcripts', transcripts);
-  const runner = options.demo
-    ? null
-    : new SessionRunner({
-        store,
-        transcripts,
-        logger: logger.child({ component: 'runner' }),
-        onActivity: recordActivity,
-        onMessage: (message) => gateway.broadcast(message),
-        ...options.runner,
-      });
+  // Demo board sessions run the real runner over a scripted query and the demo transcripts.
+  const demoTranscripts = demo?.transcripts;
+  const runner = new SessionRunner({
+    store,
+    transcripts: demoTranscripts ?? transcripts,
+    logger: logger.child({ component: 'runner' }),
+    onActivity: recordActivity,
+    onMessage: (message) => gateway.broadcast(message),
+    ...(demoTranscripts
+      ? { query: createDemoQuery({ onFork: (from, to) => demoTranscripts.copy(from, to) }) }
+      : {}),
+    ...options.runner,
+  });
   app.decorate('sessionRunner', runner);
   const discovery = options.demo
     ? null
@@ -230,7 +234,7 @@ export async function buildServer(
       router: editorRouter,
       send: editorGateway.sendCommand.bind(editorGateway),
     }),
-    ...runner?.actions(),
+    ...runner.actions(),
     // Demo windows have no socket, so the simulator plays the editor's part.
     ...demo?.terminalActions(),
   };
@@ -239,12 +243,12 @@ export async function buildServer(
     store,
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
-    ...(demo
-      ? { decideApproval: demo.decideApproval.bind(demo) }
-      : runner
-        ? { decideApproval: runner.decideApproval.bind(runner) }
-        : {}),
-    ...(runner ? { sendToSession: runner.send.bind(runner) } : {}),
+    // Demo approvals come from the simulator, unless a demo board session asked.
+    decideApproval: (decision) => {
+      const result = runner.decideApproval(decision);
+      return demo && !result.ok ? demo.decideApproval(decision) : result;
+    },
+    sendToSession: runner.send.bind(runner),
     recentActivity: () =>
       persistence.listActivity({ since: Date.now() - PULSE_WINDOW_MS, limit: MAX_ACTIVITY_BATCH }),
     logger: logger.child({ component: 'ui-ws' }),

@@ -6,6 +6,8 @@ import { Chip } from '../ui/Chip.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { EmptyState } from '../views/Page.js';
+import { SessionComposer } from './Composer.js';
+import { OriginBadge } from './OriginBadge.js';
 import { streamingTail } from './transcript.js';
 import { useTranscript } from './useTranscript.js';
 
@@ -35,7 +37,14 @@ export function ClaudePanel({
   // The replay of a long transcript is hundreds of socket messages: keep them out of the morph.
   const { rows, loaded } = useTranscript(session.id, settled);
   const status = sessionStatusView(session.status);
-  const tail = streamingTail(rows, session.lastAssistantText, WRITING.has(session.status.kind));
+  const writing = WRITING.has(session.status.kind);
+  // Board sessions stream into `draft`, cleared as the block lands in the transcript.
+  const tail =
+    session.origin === 'board'
+      ? writing && session.draft
+        ? session.draft
+        : null
+      : streamingTail(rows, session.lastAssistantText, writing);
 
   return (
     <div className="claude-panel flex h-full min-h-0 flex-col" data-session-panel={session.id}>
@@ -46,6 +55,7 @@ export function ClaudePanel({
         >
           {session.title ?? 'Claude session'}
         </h2>
+        <OriginBadge origin={session.origin} compact="narrow" />
         <StatusDot
           tone={status.tone}
           label={status.label}
@@ -68,7 +78,9 @@ export function ClaudePanel({
       ) : rows.length === 0 && tail === null ? (
         <div className="min-h-0 flex-1 px-5">
           <EmptyState title="No messages yet">
-            The conversation shows up here as soon as Claude writes to its transcript.
+            {session.origin === 'board'
+              ? 'Your first message and Claude’s reply show up here.'
+              : 'The conversation shows up here as soon as Claude writes to its transcript.'}
           </EmptyState>
         </div>
       ) : (
@@ -76,13 +88,17 @@ export function ClaudePanel({
           <MessageList key={session.id} rows={rows} tail={tail} cwd={session.cwd ?? undefined} />
         </Suspense>
       )}
+      <SessionComposer session={session} />
     </div>
   );
 }
 
 function TranscriptSkeleton() {
   return (
-    <div aria-busy className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-5 pt-5">
+    <div
+      aria-busy
+      className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 px-5 pt-5"
+    >
       <Skeleton className="h-9 w-2/5 self-end rounded-panel" />
       <Skeleton className="h-4 w-11/12" />
       <Skeleton className="h-4 w-4/5" />

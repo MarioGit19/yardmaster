@@ -1,6 +1,7 @@
 import type { UiAction, UiActionKind } from '@c-board/protocol';
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+/** `sessionId`: the session an action started (`session.create`, a forked resume). */
+export type ActionResult = { ok: true; sessionId?: string } | { ok: false; error: string };
 
 export type ActionOf<K extends UiActionKind> = Extract<UiAction, { kind: K }>;
 

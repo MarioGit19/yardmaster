@@ -331,6 +331,8 @@ describe('/ws/ui messages', () => {
         seen.push(action.terminalId);
         return { ok: true };
       },
+      // The session an action started travels back with the result.
+      'session.close': () => ({ ok: true, sessionId: 'sess-2' }),
     };
     const { port, origin } = await boot(actions);
     const client = await connect(port, origin);
@@ -339,6 +341,13 @@ describe('/ws/ui messages', () => {
     client.send('action', { kind: 'terminal.focus', terminalId: 'term-1' }, 'act-1');
     expect((await client.nextOf('action.result')).payload).toEqual({ id: 'act-1', ok: true });
     expect(seen).toEqual(['term-1']);
+
+    client.send('action', { kind: 'session.close', sessionId: 'sess-1' }, 'act-3');
+    expect((await client.nextOf('action.result')).payload).toEqual({
+      id: 'act-3',
+      ok: true,
+      sessionId: 'sess-2',
+    });
 
     client.send('action', { kind: 'terminal.interrupt', terminalId: 'term-1' }, 'act-2');
     expect((await client.nextOf('action.result')).payload).toEqual({

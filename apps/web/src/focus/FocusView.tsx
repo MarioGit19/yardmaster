@@ -1,9 +1,11 @@
 import type { ClaudeSession, Project } from '@c-board/protocol';
-import { ArrowLeft, GitBranch } from 'lucide-react';
+import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
+import { NewSessionComposer } from '../claude/Composer.js';
+import { OriginBadge } from '../claude/OriginBadge.js';
 import {
   selectApproval,
   selectHydrated,
@@ -29,6 +31,7 @@ import { useTerminalTarget } from '../terminal/target.js';
 import { buttonClass } from '../ui/Button.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
+import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
@@ -99,6 +102,11 @@ function ProjectFocus({
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
   const terminalRequested = useTerminalTarget(project.id) !== null;
+  // "New session" swaps the Claude panel for a blank composer until the session exists.
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (sessionId) setComposing(false);
+  }, [sessionId]);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -110,13 +118,20 @@ function ProjectFocus({
     <SessionsColumn
       project={project}
       sessions={sessions}
-      activeId={session?.id}
+      activeId={composing ? undefined : session?.id}
       accent={accent}
       sharedOrbs={shared && !tabs}
+      composing={composing}
+      onNewSession={() => setComposing(true)}
     />
   );
   const claudeColumn = (
-    <ClaudeColumn session={session} missing={Boolean(sessionId && !session)} defer={shared} />
+    <ClaudeColumn
+      project={project}
+      session={composing ? undefined : session}
+      missing={!composing && Boolean(sessionId && !session)}
+      defer={shared}
+    />
   );
   const [maximized, setMaximized] = useState(false);
   const terminalsColumn = (
@@ -181,7 +196,7 @@ function ProjectFocus({
       <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
         {tabs ? (
           <FocusTabs
-            show={terminalRequested ? 'terminals' : null}
+            show={composing ? 'claude' : terminalRequested ? 'terminals' : null}
             panels={[
               { id: 'sessions', label: 'Sessions', content: sessionsColumn },
               { id: 'claude', label: 'Claude', content: claudeColumn },
@@ -294,6 +309,8 @@ function SessionsColumn({
   activeId,
   accent,
   sharedOrbs,
+  composing,
+  onNewSession,
 }: {
   project: Project;
   sessions: readonly ClaudeSession[];
@@ -301,6 +318,8 @@ function SessionsColumn({
   accent: string;
   /** Orbs take part in the hand-off only where the session list is on screen (not in tabs). */
   sharedOrbs: boolean;
+  composing: boolean;
+  onNewSession: () => void;
 }) {
   const live = podSessions(sessions);
   const ended = sessions.filter((s) => s.status.kind === 'ended');
@@ -309,7 +328,21 @@ function SessionsColumn({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <ColumnHeading meta={sessions.length || undefined}>Sessions</ColumnHeading>
+        <ColumnHeading
+          meta={sessions.length || undefined}
+          actions={
+            <IconButton
+              label="New session"
+              icon={<Plus className="size-4" strokeWidth={1.5} />}
+              size="sm"
+              aria-pressed={composing}
+              onClick={onNewSession}
+              data-new-session
+            />
+          }
+        >
+          Sessions
+        </ColumnHeading>
         {ordered.length === 0 ? (
           <p className="text-body-sm text-text-2">No Claude sessions</p>
         ) : (
@@ -386,8 +419,14 @@ function SessionLink({
         />
       </motion.span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-body-sm text-text-1" title={session.title ?? undefined}>
-          {session.title ?? 'Claude session'}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="min-w-0 flex-1 truncate text-body-sm text-text-1"
+            title={session.title ?? undefined}
+          >
+            {session.title ?? 'Claude session'}
+          </span>
+          {session.origin === 'board' && <OriginBadge origin="board" compact />}
         </span>
         <span className="flex min-w-0 items-center justify-between gap-2">
           <StatusDot
@@ -406,22 +445,33 @@ function SessionLink({
 }
 
 function ClaudeColumn({
+  project,
   session,
   missing,
   defer,
 }: {
+  project: Project;
   session?: ClaudeSession;
   missing: boolean;
   defer: boolean;
 }) {
   if (!session) {
     return (
-      <>
-        <ColumnHeading>Claude</ColumnHeading>
-        <p className="text-body-sm text-text-2">
-          {missing ? 'This session is no longer available.' : 'No Claude sessions in this project.'}
-        </p>
-      </>
+      <div className="claude-panel flex h-full min-h-0 flex-col" data-new-session-panel>
+        <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
+          <h2 className="min-w-0 flex-1 truncate font-medium text-body text-text-1 leading-7">
+            New session
+          </h2>
+          <OriginBadge origin="board" />
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5">
+          <EmptyState title={missing ? 'This session is no longer available' : 'Start a session'}>
+            Claude runs headless from the board in {project.name}, with your own Claude Code login.
+            Pick a model and how much it may do without asking.
+          </EmptyState>
+        </div>
+        <NewSessionComposer projectId={project.id} />
+      </div>
     );
   }
   return <ClaudePanel session={session} defer={defer} />;

@@ -1,4 +1,6 @@
 import { type ChatMessage, sessionIdFromStream, transcriptStreamId } from '@c-board/protocol';
+import type { TranscriptFeed } from '../claude/runner.js';
+import { normalizeEntry } from '../claude/transcript-normalize.js';
 import { type ReadResult, RingBuffer } from '../ring-buffer.js';
 import type { StreamSource } from '../ui-gateway.js';
 import type { DemoProject, DemoScenario, DemoTool } from './content.js';
@@ -18,9 +20,10 @@ export type DemoEntry =
 
 /**
  * `transcript:<sessionId>` streams for `--demo`, in the same normalized `ChatMessage` form the
- * real transcript reader publishes. The simulator appends to them as its sessions work.
+ * real transcript reader publishes. The simulator appends to them as its sessions work, and
+ * board sessions (the runner over the demo query) feed them raw SDK messages.
  */
-export class DemoTranscripts implements StreamSource {
+export class DemoTranscripts implements StreamSource, TranscriptFeed {
   private readonly rings = new Map<string, RingBuffer>();
   private readonly listeners = new Set<Listener>();
   private readonly models = new Map<string, string>();
@@ -52,12 +55,40 @@ export class DemoTranscripts implements StreamSource {
 
   /** Appends one entry, stamped `ts`, and publishes it. */
   append(sessionId: string, entry: DemoEntry, ts: number): void {
+    this.publish(sessionId, this.message(sessionId, entry, ts));
+  }
+
+  /** Nothing is tailed in demo mode, so a claim needs no bookkeeping. */
+  claim(_sessionId: string): void {}
+
+  /** Raw SDK messages of a board session, normalized like transcript lines. */
+  feed(sessionId: string, entries: readonly unknown[]): void {
+    for (const entry of entries) {
+      for (const message of normalizeEntry(entry)) this.publish(sessionId, message);
+    }
+  }
+
+  release(_sessionId: string): void {}
+
+  /** A fork starts with its parent's conversation, as a forked transcript file would. */
+  copy(fromId: string, toId: string): void {
+    const ring = this.rings.get(fromId);
+    if (!ring || fromId === toId) return;
+    const model = this.models.get(fromId);
+    if (model !== undefined) this.models.set(toId, model);
+    for (const { chunk } of ring.read(0).chunks) this.publishChunk(toId, chunk);
+  }
+
+  private publish(sessionId: string, message: ChatMessage): void {
+    this.publishChunk(sessionId, JSON.stringify(message));
+  }
+
+  private publishChunk(sessionId: string, chunk: string): void {
     let ring = this.rings.get(sessionId);
     if (!ring) {
       ring = new RingBuffer(DEMO_TRANSCRIPT_BYTES);
       this.rings.set(sessionId, ring);
     }
-    const chunk = JSON.stringify(this.message(sessionId, entry, ts));
     const seq = ring.append(chunk);
     const streamId = transcriptStreamId(sessionId);
     for (const listener of this.listeners) listener(streamId, seq, chunk);

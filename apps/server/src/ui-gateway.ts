@@ -184,7 +184,9 @@ export class UiGateway {
         return;
       case 'action': {
         const result = await this.dispatch(message.payload);
-        this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
+        this.reply(client, message.id, result.ok, result.ok ? undefined : result.error, {
+          ...(result.ok && result.sessionId !== undefined ? { sessionId: result.sessionId } : {}),
+        });
         return;
       }
       case 'approval.decide': {
@@ -274,9 +276,16 @@ export class UiGateway {
     if (events.length > 0) this.broadcast(this.message('activity', { events, replace: false }));
   }
 
-  private reply(client: Client, id: string | undefined, ok: boolean, error?: string): void {
+  private reply(
+    client: Client,
+    id: string | undefined,
+    ok: boolean,
+    error?: string,
+    extra: { sessionId?: string } = {},
+  ): void {
     if (id === undefined) return;
-    const payload = error === undefined ? { id, ok } : { id, ok, error: error.slice(0, 1_000) };
+    const payload =
+      error === undefined ? { id, ok, ...extra } : { id, ok, error: error.slice(0, 1_000) };
     this.send(client, this.message('action.result', payload));
   }
 

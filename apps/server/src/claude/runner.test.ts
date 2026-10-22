@@ -624,7 +624,7 @@ describe('SessionRunner actions', () => {
         projectId: PROJECT.id,
         prompt: 'Hi',
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, sessionId: SESSION_A });
     expect(
       await actions['session.setModel']({
         kind: 'session.setModel',

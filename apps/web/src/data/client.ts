@@ -68,7 +68,8 @@ export interface ChunkInfo {
 
 export type ChunkListener = (chunk: string, info: ChunkInfo) => void;
 
-export type RequestResult = { ok: true } | { ok: false; error: string };
+/** `sessionId`: the session the action started, if any. */
+export type RequestResult = { ok: true; sessionId?: string } | { ok: false; error: string };
 
 type RequestMessage = Extract<UiToServer, { type: 'action' | 'session.send' | 'approval.decide' }>;
 
@@ -305,8 +306,12 @@ export class BoardClient {
         if (!pending) return;
         this.pending.delete(message.payload.id);
         clearTimeout(pending.timer);
-        const { ok, error } = message.payload;
-        pending.resolve(ok ? { ok: true } : { ok: false, error: error ?? 'action_failed' });
+        const { ok, error, sessionId } = message.payload;
+        pending.resolve(
+          ok
+            ? { ok: true, ...(sessionId !== undefined ? { sessionId } : {}) }
+            : { ok: false, error: error ?? 'action_failed' },
+        );
         return;
       }
       default:

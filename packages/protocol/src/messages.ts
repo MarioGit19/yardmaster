@@ -209,7 +209,13 @@ export const ApprovalResolved = envelope(
 /** Reply to a UI message that carried an envelope `id`. */
 export const ActionResult = envelope(
   'action.result',
-  z.object({ id: MessageId, ok: z.boolean(), error: ShortText.optional() }),
+  z.object({
+    id: MessageId,
+    ok: z.boolean(),
+    error: ShortText.optional(),
+    /** The session the action started: `session.create`, or a forked `session.resume`. */
+    sessionId: SessionId.optional(),
+  }),
 );
 
 export const ServerToUi = z.discriminatedUnion('type', [

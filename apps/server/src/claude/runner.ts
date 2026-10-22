@@ -396,7 +396,8 @@ export class SessionRunner {
     | 'session.setModel'
     | 'session.setPermissionMode'
   > {
-    const done = (result: RunnerResult): ActionResult => (result.ok ? { ok: true } : result);
+    const done = (result: RunnerResult): ActionResult =>
+      result.ok ? { ok: true, sessionId: result.sessionId } : result;
     return {
       'session.create': async ({ projectId, prompt, model, permissionMode }) =>
         done(

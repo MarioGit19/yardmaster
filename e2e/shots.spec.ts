@@ -654,3 +654,46 @@ test.describe('worst case', () => {
     }
   }
 });
+
+// The composer: a new session, a board session mid-stream, and a terminal session's fork bar.
+test.describe('composer', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('composer', async ({ page }) => {
+          const shot = (name: string) =>
+            page.screenshot({
+              path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          await openRoute(page, '/');
+          await openRoute(page, await firstProjectRoute(page));
+          const narrow = viewport.width < 1024;
+          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
+          const forkable = page.locator('[data-focus] a[data-session]').first();
+          await forkable.click();
+          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
+          await expect(page.locator('[data-fork-bar]')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot('composer-fork');
+
+          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
+          await page.locator('[data-new-session]').click();
+          const input = page.getByRole('textbox', { name: 'First message for a new session' });
+          await input.fill('Tidy up the cart totals and keep the public API the same.');
+          await page.waitForTimeout(300);
+          await shot('composer-new');
+          await input.press('Enter');
+          const tail = page.locator('[data-session-panel] [data-row="tail"]');
+          await expect(tail).toBeVisible({ timeout: 15_000 });
+          await page.waitForTimeout(1_200);
+          await shot('composer-streaming');
+        });
+      });
+    }
+  }
+});

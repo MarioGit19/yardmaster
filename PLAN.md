@@ -400,10 +400,13 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `approval.new`/`approval.resolved` already existed in the protocol; `Approval` gained optional `suggestions` and `blockedPath`. When the SDK sets `suppressAlwaysAllowRule`, suggestions are dropped, so "Always" acts as allow once. Aborts, timeouts (`approvalTimeoutMs`, default none) and closed sessions resolve as `expired` and deny the call. A session with several pending approvals points its `waiting_permission` status at the oldest one. Resolved approvals leave the store after 60 s, like demo ones. Hook approvals (away mode) don't route through `approval.decide` yet.
 
-- [ ] **8.3 Composer and board-session UX**
+- [x] **8.3 Composer and board-session UX**
   - Claude panel composer: multiline (Enter sends, Shift+Enter adds a newline), model pill, permission-mode pill, interrupt (Esc) and send button with a "sending" morph. "New session" in a project. Board sessions get a distinct badge from terminal sessions. For terminal-origin sessions the composer shows "Resume here (fork)", which uses `forkSession` and warns if the original is still live.
   - **Done when:** an e2e test (demo mode with a mocked runner) starts a session, sends, sees streaming and interrupts.
   - **Verify:** `pnpm e2e`
+  - Note: The "mocked runner" is the real `SessionRunner` over a scripted `createDemoQuery` (`apps/server/src/demo/demo-query.ts`), feeding `DemoTranscripts`. So `--demo` now runs board sessions too: a Read tool call on the first turn, then a streamed reply. Interrupts keep the text written so far, and forks copy the parent's transcript. `action.result` gained an optional `sessionId` (the session `session.create` or a fork started), so the UI navigates to it.
+  - Note: Board sessions stream from `session.draft`. "New session" (the + in the Sessions column) swaps the Claude panel for a new-session composer. A project with no session shows it directly. The model and permission pills are native selects behind a pill face. They change a live session through `session.setModel`/`setPermissionMode` and are disabled once it has ended or errored. The model pill offers the aliases opus/sonnet/haiku. Not yet in ⌘K: New session.
+  - Note: e2e at load ~30–35: `composer.spec` passed on every run. Across full runs, the only failures were the known load-sensitive `focus.spec` morph and `messages.spec` long-task tests, and both pass when run alone.
 
 - [ ] **8.4 Attention Center**
   - Right sheet per DESIGN.md §4.5. It collects approvals from every source, with keyboard shortcuts A, ⇧A and D, a deny reason input, collapse on resolve, a toast plus an `aria-live` announcement on new items and an optional browser Notification (permission asked in Settings).
