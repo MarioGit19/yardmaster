@@ -20,6 +20,8 @@ export default defineConfig({
       '/ws': { target, ws: true },
     },
   },
+  // The syntax highlighter worker loads grammars on demand, which needs code splitting.
+  worker: { format: 'es' },
   build: {
     target: 'es2023',
     sourcemap: true,

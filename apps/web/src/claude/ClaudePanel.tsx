@@ -1,0 +1,93 @@
+import type { ClaudeSession } from '@c-board/protocol';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { MORPH_SETTLE_MS } from '../focus/shared.js';
+import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import { Chip } from '../ui/Chip.js';
+import { Skeleton } from '../ui/Skeleton.js';
+import { StatusDot } from '../ui/StatusDot.js';
+import { EmptyState } from '../views/Page.js';
+import { streamingTail } from './transcript.js';
+import { useTranscript } from './useTranscript.js';
+
+// Markdown, highlighting and virtualization load with the first conversation, not the app.
+const MessageList = lazy(() =>
+  import('./MessageList.js').then((m) => ({ default: m.MessageList })),
+);
+
+/** Statuses during which Claude may still be writing the last text block. */
+const WRITING = new Set<ClaudeSession['status']['kind']>(['working', 'tool']);
+
+/** The focus view's center column: one session's conversation (DESIGN.md §4.6). */
+export function ClaudePanel({
+  session,
+  defer = false,
+}: {
+  session: ClaudeSession;
+  /** Hold the transcript back until the pod-to-focus morph has settled. */
+  defer?: boolean;
+}) {
+  const [settled, setSettled] = useState(!defer);
+  useEffect(() => {
+    if (settled) return;
+    const timer = setTimeout(() => setSettled(true), MORPH_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [settled]);
+  // The replay of a long transcript is hundreds of socket messages: keep them out of the morph.
+  const { rows, loaded } = useTranscript(session.id, settled);
+  const status = sessionStatusView(session.status);
+  const tail = streamingTail(rows, session.lastAssistantText, WRITING.has(session.status.kind));
+
+  return (
+    <div className="claude-panel flex h-full min-h-0 flex-col" data-session-panel={session.id}>
+      <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 py-3">
+        <h2
+          className="min-w-0 flex-1 truncate font-medium text-body text-text-1"
+          title={session.title ?? undefined}
+        >
+          {session.title ?? 'Claude session'}
+        </h2>
+        <StatusDot
+          tone={status.tone}
+          label={status.label}
+          showLabel
+          className="shrink-0 text-meta text-text-3"
+        />
+        {session.model && (
+          <span className="hidden min-w-0 max-w-40 xl:flex">
+            <Chip mono title={session.model}>
+              {session.model.replace(/^claude-/, '')}
+            </Chip>
+          </span>
+        )}
+        <span className="tabular shrink-0 font-mono text-meta text-text-3">
+          {formatCount(totalTokens(session))} tok
+        </span>
+      </header>
+      {!loaded ? (
+        <TranscriptSkeleton />
+      ) : rows.length === 0 && tail === null ? (
+        <div className="min-h-0 flex-1 px-5">
+          <EmptyState title="No messages yet">
+            The conversation shows up here as soon as Claude writes to its transcript.
+          </EmptyState>
+        </div>
+      ) : (
+        <Suspense fallback={<TranscriptSkeleton />}>
+          <MessageList key={session.id} rows={rows} tail={tail} cwd={session.cwd ?? undefined} />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+function TranscriptSkeleton() {
+  return (
+    <div aria-busy className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-5 pt-5">
+      <Skeleton className="h-9 w-2/5 self-end rounded-panel" />
+      <Skeleton className="h-4 w-11/12" />
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="h-8 w-full rounded-control" />
+      <Skeleton className="h-4 w-3/5" />
+    </div>
+  );
+}

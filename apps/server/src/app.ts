@@ -201,7 +201,7 @@ export async function buildServer(
 
   const gateway: UiGateway = new UiGateway({
     store,
-    ...(transcripts ? { transcripts } : {}),
+    ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
     ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
     logger: logger.child({ component: 'ui-ws' }),

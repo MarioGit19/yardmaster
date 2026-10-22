@@ -41,6 +41,13 @@ import {
   typedCommand,
 } from './logs.js';
 import { Rng } from './rng.js';
+import {
+  type DemoEntry,
+  DemoTranscripts,
+  demoAssistantText,
+  demoHistory,
+  demoToolCall,
+} from './transcripts.js';
 
 /** PRD F12: a permission request roughly every 45 s. */
 export const DEMO_PERMISSION_INTERVAL_MS = 45_000;
@@ -53,6 +60,11 @@ const RESOLVED_APPROVAL_TTL_MS = 60_000;
 const MAX_SUBAGENTS = 6;
 /** SIGINT: what a shell reports for a command stopped with Ctrl+C. */
 const INTERRUPTED_EXIT = 130;
+/**
+ * Transcript entries in the first session of the first project: a long history for the message
+ * list (tool results fold into their calls, so this shows as about 550 messages).
+ */
+export const DEMO_LONG_HISTORY = 800;
 
 export interface DemoSimulatorOptions {
   store: BoardStore;
@@ -63,6 +75,8 @@ export interface DemoSimulatorOptions {
   onMessage?: (message: ServerToUi) => void;
   permissionIntervalMs?: number;
   approvalTimeoutMs?: number;
+  /** Where session transcripts go. Defaults to a fresh one, exposed as `transcripts`. */
+  transcripts?: DemoTranscripts;
 }
 
 interface ProjectCtx {
@@ -110,8 +124,11 @@ interface SessionCtx {
  * like the real ingest, so the UI can't tell the difference.
  */
 export class DemoSimulator {
+  readonly transcripts: DemoTranscripts;
   private readonly store: BoardStore;
   private readonly rng: Rng;
+  /** Transcript wording only, so it doesn't shift the simulation's own random sequence. */
+  private readonly textRng: Rng;
   private readonly onActivity: (event: ActivityEvent) => void;
   private readonly onMessage: (message: ServerToUi) => void;
   private readonly permissionIntervalMs: number;
@@ -122,11 +139,14 @@ export class DemoSimulator {
   private readonly sessions = new Map<string, SessionCtx>();
   private readonly ports = new Map<string, PortBinding>();
   private running = false;
+  private longHistory = false;
   private seq = 0;
 
   constructor(options: DemoSimulatorOptions) {
     this.store = options.store;
     this.rng = new Rng(options.seed ?? 0xc0ffee);
+    this.textRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x5eed);
+    this.transcripts = options.transcripts ?? new DemoTranscripts();
     this.onActivity = options.onActivity ?? (() => {});
     this.onMessage = options.onMessage ?? (() => {});
     this.permissionIntervalMs = options.permissionIntervalMs ?? DEMO_PERMISSION_INTERVAL_MS;
@@ -473,6 +493,7 @@ export class DemoSimulator {
       approval: null,
     };
     this.sessions.set(id, session);
+    this.seedTranscript(session, model);
     terminal.session = session;
     // No hook yet: the session shows as "unknown, alive" until SessionStart.
     this.store.upsertSession({
@@ -520,6 +541,13 @@ export class DemoSimulator {
     this.store.setSessionStatus(session.id, { kind: 'working' });
     this.addTokens(session, this.rng.int(800, 3_000), 0);
     this.activity('prompt', session, scenario.prompt);
+    this.transcript(session, { kind: 'user', text: scenario.prompt });
+    if (this.textRng.chance(0.6)) {
+      this.transcript(session, {
+        kind: 'thinking',
+        text: `I'll start with the todo list: ${scenario.todos.join('; ')}.`,
+      });
+    }
     session.timer = this.after(this.rng.int(600, 1_500), () => this.nextStep(session));
   }
 
@@ -557,6 +585,7 @@ export class DemoSimulator {
       if (shown < words.length) {
         session.timer = this.after(this.rng.int(90, 220), emit);
       } else {
+        this.transcript(session, { kind: 'assistant', text });
         session.timer = this.after(this.rng.int(400, 1_200), () => this.nextStep(session));
       }
     };
@@ -583,11 +612,19 @@ export class DemoSimulator {
       tool_use_id: toolUseId,
     });
     if (tool.tool === 'Task') this.spawnSubagent(session, tool.summary);
+    const call = demoToolCall(session.project.def, tool, this.textRng);
+    this.transcript(session, { kind: 'tool_use', toolUseId, name: tool.tool, input: call.input });
 
     const duration = tool.tool === 'Bash' ? this.rng.int(2_000, 7_000) : this.rng.int(500, 3_000);
     session.terminal.busyUntil = this.now() + duration;
     session.timer = this.after(duration, () => {
       const failed = this.rng.chance(0.06);
+      this.transcript(session, {
+        kind: 'tool_result',
+        toolUseId,
+        text: failed ? `Error: ${tool.tool} failed` : call.result,
+        isError: failed,
+      });
       this.activity(failed ? 'tool.error' : 'tool.end', session, `${tool.tool} ${tool.summary}`, {
         tool_name: tool.tool,
         tool_use_id: toolUseId,
@@ -659,6 +696,10 @@ export class DemoSimulator {
       todos: this.todos(turn.scenario, 1),
       lastAssistantText: turn.scenario.texts.at(-1) ?? null,
     });
+    this.transcript(session, {
+      kind: 'assistant',
+      text: demoAssistantText(turn.scenario, this.textRng, true),
+    });
     this.store.setSessionStatus(session.id, { kind: 'idle' });
     this.activity('stop', session, turn.scenario.title);
     if (this.rng.chance(0.06)) {
@@ -680,6 +721,7 @@ export class DemoSimulator {
     this.after(this.rng.int(15_000, 25_000), () => {
       this.sessions.delete(session.id);
       this.store.removeSession(session.id);
+      this.transcripts.forget(session.id);
       this.launchClaude(terminal);
     });
   }
@@ -757,6 +799,23 @@ export class DemoSimulator {
     } else {
       this.streamText(session, "Understood, I won't run that. I'll take a different approach.");
     }
+  }
+
+  // Transcripts
+
+  private seedTranscript(session: SessionCtx, model: string): void {
+    this.transcripts.open(session.id, model);
+    const long = !this.longHistory && session.project === this.projects[0];
+    if (long) this.longHistory = true;
+    const count = long ? DEMO_LONG_HISTORY : this.textRng.int(12, 90);
+    const seed = Number.parseInt(session.id.slice(0, 8), 16);
+    for (const { entry, ts } of demoHistory(session.project.def, seed, count, this.now())) {
+      this.transcripts.append(session.id, entry, ts);
+    }
+  }
+
+  private transcript(session: SessionCtx, entry: DemoEntry): void {
+    this.transcripts.append(session.id, entry, this.now());
   }
 
   // Shared plumbing

@@ -3,10 +3,12 @@ import {
   type ActivityKind,
   applyPatch,
   BoardState,
+  decodeChatMessage,
   emptyBoardState,
   type PatchOp,
   type ServerToUi,
   type SessionStatusKind,
+  transcriptStreamId,
 } from '@c-board/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
@@ -14,7 +16,7 @@ import type { ServerConfig } from '../config.js';
 import { BoardStore } from '../store.js';
 import { generateToken } from '../token.js';
 import { DEMO_PROJECTS } from './content.js';
-import { DemoSimulator } from './simulator.js';
+import { DEMO_LONG_HISTORY, DemoSimulator } from './simulator.js';
 
 const T0 = 1_760_000_000_000;
 
@@ -76,6 +78,41 @@ describe('DemoSimulator', () => {
       expect.arrayContaining([3000, 3001, 5173, 5174]),
     );
     expect(Object.values(state.approvals).some((a) => a.state === 'pending')).toBe(true);
+    sim.stop();
+  });
+
+  it('publishes transcripts: a long history, then the live turns', () => {
+    const { store, sim, advance } = run();
+    const live: string[] = [];
+    sim.transcripts.onData((streamId) => live.push(streamId));
+    sim.start();
+    advance(3 * 60_000);
+
+    const read = (id: string) =>
+      (sim.transcripts.read(transcriptStreamId(id), 0)?.chunks ?? []).map((c) =>
+        decodeChatMessage(c.chunk),
+      );
+    const sessions = Object.values(store.state.sessions);
+    expect(sessions.length).toBeGreaterThan(0);
+    const lengths = sessions.map((s) => read(s.id).length);
+    expect(Math.max(...lengths)).toBeGreaterThanOrEqual(DEMO_LONG_HISTORY);
+
+    const messages = sessions.flatMap((s) => read(s.id));
+    expect(messages.every((m) => m !== null)).toBe(true);
+    const kinds = new Set(messages.map((m) => m?.kind));
+    expect([...kinds]).toEqual(
+      expect.arrayContaining(['user', 'assistant', 'thinking', 'tool_use', 'tool_result']),
+    );
+    expect(messages.some((m) => m?.kind === 'assistant' && m.text.includes('```'))).toBe(true);
+    // Every tool result answers a tool call earlier in the same transcript.
+    for (const s of sessions) {
+      const seen = new Set<string>();
+      for (const m of read(s.id)) {
+        if (m?.kind === 'tool_use') seen.add(m.toolUseId);
+        if (m?.kind === 'tool_result') expect(seen.has(m.toolUseId)).toBe(true);
+      }
+    }
+    expect(live.length).toBeGreaterThan(DEMO_LONG_HISTORY);
     sim.stop();
   });
 

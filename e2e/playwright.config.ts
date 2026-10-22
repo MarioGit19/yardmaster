@@ -15,9 +15,20 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    // Frame-rate samples run alone, before the parallel suite, so other browsers don't skew them.
+    // Frame-rate and long-task checks run alone, one after the other, before the parallel suite.
     { name: 'perf', testMatch: /crew\.spec\.ts$/ },
-    { name: 'e2e', testIgnore: /(shots|crew)\.spec\.ts$/, dependencies: ['perf'] },
+    // The transcript tests scroll hundreds of rows and highlight code in a worker: alone, in order.
+    {
+      name: 'perf-messages',
+      testMatch: /messages\.spec\.ts$/,
+      fullyParallel: false,
+      dependencies: ['perf'],
+    },
+    {
+      name: 'e2e',
+      testIgnore: /(shots|crew|messages)\.spec\.ts$/,
+      dependencies: ['perf-messages'],
+    },
     { name: 'shots', testMatch: /shots\.spec\.ts$/ },
   ],
 });

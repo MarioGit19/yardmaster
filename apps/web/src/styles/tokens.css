@@ -60,6 +60,22 @@
   /* Crew mascot visor glass, DESIGN.md §4.11; dark in both themes so the eyes glow. */
   --crew-visor: #05070c;
 
+  /* Code highlighting (shiki css-variables theme), built from the tokens above. */
+  --shiki-foreground: var(--text-1);
+  --shiki-background: transparent;
+  --shiki-token-keyword: var(--orb-edit);
+  --shiki-token-string: var(--orb-web);
+  --shiki-token-string-expression: var(--orb-web);
+  --shiki-token-function: var(--orb-read);
+  --shiki-token-constant: var(--orb-task);
+  --shiki-token-parameter: var(--text-2);
+  --shiki-token-punctuation: var(--text-2);
+  --shiki-token-comment: var(--text-3);
+  --shiki-token-link: var(--orb-read);
+  --shiki-token-inserted: var(--st-ok);
+  --shiki-token-deleted: var(--st-err);
+  --shiki-token-changed: var(--st-wait);
+
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
 }

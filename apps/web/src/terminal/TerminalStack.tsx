@@ -18,6 +18,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { selectWindow, useBoard, useBoardClient, useBoardShallow } from '../data/index.js';
+import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution } from '../lanes/lane.js';
 import { spring } from '../motion.js';
 import { usePreference } from '../prefs.js';
@@ -53,9 +54,6 @@ export interface TerminalStackProps {
   /** Hold the renderers back until the pod-to-focus morph has settled, so it keeps its frames. */
   deferRenderers?: boolean;
 }
-
-/** About as long as `spring.smooth` takes to settle the morph. */
-const MORPH_SETTLE_MS = 550;
 
 /**
  * The focus view's terminal stack, DESIGN.md §4.6: every terminal of the project mirrored in

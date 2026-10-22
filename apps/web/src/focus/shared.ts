@@ -14,3 +14,6 @@ export const sharedId = {
  * the focus side has none, so the hand-off still runs in both directions.
  */
 export const POD_LAYOUT_DEPENDENCY = 'pod';
+
+/** About as long as `spring.smooth` takes to settle the morph; heavy panes mount after it. */
+export const MORPH_SETTLE_MS = 550;

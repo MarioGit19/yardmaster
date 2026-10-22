@@ -1,5 +1,6 @@
 import type { WebSocketRoute } from '@playwright/test';
 import { expect, firstProjectRoute, openRoute, type Theme, test } from './fixtures.js';
+import { openLongTranscript } from './messages.js';
 
 const VIEWPORTS = [
   { width: 1440, height: 900 },
@@ -310,6 +311,49 @@ test.describe('terminal stack', () => {
         await page.waitForTimeout(900);
         await shot('terminals-maximized');
       });
+    });
+  }
+});
+
+// The Claude panel: the latest messages, a scrolled-up view with the jump pill and an open
+// thinking block, and the narrow tab layout.
+test.describe('claude panel', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test.describe(`${viewport.width}`, () => {
+          test.use({ theme, viewport });
+          test('messages', async ({ page }) => {
+            const shot = (name: string) =>
+              page.screenshot({
+                path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+                animations: 'disabled',
+              });
+            const list = await openLongTranscript(page);
+            await page.waitForTimeout(900);
+            await shot('claude-latest');
+            if (viewport.width < 1024) return;
+
+            await list.evaluate((el) => el.scrollBy(0, -el.clientHeight * 3));
+            await page.waitForTimeout(200);
+            for (
+              let i = 0;
+              i < 40 && (await list.locator('[data-row="thinking"]').count()) === 0;
+              i++
+            ) {
+              await list.evaluate((el) => el.scrollBy(0, -el.clientHeight * 0.8));
+              await page.waitForTimeout(60);
+            }
+            const thinking = list.locator('[data-row="thinking"] button[aria-expanded="false"]');
+            if ((await thinking.count()) > 0) await thinking.first().click();
+            await page.waitForTimeout(600);
+            await shot('claude-history');
+          });
+        });
+      }
     });
   }
 });

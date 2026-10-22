@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, GitBranch, GitCommitHorizontal } from 'l
 import { motion } from 'motion/react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
+import { ClaudePanel } from '../claude/ClaudePanel.js';
 import {
   selectApproval,
   selectHydrated,
@@ -108,7 +109,9 @@ function ProjectFocus({
       sharedOrbs={shared && !tabs}
     />
   );
-  const claudeColumn = <ClaudeColumn session={session} missing={Boolean(sessionId && !session)} />;
+  const claudeColumn = (
+    <ClaudeColumn session={session} missing={Boolean(sessionId && !session)} defer={shared} />
+  );
   const [maximized, setMaximized] = useState(false);
   const terminalsColumn = (
     <TerminalStack
@@ -463,8 +466,15 @@ function GitSummary({ git }: { git: Project['git'] }) {
   );
 }
 
-/** Interim Claude panel; 7.8 replaces it with the message list. */
-function ClaudeColumn({ session, missing }: { session?: ClaudeSession; missing: boolean }) {
+function ClaudeColumn({
+  session,
+  missing,
+  defer,
+}: {
+  session?: ClaudeSession;
+  missing: boolean;
+  defer: boolean;
+}) {
   if (!session) {
     return (
       <>
@@ -475,36 +485,7 @@ function ClaudeColumn({ session, missing }: { session?: ClaudeSession; missing: 
       </>
     );
   }
-  const status = sessionStatusView(session.status);
-  const rows: [string, ReactNode][] = [
-    ['Status', <StatusDot key="s" tone={status.tone} label={status.label} showLabel />],
-    ['Model', session.model ?? '—'],
-    [
-      'Tokens',
-      <span key="t" className="tabular font-mono">
-        {formatCount(totalTokens(session))}
-      </span>,
-    ],
-    ['Current tool', session.currentTool?.summary ?? session.currentTool?.tool ?? '—'],
-  ];
-  return (
-    <div className="flex max-w-3xl flex-col gap-4">
-      <ColumnHeading>{session.title ?? 'Claude session'}</ColumnHeading>
-      <dl className="-mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2 text-body-sm">
-        {rows.map(([term, value]) => (
-          <div key={term} className="contents">
-            <dt className="text-text-3">{term}</dt>
-            <dd className="truncate text-text-1">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      {session.lastAssistantText && (
-        <p className="border-line border-t pt-4 text-body text-text-2">
-          {session.lastAssistantText}
-        </p>
-      )}
-    </div>
-  );
+  return <ClaudePanel session={session} defer={defer} />;
 }
 
 function FocusSkeleton() {
