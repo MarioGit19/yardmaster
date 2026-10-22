@@ -18,6 +18,7 @@ import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Kbd } from '../ui/Kbd.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
+import { TONE_MARK } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { selectHudCounts } from './counts.js';
 
@@ -167,32 +168,27 @@ function Counter({ tone, label, value, format }: CounterProps) {
       title={`${format ? format(value) : value} ${label}`}
     >
       {tone && (
-        <span
-          aria-hidden
-          className={cx(
-            'size-1.5 shrink-0 rounded-full transition-colors duration-200',
-            active ? DOT[tone] : 'bg-st-idle opacity-60',
-          )}
-        />
+        // Shaped like the board's status marks, so the counters read without color or labels
+        // (labels hide below lg). Zero keeps the shape, greyed out.
+        <span aria-hidden data-mark={tone} className="grid size-2 shrink-0 place-items-center">
+          <span
+            className={cx(
+              'block shrink-0 transition-opacity duration-200',
+              TONE_MARK[tone],
+              !active && 'opacity-40 grayscale',
+            )}
+          />
+        </span>
       )}
       <NumberTicker
         value={value}
         format={format}
-        className={cx('transition-colors duration-200', active ? 'text-text-1' : 'text-text-3')}
+        className={cx('transition-colors duration-200', active ? 'text-text-1' : 'text-text-2')}
       />
-      <span className="text-label text-text-3 max-lg:sr-only">{label}</span>
+      <span className="text-label text-text-2 max-lg:sr-only">{label}</span>
     </span>
   );
 }
-
-const DOT: Record<Tone, string> = {
-  work: 'bg-st-work',
-  tool: 'bg-st-tool',
-  wait: 'bg-st-wait',
-  ok: 'bg-st-ok',
-  err: 'bg-st-err',
-  idle: 'bg-st-idle',
-};
 
 function Connection() {
   const connection = useBoard(selectConnection);
@@ -206,9 +202,7 @@ function Connection() {
       title={view.label}
     >
       <span aria-hidden className="relative grid size-3.5 place-items-center">
-        <span
-          className={cx('size-2 rounded-full transition-colors duration-200', DOT[view.tone])}
-        />
+        <span data-mark={view.tone} className={cx('block', TONE_MARK[view.tone])} />
         {reconnecting && (
           <span className="hud-spin absolute inset-0 rounded-full border border-st-err border-r-transparent border-b-transparent" />
         )}

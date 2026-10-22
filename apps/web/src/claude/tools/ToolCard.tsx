@@ -193,7 +193,7 @@ function Card({
       <span className="flex shrink-0 items-center">{status}</span>
     </>
   );
-  const headClass = 'flex h-8 w-full min-w-0 items-center gap-2.5 px-2.5 text-left text-label';
+  const headClass = 'flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-label';
   return (
     <div
       data-tool={row.name}
@@ -235,7 +235,7 @@ function ResultText({ text, tone }: { text: string; tone?: 'error' }) {
         tone === 'error' ? 'bg-st-err/[0.06] text-st-err-ink' : 'text-text-2',
       )}
     >
-      {clipped || <span className="font-sans text-text-3 italic">No output</span>}
+      {clipped || <span className="font-sans text-text-2 italic">No output</span>}
     </pre>
   );
 }
@@ -277,7 +277,7 @@ function CodeLines({
         ))}
       </div>
       {more > 0 && (
-        <p className="px-3 pt-1 font-sans text-meta text-text-3">
+        <p className="px-3 pt-1 font-sans text-meta text-text-2">
           {more} more {more === 1 ? 'line' : 'lines'}
         </p>
       )}
@@ -317,7 +317,7 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
       }
       extra={
         call.background ? (
-          <span className="shrink-0 rounded-chip bg-bg-2 px-1.5 text-meta text-text-3">
+          <span className="shrink-0 rounded-chip bg-bg-2 px-1.5 text-meta text-text-2">
             background
           </span>
         ) : null
@@ -340,7 +340,7 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
         </pre>
       )}
       {output === null ? (
-        <p className="px-3 py-2 text-meta text-text-3">Waiting for output…</p>
+        <p className="px-3 py-2 text-meta text-text-2">Waiting for output…</p>
       ) : (
         <ResultText text={output} tone={exit !== 0 ? 'error' : undefined} />
       )}
@@ -401,7 +401,7 @@ function EditCard({ row, cwd, call }: CardProps & { call: CallOf<'edit'> | CallO
       defaultOpen
     >
       <div className="flex h-8 items-center justify-between gap-3 border-line border-b pr-1.5 pl-3">
-        <span className="truncate text-meta text-text-3">{note}</span>
+        <span className="truncate text-meta text-text-2">{note}</span>
         <LayoutToggle />
       </div>
       {row.result?.isError && <ResultText text={stripAnsi(row.result.text)} tone="error" />}
@@ -418,7 +418,7 @@ function EditCard({ row, cwd, call }: CardProps & { call: CallOf<'edit'> | CallO
 function LayoutToggle() {
   const layout = usePreference(diffLayoutPreference);
   return (
-    <div role="radiogroup" aria-label="Diff layout" className="flex rounded-chip bg-bg-2 p-0.5">
+    <div role="radiogroup" aria-label="Diff layout" className="flex rounded-control bg-bg-2 p-0.5">
       {DIFF_LAYOUTS.map((option) => (
         // biome-ignore lint/a11y/useSemanticElements: a segmented control, styled as buttons
         <button
@@ -428,7 +428,7 @@ function LayoutToggle() {
           aria-checked={layout === option}
           onClick={() => diffLayoutPreference.set(option)}
           className={cx(
-            'h-5 rounded-[4px] px-2 text-meta capitalize transition-colors duration-150',
+            'h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-150',
             layout === option
               ? 'bg-bg-1 text-text-1 shadow-raised'
               : 'text-text-3 hover:text-text-1',
@@ -521,7 +521,7 @@ function ChipCard({
           <Icon aria-hidden className="size-3.5 shrink-0 text-text-3" strokeWidth={1.5} />
           <span className="shrink-0 text-text-2">{row.name}</span>
           {target}
-          {count && <span className="shrink-0 text-meta tabular text-text-3">{count}</span>}
+          {count && <span className="shrink-0 text-meta tabular text-text-2">{count}</span>}
           <span className="flex shrink-0 items-center">
             <ToolState row={row} />
           </span>
@@ -589,15 +589,15 @@ function ChipPreview({
     }
     case 'fetch':
       return (
-        <div className="space-y-2 px-3 py-2.5">
-          {call.prompt && <p className="text-meta text-text-3">{call.prompt}</p>}
+        <div className="space-y-2 px-3 py-2">
+          {call.prompt && <p className="text-meta text-text-2">{call.prompt}</p>}
           <Markdown className="md-sm" text={text.slice(0, MAX_RESULT_CHARS)} />
         </div>
       );
     case 'search': {
       const links = urlsIn(text);
       return (
-        <div className="space-y-2 px-3 py-2.5">
+        <div className="space-y-2 px-3 py-2">
           {links.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {links.map((url) => (
@@ -667,7 +667,7 @@ function TodoCard({
       }
       extra={
         total > 0 && (
-          <span className="flex shrink-0 items-center gap-2 text-meta tabular text-text-3">
+          <span className="flex shrink-0 items-center gap-2 text-meta tabular text-text-2">
             <span aria-hidden className="h-1 w-10 overflow-hidden rounded-full bg-line-strong">
               <span
                 className="todo-progress block h-full origin-left rounded-full bg-st-ok"
@@ -681,13 +681,13 @@ function TodoCard({
       status={null}
       defaultOpen
     >
-      <ul className="space-y-1 px-3 py-2.5" aria-label={`${done} of ${total} done`}>
+      <ul className="space-y-1 px-3 py-2" aria-label={`${done} of ${total} done`}>
         {call.todos.map((todo, i) => (
           <li
             // biome-ignore lint/suspicious/noArrayIndexKey: todo text can repeat
             key={i}
             data-todo={todo.status}
-            className="flex items-start gap-2.5 text-body-sm"
+            className="flex items-start gap-2 text-body-sm"
           >
             <TodoMark status={todo.status} draw={draw && !wasDone.has(todo.content)} />
             <span
@@ -761,7 +761,7 @@ function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
       summary={<span className="min-w-0 truncate text-text-2">{call.description}</span>}
       extra={
         call.agent ? (
-          <span className="shrink-0 rounded-chip border border-line px-1.5 text-meta text-text-3">
+          <span className="shrink-0 rounded-chip border border-line px-1.5 text-meta text-text-2">
             {call.agent}
           </span>
         ) : null
@@ -769,7 +769,7 @@ function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
       status={<ToolState row={row} />}
       defaultOpen={false}
     >
-      <div className="task-thread my-2.5 mr-3 ml-[17px] space-y-2.5 border-l pl-3.5">
+      <div className="task-thread my-2 mr-3 ml-[17px] space-y-2 border-l pl-4">
         {call.prompt && (
           <div className="rounded-control border border-line bg-bg-2 px-3 py-2 text-body-sm text-text-2">
             <p
@@ -792,7 +792,7 @@ function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
           </div>
         )}
         {row.result === null ? (
-          <p className="text-body-sm text-text-3">
+          <p className="text-body-sm text-text-2">
             <span data-shimmer className="shimmer relative inline-block overflow-hidden">
               Subagent working…
             </span>

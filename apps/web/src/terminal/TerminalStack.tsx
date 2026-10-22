@@ -18,6 +18,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { selectWindow, useBoard, useBoardClient, useBoardShallow } from '../data/index.js';
+import type { BoardStoreState } from '../data/store.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
@@ -84,7 +85,9 @@ export function TerminalStack({
     setChosen(target);
     terminalTarget.set(null);
   }, [target, ordered]);
-  const activeId = resolveActive(ordered, chosen);
+  const interactiveIds = useBoard(selectInteractiveIds(ordered));
+  const interactive = useMemo(() => new Set(interactiveIds.split('\n')), [interactiveIds]);
+  const activeId = resolveActive(ordered, chosen, (id) => !interactive.has(id));
   const active = ordered.find((t) => t.id === activeId) ?? null;
   const layout = usePreference(stackLayoutPreference);
   const grid = layout === 'grid' && ordered.length > 1;
@@ -153,7 +156,7 @@ export function TerminalStack({
       {ordered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-control border border-line border-dashed px-6 text-center">
           <p className="text-body-sm text-text-2">No terminals</p>
-          <p className="text-meta text-text-3">Terminals opened in the editor show up here.</p>
+          <p className="text-meta text-text-2">Terminals opened in the editor show up here.</p>
         </div>
       ) : (
         <>
@@ -228,6 +231,18 @@ function useRetainedStreams(terminals: readonly Terminal[]) {
   }, [client, key]);
 }
 
+/** The ids of terminals showing an interactive app's pane, as one string so it compares by value. */
+const selectInteractiveIds =
+  (terminals: readonly Terminal[]) =>
+  (s: BoardStoreState): string =>
+    terminals
+      .filter((t) => {
+        const execution = selectLaneExecution(t)(s);
+        return paneKind(execution.id === null ? null : execution, t) === 'interactive';
+      })
+      .map((t) => t.id)
+      .join('\n');
+
 function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   return { execution, view: laneView(terminal, execution) };
@@ -279,7 +294,7 @@ function StackTab({
       data-tab={terminal.id}
       onClick={onSelect}
       className={cx(
-        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-2.5 text-label transition-colors duration-150',
+        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-150',
         selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
         closed && 'opacity-70',
       )}
@@ -336,7 +351,7 @@ function Pane({
       )}
     >
       {inGrid && (
-        <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-2.5 text-label">
+        <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-3 text-label">
           <StatusDot tone={view.tone} label={view.label} />
           <span
             title={terminalName(terminal)}
@@ -345,7 +360,7 @@ function Pane({
             {terminalName(terminal)}
           </span>
           {view.command && (
-            <span className="min-w-0 truncate font-mono text-meta text-text-3" title={view.command}>
+            <span className="min-w-0 truncate font-mono text-meta text-text-2" title={view.command}>
               {view.command}
             </span>
           )}
@@ -357,7 +372,7 @@ function Pane({
         </header>
       )}
       {kind === 'interactive' ? (
-        <InteractiveCard terminal={terminal} command={view.command} />
+        <InteractiveCard terminal={terminal} command={view.command} compact={inGrid} />
       ) : (
         <div className="min-h-0 flex-1 py-2 pl-3 pr-1">
           {renderer && (
@@ -388,32 +403,51 @@ function useTerminalAction() {
   };
 }
 
-/** Alt-screen apps can't be mirrored faithfully; point to the editor instead. */
-function InteractiveCard({ terminal, command }: { terminal: Terminal; command: string | null }) {
+/**
+ * Alt-screen apps can't be mirrored faithfully; point to the editor instead. A grid tile gets
+ * the short version (its header already names the command), and never overflows its header.
+ */
+function InteractiveCard({
+  terminal,
+  command,
+  compact,
+}: {
+  terminal: Terminal;
+  command: string | null;
+  compact: boolean;
+}) {
   const editor = useEditorName(terminal);
   const act = useTerminalAction();
   const claude = command !== null && /^claude(\s|$)/.test(command);
   return (
     <div
       data-interactive={terminal.id}
-      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center"
+      className={cx(
+        'flex min-h-0 flex-1 flex-col items-center justify-center-safe overflow-y-auto text-center',
+        compact ? 'gap-2 px-3 py-2' : 'gap-3 px-6 py-4',
+      )}
     >
-      <AppWindow aria-hidden className="size-5 text-text-3" strokeWidth={1.5} />
-      <div className="flex max-w-72 flex-col gap-1">
-        <p className="font-medium text-body-sm text-text-1">Interactive app, open in {editor}</p>
-        <p className="text-meta text-text-3">
-          {command ? <span className="font-mono text-text-2">{command}</span> : 'This program'}{' '}
-          draws full screen, which a mirror can't show faithfully.
-          {claude && ' Its conversation is in the Claude panel.'}
-        </p>
-      </div>
+      <AppWindow aria-hidden className="size-5 shrink-0 text-text-3" strokeWidth={1.5} />
+      {compact ? (
+        <p className="font-medium text-body-sm text-text-1">Interactive app</p>
+      ) : (
+        <div className="flex max-w-72 flex-col gap-1">
+          <p className="font-medium text-body-sm text-text-1">Interactive app, open in {editor}</p>
+          <p className="text-meta text-text-2">
+            {command ? <span className="font-mono text-text-1">{command}</span> : 'This program'}{' '}
+            draws full screen, which a mirror can't show faithfully.
+            {claude && ' Its conversation is in the Claude panel.'}
+          </p>
+        </div>
+      )}
       <button
         type="button"
-        className={buttonClass('secondary', 'sm')}
+        title={`Show in ${editor}`}
+        className={cx(buttonClass('secondary', 'sm'), 'max-w-full shrink-0')}
         onClick={() => act({ kind: 'terminal.focus', terminalId: terminal.id })}
       >
-        <ExternalLink aria-hidden className="size-3.5" strokeWidth={1.5} />
-        Show in {editor}
+        <ExternalLink aria-hidden className="size-3.5 shrink-0" strokeWidth={1.5} />
+        <span className="truncate">Show in {editor}</span>
       </button>
     </div>
   );
@@ -482,7 +516,7 @@ function ActiveControls({
           icon={<Eraser className="size-4" strokeWidth={1.5} />}
           onClick={() => controller()?.clear()}
         />
-        <span className="ml-auto min-w-0 truncate pl-2 font-mono text-meta text-text-3">
+        <span className="ml-auto min-w-0 truncate pl-2 font-mono text-meta text-text-2">
           {view.running ? 'running' : view.exit ? `exit ${view.exit.code}` : null}
         </span>
       </div>
@@ -516,7 +550,7 @@ function SearchBar({
     onClose();
   };
   return (
-    <div className="flex min-w-0 items-center gap-1 rounded-control border border-line bg-bg-0 pr-1 pl-2.5 focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
+    <div className="flex min-w-0 items-center gap-1 rounded-control border border-line bg-bg-0 pr-1 pl-3 focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
       <Search aria-hidden className="size-3.5 shrink-0 text-text-3" strokeWidth={1.5} />
       <input
         // biome-ignore lint/a11y/noAutofocus: opened on purpose from the toolbar.
@@ -543,7 +577,7 @@ function SearchBar({
         className="terminal-search h-8 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none"
       />
       {query !== '' && results && (
-        <span aria-live="polite" className="shrink-0 px-1 font-mono text-meta text-text-3 tabular">
+        <span aria-live="polite" className="shrink-0 px-1 font-mono text-meta text-text-2 tabular">
           {results.count === 0 ? 'No matches' : `${results.index + 1}/${results.count}`}
         </span>
       )}

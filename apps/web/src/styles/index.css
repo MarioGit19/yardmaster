@@ -649,6 +649,15 @@
     display: none;
   }
 }
+/* A quiet pod steps back (§4.10) on its non-text layers only, so its text keeps AA contrast.
+   Stepping back is slow; coming forward is quick. */
+.pod-dim {
+  transition: opacity 120ms var(--ease-out);
+}
+.pod[data-faded] .pod-dim {
+  opacity: 0.7;
+  transition-duration: 800ms;
+}
 .pod::before {
   content: "";
   position: absolute;

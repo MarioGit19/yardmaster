@@ -4,6 +4,7 @@ import {
   CENTER_MIN,
   COLUMN_LIMITS,
   DEFAULT_SIZES,
+  defaultSizes,
   fitSizes,
   HANDLE_PX,
   loadSizes,
@@ -92,33 +93,52 @@ describe('snapWidth', () => {
   });
 });
 
+describe('defaultSizes', () => {
+  it('gives the terminal column a share of the body, within its limits', () => {
+    expect(defaultSizes(0)).toEqual(DEFAULT_SIZES);
+    expect(defaultSizes(1150)).toEqual({ left: 240, right: 345 });
+    expect(defaultSizes(1600)).toEqual({ left: 280, right: 480 });
+    expect(defaultSizes(900).right).toBe(COLUMN_LIMITS.right.min);
+    expect(defaultSizes(4000).right).toBe(520);
+  });
+
+  it('leaves the Claude panel the larger share on a laptop-sized body', () => {
+    const width = 1150;
+    const { left, right } = fitSizes(defaultSizes(width), width);
+    expect(width - left - right - 2 * HANDLE_PX).toBeGreaterThan(right);
+  });
+});
+
 describe('persistence', () => {
   it('round-trips per project', () => {
     const storage = memoryStorage();
     saveSizes('p-acme', { left: 312.6, right: 500 }, storage);
     expect(loadSizes('p-acme', storage)).toEqual({ left: 313, right: 500 });
-    expect(loadSizes('p-zen', storage)).toEqual(DEFAULT_SIZES);
+    expect(loadSizes('p-zen', storage)).toEqual({});
   });
 
-  it('falls back to defaults for corrupt or partial entries', () => {
+  it('saves only the columns the user sized', () => {
+    const storage = memoryStorage();
+    saveSizes('p-acme', { right: 380.2 }, storage);
+    expect(loadSizes('p-acme', storage)).toEqual({ right: 380 });
+  });
+
+  it('keeps only the valid parts of corrupt or partial entries', () => {
     const storage = memoryStorage({
       'cboard.focus.a': '{not json',
       'cboard.focus.b': '"280"',
       'cboard.focus.c': JSON.stringify({ left: 'wide', right: 9000 }),
       'cboard.focus.d': JSON.stringify({ left: Number.NaN, right: -4 }),
     });
-    expect(loadSizes('a', storage)).toEqual(DEFAULT_SIZES);
-    expect(loadSizes('b', storage)).toEqual(DEFAULT_SIZES);
-    expect(loadSizes('c', storage)).toEqual({
-      left: DEFAULT_SIZES.left,
-      right: COLUMN_LIMITS.right.max,
-    });
-    expect(loadSizes('d', storage)).toEqual(DEFAULT_SIZES);
+    expect(loadSizes('a', storage)).toEqual({});
+    expect(loadSizes('b', storage)).toEqual({});
+    expect(loadSizes('c', storage)).toEqual({ right: COLUMN_LIMITS.right.max });
+    expect(loadSizes('d', storage)).toEqual({});
   });
 
   it('survives storage that throws', () => {
-    expect(loadSizes('p-acme', throwing)).toEqual(DEFAULT_SIZES);
+    expect(loadSizes('p-acme', throwing)).toEqual({});
     expect(() => saveSizes('p-acme', DEFAULT_SIZES, throwing)).not.toThrow();
-    expect(loadSizes('p-acme', undefined)).toEqual(DEFAULT_SIZES);
+    expect(loadSizes('p-acme', undefined)).toEqual({});
   });
 });

@@ -195,6 +195,21 @@ describe('DemoSimulator', () => {
     }
     // Dev servers crash now and then; tests fail sometimes.
     expect(activity.some((e) => e.kind === 'exec.end' && e.data.exitCode !== 0)).toBe(true);
+    // Their toasts name the project and the exit code.
+    const names = Object.values(store.state.projects).map((p) => p.name);
+    const failures = messages.flatMap((m) =>
+      m.type === 'toast' && m.payload.level !== 'info' && m.payload.level !== 'success'
+        ? [m.payload]
+        : [],
+    );
+    expect(failures.length).toBeGreaterThan(0);
+    for (const toast of failures) {
+      expect(
+        names.some((name) => toast.title.endsWith(` in ${name}`)),
+        toast.title,
+      ).toBe(true);
+      if (!toast.title.startsWith('Claude')) expect(toast.body).toMatch(/code \d+/);
+    }
     expect(messages.some((m) => m.type === 'approval.new')).toBe(true);
     // Undecided approvals expire.
     expect(

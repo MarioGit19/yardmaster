@@ -46,7 +46,7 @@ export function FocusCaption({ session }: { session: ClaudeSession }) {
             <span
               data-elapsed
               title="Running for"
-              className="shrink-0 font-mono text-meta text-text-3 tabular"
+              className="shrink-0 font-mono text-meta text-text-2 tabular"
             >
               {formatElapsed(elapsed)}
             </span>

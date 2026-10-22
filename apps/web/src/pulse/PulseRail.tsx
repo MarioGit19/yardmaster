@@ -15,7 +15,7 @@ import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
 import { ease, useMotionLevel } from '../motion.js';
 import { resolveColor } from '../orb/colors.js';
-import { usePreference } from '../prefs.js';
+import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
 import { terminalTarget } from '../terminal/target.js';
 import { useTheme } from '../theme/theme.js';
@@ -37,7 +37,13 @@ import {
   stepDot,
   timeToX,
 } from './model.js';
-import { pulseFilterPreference, pulsePreference, togglePulse } from './prefs.js';
+import {
+  PULSE_COMPACT_QUERY,
+  pulseCollapsed,
+  pulseFilterPreference,
+  pulsePreference,
+  togglePulse,
+} from './prefs.js';
 
 /** How long a new dot takes to fly in from the right gutter. */
 const FLY_MS = 300;
@@ -108,7 +114,10 @@ interface Frame {
  * one dot per event colored by type. Everything inside the plot is drawn on one canvas.
  */
 export function PulseRail() {
-  const collapsed = usePreference(pulsePreference) === 'collapsed';
+  const collapsed = pulseCollapsed(
+    usePreference(pulsePreference),
+    useMediaQuery(PULSE_COMPACT_QUERY),
+  );
   const count = useBoard((s) => s.activity.length);
 
   return (
@@ -130,7 +139,7 @@ export function PulseRail() {
             <ChevronDown className="size-4" strokeWidth={1.5} />
           )}
           <span className="font-medium text-text-1">Pulse</span>
-          <span className="tabular hidden text-text-3 sm:inline">
+          <span className="tabular hidden text-text-2 sm:inline">
             {count} {count === 1 ? 'event' : 'events'} · 15 min
           </span>
         </button>
@@ -147,7 +156,7 @@ function FilterToggle() {
     <div
       role="radiogroup"
       aria-label="Show"
-      className="ml-auto flex shrink-0 rounded-chip bg-bg-2 p-0.5"
+      className="ml-auto flex shrink-0 rounded-control bg-bg-2 p-0.5"
     >
       {PULSE_FILTERS.map((option) => (
         // biome-ignore lint/a11y/useSemanticElements: a segmented control, styled as buttons
@@ -159,7 +168,7 @@ function FilterToggle() {
           data-filter={option}
           onClick={() => pulseFilterPreference.set(option)}
           className={cx(
-            'h-6 rounded-[4px] px-2 text-meta transition-colors duration-150',
+            'h-6 rounded-chip px-2 text-meta transition-colors duration-150',
             filter === option
               ? 'bg-bg-1 text-text-1 shadow-raised'
               : 'text-text-3 hover:text-text-1',
@@ -489,7 +498,7 @@ function PulseTooltip({
       data-x={Math.round(dot.x)}
       data-y={Math.round(dot.y - scrollTop)}
       style={{ left, top: dot.y - scrollTop }}
-      className="pointer-events-none absolute z-20 w-max max-w-70 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-control border border-line bg-bg-2 px-2.5 py-1.5 text-label shadow-raised"
+      className="pointer-events-none absolute z-20 w-max max-w-70 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-control border border-line bg-bg-2 px-3 py-1.5 text-label shadow-raised"
     >
       <div className="flex items-center gap-1.5">
         <span
@@ -498,14 +507,14 @@ function PulseTooltip({
           style={{ background: TONE_VAR[dot.tone] }}
         />
         <span className="font-medium text-text-1">{eventLabel(event)}</span>
-        <span className="tabular text-text-3">{formatAgo(Date.now() - event.ts)}</span>
+        <span className="tabular text-text-2">{formatAgo(Date.now() - event.ts)}</span>
       </div>
       {event.summary && (
         <p className="mt-0.5 line-clamp-2 break-words font-mono text-meta text-text-2">
           {event.summary}
         </p>
       )}
-      {projectName && <p className="mt-0.5 text-meta text-text-3">{projectName}</p>}
+      {projectName && <p className="mt-0.5 text-meta text-text-2">{projectName}</p>}
     </div>
   );
 }

@@ -23,3 +23,16 @@ export function formatWhen(ts: number, now: number): string {
 /** The full local date and time, for a tooltip. */
 export const formatDateTime = (ts: number) =>
   new Date(ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** A start time that tells sessions apart: `14:05` today, `Mar 4, 14:05` before. */
+export function formatStarted(ts: number, now: number): string {
+  const date = new Date(ts);
+  const time = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  if (date.toDateString() === new Date(now).toDateString()) return time;
+  const day = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${day}, ${time}`;
+}

@@ -6,6 +6,7 @@ import { spring } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
 import { formatCount, totalTokens } from '../status.js';
+import { formatStarted } from '../time.js';
 import { LiveCaption } from './LiveCaption.js';
 import { isStreaming, lastLine, sessionCaption } from './model.js';
 
@@ -20,7 +21,12 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
   const caption = sessionCaption(session, approval);
   const line = lastLine(session.lastAssistantText);
   const title = session.title?.trim() || null;
-  const fallback = title && title !== caption.text ? title : 'No reply yet';
+  // Untitled sessions with no reply yet would read the same: their start time and short id
+  // (what `claude --resume` takes) tell them apart.
+  const fallback =
+    title && title !== caption.text
+      ? title
+      : `Started ${formatStarted(session.startedAt, Date.now())} · ${session.id.slice(0, 8)}`;
   const tokens = totalTokens(session);
   const streaming = isStreaming(session);
   const tool = session.status.kind === 'tool' ? session.status.tool : null;
@@ -38,15 +44,17 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
         transition={spring.smooth}
         className="flex shrink-0"
       >
-        <ClaudeOrb
-          state={orbStateFor(session.status)}
-          size={28}
-          accent={accent}
-          tool={tool}
-          subagents={subagents}
-          countdown={countdown}
-          showToolLabel={false}
-        />
+        <span className="pod-dim flex">
+          <ClaudeOrb
+            state={orbStateFor(session.status)}
+            size={28}
+            accent={accent}
+            tool={tool}
+            subagents={subagents}
+            countdown={countdown}
+            showToolLabel={false}
+          />
+        </span>
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
@@ -54,7 +62,7 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
           {tokens > 0 && (
             <span
               title={`${tokens.toLocaleString('en-US')} tokens`}
-              className="tabular shrink-0 font-mono text-meta text-text-3"
+              className="tabular shrink-0 font-mono text-meta text-text-2"
             >
               {formatCount(tokens)} tok
             </span>
@@ -64,7 +72,7 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
           dir="auto"
           data-shimmer={(streaming && line !== null) || undefined}
           title={line ?? undefined}
-          className="shimmer relative truncate text-label text-text-3"
+          className="shimmer relative truncate text-label text-text-2"
         >
           {line ?? fallback}
         </p>

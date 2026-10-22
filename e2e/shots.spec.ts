@@ -475,6 +475,7 @@ test.describe('pulse rail', () => {
       test.use({ theme });
 
       test('tooltip', async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem('cboard.pulse', 'expanded'));
         await openRoute(page, '/');
         const rail = page.locator('[data-pulse]');
         const canvas = rail.locator('canvas[data-pulse-canvas]');

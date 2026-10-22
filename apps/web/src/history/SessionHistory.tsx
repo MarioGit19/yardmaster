@@ -63,7 +63,7 @@ export function SessionHistory({ projectId, knownIds, refreshKey, branch }: Sess
           </button>
         </p>
       ) : sessions.length === 0 ? (
-        <p className="text-body-sm text-text-3">No past sessions</p>
+        <p className="text-body-sm text-text-2">No past sessions</p>
       ) : (
         <>
           <ul className="-mx-2 flex flex-col gap-0.5">
@@ -127,7 +127,7 @@ function HistoryRow({
         >
           {title}
         </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-meta text-text-3">
+        <span className="flex min-w-0 items-center gap-1.5 text-meta text-text-2">
           <time
             className="shrink-0 tabular"
             dateTime={new Date(entry.updatedAt).toISOString()}

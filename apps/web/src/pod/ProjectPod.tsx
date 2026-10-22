@@ -19,7 +19,7 @@ import {
 } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
-import { dur, ease, spring } from '../motion.js';
+import { spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, projectTone, toneLabel } from '../status.js';
@@ -39,9 +39,6 @@ const MAX_CREW = 3;
 const IDLE_CLOCK_MS = 15_000;
 const WORKING = new Set<ClaudeSession['status']['kind']>(['working', 'tool', 'compacting']);
 const SPOTLIGHT_PX = 320;
-const DIM_OPACITY = 0.7;
-/** Seconds: stepping back is slow and quiet, coming forward is quick. */
-const DIM_S = 0.8;
 const CREW_PX = 56;
 /** CrewMascot draws mini crew members at 46% of its size. */
 const MINI_PX = Math.round(CREW_PX * 0.46);
@@ -78,8 +75,9 @@ export function ProjectPod({ project }: { project: Project }) {
   const now = useNow(IDLE_CLOCK_MS);
   const lastPulse = useLastActivity(pulseKey);
   const lastActivity = Math.max(lastPulse ?? 0, project.lastActivityAt ?? 0) || null;
-  // Nothing for five minutes: the pod steps back to 70% (Motion owns its opacity for the
-  // shared-element morph). Pointing at it or focusing inside brings it forward.
+  // Nothing for five minutes: the pod steps back. Only its non-text layers (`.pod-dim`: avatar,
+  // crew, orbs, sparklines) fade to 70%, so its text keeps its contrast. Pointing at it or
+  // focusing inside brings it forward.
   const [engaged, setEngaged] = useState(false);
   const dim = isDimmed(tone, crashed, lastActivity, now);
   const faded = dim && !engaged;
@@ -109,11 +107,7 @@ export function ProjectPod({ project }: { project: Project }) {
     <motion.article
       layoutId={sharedId.container(project.id)}
       layoutDependency={POD_LAYOUT_DEPENDENCY}
-      animate={{ opacity: faded ? DIM_OPACITY : 1 }}
-      transition={{
-        ...spring.smooth,
-        opacity: { duration: faded ? DIM_S : dur.fast, ease: ease.out },
-      }}
+      transition={spring.smooth}
       onPointerEnter={() => setEngaged(true)}
       onPointerLeave={() => setEngaged(false)}
       onFocus={() => setEngaged(true)}
@@ -127,6 +121,7 @@ export function ProjectPod({ project }: { project: Project }) {
       data-tone={tone}
       data-crashed={crashed || undefined}
       data-dim={dim || undefined}
+      data-faded={faded || undefined}
       aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
       onPointerMove={onPointerMove}
       style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
@@ -163,7 +158,9 @@ export function ProjectPod({ project }: { project: Project }) {
         transition={spring.smooth}
         className="flex min-w-0 items-center gap-3"
       >
-        <ProjectAvatar project={project} />
+        <span className="pod-dim flex shrink-0">
+          <ProjectAvatar project={project} />
+        </span>
         <div className="pod-title flex min-w-0 flex-1 flex-col">
           <Link
             href={projectHref(project.id)}
@@ -188,13 +185,13 @@ export function ProjectPod({ project }: { project: Project }) {
             <SessionRow key={session.id} session={session} accent={accent} />
           ))}
           {hiddenSessions > 0 && (
-            <li className="pl-10 text-meta text-text-3 tabular">
+            <li className="pl-10 text-meta text-text-2 tabular">
               {hiddenSessions} more {hiddenSessions === 1 ? 'session' : 'sessions'}
             </li>
           )}
         </ul>
       ) : (
-        <p className="text-body-sm text-text-3">No Claude sessions</p>
+        <p className="text-body-sm text-text-2">No Claude sessions</p>
       )}
 
       {openTerminals.length > 0 ? (
@@ -205,26 +202,26 @@ export function ProjectPod({ project }: { project: Project }) {
             ))}
           </ul>
           {hiddenLanes > 0 && (
-            <p className="mt-1 pl-[18px] text-meta text-text-3 tabular">
+            <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
               {hiddenLanes} more {hiddenLanes === 1 ? 'terminal' : 'terminals'}
             </p>
           )}
         </div>
       ) : (
-        <p className="text-meta text-text-3">No open terminals</p>
+        <p className="text-meta text-text-2">No open terminals</p>
       )}
     </motion.article>
   );
 }
 
 function GitLine({ git }: { git: Project['git'] }) {
-  if (!git) return <span className="text-meta text-text-3">Not a git repository</span>;
+  if (!git) return <span className="text-meta text-text-2">Not a git repository</span>;
   const branch = git.branch ?? (git.head ? git.head.slice(0, 7) : 'no branch');
   return (
-    <span className="flex min-w-0 items-center gap-2.5 font-mono text-meta text-text-3 tabular">
+    <span className="flex min-w-0 items-center gap-2 font-mono text-meta text-text-2 tabular">
       <span className="flex min-w-[min(3rem,100%)] items-center gap-1" title={branch}>
         <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
-        <span className="truncate text-text-2">{branch}</span>
+        <span className="truncate">{branch}</span>
       </span>
       {git.dirty > 0 && (
         <span
@@ -287,7 +284,7 @@ function PodCrew({
   );
   const crew = sessions.length > 0 ? sessions : [null];
   return (
-    <div className="pod-crew -my-2 flex shrink-0 items-end">
+    <div className="pod-crew pod-dim -my-2 flex shrink-0 items-end">
       {crew.map((session, i) => (
         <CrewMember
           key={session?.id ?? 'project'}
@@ -333,30 +330,45 @@ function CrewMember({
   );
 }
 
-/** Pod-shaped loading placeholder. */
+/** Pod-shaped loading placeholder: the real pod's header, crew, session rows and lane tracks. */
 export function ProjectPodSkeleton() {
   return (
     <div
       aria-hidden
+      data-pod-skeleton
       className="flex flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised"
     >
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-6 rounded-full" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-24" />
+      <div className="flex min-w-0 items-center gap-3">
+        <Skeleton className="size-6 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Skeleton className="h-4 w-32 max-w-full" />
+          <Skeleton className="h-3 w-20 max-w-full" />
         </div>
-        <Skeleton className="size-10 rounded-full" />
+        {/* The crew mascot is CREW_PX (56px) square. */}
+        <Skeleton className="-my-2 size-14 shrink-0 rounded-panel" />
       </div>
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-7 rounded-full" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-3 w-3/4" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
+      <div className="flex flex-col gap-3">
+        {[0, 1].map((row) => (
+          <div key={row} className="flex min-w-0 items-center gap-3">
+            <Skeleton className="size-7 shrink-0 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className={cx('h-3.5', row === 0 ? 'w-3/4' : 'w-1/2')} />
+              <Skeleton className={cx('h-3', row === 0 ? 'w-1/2' : 'w-2/3')} />
+            </div>
+          </div>
+        ))}
       </div>
-      <Skeleton className="mt-2 h-3 w-full" />
-      <Skeleton className="h-3 w-full" />
+      <div className="lanes">
+        {[0, 1].map((lane) => (
+          <div key={lane} className="lane-row">
+            <Skeleton className="h-3 w-4/5" />
+            <Skeleton className="h-3 w-3/5" />
+            <Skeleton className="h-3 w-full" />
+            <span />
+            <Skeleton className="ml-auto size-1.5 rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

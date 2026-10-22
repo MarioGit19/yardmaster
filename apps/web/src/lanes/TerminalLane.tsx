@@ -132,14 +132,19 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
 
         {!errorLine && (
           <>
-            <Sparkline terminalId={terminal.id} color={accent} error={view.tone === 'err'} />
+            <Sparkline
+              terminalId={terminal.id}
+              color={accent}
+              error={view.tone === 'err'}
+              className="pod-dim"
+            />
             <span className="flex min-w-0 items-center">
               {port && <PortChip port={port} others={morePorts} />}
             </span>
           </>
         )}
 
-        <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-meta tabular text-text-3">
+        <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-meta tabular text-text-2">
           <AnimatePresence initial={false} mode="popLayout">
             {view.exit ? (
               <motion.span
@@ -164,7 +169,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                   aria-hidden
                   data-level={view.running && streaming ? level : undefined}
                   className={cx(
-                    'lane-dot size-1.5 rounded-full',
+                    'lane-dot pod-dim size-1.5 rounded-full',
                     view.running ? 'bg-st-ok text-st-ok' : 'bg-st-idle text-st-idle',
                   )}
                 />
@@ -237,7 +242,7 @@ function LaneCaption({
           }}
           className={cx(
             'block min-w-0 truncate',
-            error ? 'text-st-err-ink' : running ? 'text-text-2' : 'text-text-3',
+            error ? 'text-st-err-ink' : running ? 'text-text-1' : 'text-text-2',
           )}
         >
           {error ?? command ?? '—'}

@@ -47,14 +47,14 @@ export function TerminalPeek({ terminalId, id, label, className }: TerminalPeekP
       aria-label={label}
       data-peek={terminalId}
       className={cx(
-        'overflow-hidden rounded-control border border-line-strong bg-bg-2 px-2.5 py-2 font-mono text-meta text-text-2 shadow-raised',
+        'overflow-hidden rounded-control border border-line-strong bg-bg-2 px-3 py-2 font-mono text-meta text-text-2 shadow-raised',
         className,
       )}
     >
       {/* Fixed height: the peek never changes size while output streams in. */}
       <div className="flex h-24 flex-col justify-end">
         {lines.length === 0 ? (
-          <p className="text-text-3">No recent output</p>
+          <p className="text-text-2">No recent output</p>
         ) : (
           lines.map((line, i) => (
             // Lines have no identity of their own; the newest is always last.

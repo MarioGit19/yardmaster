@@ -156,9 +156,9 @@ describe('routes', () => {
     act(() => handle?.focus());
     press('ArrowRight');
     await vi.waitFor(() => expect(handle?.getAttribute('aria-valuenow')).toBe('296'));
+    // Only the resized column is saved; the other keeps following the body width.
     expect(JSON.parse(localStorage.getItem('cboard.focus.p-orbit') ?? '{}')).toEqual({
       left: 296,
-      right: 420,
     });
     expect(localStorage.getItem('cboard.focus.p-zen')).toBeNull();
   });

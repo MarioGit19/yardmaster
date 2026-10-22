@@ -30,13 +30,25 @@ export function stackOrder<T extends StackTerminal>(terminals: readonly T[]): T[
   return [...open, ...closed];
 }
 
-/** The chosen tab if it still exists, else the editor's active terminal, else the first. */
+/**
+ * The chosen tab if it still exists. Without a choice: the editor's active terminal, else the
+ * first, preferring ones the stack can mirror (`mirrorable`) over an interactive app's pane.
+ */
 export function resolveActive(
   ordered: readonly StackTerminal[],
   chosen: string | null,
+  mirrorable: (id: string) => boolean = () => true,
 ): string | null {
   if (chosen !== null && ordered.some((t) => t.id === chosen)) return chosen;
-  return (ordered.find((t) => t.active && t.state === 'open') ?? ordered[0])?.id ?? null;
+  const editorActive = (t: StackTerminal) => t.active && t.state === 'open';
+  return (
+    (
+      ordered.find((t) => editorActive(t) && mirrorable(t.id)) ??
+      ordered.find((t) => mirrorable(t.id)) ??
+      ordered.find(editorActive) ??
+      ordered[0]
+    )?.id ?? null
+  );
 }
 
 /** Up to four terminals for the grid, always including the active one. */

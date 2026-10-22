@@ -213,7 +213,7 @@ export function DiffView({ id, hunks, lang, gapLabel }: DiffViewProps) {
           </div>
         </div>
       ))}
-      {total === 0 && <p className="px-3 py-1.5 font-sans text-meta text-text-3">No changes</p>}
+      {total === 0 && <p className="px-3 py-1.5 font-sans text-meta text-text-2">No changes</p>}
       {(hidden > 0 || (all && total > CLAMP_ROWS)) && (
         <button
           type="button"

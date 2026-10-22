@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import { type ClaudeSession, toolInputDetail } from '@c-board/protocol';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
@@ -30,6 +30,19 @@ export function AttentionCenter() {
   const offscreen = still ? 'none' : narrow ? 'translateY(100%)' : 'translateX(100%)';
   return (
     <AnimatePresence>
+      {open && (
+        // The scrim sets the sheet apart from the pods it covers; a click on it closes the sheet.
+        <motion.div
+          key="attention-scrim"
+          aria-hidden
+          data-attention-scrim
+          onClick={close}
+          initial={level === 'off' ? false : { opacity: 0 }}
+          animate={{ opacity: 1, transition: { duration: dur.base, ease: ease.out } }}
+          exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+          className="fixed inset-x-0 top-12 bottom-0 z-40 bg-bg-0/50"
+        />
+      )}
       {open && (
         <motion.aside
           key="attention"
@@ -83,7 +96,7 @@ function SheetBody() {
           className="flex-1 text-body text-text-1 outline-none"
         >
           Needs you
-          <span className="ml-2 text-text-3 tabular-nums">{waiting.length}</span>
+          <span className="ml-2 text-text-2 tabular-nums">{waiting.length}</span>
         </h2>
         <IconButton
           label="Close"
@@ -95,7 +108,7 @@ function SheetBody() {
         />
       </header>
       {waiting.length === 0 ? (
-        <p className="px-5 py-8 text-center text-body-sm text-text-3">
+        <p className="px-5 py-8 text-center text-body-sm text-text-2">
           Nothing is waiting for you.
         </p>
       ) : (
@@ -115,6 +128,10 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
   const caption = sessionCaption(session, approval);
+  // The exact payload (the command, the file) until 8.4's full approval cards.
+  const raw = approval ? toolInputDetail(approval.input)?.trim() || null : null;
+  const detail =
+    raw && project && raw.startsWith(`${project.path}/`) ? raw.slice(project.path.length + 1) : raw;
   const title = session.title?.trim() || null;
   const href = project ? sessionHref(project.id, session.id) : null;
   const body = (
@@ -127,7 +144,7 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
             {project?.name ?? 'No project'}
           </span>
           {title && (
-            <span className="min-w-0 truncate text-text-3" title={title}>
+            <span className="min-w-0 truncate text-text-2" title={title}>
               <span aria-hidden>&nbsp;·&nbsp;</span>
               {title}
             </span>
@@ -135,14 +152,22 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
         </span>
         <StatusDot
           tone="wait"
-          label={caption.text}
+          label={approval ? `Wants to run ${approval.tool}` : caption.text}
           showLabel
           className="text-label text-st-wait-ink"
         />
+        {detail && (
+          <code
+            title={detail}
+            className="mt-1.5 line-clamp-2 break-all rounded-chip bg-bg-2 px-2 py-1 font-mono text-label text-text-1"
+          >
+            {detail}
+          </code>
+        )}
       </span>
     </>
   );
-  const row = 'flex items-center gap-3 rounded-control px-3 py-2';
+  const row = 'flex items-start gap-3 rounded-control px-3 py-2';
   return (
     <li data-waiting={session.id}>
       {href ? (

@@ -22,6 +22,24 @@ export const COLUMN_LIMITS: Record<SideColumn, ColumnLimit> = {
 
 export const DEFAULT_SIZES: ColumnSizes = { left: 280, right: 420 };
 
+/** Without a saved size the terminal column takes this share of the body. */
+const RIGHT_SHARE = 0.3;
+/** Bodies narrower than this start with the slimmer left column. */
+const NARROW_BODY = 1280;
+
+/**
+ * Sizes for a project nobody resized yet, relative to a body `width` px wide (0: not measured),
+ * so the Claude panel keeps most of the room on laptop screens.
+ */
+export function defaultSizes(width: number): ColumnSizes {
+  if (width <= 0) return DEFAULT_SIZES;
+  const right = COLUMN_LIMITS.right;
+  return {
+    left: width < NARROW_BODY ? 240 : DEFAULT_SIZES.left,
+    right: Math.round(clamp(width * RIGHT_SHARE, right.min, right.snaps[2] ?? right.max)),
+  };
+}
+
 /** The Claude panel never gets narrower than this while the side columns can still give way. */
 export const CENTER_MIN = 360;
 /** Each resize handle is its own grid track. */
@@ -82,39 +100,43 @@ function defaultStorage(): KeyValueStorage | undefined {
 const isWidth = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
 
-/** The project's saved column sizes. Missing, corrupt or blocked storage gives the defaults. */
+/**
+ * The project's saved column sizes, each one only if it was saved and is valid. Missing,
+ * corrupt or blocked storage gives `{}` (the caller fills in `defaultSizes`).
+ */
 export function loadSizes(
   projectId: string,
   storage: KeyValueStorage | undefined = defaultStorage(),
-): ColumnSizes {
+): Partial<ColumnSizes> {
   try {
     const raw = storage?.getItem(storageKey(projectId));
-    if (!raw) return DEFAULT_SIZES;
+    if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return DEFAULT_SIZES;
+    if (typeof parsed !== 'object' || parsed === null) return {};
     const { left, right } = parsed as Record<string, unknown>;
-    return fitSizes(
-      {
-        left: isWidth(left) ? left : DEFAULT_SIZES.left,
-        right: isWidth(right) ? right : DEFAULT_SIZES.right,
-      },
-      0,
-    );
+    return {
+      ...(isWidth(left) ? { left: clampColumn('left', left) } : {}),
+      ...(isWidth(right) ? { right: clampColumn('right', right) } : {}),
+    };
   } catch {
-    return DEFAULT_SIZES;
+    return {};
   }
 }
 
+const clampColumn = (column: SideColumn, value: number) =>
+  Math.round(clamp(value, COLUMN_LIMITS[column].min, COLUMN_LIMITS[column].max));
+
+/** Saves the columns the user sized; the others keep following `defaultSizes`. */
 export function saveSizes(
   projectId: string,
-  sizes: ColumnSizes,
+  sizes: Partial<ColumnSizes>,
   storage: KeyValueStorage | undefined = defaultStorage(),
 ): void {
+  const rounded: Partial<ColumnSizes> = {};
+  if (sizes.left !== undefined) rounded.left = Math.round(sizes.left);
+  if (sizes.right !== undefined) rounded.right = Math.round(sizes.right);
   try {
-    storage?.setItem(
-      storageKey(projectId),
-      JSON.stringify({ left: Math.round(sizes.left), right: Math.round(sizes.right) }),
-    );
+    storage?.setItem(storageKey(projectId), JSON.stringify(rounded));
   } catch {
     // Full or disabled storage: the sizes still apply until the page reloads.
   }

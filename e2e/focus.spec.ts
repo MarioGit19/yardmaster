@@ -95,15 +95,16 @@ test.describe('at 1440', () => {
   test('a released handle springs to a snap width and is remembered', async ({ page }) => {
     const { card } = await openFirstPod(page);
     const handle = card.locator('[role="separator"][data-resize="left"]');
-    await expect(handle).toHaveAttribute('aria-valuenow', '280');
+    // A body under 1280px wide starts with the slimmer left column.
+    await expect(handle).toHaveAttribute('aria-valuenow', '240');
     const box = await handle.boundingBox();
     if (!box) throw new Error('no handle');
     const y = box.y + box.height / 2;
     await page.mouse.move(box.x + box.width / 2, y);
     await page.mouse.down();
-    // 280 + 52 = 332: within the snap radius of 340.
-    await page.mouse.move(box.x + box.width / 2 + 30, y, { steps: 4 });
-    await page.mouse.move(box.x + box.width / 2 + 52, y, { steps: 4 });
+    // 240 + 92 = 332: within the snap radius of 340.
+    await page.mouse.move(box.x + box.width / 2 + 50, y, { steps: 4 });
+    await page.mouse.move(box.x + box.width / 2 + 92, y, { steps: 4 });
     await expect(handle).toHaveAttribute('aria-valuenow', '332');
     await page.mouse.up();
     await expect(handle).toHaveAttribute('aria-valuenow', '340');
@@ -139,9 +140,14 @@ for (const viewport of [
     expect(sessions.right).toBeLessThanOrEqual(claude.left);
     expect(claude.right).toBeLessThanOrEqual(terminals.left);
     expect(new Set(boxes.map((b) => Math.round(b.top))).size).toBe(1);
-    expect(Math.round(sessions.width)).toBe(280);
-    expect(Math.round(terminals.width)).toBe(420);
-    expect(claude.width).toBeGreaterThanOrEqual(360);
+    // Nobody resized them: the defaults follow the body width (`defaultSizes`), and the Claude
+    // panel keeps the largest share.
+    const body = await columns
+      .first()
+      .evaluate((el) => (el.parentElement as HTMLElement).clientWidth);
+    expect(Math.round(sessions.width)).toBe(body < 1280 ? 240 : 280);
+    expect(Math.round(terminals.width)).toBe(Math.min(520, Math.max(300, Math.round(body * 0.3))));
+    expect(claude.width).toBeGreaterThan(terminals.width);
     // The card fills the main area inside the page gutters, without page scroll.
     const cardBox = await card.boundingBox();
     expect((cardBox?.y ?? 0) + (cardBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height);

@@ -364,7 +364,7 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: Tried a 340px default for the terminal column to give the Claude panel more room. Reverted: the 2×2 terminal grid broke at that width (the interactive placeholder overlapped its tile header).
   - Note: e2e on a heavily loaded machine (load ~30): each full run failed 1–3 different timing-sensitive tests (pod morph widths, pulse oldest-dot hover, grid lefts mid-reorder), and each passed when re-run alone or with `--repeat-each`. One full run passed clean. The pulse test hovers the oldest dot, which can age out of the 15-min window before the hover lands.
 
-- [ ] **7.16b Design critique follow-ups**
+- [x] **7.16b Design critique follow-ups**
   - Remaining issues from the 7.16 critique, all within DESIGN.md's direction:
     - (a) Dark `--text-3` `#6B7183` is 4.0:1 on `--bg-1` and 3.8:1 on `--bg-2`, below AA for 11–12px meta. Either change the DESIGN-specified hex (e.g. `#7A8093`, needs maintainer sign-off) or move information-bearing meta to text-2.
     - (b) Dimmed pods (opacity 0.7) put meta text at ~2.5:1: dim only the non-text layers.
@@ -379,6 +379,10 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
     - (k) Off-scale radius and spacing leftovers (`rounded-[4px]` in ToolCard and PulseRail, 10/14px steps).
     - (l) The pulse e2e test's oldest-dot hover is timing-sensitive.
   - **Verify:** `pnpm shots && pnpm check`
+  - Note: (a) The DESIGN hex for dark `--text-3` is unchanged (it needs maintainer sign-off). Information-bearing meta moved to text-2 instead: git lines, token counts, last assistant lines, idle captions, lane commands and uptime, history and commit meta, Pulse counts and times, column and page meta, and empty states. text-3 stays only on icons, placeholders, path prefixes beside a file name, and kbd hints.
+  - Note: (b) Quiet pods keep opacity 1. Only `.pod-dim` layers (avatar, crew, orbs, sparklines, lane dots) fade to 70%, through a CSS transition (800 ms out, 120 ms back). (c) The Pulse preference now defaults to `auto`: collapsed below 960px tall or 768px wide, until the user toggles it. (d) Columns nobody has resized follow `defaultSizes(width)` (terminal column 30% of the body, between 300 and 520px; left column 240 below a 1280px body). Only the column that was resized is saved. Grid tiles get a compact interactive card that can't overflow its header.
+  - Note: (e) Without a choice, the stack prefers a mirrorable terminal. If an interactive app starts in the auto-picked terminal, the stack moves on to another one. (f) StatusDot and the HUD use shaped marks: wait is a ring, err a diamond, ok a square, idle a small dot. (g) Demo crash, test-failure and Claude-error toasts name the project and the exit code. (h) Attention rows show the request's payload (relative to the project), and a scrim behind the sheet closes it on click. (i) Untitled rows with no reply show "Started 14:05 · <short id>". (l) The pulse test clicks a dot five steps back from the newest instead of the oldest.
+  - Note: e2e at load 27–38: the full run failed only `focus.spec` "pod morphs" and `overview.spec` grid columns (mid-reorder). The unchanged code (stashed and rebuilt) failed the morph test 5/5 under the same load, so the failures come from load, not from this change. The focus tests now expect the width-relative defaults. `pnpm shots` passed 67/67 on one run. On the next run, three shots timed out at load 38 and passed when re-run.
 
 ## Phase 8 — Act: headless sessions and approvals
 

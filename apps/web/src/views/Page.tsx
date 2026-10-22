@@ -28,7 +28,7 @@ export function PageHeader({ title, meta }: { title: ReactNode; meta?: ReactNode
   return (
     <header className="mb-6 flex min-w-0 flex-col gap-1">
       <h1 className="truncate font-medium text-title text-text-1">{title}</h1>
-      {meta && <div className="text-meta text-text-3">{meta}</div>}
+      {meta && <div className="text-meta text-text-2">{meta}</div>}
     </header>
   );
 }

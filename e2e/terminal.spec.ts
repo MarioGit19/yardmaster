@@ -86,6 +86,18 @@ test.describe('terminal stack', () => {
     await expect(stack.locator('[data-xterm]')).toHaveCount(0);
   });
 
+  test('without a choice the stack opens on a terminal it can mirror', async ({ page }) => {
+    const stack = await openStack(page);
+    // Wait until the claude terminal's interactive run is known, then check the pick held.
+    await stack.getByRole('tab', { name: /^claude\b/ }).waitFor();
+    await expect(stack.locator('[data-xterm]')).toHaveCount(1, { timeout: 10_000 });
+    await expect(stack.locator('[data-interactive]')).toHaveCount(0);
+    await expect(stack.getByRole('tab', { name: /^claude\b/ })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+  });
+
   test('the grid shows four terminals, and maximize covers the view until Escape', async ({
     page,
   }) => {

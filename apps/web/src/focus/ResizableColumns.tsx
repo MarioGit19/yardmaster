@@ -13,7 +13,7 @@ import { cx } from '../ui/cx.js';
 import {
   COLUMN_LIMITS,
   type ColumnSizes,
-  DEFAULT_SIZES,
+  defaultSizes,
   fitSizes,
   HANDLE_PX,
   KEY_STEP,
@@ -49,11 +49,13 @@ export function ResizableColumns({
 }: ResizableColumnsProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  // What the user chose; the rendered widths are this fitted to the current body width.
+  // What the user chose (unsized columns follow the body width); the rendered widths are this
+  // fitted to the current body width.
   const [initial] = useState(() => loadSizes(projectId));
-  const chosen = useRef<ColumnSizes>(initial);
-  const leftWidth = useMotionValue(initial.left);
-  const rightWidth = useMotionValue(initial.right);
+  const chosen = useRef<Partial<ColumnSizes>>(initial);
+  const start = { ...defaultSizes(0), ...initial };
+  const leftWidth = useMotionValue(start.left);
+  const rightWidth = useMotionValue(start.right);
   const columns = useMotionTemplate`${leftWidth}px ${HANDLE_PX}px minmax(0, 1fr) ${HANDLE_PX}px ${rightWidth}px`;
 
   useLayoutEffect(() => {
@@ -68,7 +70,7 @@ export function ResizableColumns({
   }, []);
 
   useLayoutEffect(() => {
-    const fitted = fitSizes(chosen.current, width);
+    const fitted = fitSizes({ ...defaultSizes(width), ...chosen.current }, width);
     leftWidth.jump(fitted.left);
     rightWidth.jump(fitted.right);
   }, [width, leftWidth, rightWidth]);
@@ -188,7 +190,7 @@ function Handle({
     else if (e.key === 'ArrowLeft') next = current - step * direction;
     else if (e.key === 'Home') next = min;
     else if (e.key === 'End') next = max;
-    else if (e.key === 'Enter') next = DEFAULT_SIZES[column];
+    else if (e.key === 'Enter') next = defaultSizes(width)[column];
     if (next === null) return;
     e.preventDefault();
     settle(next);
@@ -212,7 +214,7 @@ function Handle({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      onDoubleClick={() => settle(DEFAULT_SIZES[column])}
+      onDoubleClick={() => settle(defaultSizes(width)[column])}
       onKeyDown={onKeyDown}
       className={cx('focus-handle group', dragging && 'cursor-col-resize')}
     >

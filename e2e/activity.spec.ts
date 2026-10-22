@@ -96,12 +96,22 @@ test('quiet pods dim after five minutes', async ({ page }) => {
   await expect(pod(page, id)).not.toHaveAttribute('data-dim');
   await page.clock.fastForward('01:20');
   await expect(pod(page, id)).toHaveAttribute('data-dim', 'true');
-  // Motion fades it with WAAPI, whose timeline the fake clock doesn't drive: jump to the end.
+  // The fade is a CSS transition, whose timeline the fake clock doesn't drive: jump to the end.
   await page.clock.runFor(100);
   await pod(page, id).evaluate((el) => {
-    for (const animation of el.getAnimations()) animation.finish();
+    for (const animation of el.getAnimations({ subtree: true })) {
+      if (animation instanceof CSSTransition) animation.finish();
+    }
   });
-  await expect.poll(() => pod(page, id).evaluate((el) => getComputedStyle(el).opacity)).toBe('0.7');
+  // Only the non-text layers step back; the pod and its text keep full contrast.
+  const opacity = (selector: string) =>
+    pod(page, id)
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).opacity);
+  await expect.poll(() => opacity('.pod-crew')).toBe('0.7');
+  await expect.poll(() => pod(page, id).evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+  expect(await opacity('header a')).toBe('1');
 
   // A pod that needs you never dims, however long it waits.
   for (const tone of ['wait', 'err', 'work']) {

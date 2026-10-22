@@ -49,6 +49,17 @@ describe('resolveActive', () => {
     expect(resolveActive([term('a', T0), term('c', T0)], null)).toBe('a');
     expect(resolveActive([], null)).toBeNull();
   });
+
+  it('prefers a terminal it can mirror when nothing was chosen', () => {
+    const interactive = new Set(['b']);
+    const mirrorable = (id: string) => !interactive.has(id);
+    expect(resolveActive(ordered, null, mirrorable)).toBe('a');
+    expect(resolveActive(ordered, 'b', mirrorable)).toBe('b');
+    interactive.add('a');
+    expect(resolveActive(ordered, null, mirrorable)).toBe('c');
+    interactive.add('c');
+    expect(resolveActive(ordered, null, mirrorable)).toBe('b');
+  });
 });
 
 describe('gridTerminals', () => {

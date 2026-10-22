@@ -50,7 +50,7 @@ export function ClaudePanel({
           tone={status.tone}
           label={status.label}
           showLabel
-          className="shrink-0 text-meta text-text-3"
+          className="shrink-0 text-meta text-text-2"
         />
         {session.model && (
           <span className="hidden min-w-0 max-w-40 xl:flex">
@@ -59,7 +59,7 @@ export function ClaudePanel({
             </Chip>
           </span>
         )}
-        <span className="tabular shrink-0 font-mono text-meta text-text-3">
+        <span className="tabular shrink-0 font-mono text-meta text-text-2">
           {formatCount(totalTokens(session))} tok
         </span>
       </header>

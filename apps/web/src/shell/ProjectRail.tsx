@@ -14,7 +14,7 @@ import { projectTone, toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { StatusDot } from '../ui/StatusDot.js';
+import { StatusDot, TONE_MARK } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { ProjectAvatar } from './ProjectAvatar.js';
 import { railKeyTarget } from './railNav.js';
@@ -78,7 +78,7 @@ export function ProjectRail({ collapsed, onToggle }: ProjectRailProps) {
         <li aria-hidden className="mx-2 my-1.5 h-px bg-line" />
         {!hydrated && projects.length === 0 && <RailSkeleton collapsed={collapsed} />}
         {hydrated && projects.length === 0 && !collapsed && (
-          <li className="px-2 py-1.5 text-meta text-text-3">No projects yet</li>
+          <li className="px-2 py-1.5 text-meta text-text-2">No projects yet</li>
         )}
         {projects.map((project, i) => (
           <li key={project.id}>
@@ -166,14 +166,6 @@ interface RailLinkProps {
   tabStop: boolean;
 }
 
-const BADGE = {
-  work: 'bg-st-work',
-  tool: 'bg-st-tool',
-  wait: 'bg-st-wait',
-  ok: 'bg-st-ok',
-  err: 'bg-st-err',
-} as const;
-
 function RailLink({
   href,
   label,
@@ -193,7 +185,7 @@ function RailLink({
       tabIndex={tabStop ? 0 : -1}
       data-rail-item=""
       className={cx(
-        'relative flex h-9 items-center gap-2.5 rounded-control px-2 text-body-sm outline-none',
+        'relative flex h-9 items-center gap-2 rounded-control px-2 text-body-sm outline-none',
         'transition-colors duration-150 ease-out',
         collapsed && 'justify-center px-0',
         active
@@ -204,13 +196,14 @@ function RailLink({
       <span className="relative flex shrink-0 text-text-2">
         {icon}
         {badge && (
+          // The same shaped mark as the expanded rail, on a plate that cuts it out of the icon.
           <span
             aria-hidden
-            className={cx(
-              'absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-bg-1',
-              BADGE[badge],
-            )}
-          />
+            data-mark={badge}
+            className="absolute -top-1 -right-1 grid size-3 place-items-center rounded-full bg-bg-1"
+          >
+            <span className={cx('block', TONE_MARK[badge])} />
+          </span>
         )}
       </span>
       {!collapsed && (
@@ -241,7 +234,7 @@ function RailSkeleton({ collapsed }: { collapsed: boolean }) {
   return (
     <>
       {[0, 1, 2].map((i) => (
-        <li key={i} aria-hidden className="flex h-9 items-center gap-2.5 px-2">
+        <li key={i} aria-hidden className="flex h-9 items-center gap-2 px-2">
           <Skeleton className="size-6 rounded-full" />
           {!collapsed && <Skeleton className={cx('h-3', i === 1 ? 'w-20' : 'w-28')} />}
         </li>

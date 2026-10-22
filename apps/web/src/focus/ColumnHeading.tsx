@@ -17,7 +17,7 @@ export function ColumnHeading({
     <div className={cx('flex h-7 min-w-0 items-center gap-2', className)}>
       <h2 className="flex min-w-0 flex-1 items-baseline gap-2 font-medium text-body text-text-1">
         <span className="truncate">{children}</span>
-        {meta !== undefined && <span className="tabular text-meta text-text-3">{meta}</span>}
+        {meta !== undefined && <span className="tabular text-meta text-text-2">{meta}</span>}
       </h2>
       {actions}
     </div>

@@ -1,11 +1,15 @@
 import { createPreference } from '../prefs.js';
 import { PULSE_FILTERS, type PulseFilter } from './model.js';
 
-export const pulsePreference = createPreference<'expanded' | 'collapsed'>(
+/** `auto` until the user toggles: collapsed on short or narrow screens, else expanded. */
+export const pulsePreference = createPreference<'auto' | 'expanded' | 'collapsed'>(
   'cboard.pulse',
-  ['expanded', 'collapsed'],
-  'expanded',
+  ['auto', 'expanded', 'collapsed'],
+  'auto',
 );
+
+/** Screens where the expanded rail would take too much of the board (DESIGN.md §4.7). */
+export const PULSE_COMPACT_QUERY = '(max-height: 959px), (max-width: 767px)';
 
 export const pulseFilterPreference = createPreference<PulseFilter>(
   'cboard.pulse.filter',
@@ -13,6 +17,17 @@ export const pulseFilterPreference = createPreference<PulseFilter>(
   'all',
 );
 
+const isCompact = () => globalThis.matchMedia?.(PULSE_COMPACT_QUERY).matches ?? false;
+
+/** Whether the rail shows collapsed for a preference on a compact screen or not. */
+export function pulseCollapsed(
+  setting: 'auto' | 'expanded' | 'collapsed',
+  compact: boolean,
+): boolean {
+  return setting === 'auto' ? compact : setting === 'collapsed';
+}
+
 export function togglePulse(): void {
-  pulsePreference.set(pulsePreference.get() === 'collapsed' ? 'expanded' : 'collapsed');
+  const collapsed = pulseCollapsed(pulsePreference.get(), isCompact());
+  pulsePreference.set(collapsed ? 'expanded' : 'collapsed');
 }

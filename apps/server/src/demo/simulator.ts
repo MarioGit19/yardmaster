@@ -57,6 +57,8 @@ import {
 export const DEMO_PERMISSION_INTERVAL_MS = 45_000;
 export const DEMO_APPROVAL_TIMEOUT_MS = 120_000;
 const CRASH_CHANCE = 0.012;
+/** What a crashed dev server exits with. */
+const CRASH_EXIT_CODE = 1;
 /** The `staysDown` dev server crashes on this tick (a few seconds after it boots). */
 const STAYS_DOWN_AFTER_TICKS = 2;
 /** A quiet terminal's newest history is at least this old, past the board's idle threshold. */
@@ -477,15 +479,15 @@ export class DemoSimulator {
       // Once: after a rerun from the board it stays up.
       if (staysDown ? terminal.ticks === STAYS_DOWN_AFTER_TICKS : this.rng.chance(CRASH_CHANCE)) {
         this.write(terminal, execId, script.crash(this.rng));
-        this.endExec(terminal, execId, 1);
+        this.endExec(terminal, execId, CRASH_EXIT_CODE);
         terminal.execId = null;
         terminal.childPid = null;
         this.unbindPort(terminal);
         this.toast(
           'error',
-          `${terminal.def.name} crashed`,
+          `${terminal.def.name} crashed in ${terminal.project.def.name}`,
           terminal.project,
-          staysDown ? 'Rerun it from the board' : 'Restarting in a few seconds',
+          `Exit code ${CRASH_EXIT_CODE}. ${staysDown ? 'Rerun it from the board.' : 'Restarting in a few seconds.'}`,
         );
         if (!staysDown) {
           this.after(this.rng.int(3_000, 7_000), () => this.bootDevServer(terminal, kind));
@@ -526,7 +528,14 @@ export class DemoSimulator {
     });
     this.after(400 * run.chunks.length + 100, () => {
       this.endExec(terminal, execId, run.failed ? 1 : 0);
-      if (run.failed) this.toast('warning', 'Tests failed', terminal.project, terminal.def.name);
+      if (run.failed) {
+        this.toast(
+          'warning',
+          `Tests failed in ${terminal.project.def.name}`,
+          terminal.project,
+          `pnpm jest exited with code 1 in ${terminal.def.name}.`,
+        );
+      }
       this.after(this.rng.int(20_000, 45_000), () => this.runTests(terminal));
     });
   }
@@ -823,7 +832,12 @@ export class DemoSimulator {
       const message = this.rng.pick(['API Error: 529 Overloaded', 'Request timed out']);
       this.store.setSessionStatus(session.id, { kind: 'error', message });
       this.activity('stop.failure', session, message);
-      this.toast('error', 'Claude stopped with an error', session.project, message);
+      this.toast(
+        'error',
+        `Claude stopped with an error in ${session.project.def.name}`,
+        session.project,
+        message,
+      );
       session.timer = this.after(this.rng.int(8_000, 14_000), () => {
         this.store.setSessionStatus(session.id, { kind: 'idle' });
         this.scheduleTurn(session, this.rng.int(4_000, 15_000));

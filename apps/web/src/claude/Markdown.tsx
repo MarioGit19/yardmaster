@@ -78,7 +78,7 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
       </div>
       <pre
         data-highlighted={lines ? '' : undefined}
-        className="overflow-x-auto px-3 py-2.5 font-mono text-label leading-5 text-text-1"
+        className="overflow-x-auto px-3 py-2 font-mono text-label leading-5 text-text-1"
       >
         <code>{lines ? <Tokens lines={lines} /> : code}</code>
       </pre>

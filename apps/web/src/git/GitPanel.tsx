@@ -32,7 +32,7 @@ export function GitPanel({ git, now }: GitPanelProps) {
     return (
       <section aria-label="Git" data-git-panel>
         <ColumnHeading>Git</ColumnHeading>
-        <p className="text-body-sm text-text-3">Not a git repository</p>
+        <p className="text-body-sm text-text-2">Not a git repository</p>
       </section>
     );
   }
@@ -59,8 +59,8 @@ function BranchLine({ git }: { git: GitInfo }) {
   const branch = git.branch ?? (git.head ? git.head.slice(0, 7) : 'no branch');
   const sync = syncState(git);
   return (
-    <div className="-mt-2 flex min-w-0 flex-col gap-1 font-mono text-meta text-text-3">
-      <p className="flex min-w-0 items-center gap-2.5 tabular">
+    <div className="-mt-2 flex min-w-0 flex-col gap-1 font-mono text-meta text-text-2">
+      <p className="flex min-w-0 items-center gap-2 tabular">
         <span className="flex min-w-0 items-center gap-1" title={branch}>
           <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
           <span className="truncate text-text-2">{branch}</span>
@@ -106,7 +106,7 @@ function ChangedFiles({ git }: { git: GitInfo }) {
         budget -= shown.length;
         return (
           <div key={group.status} data-git-group={group.status}>
-            <h3 className="mb-1 flex items-baseline gap-1.5 text-label text-text-3">
+            <h3 className="mb-1 flex items-baseline gap-1.5 text-label text-text-2">
               {group.label}
               <span className="tabular">{group.files.length}</span>
             </h3>
@@ -119,7 +119,7 @@ function ChangedFiles({ git }: { git: GitInfo }) {
         );
       })}
       {(hidden > 0 || unlisted > 0) && (
-        <div className="flex flex-col items-start gap-1 text-meta text-text-3">
+        <div className="flex flex-col items-start gap-1 text-meta text-text-2">
           {hidden > 0 && (
             <button
               type="button"
@@ -173,15 +173,15 @@ function FileRow({ file }: { file: GitFileChange }) {
 function Commits({ commits, now }: { commits: readonly GitCommit[]; now: number }) {
   return (
     <div>
-      <h3 className="mb-1.5 text-label text-text-3">Recent commits</h3>
+      <h3 className="mb-1.5 text-label text-text-2">Recent commits</h3>
       <ol className="flex flex-col gap-2">
         {commits.map((commit) => (
           <li key={commit.hash} className="flex min-w-0 flex-col gap-0.5" data-commit={commit.hash}>
             <span className="truncate text-body-sm text-text-1" title={commit.subject}>
               {commit.subject}
             </span>
-            <span className="flex min-w-0 items-center gap-1.5 text-meta text-text-3">
-              <span className="shrink-0 font-mono text-text-2">{commit.hash.slice(0, 7)}</span>
+            <span className="flex min-w-0 items-center gap-1.5 text-meta text-text-2">
+              <span className="shrink-0 font-mono">{commit.hash.slice(0, 7)}</span>
               <span aria-hidden>·</span>
               <span className="truncate">{commit.author}</span>
               <span aria-hidden>·</span>

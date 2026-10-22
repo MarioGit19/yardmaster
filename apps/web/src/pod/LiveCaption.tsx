@@ -8,7 +8,7 @@ export const CAPTION_COLOR: Record<CaptionTone, string> = {
   active: 'text-text-1',
   wait: 'text-st-wait-ink',
   err: 'text-st-err-ink',
-  rest: 'text-text-3',
+  rest: 'text-text-2',
 };
 
 /**

@@ -263,7 +263,7 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
                   transition: { duration: dur.fast, ease: ease.out },
                 }}
                 transition={spring.snappy}
-                className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-3.5 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] hover:bg-bg-1"
+                className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-4 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] hover:bg-bg-1"
               >
                 <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
                 Jump to latest
@@ -333,7 +333,7 @@ function UserBubble({
     <div className="flex justify-end">
       <div
         title={fullTime(row.ts)}
-        className="max-w-[min(85%,36rem)] rounded-panel rounded-br-chip border border-line bg-bg-2 px-3.5 py-2 text-body text-text-1 shadow-raised"
+        className="max-w-[min(85%,36rem)] rounded-panel rounded-br-chip border border-line bg-bg-2 px-4 py-2 text-body text-text-1 shadow-raised"
       >
         <p className="whitespace-pre-wrap break-words">{shown}</p>
         {long && (

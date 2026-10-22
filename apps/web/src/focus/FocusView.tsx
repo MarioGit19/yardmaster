@@ -160,7 +160,7 @@ function ProjectFocus({
           >
             {project.name}
           </h1>
-          <p className="truncate font-mono text-meta text-text-3" title={project.path}>
+          <p className="truncate font-mono text-meta text-text-2" title={project.path}>
             {project.path}
           </p>
         </div>
@@ -311,7 +311,7 @@ function SessionsColumn({
       <div>
         <ColumnHeading meta={sessions.length || undefined}>Sessions</ColumnHeading>
         {ordered.length === 0 ? (
-          <p className="text-body-sm text-text-3">No Claude sessions</p>
+          <p className="text-body-sm text-text-2">No Claude sessions</p>
         ) : (
           <ul className="-mx-2 flex flex-col gap-0.5">
             {ordered.map((s) => (
@@ -394,9 +394,9 @@ function SessionLink({
             tone={status.tone}
             label={status.label}
             showLabel
-            className="min-w-0 text-meta text-text-3"
+            className="min-w-0 text-meta text-text-2"
           />
-          <span className="tabular shrink-0 font-mono text-meta text-text-3">
+          <span className="tabular shrink-0 font-mono text-meta text-text-2">
             {formatCount(totalTokens(session))} tok
           </span>
         </span>
@@ -418,7 +418,7 @@ function ClaudeColumn({
     return (
       <>
         <ColumnHeading>Claude</ColumnHeading>
-        <p className="text-body-sm text-text-3">
+        <p className="text-body-sm text-text-2">
           {missing ? 'This session is no longer available.' : 'No Claude sessions in this project.'}
         </p>
       </>

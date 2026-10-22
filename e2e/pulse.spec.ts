@@ -5,6 +5,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 test('the Pulse rail renders demo activity, filters it, and navigates on click', async ({
   page,
 }) => {
+  await page.addInitScript(() => localStorage.setItem('cboard.pulse', 'expanded'));
   await openRoute(page, '/');
   const rail = page.locator('[data-pulse]');
   await expect(rail).toHaveAttribute('data-pulse', 'expanded');
@@ -29,8 +30,10 @@ test('the Pulse rail renders demo activity, filters it, and navigates on click',
   await page.keyboard.press('Escape');
   await expect(tooltip).toBeHidden();
 
-  // Pick an older dot (it won't drift out from under the pointer) and click it.
-  await page.keyboard.press('Home');
+  // Pick a dot a few steps back from the newest: past its fly-in, and nowhere near the oldest,
+  // which can age out of the 15-minute window before the pointer lands on it.
+  await page.keyboard.press('End');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft');
   await expect(tooltip).toBeVisible();
   const x = Number(await tooltip.getAttribute('data-x'));
   const y = Number(await tooltip.getAttribute('data-y'));
@@ -42,9 +45,21 @@ test('the Pulse rail renders demo activity, filters it, and navigates on click',
   await expect(page.locator('[data-focus]')).toBeVisible();
 });
 
-test('the Pulse rail collapses and remembers it', async ({ page }) => {
+test('the Pulse rail starts collapsed on a short screen and expanded on a tall one', async ({
+  page,
+}) => {
   await openRoute(page, '/');
   const rail = page.locator('[data-pulse]');
+  await expect(rail).toHaveAttribute('data-pulse', 'collapsed');
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await expect(rail).toHaveAttribute('data-pulse', 'expanded');
+});
+
+test('the Pulse rail collapses and remembers it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await openRoute(page, '/');
+  const rail = page.locator('[data-pulse]');
+  await expect(rail).toHaveAttribute('data-pulse', 'expanded');
   await rail.getByRole('button', { name: /Pulse/ }).click();
   await expect(rail).toHaveAttribute('data-pulse', 'collapsed');
   await expect(rail.locator('canvas')).toHaveCount(0);
