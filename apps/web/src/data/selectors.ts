@@ -69,3 +69,27 @@ export const selectPortsByTerminal =
     Object.values(s.board.ports)
       .filter((p) => p.terminalId === terminalId)
       .sort((a, b) => a.port - b.port || a.id.localeCompare(b.id));
+
+/** A failed exit that counts as a crash: Ctrl+C (SIGINT, 130) is the user stopping it. */
+export const isCrashExit = (code: number | null | undefined): code is number =>
+  code != null && code !== 0 && code !== 130;
+
+/**
+ * How many of the project's open terminals crashed: their newest command failed and nothing has
+ * run since (DESIGN.md §4.10, "broke").
+ */
+export const selectCrashedCount =
+  (projectId: string | null) =>
+  (s: S): number => {
+    let count = 0;
+    for (const terminal of Object.values(s.board.terminals)) {
+      if (terminal.projectId !== projectId || terminal.state !== 'open') continue;
+      for (let i = terminal.executionIds.length - 1; i >= 0; i--) {
+        const execution = s.board.executions[terminal.executionIds[i] ?? ''];
+        if (!execution) continue;
+        if (execution.endedAt !== null && isCrashExit(execution.exitCode)) count++;
+        break;
+      }
+    }
+    return count;
+  };

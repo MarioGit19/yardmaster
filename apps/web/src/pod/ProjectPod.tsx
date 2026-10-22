@@ -1,21 +1,33 @@
 import type { ClaudeSession, Project, Terminal } from '@c-board/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
-import { type PointerEvent, useRef } from 'react';
+import { type PointerEvent, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
-import { miniCrewCount } from '../crew/model.js';
-import { selectSessionsByProject, selectTerminalsByProject, useBoardList } from '../data/index.js';
+import { type CrewTerminal, miniCrewCount } from '../crew/model.js';
+import {
+  activityKey,
+  selectCrashedCount,
+  selectSessionsByProject,
+  selectTerminalsByProject,
+  useBoard,
+  useBoardList,
+  useBusyFlags,
+  useLastActivity,
+  useLatestActivity,
+} from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
-import { spring } from '../motion.js';
+import { dur, ease, spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { projectTone, toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
+import { isDimmed } from './activity.js';
 import { MAX_SESSION_ROWS, podSessions } from './model.js';
+import { ActivityBorder, DoneSweep, EventSparks } from './PodActivity.js';
 import { SessionRow } from './SessionRow.js';
 import { useMascotState } from './useMascotState.js';
 
@@ -23,9 +35,13 @@ import { useMascotState } from './useMascotState.js';
 const MAX_LANES = 4;
 /** Header crew members; the rest of the sessions still have their rows. */
 const MAX_CREW = 3;
-/** The sleeping check only needs to notice five quiet minutes. */
-const CREW_CLOCK_MS = 30_000;
+/** Sleeping crews and dimmed pods only need to notice five quiet minutes. */
+const IDLE_CLOCK_MS = 15_000;
+const WORKING = new Set<ClaudeSession['status']['kind']>(['working', 'tool', 'compacting']);
 const SPOTLIGHT_PX = 320;
+const DIM_OPACITY = 0.7;
+/** Seconds: stepping back is slow and quiet, coming forward is quick. */
+const DIM_S = 0.8;
 const CREW_PX = 56;
 /** CrewMascot draws mini crew members at 46% of its size. */
 const MINI_PX = Math.round(CREW_PX * 0.46);
@@ -55,6 +71,20 @@ export function ProjectPod({ project }: { project: Project }) {
   const hiddenSessions = live.length - MAX_SESSION_ROWS;
   const hiddenLanes = openTerminals.length - MAX_LANES;
 
+  // Activity, DESIGN.md §4.10.
+  const pulseKey = activityKey.project(project.id);
+  const crashed = useBoard(selectCrashedCount(project.id)) > 0;
+  const working = sessions.filter((s) => WORKING.has(s.status.kind)).length;
+  const now = useNow(IDLE_CLOCK_MS);
+  const lastPulse = useLastActivity(pulseKey);
+  const lastActivity = Math.max(lastPulse ?? 0, project.lastActivityAt ?? 0) || null;
+  // Nothing for five minutes: the pod steps back to 70% (Motion owns its opacity for the
+  // shared-element morph). Pointing at it or focusing inside brings it forward.
+  const [engaged, setEngaged] = useState(false);
+  const dim = isDimmed(tone, crashed, lastActivity, now);
+  const faded = dim && !engaged;
+  const sweeps = useRef(0);
+
   // The spotlight follows the pointer by transform on its own layer: no style recalc below it.
   const spotRef = useRef<HTMLDivElement>(null);
   // While it morphs back from the focus view, the pod flies over its neighbours.
@@ -79,19 +109,31 @@ export function ProjectPod({ project }: { project: Project }) {
     <motion.article
       layoutId={sharedId.container(project.id)}
       layoutDependency={POD_LAYOUT_DEPENDENCY}
-      transition={spring.smooth}
+      animate={{ opacity: faded ? DIM_OPACITY : 1 }}
+      transition={{
+        ...spring.smooth,
+        opacity: { duration: faded ? DIM_S : dur.fast, ease: ease.out },
+      }}
+      onPointerEnter={() => setEngaged(true)}
+      onPointerLeave={() => setEngaged(false)}
+      onFocus={() => setEngaged(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEngaged(false);
+      }}
       onLayoutAnimationStart={() => raise(true)}
       onLayoutAnimationComplete={() => raise(false)}
       ref={podRef}
       data-pod={project.id}
       data-tone={tone}
+      data-crashed={crashed || undefined}
+      data-dim={dim || undefined}
       aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
       onPointerMove={onPointerMove}
       style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
       className={cx(
         'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
         'transition-[border-color] duration-150 ease-out hover:border-line-strong',
-        BORDER[tone],
+        crashed && tone !== 'wait' ? BORDER.err : BORDER[tone],
       )}
     >
       <div
@@ -104,6 +146,16 @@ export function ProjectPod({ project }: { project: Project }) {
           style={{ width: SPOTLIGHT_PX, height: SPOTLIGHT_PX }}
         />
       </div>
+      <ActivityBorder pulseKey={pulseKey} working={working} />
+      <EventSparks pulseKey={pulseKey} />
+      <DoneSweep
+        pulseKey={pulseKey}
+        onPlay={() => {
+          // Counted on the element for the e2e check that each turn sweeps once.
+          sweeps.current += 1;
+          if (podRef.current) podRef.current.dataset.sweeps = String(sweeps.current);
+        }}
+      />
 
       <motion.header
         layoutId={sharedId.header(project.id)}
@@ -122,7 +174,12 @@ export function ProjectPod({ project }: { project: Project }) {
           </Link>
           <GitLine git={project.git} />
         </div>
-        <PodCrew sessions={live.slice(0, MAX_CREW)} terminals={terminals} accent={accent} />
+        <PodCrew
+          sessions={live.slice(0, MAX_CREW)}
+          terminals={terminals}
+          accent={accent}
+          now={now}
+        />
       </motion.header>
 
       {live.length > 0 ? (
@@ -200,14 +257,28 @@ function GitLine({ git }: { git: Project['git'] }) {
 /** The project's crew in the header: one per live session, or one for the project itself. */
 function PodCrew({
   sessions,
-  terminals,
+  terminals: raw,
   accent,
+  now,
 }: {
   sessions: readonly ClaudeSession[];
   terminals: readonly Terminal[];
   accent: string;
+  now: number;
 }) {
-  const now = useNow(CREW_CLOCK_MS);
+  // The crew watches streaming terminals and falls asleep after five quiet minutes (§4.11).
+  const keys = raw.map((t) => activityKey.terminal(t.id));
+  const busy = useBusyFlags(keys);
+  const lastOutputAt = useLatestActivity(keys);
+  const terminals = raw.map(
+    (t, i): CrewTerminal => ({
+      state: t.state,
+      createdAt: t.createdAt,
+      closedAt: t.closedAt,
+      streaming: busy[i] === '1',
+      lastOutputAt,
+    }),
+  );
   const crew = sessions.length > 0 ? sessions : [null];
   return (
     <div className="-my-2 flex shrink-0 items-end">
@@ -233,7 +304,7 @@ function CrewMember({
   overlap,
 }: {
   session: ClaudeSession | null;
-  terminals: readonly Terminal[];
+  terminals: readonly CrewTerminal[];
   accent: string;
   now: number;
   overlap: boolean;

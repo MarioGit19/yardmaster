@@ -63,7 +63,7 @@ describe('DemoSimulator', () => {
 
     const state = store.state;
     expect(BoardState.safeParse(state).success).toBe(true);
-    expect(Object.keys(state.projects)).toHaveLength(5);
+    expect(Object.keys(state.projects)).toHaveLength(DEMO_PROJECTS.length);
     expect(Object.values(state.projects).map((p) => p.name)).toEqual(
       DEMO_PROJECTS.map((p) => p.name),
     );
@@ -74,9 +74,21 @@ describe('DemoSimulator', () => {
     for (const project of Object.values(state.projects)) {
       expect(project.path.startsWith('/home/dev/')).toBe(true);
       const terminals = Object.values(state.terminals).filter((t) => t.projectId === project.id);
-      expect(terminals.length).toBeGreaterThanOrEqual(2);
+      expect(terminals.length).toBeGreaterThanOrEqual(1);
       expect(terminals.length).toBeLessThanOrEqual(5);
     }
+    // One project of each kind for the board's activity states (DESIGN.md §4.10): a dev server
+    // that crashed and stays down, and a quiet project with nothing recent.
+    const storybook = Object.values(state.terminals).find((t) => t.name === 'storybook');
+    const newest = state.executions[storybook?.executionIds.at(-1) ?? ''];
+    expect(newest?.exitCode).toBe(1);
+    const quiet = Object.values(state.projects).find((p) => p.name === 'field-notes');
+    expect(Date.now() - (quiet?.lastActivityAt ?? Date.now())).toBeGreaterThan(5 * 60_000);
+    expect(
+      Object.values(state.executions).some(
+        (e) => state.terminals[e.terminalId]?.projectId === quiet?.id,
+      ),
+    ).toBe(false);
     expect(Object.values(state.ports).map((p) => p.port)).toEqual(
       expect.arrayContaining([3000, 3001, 5173, 5174]),
     );
@@ -428,7 +440,7 @@ describe('demo server', () => {
     try {
       expect(app.demo?.isRunning).toBe(true);
       await vi.advanceTimersByTimeAsync(20_000);
-      expect(Object.keys(app.store.state.projects)).toHaveLength(5);
+      expect(Object.keys(app.store.state.projects)).toHaveLength(DEMO_PROJECTS.length);
       expect(app.persistence.listActivity().length).toBeGreaterThan(0);
     } finally {
       await app.close();

@@ -5,8 +5,6 @@ import type { BoardState } from '@c-board/protocol';
 
 export const SAMPLES = 60;
 export const SAMPLE_MS = 1_000;
-/** A lane counts as streaming while output arrived within this many recent samples. */
-export const STREAMING_WINDOW = 2;
 
 /** A fixed-size ring of bytes-per-sample values, oldest first when read. */
 export class SampleRing {
@@ -77,16 +75,6 @@ export function backfill(board: BoardState, terminalId: string, now: number): Sa
     }
   }
   return ring;
-}
-
-/** 0 = quiet, 1–3 = how busy, for the lane's pulse speed. */
-export function rateLevel(ring: SampleRing): 0 | 1 | 2 | 3 {
-  if (!ring.recent(STREAMING_WINDOW)) return 0;
-  const latest = Math.max(ring.at(SAMPLES - 1), ring.at(SAMPLES - 2));
-  const perSecond = (latest * 1000) / SAMPLE_MS;
-  if (perSecond >= 8_192) return 3;
-  if (perSecond >= 1_024) return 2;
-  return 1;
 }
 
 export type ThroughputListener = (ring: SampleRing) => void;

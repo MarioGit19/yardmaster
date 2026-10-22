@@ -26,7 +26,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
+  });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -152,11 +154,33 @@ describe('TerminalLane', () => {
       store
         .getState()
         .applyOps([{ op: 'merge', path: ['executions', 'e1'], value: { outputBytes: 4_096 } }]);
-      vi.advanceTimersByTime(1_000);
     });
     expect(lane()?.dataset.streaming).toBe('true');
-    act(() => vi.advanceTimersByTime(2_000));
+    expect(lane()?.dataset.level).toBe('2');
+    // The level decays once the output stops.
+    act(() => vi.advanceTimersByTime(10_000));
     expect(lane()?.dataset.streaming).toBeUndefined();
+  });
+
+  it('slides the error line into the caption after a crash', () => {
+    const { store, streams } = render(execution());
+    act(() =>
+      store
+        .getState()
+        .applyOps([
+          { op: 'merge', path: ['executions', 'e1'], value: { endedAt: NOW, exitCode: 1 } },
+        ]),
+    );
+    expect(lane()?.dataset.crashed).toBe('true');
+    const listener = streams.get('exec:e1');
+    expect(listener).toBeDefined();
+    const info = { seq: 0, gap: false };
+    act(() => {
+      listener?.('ready on :3000\r\n\x1b[31mError: listen EADDRINUSE\x1b[39m\r\nExiting\r\n', info);
+      vi.advanceTimersByTime(200);
+    });
+    const caption = container.querySelector('[data-error-line]');
+    expect(caption?.textContent).toBe('Error: listen EADDRINUSE');
   });
 
   it('pins a live peek of the last six lines, throttled', () => {

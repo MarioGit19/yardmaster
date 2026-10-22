@@ -557,7 +557,14 @@
 }
 [data-streaming] > .lane-row::after {
   opacity: 0.85;
-  animation: lane-comet 1.8s linear infinite;
+  animation: lane-comet var(--lane-comet, 2.4s) linear infinite;
+}
+/* The comet runs faster the more the lane writes. */
+[data-level="2"] > .lane-row {
+  --lane-comet: 1.6s;
+}
+[data-level="3"] > .lane-row {
+  --lane-comet: 1s;
 }
 
 /* The running dot pulses faster the more the lane writes. */
@@ -640,6 +647,129 @@
   opacity: 0.5;
 }
 
+/* Activity border, DESIGN.md §4.10: a soft light travels around the edge while the project
+   works. The ring is a 1px mask over a rotating conic layer, so each frame is one transform. */
+.pod-ring {
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.pod-ring[data-activity-border] {
+  opacity: 0.5;
+}
+.pod-ring-light {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 62%,
+    color-mix(in srgb, var(--accent) 45%, transparent) 80%,
+    color-mix(in srgb, var(--accent) 70%, white) 88%,
+    transparent 96%
+  );
+  will-change: transform;
+}
+/* Reduced and Off: a still light where the spin would be. */
+.pod-ring[data-activity-border="still"] .pod-ring-light {
+  will-change: auto;
+}
+/* Wait and error own the border with their steady glow. */
+.pod[data-tone="wait"] .pod-ring,
+.pod[data-tone="err"] .pod-ring,
+.pod[data-crashed] .pod-ring {
+  display: none;
+}
+
+/* One spark on the top hairline per event: rises a few px and fades (transform, opacity). */
+.pod-sparks {
+  position: absolute;
+  inset-inline: 16px;
+  top: 0;
+  height: 1px;
+  pointer-events: none;
+}
+@keyframes pod-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(1);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -9px) scale(0.4);
+  }
+}
+.pod-spark {
+  position: absolute;
+  top: -1.5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--accent) 60%, white);
+  box-shadow: 0 0 6px var(--accent);
+  animation: pod-spark 900ms var(--ease-out) forwards;
+}
+
+/* Turn finished: one green band sweeps left to right, 600 ms, never loops (§3 rule 5). */
+.pod-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+@keyframes pod-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+.pod-sweep-band {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--st-ok) 16%, transparent),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: pod-sweep 600ms var(--ease-in-out) forwards;
+}
+@keyframes pod-sweep-wash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+[data-motion="reduced"] .pod-sweep-band {
+  width: 100%;
+  transform: none;
+  background: color-mix(in srgb, var(--st-ok) 8%, transparent);
+  animation: pod-sweep-wash 600ms var(--ease-out) forwards;
+}
+
 .pod-spotlight {
   position: absolute;
   top: 0;
@@ -655,21 +785,60 @@
   }
 }
 
-/* Session caption: characters type in on a CSS delay (opacity only). */
-@keyframes type-in {
+/* Session caption, DESIGN.md §4.10: a new action slides in with one shimmer sweep across it. */
+@keyframes caption-sweep {
   from {
-    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
   }
 }
-.typewriter > [aria-hidden] {
-  animation: type-in 80ms linear backwards;
-  animation-delay: calc(var(--i) * 10ms);
+.caption-sweep::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--text-shimmer), transparent);
+  transform: translateX(-100%);
+  animation: caption-sweep 700ms var(--ease-in-out) 80ms forwards;
+  pointer-events: none;
 }
-[data-motion="reduced"] .typewriter > [aria-hidden] {
+[data-motion="reduced"] .caption-sweep::after {
   animation: none;
+  opacity: 0;
 }
-[data-motion="reduced"] .typewriter {
-  animation: fade-in 220ms var(--ease-out);
+
+/* Focus header: a progress shimmer under the caption while a tool runs. */
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+.progress-shimmer {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--st-work) 18%, transparent);
+}
+.progress-shimmer::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 25%;
+  background: linear-gradient(90deg, transparent, var(--st-work), transparent);
+  animation: progress-sweep 1.4s var(--ease-in-out) infinite;
+}
+[data-motion="reduced"] .progress-shimmer::after {
+  animation: none;
+  width: 100%;
+  opacity: 0.4;
 }
 
 /* The last assistant line shimmers while the session streams (transform only). */

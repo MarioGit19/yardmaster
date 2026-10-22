@@ -6,19 +6,11 @@ import { spring } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
 import { formatCount, totalTokens } from '../status.js';
-import { cx } from '../ui/cx.js';
-import { type CaptionTone, isStreaming, lastLine, sessionCaption } from './model.js';
-import { Typewriter } from './Typewriter.js';
-
-const CAPTION_COLOR: Record<CaptionTone, string> = {
-  active: 'text-text-1',
-  wait: 'text-st-wait',
-  err: 'text-st-err',
-  rest: 'text-text-3',
-};
+import { LiveCaption } from './LiveCaption.js';
+import { isStreaming, lastLine, sessionCaption } from './model.js';
 
 /**
- * One Claude session in a pod, DESIGN.md §4.3: orb · status caption (typed in on change) ·
+ * One Claude session in a pod, DESIGN.md §4.3: orb · live caption (slides in on change) ·
  * tokens, over the last assistant line, which shimmers while the session streams.
  */
 export function SessionRow({ session, accent }: { session: ClaudeSession; accent: string }) {
@@ -57,20 +49,7 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
-          <p
-            title={caption.text}
-            className={cx(
-              'caption min-w-0 flex-1 truncate text-body-sm',
-              CAPTION_COLOR[caption.tone],
-            )}
-          >
-            {caption.glyph && (
-              <span aria-hidden className="mr-1.5 inline-block w-3 text-center font-mono">
-                {caption.glyph}
-              </span>
-            )}
-            <Typewriter key={caption.text} text={caption.text} />
-          </p>
+          <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
           <span
             title={`${totalTokens(session).toLocaleString('en-US')} tokens`}
             className="tabular shrink-0 font-mono text-meta text-text-3"

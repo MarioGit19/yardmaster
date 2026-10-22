@@ -3,16 +3,22 @@ import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNow } from '../anim/clock.js';
-import { selectPortsByTerminal, useBoardList, useBoardShallow } from '../data/index.js';
-import { dur, ease } from '../motion.js';
+import {
+  activityKey,
+  isCrashExit,
+  selectPortsByTerminal,
+  useActivityStep,
+  useBoardList,
+  useBoardShallow,
+} from '../data/index.js';
+import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
 import { formatUptime, laneView, selectLaneExecution, uptimePeriod } from './lane.js';
 import { PortChip } from './PortChip.js';
 import { Sparkline } from './Sparkline.js';
 import { TerminalPeek } from './TerminalPeek.js';
-import { rateLevel } from './throughput.js';
-import { useThroughput } from './useThroughput.js';
+import { useErrorLine } from './useErrorLine.js';
 
 /** Hovering across lanes shouldn't flash a peek for every lane the pointer crosses. */
 const PEEK_DELAY_MS = 140;
@@ -33,8 +39,10 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const ports = useBoardList(selectPortsByTerminal(terminal.id));
   const view = laneView(terminal, execution);
-  const [level, setLevel] = useState<0 | 1 | 2 | 3>(0);
-  useThroughput(terminal.id, (ring) => setLevel(rateLevel(ring)));
+  // Pulse speed and comet follow the store's activity level for the terminal (§4.10).
+  const level = useActivityStep(activityKey.terminal(terminal.id));
+  const crashed = isCrashExit(view.exit?.code);
+  const errorLine = useErrorLine(crashed ? (view.exit?.key ?? null) : null);
 
   const now = useNow(view.startedAt === null ? null : uptimePeriod(Date.now() - view.startedAt));
   const uptime = view.startedAt === null ? null : formatUptime(now - view.startedAt);
@@ -67,6 +75,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
     <li
       data-lane={terminal.id}
       data-streaming={streaming || undefined}
+      data-level={streaming ? level : undefined}
+      data-crashed={crashed || undefined}
       data-open={open || undefined}
       className="relative"
       style={
@@ -95,7 +105,11 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
             setFocused(false);
             setPinned(false);
           }}
-          className="col-span-2 grid min-w-0 grid-cols-subgrid items-center rounded-chip text-left"
+          className={cx(
+            'grid min-w-0 grid-cols-subgrid items-center rounded-chip text-left',
+            // A crash's error line takes the sparkline and port tracks too: it needs the room.
+            errorLine ? 'col-span-4' : 'col-span-2',
+          )}
         >
           <span className="flex min-w-0 items-center gap-1 text-body-sm text-text-1">
             <ChevronRight
@@ -110,27 +124,29 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
               {terminal.name}
             </span>
           </span>
-          <span
-            className={cx(
-              'truncate font-mono text-meta',
-              view.running ? 'text-text-2' : 'text-text-3',
-            )}
-            title={view.command ?? undefined}
-          >
-            {view.command ?? '—'}
-          </span>
+          <LaneCaption command={view.command} running={view.running} error={errorLine} />
         </button>
 
-        <Sparkline terminalId={terminal.id} color={accent} error={view.tone === 'err'} />
-
-        <span className="flex min-w-0 items-center">
-          {port && <PortChip port={port} others={morePorts} />}
-        </span>
+        {!errorLine && (
+          <>
+            <Sparkline terminalId={terminal.id} color={accent} error={view.tone === 'err'} />
+            <span className="flex min-w-0 items-center">
+              {port && <PortChip port={port} others={morePorts} />}
+            </span>
+          </>
+        )}
 
         <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-meta tabular text-text-3">
           <AnimatePresence initial={false} mode="popLayout">
             {view.exit ? (
-              <ExitBadge key={view.exit.key} code={view.exit.code} />
+              <motion.span
+                key={view.exit.key}
+                className="inline-flex items-center gap-1.5"
+                exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+              >
+                {crashed && <span aria-hidden className="size-1.5 rounded-full bg-st-err" />}
+                <ExitBadge code={view.exit.code} />
+              </motion.span>
             ) : (
               <motion.span
                 key="state"
@@ -178,5 +194,50 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
         )}
       </AnimatePresence>
     </li>
+  );
+}
+
+/**
+ * The lane's command column. After a crash the error line slides up into its place (§4.10),
+ * in rose; the command stays in the tooltip.
+ */
+function LaneCaption({
+  command,
+  running,
+  error,
+}: {
+  command: string | null;
+  running: boolean;
+  error: string | null;
+}) {
+  const still = useMotionLevel() !== 'full';
+  return (
+    <span
+      className={cx(
+        'relative flex min-w-0 overflow-hidden font-mono text-meta',
+        error && 'col-span-3',
+      )}
+      title={error ? `${command ?? ''}\n${error}`.trim() : (command ?? undefined)}
+    >
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={error ? `error:${error}` : 'command'}
+          data-error-line={error ? '' : undefined}
+          initial={{ opacity: 0, transform: slide(still, '100%') }}
+          animate={{ opacity: 1, transform: slide(still, '0%'), transition: spring.snappy }}
+          exit={{
+            opacity: 0,
+            transform: slide(still, '-100%'),
+            transition: { duration: dur.fast, ease: ease.out },
+          }}
+          className={cx(
+            'block min-w-0 truncate',
+            error ? 'text-st-err' : running ? 'text-text-2' : 'text-text-3',
+          )}
+        >
+          {error ?? command ?? '—'}
+        </motion.span>
+      </AnimatePresence>
+    </span>
   );
 }

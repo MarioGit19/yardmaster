@@ -34,6 +34,7 @@ import { StatusDot } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { EmptyState } from '../views/Page.js';
 import { ColumnHeading } from './ColumnHeading.js';
+import { FocusCaption } from './FocusCaption.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
 
@@ -163,6 +164,11 @@ function ProjectFocus({
             {project.path}
           </p>
         </div>
+        {session && session.status.kind !== 'ended' && (
+          <div className="hidden min-w-0 max-w-[32rem] flex-[1.4] md:block">
+            <FocusCaption session={session} />
+          </div>
+        )}
         {project.git?.branch && (
           <span className="hidden min-w-0 max-w-60 sm:flex">
             <Chip mono icon={<GitBranch />} title={project.git.branch}>

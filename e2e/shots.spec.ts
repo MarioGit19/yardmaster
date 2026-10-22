@@ -537,3 +537,29 @@ test.describe('git and history', () => {
     });
   });
 });
+
+// Activity states side by side (DESIGN.md §4.10): busy pods with the border light and live
+// captions, waiting and crashed pods, and the quiet, dimmed one. Motion stays on for these.
+test.describe('activity', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('overview', async ({ page }) => {
+        await openRoute(page, '/');
+        await expect(page.locator('[data-activity-border="spin"]').first()).toBeAttached();
+        await page.waitForTimeout(1500);
+        await page.screenshot({ path: new URL(`activity-${theme}.png`, OUT_DIR).pathname });
+        const shootPod = async (selector: string, name: string) => {
+          const box = await page.locator(selector).first().boundingBox();
+          if (!box) return;
+          await page.screenshot({
+            path: new URL(`activity-${name}-${theme}.png`, OUT_DIR).pathname,
+            clip: { x: box.x - 12, y: box.y - 12, width: box.width + 24, height: box.height + 24 },
+          });
+        };
+        await shootPod('[data-pod]:has([data-activity-border="spin"])', 'busy');
+        await shootPod('[data-pod][data-crashed]', 'crashed');
+      });
+    });
+  }
+});

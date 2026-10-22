@@ -1,10 +1,12 @@
 import { BoardClient } from './client.js';
 import { createBoardStore } from './store.js';
 
+export * from './activity.js';
 export * from './client.js';
 export * from './react.js';
 export * from './selectors.js';
 export * from './store.js';
+export * from './useActivity.js';
 
 /** `/ws/ui` on the page's own origin (the Vite dev server proxies it). */
 export function boardSocketUrl(location: Pick<Location, 'protocol' | 'host'>): string {

@@ -57,6 +57,11 @@ import {
 export const DEMO_PERMISSION_INTERVAL_MS = 45_000;
 export const DEMO_APPROVAL_TIMEOUT_MS = 120_000;
 const CRASH_CHANCE = 0.012;
+/** The `staysDown` dev server crashes on this tick (a few seconds after it boots). */
+const STAYS_DOWN_AFTER_TICKS = 2;
+/** A quiet terminal's newest history is at least this old, past the board's idle threshold. */
+const QUIET_MS = 6 * 60_000;
+const quiet = (def: DemoProject) => def.terminals.every((t) => t.quiet === true);
 const COMPACT_AT_TOKENS = 150_000;
 const STATS_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -103,6 +108,8 @@ interface TerminalCtx {
   childPid: number | null;
   session: SessionCtx | null;
   busyUntil: number;
+  /** Dev server ticks so far, for the one that crashes on purpose. */
+  ticks: number;
 }
 
 interface Turn {
@@ -278,7 +285,7 @@ export class DemoSimulator {
         source: 'editor',
         git: this.gitInfo(project, ts),
         createdAt: ts - this.rng.int(1, 30) * 86_400_000,
-        lastActivityAt: ts - this.rng.int(10, 600) * 1000,
+        lastActivityAt: ts - this.rng.int(10, 600) * 1000 - (quiet(def) ? QUIET_MS : 0),
       });
     }
 
@@ -310,6 +317,7 @@ export class DemoSimulator {
           childPid: null,
           session: null,
           busyUntil: 0,
+          ticks: 0,
         };
         this.terminals.push(terminal);
         this.store.upsertTerminal({
@@ -339,6 +347,7 @@ export class DemoSimulator {
         this.after(this.rng.int(1_000, 6_000), () => this.runTests(terminal));
         return;
       case 'shell':
+        if (terminal.def.quiet) return;
         this.after(this.rng.int(1_500, 8_000), () => this.runShellCommand(terminal));
         return;
       case 'claude':
@@ -389,7 +398,8 @@ export class DemoSimulator {
       return;
     }
     let at = now - rng.int(13, 14) * 60_000;
-    while (at < now - 20_000) {
+    const until = now - (terminal.def.quiet ? QUIET_MS : 20_000);
+    while (at < until) {
       const command = kind === 'jest' ? 'pnpm jest' : rng.pick(SHELL_COMMANDS).command;
       const exitCode = kind === 'jest' && rng.chance(0.25) ? 1 : 0;
       this.pastEvent(at, 'exec.start', terminal, null, command);
@@ -462,7 +472,10 @@ export class DemoSimulator {
     this.after(this.rng.int(1_500, 6_000), () => {
       if (terminal.execId !== execId) return;
       const script = DEV_SERVERS[kind];
-      if (this.rng.chance(CRASH_CHANCE)) {
+      terminal.ticks++;
+      const staysDown = terminal.def.staysDown === true;
+      // Once: after a rerun from the board it stays up.
+      if (staysDown ? terminal.ticks === STAYS_DOWN_AFTER_TICKS : this.rng.chance(CRASH_CHANCE)) {
         this.write(terminal, execId, script.crash(this.rng));
         this.endExec(terminal, execId, 1);
         terminal.execId = null;
@@ -472,9 +485,11 @@ export class DemoSimulator {
           'error',
           `${terminal.def.name} crashed`,
           terminal.project,
-          'Restarting in a few seconds',
+          staysDown ? 'Rerun it from the board' : 'Restarting in a few seconds',
         );
-        this.after(this.rng.int(3_000, 7_000), () => this.bootDevServer(terminal, kind));
+        if (!staysDown) {
+          this.after(this.rng.int(3_000, 7_000), () => this.bootDevServer(terminal, kind));
+        }
         return;
       }
       this.write(terminal, execId, script.tick(this.rng, this.now()));

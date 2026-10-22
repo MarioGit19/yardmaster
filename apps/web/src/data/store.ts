@@ -7,6 +7,7 @@ import {
   PULSE_WINDOW_MS,
 } from '@c-board/protocol';
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import { ingestEvents, ingestOutput, type Pulses } from './activity.js';
 
 /**
  * `connecting`: first attempt; `syncing`: socket open, waiting for the snapshot;
@@ -32,9 +33,11 @@ export interface BoardStoreState {
   connection: ConnectionState;
   /** Recent activity events for the Pulse rail, oldest first. */
   activity: readonly ActivityEvent[];
+  /** Activity levels per project, session and terminal (`activityKey`), DESIGN.md §4.10. */
+  pulses: Pulses;
   /** Replaces the whole board, e.g. from a snapshot after (re)connecting. */
   replaceBoard(board: BoardState): void;
-  applyOps(ops: readonly PatchOp[]): void;
+  applyOps(ops: readonly PatchOp[], now?: number): void;
   setConnection(connection: Partial<ConnectionState>): void;
   /** `replace` swaps in the server's window (after (re)connecting); otherwise events append. */
   addActivity(events: readonly ActivityEvent[], replace: boolean, now?: number): void;
@@ -79,18 +82,26 @@ export function createBoardStore(): BoardStore {
     hydrated: false,
     connection: { status: 'connecting', attempt: 0, retryAt: null, syncedAt: null },
     activity: [],
+    pulses: {},
     replaceBoard: (board) => set({ board, hydrated: true }),
-    applyOps: (ops) => {
+    applyOps: (ops, now = Date.now()) => {
       if (ops.length === 0) return;
       // applyPatch keeps the identity of untouched branches, so entity selectors stay stable.
-      set((state) => ({ board: applyPatch(state.board, ops) }));
+      set((state) => {
+        const board = applyPatch(state.board, ops);
+        return { board, pulses: ingestOutput(state.pulses, state.board, board, ops, now) };
+      });
     },
     setConnection: (connection) =>
       set((state) => ({ connection: { ...state.connection, ...connection } })),
     addActivity: (events, replace, now = Date.now()) =>
       set((state) => {
         const activity = mergeActivity(replace ? [] : state.activity, events, now);
-        return activity === state.activity ? state : { activity };
+        if (activity === state.activity) return state;
+        // A replay after reconnecting repeats events we already counted; only count new ones.
+        const known = new Set(state.activity.map((e) => e.id));
+        const fresh = events.filter((e) => !known.has(e.id));
+        return { activity, pulses: ingestEvents(state.pulses, fresh, state.board, now) };
       }),
   }));
 }

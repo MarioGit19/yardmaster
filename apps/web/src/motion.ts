@@ -19,6 +19,12 @@ export const ease = {
   inOut: [0.65, 0, 0.35, 1],
 } as const satisfies Record<string, readonly [number, number, number, number]>;
 
+/**
+ * A vertical slide as a full transform string, which keeps it on the compositor while the board
+ * streams; `still` (Reduced) keeps it in place so only opacity changes.
+ */
+export const slide = (still: boolean, y: string) => `translateY(${still ? '0%' : y})`;
+
 export const MOTION_SETTINGS = ['system', 'full', 'reduced', 'off'] as const;
 export type MotionSetting = (typeof MOTION_SETTINGS)[number];
 export type MotionLevel = Exclude<MotionSetting, 'system'>;

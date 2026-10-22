@@ -25,6 +25,10 @@ export interface DemoTerminal {
   kind: TerminalKind;
   name: string;
   port?: number;
+  /** A dev server that crashes a few seconds after it boots and stays down until rerun. */
+  staysDown?: boolean;
+  /** A shell nobody has touched for a while: no live commands, no recent history. */
+  quiet?: boolean;
 }
 
 export interface DemoProject {
@@ -253,6 +257,7 @@ export const DEMO_PROJECTS: DemoProject[] = [
     window: 2,
     terminals: [
       { kind: 'vite', name: 'docs dev', port: 5174 },
+      { kind: 'vite', name: 'storybook', port: 6006, staysDown: true },
       { kind: 'claude', name: 'claude' },
     ],
     testFiles: [],
@@ -274,6 +279,16 @@ export const DEMO_PROJECTS: DemoProject[] = [
         permissions: [{ tool: 'Bash', input: { command: 'pnpm build && pnpm preview' } }],
       },
     ],
+  },
+  {
+    // The quiet one: no Claude session and an untouched shell, so its pod rests and dims.
+    name: 'field-notes',
+    path: `${DEMO_HOME}/field-notes`,
+    branch: 'main',
+    window: 3,
+    terminals: [{ kind: 'shell', name: 'zsh', quiet: true }],
+    testFiles: [],
+    scenarios: [],
   },
 ];
 

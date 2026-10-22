@@ -66,7 +66,6 @@ test('renders user bubbles, markdown with highlighted code, and collapsible thin
   page,
 }) => {
   const list = await openLongTranscript(page);
-  await expect(list.locator('[data-row="user"]').first()).toBeVisible();
 
   /** Scrolls up a screen at a time until `selector` is rendered in the list. */
   const scrollUntil = async (selector: string) => {
@@ -76,6 +75,10 @@ test('renders user bubbles, markdown with highlighted code, and collapsible thin
     }
     await expect(list.locator(selector).first()).toBeAttached();
   };
+
+  // The latest screen may be all tool calls once the demo has run a while.
+  await scrollUntil('[data-row="user"]');
+  await expect(list.locator('[data-row="user"]').first()).toBeVisible();
 
   // The worker colors tokens with the token-mapped theme variables.
   await scrollUntil('.md-code');

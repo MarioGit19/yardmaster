@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatUptime, type LaneExecution, laneView, uptimePeriod } from './lane.js';
+import { errorLine, formatUptime, type LaneExecution, laneView, uptimePeriod } from './lane.js';
 
 const terminal = { id: 't1', name: 'backend', state: 'open', exitCode: null } as const;
 const execution = (over: Partial<LaneExecution> = {}): LaneExecution => ({
@@ -61,5 +61,20 @@ describe('formatUptime', () => {
     expect(formatUptime(2 * 86_400_000)).toBe('2d');
     expect(uptimePeriod(30_000)).toBe(1_000);
     expect(uptimePeriod(120_000)).toBe(15_000);
+  });
+});
+
+describe('errorLine', () => {
+  it('picks the last line that reads like an error', () => {
+    expect(
+      errorLine([
+        ' ⨯ TypeError: Cannot read properties of undefined',
+        '    at CartTotal (src/cart.tsx:18:31)',
+        'error: the dev server exited unexpectedly',
+        '',
+      ]),
+    ).toBe('error: the dev server exited unexpectedly');
+    expect(errorLine(['booting', '  Exiting  '])).toBe('Exiting');
+    expect(errorLine(['', '  '])).toBeNull();
   });
 });

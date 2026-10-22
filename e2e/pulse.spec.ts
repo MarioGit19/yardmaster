@@ -9,8 +9,8 @@ test('the Pulse rail renders demo activity, filters it, and navigates on click',
   const rail = page.locator('[data-pulse]');
   await expect(rail).toHaveAttribute('data-pulse', 'expanded');
   const canvas = rail.locator('canvas[data-pulse-canvas]');
-  // Five demo projects, each with a lane and backfilled events.
-  await expect(canvas).toHaveAttribute('data-lanes', '5');
+  // Six demo projects, each with a lane and backfilled events.
+  await expect(canvas).toHaveAttribute('data-lanes', '6');
   await expect.poll(async () => Number(await canvas.getAttribute('data-dots'))).toBeGreaterThan(20);
 
   // Filters narrow the dots; Errors shows only failures.

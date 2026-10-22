@@ -1,15 +1,7 @@
 import { type BoardState, type Execution, emptyBoardState } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { sparkLevel, sparkPoints } from './spark.js';
-import {
-  backfill,
-  bytesByTerminal,
-  rateLevel,
-  SAMPLE_MS,
-  SAMPLES,
-  SampleRing,
-  ThroughputSampler,
-} from './throughput.js';
+import { backfill, bytesByTerminal, SAMPLES, SampleRing, ThroughputSampler } from './throughput.js';
 
 const NOW = 1_760_000_000_000;
 
@@ -129,22 +121,6 @@ describe('ThroughputSampler', () => {
       board(exec('a', 't1', { outputBytes: 2 }), exec('b', 't1', { outputBytes: 3 })),
     );
     expect(totals.get('t1')).toBe(5);
-  });
-});
-
-describe('rateLevel', () => {
-  it('buckets the recent output rate', () => {
-    const ring = new SampleRing();
-    expect(rateLevel(ring)).toBe(0);
-    ring.push(100);
-    expect(rateLevel(ring)).toBe(1);
-    ring.push((2_000 * SAMPLE_MS) / 1000);
-    expect(rateLevel(ring)).toBe(2);
-    ring.push(20_000);
-    expect(rateLevel(ring)).toBe(3);
-    ring.push(0);
-    ring.push(0);
-    expect(rateLevel(ring)).toBe(0);
   });
 });
 

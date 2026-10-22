@@ -90,3 +90,20 @@ export function formatUptime(ms: number): string {
 export function uptimePeriod(ms: number): number {
   return ms < 60_000 ? 1_000 : 15_000;
 }
+
+const ERROR_WORDS = /\b(error|err!|failed|failure|fatal|panic|exception|crash(?:ed)?)\b|[⨯✗✖]/i;
+
+/**
+ * The line that best explains a crash, from the failed command's last output lines: the last
+ * one that reads like an error, else the last non-empty one. Whitespace is collapsed.
+ */
+export function errorLine(lines: readonly string[]): string | null {
+  let fallback: string | null = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = (lines[i] ?? '').replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+    if (ERROR_WORDS.test(line)) return line;
+    fallback ??= line;
+  }
+  return fallback;
+}
