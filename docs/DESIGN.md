@@ -10,6 +10,8 @@ Read this before any UI task. For UI work, also load the `frontend-design` skill
 
 A dark, calm, deep-space control room. Projects are **pods** floating on a softly lit field. Claude sessions are **orbs** that breathe, swirl and pulse according to what they are doing. Terminals are **lanes** with light flowing through them as output streams. When something needs you, the room **turns toward it**: its pod glows amber, the ambient light shifts, and the Attention Center slides in.
 
+The centerpiece is the **Live Work Preview** (§4.10): for every project you can *see* the work happen. Each project's codebase is drawn as a glowing map, and Claude's orb travels across it, lighting up the files it reads and edits. A "Now Playing" stage shows the exact action live: a diff typing itself in, a command and its output, a search sweeping through the code. Animated beams connect every actor (session to file, session to terminal, request to you). You never have to read a log to know what's going on.
+
 Three words: **calm, precise, alive.** Never noisy or gamer-RGB. Think Linear × Vercel × a planetarium.
 
 ## 2. Design tokens (CSS custom properties, Tailwind v4 `@theme`)
@@ -120,8 +122,12 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 ┌───────────────────────────────────────────────────────────┐  ← 1px accent hairline on top edge
 │ ◉ acme-shop        ⎇ feat/checkout  ●3   ↑1      ⋯       │  ← avatar w/ accent ring · branch · dirty · ahead
 │                                                           │
-│  (orb)  Claude · Editing src/cart.ts            12.4k tok │  ← each session row: orb, status text (typewriter), tokens
-│         "Refactoring the cart totals to use…"            │  ← last assistant line, 1-line clamp, shimmer while streaming
+│ ┌─────────────────────────────┐                           │
+│ │  · ·  ·:· ✶ ·  ·    ·:·  ·  │ ← Mini Codebase Map (§4.10.1): live, files glow as touched,
+│ │ ·:·  ·  ·══◉ ·:·  · ·  ·    │   orb + trail moves between files, subagent orbs in pink
+│ └─────────────────────────────┘                           │
+│  ◉ Claude · ✎ Editing src/cart/totals.ts   +12 −3  12.4k │ ← session row: orb, Now Playing caption (§4.10.2), live diff stat, tokens
+│    "Refactoring the cart totals to use…"                 │ ← last assistant line, 1-line clamp, shimmer while streaming
 │                                                           │
 │  ▸ backend     pnpm dev        ▁▂▅▇▅▂▁   :3000  ● 2m     │  ← terminal lanes: name · cmd · throughput sparkline · port · uptime
 │  ▸ storefront  shopify app dev ▁▁▂▁▁▁▁   :9292  ●        │
@@ -133,6 +139,8 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 - Throughput sparkline: a 60-sample rolling canvas line. New samples slide in from the right. Its color is the project accent, and it turns rose on error output.
 - **Flow light:** when a lane is streaming, a thin gradient "comet" travels along its bottom border (CSS keyframe on a pseudo-element, transform only).
 - The pod border takes the highest-priority status color of its children (wait > err > work).
+- **Terminal peek:** hovering (or focusing) a lane expands a live 6-line preview of that terminal's latest output beneath it (DOM text, Geist Mono 11px, ANSI colors, updated at most 10×/s), so you can read logs without opening anything.
+- **Idle pods** (no session working, no output for 5 min) dim to 70% and their mini map stops animating. Active pods are always the brightest things on screen.
 
 ### 4.4 HUD (top bar)
 
@@ -147,7 +155,8 @@ Rolling-digit counters: **Working · Waiting · Running terminals · Errors · T
 ### 4.6 Focus view (project)
 
 - A shared-element transition from the pod. The background dims and blurs other content.
-- Layout: left column is the session list plus the git panel. The center is the **Claude panel** (chat). The right is a **terminal stack** (tabs or a 2×2 grid toggle). All panels are resizable with spring-snapped handles.
+- Layout: the left column is the session list plus the git panel. The center is the **Stage**, with two tabs that switch by cross-fade: **Live** (default) shows the Codebase Map on top (§4.10.1) and the Now Playing card below (§4.10.2), and **Chat** shows the Claude panel. The right is a **terminal stack** (tabs or a 2×2 grid toggle). Along the bottom is the **session timeline** (§4.10.4). The flow-beam layer (§4.10.3) sits above all of it. All panels are resizable with spring-snapped handles.
+- A compact composer is always docked under the Stage, so you can talk to Claude from the Live tab without switching.
 - Claude panel: message stream with markdown, collapsible thinking blocks, and tool cards (Bash with output, Edit/Write with diffs, Read/Grep as compact chips, TodoWrite as an animated checklist where checks draw in, Task as a nested subagent thread). The composer has model and permission-mode pills, Enter to send and Esc to interrupt.
 - Streaming text shows a soft caret glow at the tail. Tool cards enter with a scale 0.98→1 and fade.
 
@@ -159,18 +168,80 @@ A collapsible bottom rail: a horizontal time axis covering the last 15 min. Each
 
 Built on cmdk, inside a glass modal with a scale 0.96→1 and blur-in. Groups: Projects, Sessions, Terminals, Actions. Fuzzy search highlights matched characters. Selecting a destination triggers its normal transition.
 
-### 4.9 Brand, icons, sound
+### 4.9 Brand and icons
 
 - **Name and wordmark:** `c-board`, lowercase, in Geist Mono 500.
 - **Logomark:** an inline SVG with a small glowing orb (the ClaudeOrb motif) inside a rounded-square ring, 1.5px stroke, using `currentColor` plus one accent. It's one source file (`apps/web/src/brand/logo.svg`), and every other brand asset is generated from it.
 - **Favicon:** the SVG favicon is **live**. It turns amber with a dot when anything is waiting and rose when something has crashed. The document title shows the count, for example `(2) c-board`. A PNG fallback is generated at build.
 - **Extension icon:** a 128×128 PNG rendered from the logomark at build time (Playwright screenshot of the SVG). It isn't hand-drawn and isn't committed as a binary if it can be generated.
 - **Icons:** `lucide-react` only, 1.5px stroke, 16/20 px. Tool families map to fixed icons (Bash → `terminal`, Edit/Write → `file-pen`, Read → `file-text`, Grep/Glob → `search`, Web → `globe`, Task → `git-fork`, Todo → `list-checks`). **Never** use third-party brand logos (Claude, Cursor, VS Code); use text labels instead.
-- **Sound (optional, off by default):** synthesized with WebAudio, using soft sine or triangle chimes with a short envelope: "waiting" is two rising notes, "error" one low note, "done" a single soft tick. No audio files, so there's no licensing to manage.
+- **No sound.** c-board is silent; attention is visual (pod glow, live favicon, Attention Center, optional browser notifications).
+
+### 4.10 Live Work Preview (the signature experience)
+
+The research behind this section looked at Mindwalk (a repo drawn as a night map that lights up where an agent searched, read and edited), Agent Flow (a live node graph plus a file-attention heatmap), Pixel Agents (one character per agent, with poses per activity and bubbles when waiting) and the hook-based observability dashboards (swim lanes and live pulse charts). c-board combines the clearest ideas into one **live** view. Everything below is driven by real hook events (PRD §6.1), never faked.
+
+#### 4.10.1 Codebase Map
+
+- **What it shows:** the project's files (from `git ls-files`) as a **circle-packed constellation**. Directories are faint rings and files are small dots, with size ∝ √(file bytes), using a `d3-hierarchy` pack layout and rendered on canvas. Untouched files are dim (`--text-3` at 25%). Directory labels appear only at zoom ≥ 1.5 or on hover.
+- **Heat (what Claude touched), decaying over 10 min:**
+  - Glanced (Glob or ls hit): soft blue-grey glow, 30% intensity.
+  - Read: cool white-blue glow (`--st-work`). A thin scan line sweeps across the dot once, covering the read range.
+  - Search (Grep): a radial **sweep** from the orb across the searched directory ring, and every matched file blinks cyan (`--st-tool`) in turn, staggered by 25 ms.
+  - Edited or written: a warm violet core plus an expanding **ripple ring** (scale 1→2.2, 700 ms), and a floating `+12 −3` badge that rises 12 px and fades. Edited files keep a persistent violet rim for the rest of the session (the "changed" layer).
+  - Created file: the dot grows from 0 (spring `snappy`) and the layout eases in (positions are tweened, never jumping).
+  - Error touching a file (failed tool): a rose flicker.
+- **The orb on the map:** the session's ClaudeOrb sits at the file it's working on. When it moves to a new file it **travels along a curved path** (quadratic bezier through the parent ring, 450–700 ms, `ease.inOut`) and leaves a fading comet **trail** of its last 8 hops, so you can read the path of work at a glance. While thinking without a tool, it drifts slowly near the last file. Subagents spawn as smaller pink orbs that **split off** from the parent (particle burst) and run their own trails, then merge back on `SubagentStop`.
+- **Several sessions in one project:** each orb is tinted with a per-session hue, and trails don't mix.
+- **Interaction:** wheel or pinch to zoom, drag to pan, and double-click a directory to zoom to it. Hovering a file shows its path, last action and time. Clicking a file opens its latest diff (from the session's Edit/Write events) in a side sheet. The `F` key toggles "follow orb", where the camera smoothly tracks the active orb; it's on by default.
+- **The mini version on pods** uses the same renderer at low detail: no labels, a 15 fps cap, and it redraws only while something is happening.
+- **Large repositories:** above 4,000 files, subtrees with no activity collapse into single directory nodes. They expand automatically when something inside them is touched.
+
+#### 4.10.2 Now Playing stage
+
+A large card that shows the **current action** of the selected session as a live mini-scene. One variant exists per tool. It **morphs** between variants (shared `layout` plus a cross-fade, `smooth`), it doesn't swap.
+
+| Action | Scene |
+|---|---|
+| Thinking or writing | The orb is large, and the assistant's streaming text types in with a caret glow. Thinking shows as a dim, collapsed "thinking…" shimmer. |
+| Edit / MultiEdit | The file path header and a **diff that animates itself**: removed lines tint rose and collapse upward, then added lines type in (about 2–4 ms per character, capped at 600 ms per hunk), with a `+n −m` counter ticking. Code is syntax highlighted (shiki). |
+| Write | The new file "prints" top-down with a scan line. Large files are truncated with "+N lines". |
+| Read | The file peek with line numbers, and a highlight band scans the read range. |
+| Grep / Glob | The pattern in a pill, and a hit counter rolling up as matched paths cascade in as chips (and blink on the map). |
+| Bash (Claude's own shell) | A mini terminal: the command types in, there's a running spinner with elapsed time, then the output (from `PostToolUse.tool_response`) reveals with the exit badge. Long-running commands show "running for 12s". |
+| WebFetch / WebSearch | A URL or query card with a loading bar, then the title and the first lines. |
+| TodoWrite | The checklist, where new items slide in and completed items draw their check (stroke animation) and dim. |
+| Task (subagent) | A split animation: a child card peels off the stage into a stacked "subagent" lane underneath, with its own live caption. |
+| Waiting for permission | The stage freezes and desaturates except for an amber frame. The exact request is shown with inline **Allow / Deny** buttons, the same actions as the Attention Center. |
+| Idle | A quiet summary of the last turn: files changed (with sparkline-style mini diff bars), commands run and duration. |
+
+The same caption ("✎ Editing src/cart/totals.ts") feeds the pod's session row and the ⌘K results.
+
+#### 4.10.3 Flow beams
+
+An SVG overlay layer draws **animated connections** between related elements that are on screen at the same time:
+
+- Session orb → the file node on the map, while acting on it.
+- Session → its **terminal lane**, when the session is running in that terminal (pid link) or when Claude runs a Bash command whose output shows up there.
+- Approval request → the HUD "Waiting" counter (on the overview) or the Attention Center (when open).
+- Dev-server lane → its port chip, briefly, when the port starts listening.
+
+Each beam is a gradient path (accent → status color) with small particles travelling along it, about 3 per second, moving from source to target, drawn with `stroke-dashoffset` and transform only. Beams fade in over 200 ms and fade out 1.5 s after the activity ends. There are at most 12 beams at once (prefer the newest). At the Reduced motion level they become static lines, and at Off they're hidden.
+
+#### 4.10.4 Session timeline and replay
+
+- The bottom strip of the focus view shows the session's events as markers on a time axis: edits (violet), reads (blue), searches (cyan), commands (green or rose by exit code), subagent spawns (pink), compactions (grey), user prompts (white), approvals (amber).
+- **Scrub** by dragging the playhead or clicking a marker. The Codebase Map and the Now Playing stage **replay** that moment: heat is recomputed for that point in time, and the orb is placed at that event's file. The `LIVE` pill jumps back to now.
+- Keys: `Space` play/pause replay (8× speed), `←/→` step through events, `E`, `X` and `U` jump to the next edit, error or user prompt.
+
+#### 4.10.5 Overview-level storytelling
+
+- New activity in any pod sends a tiny particle along the pod's top hairline. Several busy projects read as a calm "everything is flowing".
+- When a project finishes a turn, its pod does one gentle green sweep across the mini map (edited files flash once in sequence, then settle). That's the "done" moment, and it plays once.
 
 ## 5. Component inventory
 
-`AppShell, AmbientField, Hud, ProjectRail, PodGrid, ProjectPod, SessionRow, ClaudeOrb, TerminalLane, Sparkline, PortChip, StatusDot, AttentionCenter, ApprovalCard, FocusView, ClaudePanel, MessageList, ToolCard(*), DiffView, Composer, TerminalStack, XtermView, GitPanel, PulseRail, CommandPalette, Toasts, SettingsSheet, OnboardingWizard, EmptyState, Skeleton, Kbd, Tooltip, NumberTicker`.
+`AppShell, AmbientField, Hud, ProjectRail, PodGrid, ProjectPod, SessionRow, ClaudeOrb, CodebaseMap (+ MiniMap), NowPlayingStage (+ per-tool scenes), FlowBeams, SessionTimeline, TerminalPeek, TerminalLane, Sparkline, PortChip, StatusDot, AttentionCenter, ApprovalCard, FocusView, ClaudePanel, MessageList, ToolCard(*), DiffView, Composer, TerminalStack, XtermView, GitPanel, PulseRail, CommandPalette, Toasts, SettingsSheet, OnboardingWizard, EmptyState, Skeleton, Kbd, Tooltip, NumberTicker`.
 
 ## 6. Empty, loading and error states
 
@@ -183,6 +254,7 @@ Built on cmdk, inside a glass modal with a scale 0.96→1 and blur-in. Groups: P
 - One WebGL context (ambient). Orbs and sparklines share **one** `requestAnimationFrame` scheduler and draw only when visible (IntersectionObserver).
 - xterm instances mount only in the focus view, with the WebGL addon and a fallback to canvas/DOM. Inactive tabs dispose their renderer but keep the buffer in the store.
 - Lists over 50 items are virtualized (`@tanstack/react-virtual`).
+- Codebase Maps: compute the layout once per file-index change in a Web Worker. Render with Canvas 2D on the shared scheduler. Mini maps run at ≤ 15 fps and go fully idle when no events have arrived for 3 s. Only the focus-view map runs at 60 fps.
 - Store updates are batched. Components subscribe to narrow selectors. Overview re-renders are capped by the 30 Hz patch coalescing.
 - Lighthouse performance ≥ 90 on the overview in demo mode. No long tasks over 50 ms during steady-state streaming.
 

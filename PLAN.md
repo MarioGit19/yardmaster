@@ -84,7 +84,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
 
 - [ ] **2.6 Demo simulator**
-  - `--demo` flag and `pnpm dev:demo`. It generates 5 realistic synthetic projects (`acme-shop`, `orbit-api`, `pixel-studio`, `ledger-sync`, `docs-site`) with fake paths under `/home/dev/`, 2–5 terminals each, dev-server logs with ANSI colors (vite, next, rails-ish, jest), occasional crashes and restarts, and listening ports. Claude sessions cycle realistically through the states, with tool activities, streaming assistant text, token counts and todo lists. A permission request appears roughly every 45 s and awaits a decision, and subagents spawn occasionally.
+  - `--demo` flag and `pnpm dev:demo`. It generates 5 realistic synthetic projects (`acme-shop`, `orbit-api`, `pixel-studio`, `ledger-sync`, `docs-site`) with fake paths under `/home/dev/`, 2–5 terminals each, dev-server logs with ANSI colors (vite, next, rails-ish, jest), occasional crashes and restarts, and listening ports. Each project has a synthetic file tree (150–3,000 files, realistic folder structures such as `src/`, `app/routes/`, `components/` and `tests/`). Claude sessions cycle realistically through the states, with **coherent tool sequences** (Grep → Read several files → Edit with real-looking diff hunks → Bash `pnpm test` with output → TodoWrite updates), streaming assistant text, token counts and todo lists. A permission request appears roughly every 45 s and awaits a decision, and subagents spawn occasionally.
   - The simulator must emit through the **same** store mutators as the real ingest.
   - **Done when:** `pnpm dev:demo` runs, and a test runs the simulator for 30 virtual seconds (fake timers) and asserts that the state contains all entity types.
   - **Verify:** `pnpm --filter @c-board/server test`
@@ -128,6 +128,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 - [ ] **4.1 Hook ingest endpoint**
   - `POST /api/hooks/claude` (token header). Parse with the protocol schemas, then upsert the project (from `cwd`) and the session, and drive the **status state machine** (PRD §4.2) in a pure, unit-tested `sessionReducer(session, event)`. Record the current tool (name plus a short summary of `tool_input`, such as the command, file path or pattern), the last assistant message (from `Stop.last_assistant_message`), and the error (`StopFailure`). Respond 204 quickly; the processing is async.
   - **Done when:** the reducer table tests cover every transition, and an endpoint test using fixtures updates the store.
+  - **Verify:** `pnpm --filter @c-board/server test`
+
+- [ ] **4.1b Rich tool activity and session event log**
+  - Normalize `PreToolUse` and `PostToolUse(Failure)` pairs (matched by `tool_use_id`) into the `ToolActivity` model (PRD §4.1): compute Edit/MultiEdit diff hunks with `diff`, record Write sizes and line counts, Read ranges, Grep/Glob patterns and matched paths (parsed from `tool_response`), Bash commands with truncated output and exit status, Web URLs, Todo lists, and subagent links, with durations. Paths are relative to the project. Enforce the caps. Keep a per-session ring of 1,000 events, exposed as a stream `activity:<sessionId>` with replay from any seq.
+  - **Done when:** fixture-driven tests cover every tool family, including oversize inputs being truncated and a failure without a response.
   - **Verify:** `pnpm --filter @c-board/server test`
 
 - [ ] **4.2 Hook script**
@@ -205,6 +210,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Done when:** parser tests on synthetic porcelain output pass.
   - **Verify:** `pnpm --filter @c-board/server test`
 
+- [ ] **6.4 Project file index**
+  - A `FileIndexService` per project: run `git ls-files -z` (via `execFile`) plus `fs.stat` sizes in batches. For non-git folders, use a bounded walk honoring `.gitignore`. Cap at 20k files. Update incrementally from tool activity (Write creating files, Bash `rm`/`mv` → mark for re-index, debounced 2 s). Serve a stream `index:<projectId>` (snapshot plus incremental ops) only while subscribed.
+  - **Done when:** tests cover a temp git repo, a non-git folder with `.gitignore`, the cap, and incremental updates.
+  - **Verify:** `pnpm --filter @c-board/server test`
+
 ## Phase 7 — Signature UI (build against `pnpm dev:demo`)
 
 For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after implementing, **look at the screenshots** (Read the PNGs), and fix anything that fails the DESIGN.md §9 checklist before ticking.
@@ -220,7 +230,7 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm --filter @c-board/web test && pnpm shots`
 
 - [ ] **7.3 Sparkline, TerminalLane, PortChip**
-  - A canvas `Sparkline` (60 samples, slide-in, accent tint, rose on error), `TerminalLane` (name, command, sparkline, port chips, uptime, exit badge, streaming "comet" border, aligned columns), and `PortChip` (click copies `localhost:port`, hover shows the process).
+  - A canvas `Sparkline` (60 samples, slide-in, accent tint, rose on error), `TerminalLane` (name, command, sparkline, port chips, uptime, exit badge, streaming "comet" border, aligned columns), `PortChip` (click copies `localhost:port`, hover shows the process), and `TerminalPeek` (a live 6-line output preview on lane hover or focus, per DESIGN.md §4.3).
   - **Done when:** the lanes render in the demo with correct alignment across pods (screenshot check).
   - **Verify:** `pnpm shots`
 
@@ -235,7 +245,7 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm e2e && pnpm shots`
 
 - [ ] **7.6 Focus view and shared-element transition**
-  - Route `/p/:id`: a `layoutId` transition from the pod (container, header, orb), with the backdrop dimmed and blurred. Three-column resizable layout (sessions + git | Claude panel | terminal stack), spring-snapped resize handles, and persisted sizes per project (localStorage, wrapped in try/catch). Back with Esc.
+  - Route `/p/:id`: a `layoutId` transition from the pod (container, header, orb), with the backdrop dimmed and blurred. Resizable layout per DESIGN.md §4.6: sessions + git | **Stage** (tabs Live / Chat, with a docked composer) | terminal stack, with the timeline strip at the bottom. The Live tab gets placeholder slots for the Codebase Map and Now Playing (filled in 7.13–7.17). Spring-snapped resize handles, sizes persisted per project (localStorage, wrapped in try/catch), back with Esc.
   - **Done when:** the transition is smooth in both directions and the layout is correct at 1440 and 1920 (stacked tabs at 390).
   - **Verify:** `pnpm shots && pnpm e2e`
 
@@ -269,18 +279,48 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Done when:** both render with demo data, and the "Resume in Cursor" action is routed (server test).
   - **Verify:** `pnpm shots && pnpm --filter @c-board/server test`
 
-- [ ] **7.13 Worst-case data pass (break-ui)**
-  - Use the `break-ui` skill on ProjectPod, SessionRow, TerminalLane, ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
+- [ ] **7.13 Codebase Map: layout and rendering**
+  - `CodebaseMap` per DESIGN.md §4.10.1. Subscribe to `index:<projectId>`. A Web Worker computes the `d3-hierarchy` pack layout (size ∝ √bytes) and collapses inactive subtrees above 4,000 files. Render on canvas through the shared scheduler, with zoom/pan (wheel, pinch, drag), double-click to zoom into a directory, label rules, a hover tooltip, a click-to-open diff side sheet, and tweened layout changes. `MiniMap` variant at low detail and ≤ 15 fps. Add a showcase on `/#/_tokens`.
+  - **Done when:** the demo maps render for all 5 projects (including the 3,000-file one) at 60 fps in the focus view, and the zoom, pan and hover e2e test passes.
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **7.14 Codebase Map: live activity**
+  - Drive the map from the `activity:<sessionId>` streams: decaying heat per tool family (glance, read scan line, grep radial sweep plus staggered cyan blinks, edit ripple plus floating `+n −m`, create grow-in, error flicker, persistent "changed" rim), orb travel along bezier paths with an 8-hop comet trail, subagent orbs that split off and merge back, per-session hues, and a follow-orb camera (`F`). Wire `MiniMap` into ProjectPod (DESIGN.md §4.3).
+  - **Done when:** the demo shows the orb visibly traveling, reading, searching and editing, with every effect in DESIGN.md §4.10.1, and Reduced mode keeps the heat colors without movement.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **7.15 Now Playing stage**
+  - `NowPlayingStage` with one scene per row of the DESIGN.md §4.10.2 table (thinking/text, Edit self-typing diff, Write print, Read scan, Grep/Glob cascade, Bash mini-terminal, Web card, Todo checklist, Task split, waiting-for-permission with inline Allow/Deny, idle summary). Scenes **morph** (shared layout plus cross-fade). Feed the caption to the pod SessionRow and ⌘K. Use the `animate` and `apple-design` skills for the choreography.
+  - **Done when:** every scene appears in the `/#/_tokens` showcase and in the live demo, and the inline approve works (e2e).
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **7.16 Flow beams**
+  - A `FlowBeams` SVG overlay per DESIGN.md §4.10.3. A registry of on-screen anchors (`useBeamAnchor(id)`, updated with ResizeObserver plus scroll), beams for orb→file, session→terminal lane, approval→HUD or Attention Center, and lane→port. Gradient paths with travelling particles, fade in and out, a cap of 12, and motion-level aware. Use transform and dashoffset only.
+  - **Done when:** beams connect the correct elements in demo mode on the overview and the focus view, and an anchor that is unmounted removes its beam without errors.
+  - **Verify:** `pnpm shots && pnpm e2e`
+
+- [ ] **7.17 Session timeline and replay**
+  - `SessionTimeline` per DESIGN.md §4.10.4: event markers by type, a draggable playhead, a `LIVE` pill, play/pause at 8×, step keys, and E/X/U jumps. While scrubbing, the Codebase Map and Now Playing render the historical state (heat recomputed up to that time, orb at that event). Keep the replay state outside React render (it's driven by the store plus the scheduler).
+  - **Done when:** an e2e test scrubs to an earlier edit, sees the stage show that diff, then returns to LIVE.
+  - **Verify:** `pnpm e2e`
+
+- [ ] **7.18 Overview storytelling and idle states**
+  - Per DESIGN.md §4.10.5 and §4.3: hairline activity particles on pods, a one-time green "turn done" sweep on the mini map, idle-pod dimming (70%, mini map paused), and the active-pods-brightest rule.
+  - **Done when:** in the demo, a project finishing a turn plays the sweep exactly once, and idle pods dim after 5 virtual minutes (fake timers in the e2e test).
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **7.19 Worst-case data pass (break-ui)**
+  - Use the `break-ui` skill on ProjectPod, SessionRow, TerminalLane, TerminalPeek, the Now Playing scenes, the Codebase Map (deep trees, 20k files, very long paths), ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
   - **Done when:** the screenshots of `?worst=1` at all widths show no overflow, overlap or broken alignment.
   - **Verify:** `pnpm shots`
 
-- [ ] **7.14 Motion review pass**
+- [ ] **7.20 Motion review pass**
   - Run `review-animations` across `apps/web/src`, then `find-animation-opportunities` for the overview and focus views. Apply the fixes and opportunities that fit DESIGN.md §3–4 (reject the rest, with a one-line reason in a Note). Recheck Reduced/Off motion levels.
   - **Done when:** the review comes back without blocking issues, and the motion levels still behave as specified.
   - **Verify:** `pnpm e2e && pnpm shots`
 
-- [ ] **7.15 Impeccable design critique**
-  - Run an `impeccable` critique and audit of the overview, focus view, Attention Center and settings, using the screenshots plus the code. Fix the top issues (hierarchy, spacing, typography, contrast, states) without leaving DESIGN.md's direction. If more than about 10 issues remain, add follow-up task `7.15b`.
+- [ ] **7.21 Impeccable design critique**
+  - Run an `impeccable` critique and audit of the overview, focus view, Attention Center and settings, using the screenshots plus the code. Fix the top issues (hierarchy, spacing, typography, contrast, states) without leaving DESIGN.md's direction. If more than about 10 issues remain, add follow-up task `7.21b`.
   - **Verify:** `pnpm shots && pnpm check`
 
 ## Phase 8 — Act: headless sessions and approvals
@@ -302,12 +342,12 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm e2e`
 
 - [ ] **8.4 Attention Center**
-  - Right sheet per DESIGN.md §4.5. It collects approvals from every source, with keyboard shortcuts A, ⇧A and D, a deny reason input, collapse on resolve, a toast plus an `aria-live` announcement on new items, an optional browser Notification (permission asked in Settings) and an optional sound (off by default).
+  - Right sheet per DESIGN.md §4.5. It collects approvals from every source, with keyboard shortcuts A, ⇧A and D, a deny reason input, collapse on resolve, a toast plus an `aria-live` announcement on new items and an optional browser Notification (permission asked in Settings).
   - **Done when:** an e2e test approves a demo request with the keyboard.
   - **Verify:** `pnpm e2e && pnpm shots`
 
 - [ ] **8.5 Settings and onboarding**
-  - The Settings sheet covers theme, motion level, sounds, notifications, redact secrets, away mode (Phase 9), hooks status plus an install button (calls the installer with a confirm dialog showing the diff), connected editor windows, data retention, and token rotate.
+  - The Settings sheet covers theme, motion level, notifications, redact secrets, away mode (Phase 9), hooks status plus an install button (calls the installer with a confirm dialog showing the diff), connected editor windows, data retention, and token rotate.
   - The onboarding wizard (shown when there are no hook events and no editors connected) follows DESIGN.md §6, with live auto-ticking steps and copyable commands.
   - **Done when:** the e2e onboarding flow ticks steps from simulated events.
   - **Verify:** `pnpm e2e && pnpm shots`
@@ -332,7 +372,7 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 ## Phase 10 — Quality, docs, release
 
 - [ ] **10.1 Performance pass**
-  - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each). Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
+  - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each, 4 sessions doing roughly 5 tool calls per second, and one 20k-file repository). Include the mini maps, a 60 fps focus map and flow beams in the measurement. Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
   - **Verify:** `pnpm e2e --grep @perf`
 
 - [ ] **10.2 Accessibility pass**

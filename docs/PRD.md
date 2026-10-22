@@ -56,6 +56,8 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 - **Claude session:** identified by `session_id`. Origin is either `terminal` (interactive, observed through hooks and transcripts) or `board` (headless, run through the Agent SDK). Has a status, title, model, permission mode, token usage and context size, current tool, todo list, subagents, and the linked terminal (when known).
 - **Approval:** a pending permission decision, from an SDK `canUseTool` callback (board sessions) or from a `PermissionRequest` hook (terminal sessions in away mode).
 - **Activity event:** a normalized, timestamped event used by the Pulse timeline and history.
+- **Tool activity:** one Claude tool call with its rich detail, normalized from `PreToolUse`/`PostToolUse(Failure)`: tool family, target paths, Edit diff hunks (computed from `old_string`/`new_string`), Write size, Read range, Grep pattern and matched paths, Bash command, truncated output and exit status, Web URL, Todo list, subagent id, and duration. It powers the Codebase Map, the Now Playing stage and replay. Each field is capped (diff ≤ 64 KB, output ≤ 32 KB), and the last 1,000 per session are kept in memory, with metadata persisted.
+- **Project file index:** the files from `git ls-files` (fallback: a bounded directory walk honoring `.gitignore`) with their sizes, capped at 20k entries. It's refreshed on demand and updated incrementally when tool activity creates or deletes files. It's only sent to UI clients that subscribe (`index:<projectId>`).
 
 ### 4.2 Claude session status model
 
@@ -86,11 +88,12 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - F5 Transcript view of any session (history plus live tail), with tool calls rendered as rich cards (Bash, Edit/Write with diffs, Read, Grep, TodoWrite, Task/subagents).
 - F6 Headless Claude sessions from the board (Agent SDK): new session per project, multi-turn chat, streaming, interrupt, model and permission-mode switch, resume past sessions.
 - F7 Approvals: board sessions through `canUseTool`, with Allow once / Always allow (from suggestions) / Deny with reason.
-- F8 Attention Center plus notifications (in-app toasts, optional browser notifications, optional sound).
+- F8 Attention Center plus notifications (in-app toasts, optional browser notifications). No sound.
 - F9 Ports and processes: listening ports per terminal and project; CPU/mem per terminal subtree.
 - F10 Command palette (⌘K) for navigation and every action.
 - F11 Onboarding plus `doctor`: guided setup (server, hooks, extension) with health checks.
 - F12 Demo mode: realistic synthetic data for development, screenshots and testing.
+- F23 **Live Work Preview** (signature, DESIGN.md §4.10): per project, a live Codebase Map where Claude's orb travels between the files it reads, searches and edits (with heat, trails and subagent orbs); a Now Playing stage that animates the current action (self-typing diffs, commands with output, search sweeps, todo checks); flow beams connecting sessions, files, terminals and approvals; and a session timeline with scrub and replay. The mini version is on every overview pod, and the full version is in the focus view.
 
 **Should**
 - F13 Away mode: route `PermissionRequest` hooks from interactive terminal sessions to the board.
@@ -102,7 +105,6 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 **Could**
 - F19 Board-owned terminals (node-pty) for projects with no editor window open.
-- F20 Sound design pack.
 - F21 Saved "launch profiles" per project (for example "backend + storefront + claude").
 - F22 Light theme ("Daylight") polish beyond baseline.
 
@@ -118,6 +120,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
                                                            │  • hook ingest / status FSM   │
  ~/.claude/projects/**.jsonl ◀── tail / SDK readers ──────│  • transcript reader          │
                                                            │  • process + port scanner     │
+                                                           │  • file index + tool activity │
  Agent SDK query() sessions ◀── runs in-process ──────────│  • session runner (SDK)       │
                                                            │  • sqlite (node:sqlite)       │
                                                            └──────────────────────────────┘
