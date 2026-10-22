@@ -29,6 +29,8 @@ export interface ProcessScannerOptions {
   psIntervalMs?: number;
   portIntervalMs?: number;
   now?: () => number;
+  /** Called after each process sample has been applied. */
+  onSample?: (tree: ProcessTree) => void;
 }
 
 type PortTool = 'lsof' | 'ss' | null;
@@ -45,6 +47,7 @@ export class ProcessScanner {
   private readonly psIntervalMs: number;
   private readonly portIntervalMs: number;
   private readonly now: () => number;
+  private readonly onSample: ((tree: ProcessTree) => void) | undefined;
   private readonly timers: NodeJS.Timeout[] = [];
   private portTool: PortTool;
   private listeners: Listener[] = [];
@@ -63,6 +66,7 @@ export class ProcessScanner {
     this.psIntervalMs = options.psIntervalMs ?? PS_INTERVAL_MS;
     this.portIntervalMs = options.portIntervalMs ?? PORT_INTERVAL_MS;
     this.now = options.now ?? Date.now;
+    this.onSample = options.onSample;
     this.portTool = this.supported ? 'lsof' : null;
   }
 
@@ -107,6 +111,7 @@ export class ProcessScanner {
       this.latest = buildTree(parsePs(stdout));
       this.applyStats();
       this.applyPorts();
+      this.onSample?.(this.latest);
     } catch (err) {
       this.warnOnce('ps', err);
     } finally {

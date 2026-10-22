@@ -241,3 +241,29 @@ export function sameStats(a: ProcessStats | null, b: ProcessStats | null): boole
     a.processCount === b.processCount
   );
 }
+
+/** Deeper chains than this are a loop in a racy `ps` sample, not real nesting. */
+const MAX_ANCESTRY = 128;
+
+/**
+ * Walks from `pid` up through its ancestors and returns the terminal of the first
+ * shell pid it meets, so a process started through an intermediate `sh` still
+ * links. Null when the pid isn't sampled or no ancestor is a terminal shell.
+ */
+export function terminalForPid(
+  tree: ProcessTree,
+  pid: number,
+  shells: ReadonlyMap<number, string>,
+): string | null {
+  const seen = new Set<number>();
+  let current: number | undefined = pid;
+  while (current !== undefined && current > 0 && seen.size < MAX_ANCESTRY) {
+    const terminalId = shells.get(current);
+    if (terminalId !== undefined) return terminalId;
+    const proc = tree.procs.get(current);
+    if (!proc || seen.has(current)) return null;
+    seen.add(current);
+    current = proc.ppid;
+  }
+  return null;
+}

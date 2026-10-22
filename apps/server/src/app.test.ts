@@ -80,6 +80,22 @@ describe('server', () => {
     expect(app.processScanner).toBeNull();
   });
 
+  it('links sessions to terminals after each process sample', async () => {
+    const run = async (file: string) =>
+      file === 'ps' ? ' 4242 1 0.0 1024 -zsh\n 4300 4242 1.0 2048 claude\n' : '';
+    app = await buildServer(config, {
+      token,
+      dbPath: ':memory:',
+      processes: { platform: 'darwin', run },
+      discovery: { listHistory: null, registryDir: '/nonexistent/c-board-test' },
+    });
+    expect(app.sessionLinker).not.toBeNull();
+    app.store.upsertTerminal({ id: 't-1', windowId: 'w-1', name: 'zsh', shellPid: 4242 });
+    app.store.upsertSession({ id: 'sess-1', claudePid: 4300 });
+    await app.processScanner?.scanProcesses();
+    expect(app.store.state.sessions['sess-1']?.terminalId).toBe('t-1');
+  });
+
   it('returns 404 for unknown routes', async () => {
     app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const res = await app.inject({

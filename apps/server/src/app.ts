@@ -18,6 +18,7 @@ import { EditorRouter } from './editor-router.js';
 import { Persistence } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
+import { SessionLinker } from './session-linker.js';
 import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
@@ -72,6 +73,7 @@ declare module 'fastify' {
     transcripts: TranscriptService | null;
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
+    sessionLinker: SessionLinker | null;
   }
 }
 
@@ -108,6 +110,7 @@ export async function buildServer(
   app.addHook('onClose', async () => {
     demo?.stop();
     processScanner?.stop();
+    sessionLinker?.stop();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -147,15 +150,24 @@ export async function buildServer(
         ...options.discovery,
       });
   app.decorate('sessionDiscovery', discovery);
+  const processOptions = options.demo ? false : (options.processes ?? {});
   const processScanner =
-    options.demo || options.processes === false
+    processOptions === false
       ? null
       : new ProcessScanner({
           store,
           logger: logger.child({ component: 'processes' }),
-          ...options.processes,
+          ...processOptions,
+          onSample: (tree) => {
+            processOptions.onSample?.(tree);
+            sessionLinker?.link();
+          },
         });
+  const sessionLinker = processScanner
+    ? new SessionLinker({ store, tree: () => processScanner.tree })
+    : null;
   app.decorate('processScanner', processScanner);
+  app.decorate('sessionLinker', sessionLinker);
   const editorGateway = new EditorGateway({
     store,
     logger: logger.child({ component: 'editor-ws' }),
@@ -225,6 +237,7 @@ export async function buildServer(
   await app.ready();
   demo?.start();
   discovery?.start();
+  sessionLinker?.start();
   processScanner?.start();
   return app;
 }
