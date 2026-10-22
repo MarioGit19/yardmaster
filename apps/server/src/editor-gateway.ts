@@ -1,6 +1,7 @@
 import {
   decodeEditorToServer,
   EDITOR_CLOSE_REPLACED,
+  type EditorTerminal,
   type EditorToServer,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
@@ -8,6 +9,7 @@ import type { WebSocket } from 'ws';
 import { ensureProject, type PathResolver, resolveDir } from './claude/project-lookup.js';
 import { TOKEN_HEADER } from './security.js';
 import type { BoardStore } from './store.js';
+import { type TerminalEvent, terminalReducer } from './terminal-reducer.js';
 import { tokensEqual } from './token.js';
 
 export const EDITOR_WS_PATH = '/ws/editor';
@@ -45,7 +47,7 @@ interface WindowEntry {
 
 /**
  * Accepts extension connections on `/ws/editor`: registers each window and its workspace
- * folders as projects, and removes the window (with its terminals) once it has been gone
+ * folders as projects, keeps its terminal inventory, and removes the window (with its terminals) once it has been gone
  * for the grace period.
  */
 export class EditorGateway {
@@ -131,8 +133,22 @@ export class EditorGateway {
       case 'editor.heartbeat':
         this.store.touchWindow(connection.windowId, this.now());
         return;
+      case 'terminal.upsert':
+        await this.applyTerminal(connection.windowId, message.payload.terminalId, {
+          type: 'upsert',
+          terminal: message.payload,
+        });
+        return;
+      case 'terminal.closed':
+        await this.applyTerminal(connection.windowId, message.payload.terminalId, {
+          type: 'closed',
+          exitCode: message.payload.exitCode,
+        });
+        return;
+      case 'terminal.sync':
+        return this.onSync(connection.windowId, message.payload.terminals);
       default:
-        // Terminals, executions and command results are handled by later tasks (5.3+).
+        // Executions and command results are handled by later tasks (5.4+).
         this.log.debug({ type: message.type }, 'editor message not handled yet');
     }
   }
@@ -188,6 +204,45 @@ export class EditorGateway {
     });
     for (const id of projectIds) this.store.touchProject(id, ts);
     this.log.info({ projects: projectIds.length }, 'editor window connected');
+  }
+
+  private async applyTerminal(
+    windowId: string,
+    terminalId: string,
+    event: TerminalEvent,
+  ): Promise<void> {
+    const existing = this.store.state.terminals[terminalId];
+    const cwd = event.type === 'upsert' ? (event.terminal.cwd ?? existing?.cwd) : null;
+    const resolvedCwd = cwd ? await this.resolvePath(cwd).catch(() => null) : null;
+    // Re-read: the store may have changed while the path was resolving.
+    const current = this.store.state.terminals[terminalId];
+    const next = terminalReducer(current, event, {
+      windowId,
+      projects: this.store.state.projects,
+      windowProjectIds: this.store.state.windows[windowId]?.projectIds ?? [],
+      resolvedCwd,
+      now: this.now(),
+    });
+    if (next === null) {
+      this.log.debug({ type: event.type }, 'ignored a terminal event for an unknown terminal');
+      return;
+    }
+    const { executionIds: _, ...fields } = next;
+    this.store.upsertTerminal(fields);
+  }
+
+  /** Replaces the window's terminal list: listed terminals are upserted, the rest removed. */
+  private async onSync(windowId: string, terminals: readonly EditorTerminal[]): Promise<void> {
+    const listed = new Set<string>();
+    for (const terminal of terminals) {
+      listed.add(terminal.terminalId);
+      await this.applyTerminal(windowId, terminal.terminalId, { type: 'upsert', terminal });
+    }
+    for (const terminal of Object.values(this.store.state.terminals)) {
+      if (terminal.windowId === windowId && !listed.has(terminal.id)) {
+        this.store.removeTerminal(terminal.id);
+      }
+    }
   }
 
   private onClose(connection: Connection): void {

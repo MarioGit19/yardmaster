@@ -1,6 +1,11 @@
 import { realpath } from 'node:fs/promises';
 import { basename, resolve, sep } from 'node:path';
-import { accentIndexForProject, type ProjectSource, projectIdFromPath } from '@c-board/protocol';
+import {
+  accentIndexForProject,
+  type Project,
+  type ProjectSource,
+  projectIdFromPath,
+} from '@c-board/protocol';
 import type { BoardStore } from '../store.js';
 
 export type PathResolver = (path: string) => Promise<string>;
@@ -17,15 +22,21 @@ export async function projectForCwd(
 ): Promise<string | null> {
   const path = await resolvePath(cwd).catch(() => null);
   if (!path) return null;
+  return deepestProject(store.state.projects, path) ?? ensureProject(store, path, 'hook', ts);
+}
+
+/** The id of the deepest project whose folder contains the resolved `path`, if any. */
+export function deepestProject(
+  projects: Readonly<Record<string, Pick<Project, 'id' | 'path'>>>,
+  path: string,
+): string | null {
   let best: { id: string; depth: number } | null = null;
-  for (const project of Object.values(store.state.projects)) {
+  for (const project of Object.values(projects)) {
     const root = project.path.replace(/\/+$/, '');
     if (path !== root && !path.startsWith(root === '' ? sep : `${root}${sep}`)) continue;
     if (!best || root.length > best.depth) best = { id: project.id, depth: root.length };
   }
-  if (best) return best.id;
-
-  return ensureProject(store, path, 'hook', ts);
+  return best?.id ?? null;
 }
 
 /**

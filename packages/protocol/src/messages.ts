@@ -70,6 +70,11 @@ export const EditorHello = envelope(
   }),
 );
 export const TerminalUpsert = envelope('terminal.upsert', EditorTerminal);
+/** The window's full terminal list (sent after every connect); terminals not in it are gone. */
+export const TerminalSync = envelope(
+  'terminal.sync',
+  z.object({ terminals: z.array(EditorTerminal).max(1_000) }),
+);
 export const TerminalClosed = envelope(
   'terminal.closed',
   z.object({ terminalId: TerminalId, exitCode: z.number().int().nullable() }),
@@ -107,6 +112,7 @@ export const CmdResult = envelope(
 export const EditorToServer = z.discriminatedUnion('type', [
   EditorHello,
   TerminalUpsert,
+  TerminalSync,
   TerminalClosed,
   ExecStart,
   ExecData,

@@ -249,4 +249,84 @@ describe('/ws/editor', () => {
     await closed(socket);
     await waitFor(() => app.store.state.windows[windowId] === undefined);
   });
+  describe('terminals', () => {
+    const term = (terminalId: string, overrides: Record<string, unknown> = {}) => ({
+      terminalId,
+      name: 'zsh',
+      shellPid: 4242,
+      cwd: `${apiPath}/src`,
+      state: 'open',
+      shellIntegration: true,
+      active: false,
+      exitCode: null,
+      ...overrides,
+    });
+
+    async function ready() {
+      const { app, port } = await boot();
+      const socket = connect(port);
+      await opened(socket);
+      hello(socket);
+      await waitFor(() => app.store.state.windows[windowId] !== undefined);
+      return { app, port, socket };
+    }
+
+    it('upserts terminals and links them by cwd or the window folder', async () => {
+      const { app, socket } = await ready();
+      send(socket, 'terminal.upsert', term('term-1', { active: true }));
+      send(socket, 'terminal.upsert', term('term-2', { cwd: null, shellPid: null }));
+      await waitFor(() => app.store.state.terminals['term-2'] !== undefined);
+
+      expect(app.store.state.terminals['term-1']).toMatchObject({
+        windowId,
+        projectId: projectIdFromPath(apiPath),
+        cwd: `${apiPath}/src`,
+        shellPid: 4242,
+        active: true,
+        state: 'open',
+      });
+      expect(app.store.state.terminals['term-2']).toMatchObject({
+        projectId: projectIdFromPath(shopPath),
+        cwd: null,
+      });
+    });
+
+    it('marks a closed terminal and keeps it', async () => {
+      const { app, socket } = await ready();
+      send(socket, 'terminal.upsert', term('term-1', { active: true }));
+      send(socket, 'terminal.closed', { terminalId: 'term-1', exitCode: 1 });
+      await waitFor(() => app.store.state.terminals['term-1']?.state === 'closed');
+      expect(app.store.state.terminals['term-1']).toMatchObject({ exitCode: 1, active: false });
+    });
+
+    it('replaces the window terminal list on sync', async () => {
+      const { app, socket } = await ready();
+      send(socket, 'terminal.upsert', term('term-1'));
+      send(socket, 'terminal.upsert', term('term-2'));
+      await waitFor(() => app.store.state.terminals['term-2'] !== undefined);
+      app.store.upsertTerminal({ id: 'other-1', windowId: 'win-other', name: 'bash' });
+
+      send(socket, 'terminal.sync', {
+        terminals: [term('term-2', { name: 'node' }), term('term-3')],
+      });
+      await waitFor(() => app.store.state.terminals['term-3'] !== undefined);
+      await app.editorGateway.idle();
+
+      expect(app.store.state.terminals['term-1']).toBeUndefined();
+      expect(app.store.state.terminals['term-2']?.name).toBe('node');
+      // Other windows' terminals are untouched.
+      expect(app.store.state.terminals['other-1']).toBeDefined();
+    });
+
+    it("ignores terminal events for another window's terminal", async () => {
+      const { app, socket } = await ready();
+      app.store.upsertTerminal({ id: 'other-1', windowId: 'win-other', name: 'bash' });
+      send(socket, 'terminal.upsert', term('other-1', { name: 'hijacked' }));
+      send(socket, 'terminal.closed', { terminalId: 'other-1', exitCode: 0 });
+      send(socket, 'terminal.closed', { terminalId: 'missing', exitCode: 0 });
+      await app.editorGateway.idle();
+      expect(app.store.state.terminals['other-1']).toMatchObject({ name: 'bash', state: 'open' });
+      expect(app.store.state.terminals.missing).toBeUndefined();
+    });
+  });
 });

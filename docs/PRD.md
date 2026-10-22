@@ -218,7 +218,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 All messages are JSON envelopes `{ v: 1, type, id?, ts, payload }`.
 
-**Editor → server** (`/ws/editor`): `editor.hello {windowId, appName, appVersion, workspaceFolders[], extensionVersion}`, `terminal.upsert`, `terminal.closed`, `exec.start {execId, terminalId, commandLine, confidence, cwd}`, `exec.data {execId, seq, chunk}` (batched every ≤ 50 ms / 16 KB), `exec.end {execId, exitCode}`, `editor.heartbeat`.
+**Editor → server** (`/ws/editor`): `editor.hello {windowId, appName, appVersion, workspaceFolders[], extensionVersion}`, `terminal.upsert`, `terminal.sync {terminals[]}` (full list after every connect), `terminal.closed`, `exec.start {execId, terminalId, commandLine, confidence, cwd}`, `exec.data {execId, seq, chunk}` (batched every ≤ 50 ms / 16 KB), `exec.end {execId, exitCode}`, `editor.heartbeat`.
 
 **Server → editor:** `cmd.sendText {terminalId, text, execute}`, `cmd.interrupt {terminalId}`, `cmd.createTerminal {cwd, name, command?}`, `cmd.focusTerminal`, `cmd.disposeTerminal`, `cmd.rerun {execId}`. Each command is acknowledged with `cmd.result {id, ok, error?}`.
 

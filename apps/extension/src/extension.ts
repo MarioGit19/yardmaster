@@ -12,6 +12,7 @@ import {
 } from './core/config.js';
 import { EditorLink, type HelloPayload, type LinkStatus } from './core/editor-link.js';
 import { STATUS_TEXT, statusTooltip } from './core/status.js';
+import { TerminalTracker } from './core/terminal-tracker.js';
 import { cboardHome, readToken } from './core/token.js';
 
 const WINDOW_ID_KEY = 'cboard.windowId';
@@ -47,8 +48,18 @@ export function activate(context: vscode.ExtensionContext): void {
   statusItem.name = 'c-board';
   statusItem.text = STATUS_TEXT;
   statusItem.command = COMMANDS.openDashboard;
+  const terminals = new TerminalTracker<vscode.Terminal>({
+    sink: {
+      upsert: (terminal) => link?.send('terminal.upsert', terminal),
+      closed: (terminalId, exitCode) => link?.send('terminal.closed', { terminalId, exitCode }),
+      sync: (list) => link?.send('terminal.sync', { terminals: list }),
+    },
+    activeTerminal: () => vscode.window.activeTerminal,
+  });
   const showStatus = (status: LinkStatus) => {
     statusItem.tooltip = statusTooltip(status, config.port);
+    // Every (re)connect gets the full list, so the server drops anything stale.
+    if (status.kind === 'connected') terminals.sync(vscode.window.terminals);
   };
   showStatus({ kind: 'stopped' });
   statusItem.show();
@@ -101,6 +112,15 @@ export function activate(context: vscode.ExtensionContext): void {
       link.reconnect();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => link?.sendHello()),
+    vscode.window.onDidOpenTerminal((terminal) => terminals.opened(terminal)),
+    vscode.window.onDidCloseTerminal((terminal) => terminals.closed(terminal)),
+    vscode.window.onDidChangeTerminalState((terminal) => terminals.changed(terminal)),
+    vscode.window.onDidChangeTerminalShellIntegration(({ terminal }) =>
+      terminals.changed(terminal),
+    ),
+    // The cwd can change with every command; there is no dedicated event for it.
+    vscode.window.onDidEndTerminalShellExecution(({ terminal }) => terminals.changed(terminal)),
+    vscode.window.onDidChangeActiveTerminal(() => terminals.activeChanged()),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration(CONFIG_SECTION)) return;
       const next = readConfig();

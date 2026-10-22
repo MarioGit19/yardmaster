@@ -45,6 +45,7 @@ const editorToServer: EditorToServer[] = [
     active: true,
     exitCode: null,
   }),
+  env('terminal.sync', { terminals: [] }),
   env('terminal.closed', { terminalId: 'term-1', exitCode: 0 }),
   env('exec.start', {
     execId: 'exec-1',
