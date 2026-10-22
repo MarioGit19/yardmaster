@@ -67,7 +67,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - Fastify 5 with pino. Config from env and defaults: `CBOARD_PORT=4317`, `CBOARD_HOME=~/.c-board`, `CBOARD_HOST=127.0.0.1` (refuse any non-loopback value). Add `GET /api/health`. Run in dev with `tsx watch`.
   - **Done when:** the server starts, `/api/health` returns `{ok:true, version}`, and a test uses `fastify.inject`.
   - **Verify:** `pnpm --filter @c-board/server test`
-  - Note: `buildServer(config)` / `startServer(config)` in `app.ts`, env parsing in `config.ts` (`loadConfig(env, home)`), entry `main.ts` (`pnpm --filter @c-board/server dev`). Loopback means `127.0.0.0/8`, `::1` or `localhost`. `CBOARD_PORT=0` is allowed for ephemeral ports. Added `CBOARD_LOG_LEVEL` (default `info`). Request logging is off and pino omits the hostname.
+  - Note: `buildServer(config)` / `startServer(config)` in `app.ts`, env parsing in `config.ts` (`loadConfig(env, home)`), entry `main.ts` (`pnpm --filter @c-board/server dev`; replaced by `cli.ts` in 2.7). Loopback means `127.0.0.0/8`, `::1` or `localhost`. `CBOARD_PORT=0` is allowed for ephemeral ports. Added `CBOARD_LOG_LEVEL` (default `info`). Request logging is off and pino omits the hostname.
 
 - [x] **2.2 Security layer**
   - Token bootstrap: create `~/.c-board/token` (0600, 32 random bytes, base64url) if it's missing. Add `GET /auth?t=` to set an `HttpOnly; SameSite=Strict` cookie (signed) and redirect to `/`. Host-header allowlist and Origin check per PRD §8. Add an auth guard for `/api/*` (except health) that accepts the cookie or the `X-CBoard-Token` header.
@@ -100,11 +100,12 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `demo/simulator.ts` (`DemoSimulator`, seeded mulberry32 `Rng` so runs are reproducible), `demo/content.ts` (projects, scenarios) and `demo/logs.ts` (next/vite/rails-ish/jest/shell output). `buildServer(config, { demo })` starts it after `ready`, stops it on close, and uses a `:memory:` database so demo data never reaches `board.db`. Activity goes to `persistence.recordActivity`; toasts and `approval.new/resolved` go through `uiGateway.broadcast`. Added a `decideApproval` option to the gateway so `approval.decide` reaches the simulator (undecided approvals expire after 2 min). `server --demo` is parsed with `util.parseArgs`; root `pnpm dev` / `pnpm dev:demo` run the server only until the web app exists.
 
-- [ ] **2.7 CLI**
+- [x] **2.7 CLI**
   - A `c-board` bin (in `apps/server`) with `start [--demo] [--no-open]` (starts the server and opens `http://127.0.0.1:<port>/auth?t=…` in the default browser), `doctor` (checks the Node version, port free, token present, hooks installed, extensions connected, the `claude` binary on PATH and its version, and `ANTHROPIC_API_KEY` set → warning), and `token --rotate`.
   - In production the server serves the built `apps/web/dist` statically (SPA fallback). In dev, Vite proxies `/api` and `/ws` to the server.
   - **Done when:** `c-board doctor` prints a readable report, and the tests cover the doctor checks with mocks.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm --filter @c-board/server exec tsx src/cli.ts doctor`
+  - Note: `cli.ts` (bin entry) → `cli-app.ts` (`runCli(argv, io)`, injectable for tests; bare flags mean `start`; `pnpm c-board <cmd>` from the root). `doctor.ts` (`runDoctor(config, deps)` + `formatDoctorReport`, all I/O behind `DoctorDeps`; exits 1 only on a failed check). It reads only Claude's `settings.json` (`CLAUDE_CONFIG_DIR` aware) to spot `c-board-hook` commands, and asks a running board for the new authenticated `GET /api/status` (`ServerStatus` in protocol: editors, `hooks.received/lastAt` from `app.hookStats`, which 4.1's ingest must bump). `token --rotate` tells the user to restart; a running server keeps the old token until then. `static.ts` serves `apps/web/dist` (immutable `/assets/`, SPA fallback, `/api`, `/ws` and `/auth` never fall back) only when `index.html` exists and `webRoot` is passed (the CLI passes it; tests don't). The browser opener uses `open` / `xdg-open` / `rundll32` via `execFile`. `main.ts` is gone: `pnpm dev` runs `cli.ts start --no-open`. Limitations: the Vite dev proxy lands with the Vite setup in 3.1, and plain `node dist/cli.js` can't load `@c-board/protocol` (its exports point at TS source) until 10.6 bundles the server.
 
 ## Phase 3 — Web foundation (`apps/web`)
 

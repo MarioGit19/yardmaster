@@ -3,13 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "c-board": "./dist/cli.js"
+  },
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "dev:demo": "tsx watch src/main.ts --demo",
-    "start": "node dist/main.js",
+    "dev": "tsx watch src/cli.ts start --no-open",
+    "dev:demo": "tsx watch src/cli.ts start --demo --no-open",
+    "start": "node dist/cli.js start",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cli": "tsx src/cli.ts"
   },
   "dependencies": {
     "@c-board/protocol": "workspace:*",

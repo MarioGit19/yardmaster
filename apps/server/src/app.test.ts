@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ServerStatus } from '@c-board/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
@@ -35,6 +36,29 @@ describe('server', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.json()).toEqual({ ok: true, version: pkg.version });
+  });
+
+  it('GET /api/status needs auth and reports editors and hook stats', async () => {
+    app = await buildServer(config, { token, dbPath: ':memory:' });
+    const denied = await app.inject({ method: 'GET', url: '/api/status', headers: { host } });
+    expect(denied.statusCode).toBe(401);
+
+    app.hookStats.received = 3;
+    app.hookStats.lastAt = 1_800_000_000_000;
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/status',
+      headers: { host, 'x-cboard-token': token },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = ServerStatus.parse(res.json());
+    expect(body).toMatchObject({
+      ok: true,
+      version: pkg.version,
+      demo: false,
+      editors: 0,
+      hooks: { received: 3, lastAt: 1_800_000_000_000 },
+    });
   });
 
   it('returns 404 for unknown routes', async () => {

@@ -1,3 +1,4 @@
+import type { HealthResponse, ServerStatus } from '@c-board/protocol';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
@@ -6,6 +7,7 @@ import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
+import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
 import {
@@ -16,9 +18,11 @@ import {
 } from './ui-gateway.js';
 import { VERSION } from './version.js';
 
-export interface HealthResponse {
-  ok: true;
-  version: string;
+export type { HealthResponse, ServerStatus };
+
+export interface HookStats {
+  received: number;
+  lastAt: number | null;
 }
 
 export interface BuildOptions {
@@ -32,6 +36,8 @@ export interface BuildOptions {
   actions?: ActionHandlers;
   /** Gateway tuning, for tests. */
   gateway?: Pick<UiGatewayOptions, 'patchIntervalMs' | 'maxBufferedBytes'>;
+  /** Built web app to serve with an SPA fallback, e.g. `DEFAULT_WEB_ROOT`. Off by default. */
+  webRoot?: string;
 }
 
 declare module 'fastify' {
@@ -41,6 +47,8 @@ declare module 'fastify' {
     /** Settings loaded from the database at boot. */
     settings: Record<string, unknown>;
     demo: DemoSimulator | null;
+    /** Updated by the hook ingest; reported by `GET /api/status`. */
+    hookStats: HookStats;
   }
 }
 
@@ -106,7 +114,25 @@ export async function buildServer(
   registerUiGateway(app, gateway);
   app.decorate('demo', demo);
 
+  const startedAt = Date.now();
+  app.decorate('hookStats', { received: 0, lastAt: null } satisfies HookStats);
+
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
+  app.get(
+    '/api/status',
+    async (): Promise<ServerStatus> => ({
+      ok: true,
+      version: VERSION,
+      demo: demo !== null,
+      uptimeMs: Date.now() - startedAt,
+      editors: Object.keys(store.state.windows).length,
+      hooks: { ...app.hookStats },
+    }),
+  );
+
+  if (options.webRoot !== undefined && !registerStatic(app, options.webRoot)) {
+    app.log.debug({ webRoot: options.webRoot }, 'no web build to serve');
+  }
 
   await app.ready();
   demo?.start();
