@@ -43,6 +43,7 @@ import {
   typedCommand,
 } from './logs.js';
 import { Rng } from './rng.js';
+import { firehoseLines, STRESS_TOOLS_PER_SECOND, stressProjects } from './stress.js';
 import {
   type DemoEntry,
   DemoTranscripts,
@@ -69,6 +70,42 @@ const STATS_INTERVAL_MS = 2_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const RESOLVED_APPROVAL_TTL_MS = 60_000;
 const MAX_SUBAGENTS = 6;
+/** How often a log firehose writes a chunk. */
+const FIREHOSE_CHUNK_MS = 50;
+
+/** How fast Claude sessions work. */
+interface Pace {
+  bashMs: [number, number];
+  toolMs: [number, number];
+  stepGapMs: [number, number];
+  textChance: number;
+  steps: [number, number];
+  turnGapMs: [number, number];
+  tokenScale: number;
+}
+
+const NORMAL_PACE: Pace = {
+  bashMs: [2_000, 7_000],
+  toolMs: [500, 3_000],
+  stepGapMs: [400, 1_200],
+  textChance: 0.3,
+  steps: [4, 8],
+  turnGapMs: [5_000, 30_000],
+  tokenScale: 1,
+};
+
+/** About `STRESS_TOOLS_PER_SECOND` tool calls per second, in long turns. */
+const STRESS_CYCLE_MS = Math.round(1_000 / STRESS_TOOLS_PER_SECOND);
+const STRESS_PACE: Pace = {
+  bashMs: [Math.round(STRESS_CYCLE_MS * 0.5), Math.round(STRESS_CYCLE_MS * 0.9)],
+  toolMs: [Math.round(STRESS_CYCLE_MS * 0.5), Math.round(STRESS_CYCLE_MS * 0.9)],
+  stepGapMs: [Math.round(STRESS_CYCLE_MS * 0.1), Math.round(STRESS_CYCLE_MS * 0.3)],
+  textChance: 0,
+  steps: [40, 80],
+  turnGapMs: [1_000, 2_000],
+  tokenScale: 0.05,
+};
+const STRESS_APPROVAL_TIMEOUT_MS = 3_000;
 /** SIGINT: what a shell reports for a command stopped with Ctrl+C. */
 const INTERRUPTED_EXIT = 130;
 /**
@@ -88,6 +125,8 @@ export interface DemoSimulatorOptions {
   approvalTimeoutMs?: number;
   /** Where session transcripts go. Defaults to a fresh one, exposed as `transcripts`. */
   transcripts?: DemoTranscripts;
+  /** The `--demo-stress` board: 10 projects × 6 terminals, log firehoses and fast sessions. */
+  stress?: boolean;
 }
 
 interface ProjectCtx {
@@ -150,6 +189,8 @@ export class DemoSimulator {
   private readonly onMessage: (message: ServerToUi) => void;
   private readonly permissionIntervalMs: number;
   private readonly approvalTimeoutMs: number;
+  private readonly defs: DemoProject[];
+  private readonly pace: Pace;
   private readonly timers = new Set<NodeJS.Timeout>();
   private readonly projects: ProjectCtx[] = [];
   private readonly terminals: TerminalCtx[] = [];
@@ -170,7 +211,12 @@ export class DemoSimulator {
     this.onActivity = options.onActivity ?? (() => {});
     this.onMessage = options.onMessage ?? (() => {});
     this.permissionIntervalMs = options.permissionIntervalMs ?? DEMO_PERMISSION_INTERVAL_MS;
-    this.approvalTimeoutMs = options.approvalTimeoutMs ?? DEMO_APPROVAL_TIMEOUT_MS;
+    // Unanswered stress approvals expire quickly, so the sessions keep their pace.
+    this.approvalTimeoutMs =
+      options.approvalTimeoutMs ??
+      (options.stress ? STRESS_APPROVAL_TIMEOUT_MS : DEMO_APPROVAL_TIMEOUT_MS);
+    this.defs = options.stress ? stressProjects() : DEMO_PROJECTS;
+    this.pace = options.stress ? STRESS_PACE : NORMAL_PACE;
   }
 
   get isRunning(): boolean {
@@ -268,7 +314,7 @@ export class DemoSimulator {
   private seedBoard(): void {
     const ts = this.now();
     const windowIds = DEMO_WINDOWS.map(() => `demo-window-${this.rng.hex(8)}`);
-    for (const def of DEMO_PROJECTS) {
+    for (const def of this.defs) {
       const id = projectIdFromPath(def.path);
       const project: ProjectCtx = {
         id,
@@ -350,6 +396,10 @@ export class DemoSimulator {
         return;
       case 'shell':
         if (terminal.def.quiet) return;
+        if (terminal.def.linesPerSecond) {
+          this.after(this.rng.int(100, 600), () => this.runFirehose(terminal));
+          return;
+        }
         this.after(this.rng.int(1_500, 8_000), () => this.runShellCommand(terminal));
         return;
       case 'claude':
@@ -550,6 +600,24 @@ export class DemoSimulator {
     });
   }
 
+  /** A long-running `tail -f` that writes `linesPerSecond` lines in small, steady chunks. */
+  private runFirehose(terminal: TerminalCtx): void {
+    const execId = this.startExec(terminal, 'tail -f logs/access.log');
+    terminal.execId = execId;
+    terminal.childPid = this.rng.int(20_000, 89_999);
+    const perChunk = ((terminal.def.linesPerSecond ?? 0) * FIREHOSE_CHUNK_MS) / 1_000;
+    let owed = 0;
+    const tick = () => {
+      if (terminal.execId !== execId) return;
+      owed += perChunk;
+      const count = Math.floor(owed);
+      owed -= count;
+      if (count > 0) this.write(terminal, execId, firehoseLines(this.rng, this.now(), count));
+      this.after(FIREHOSE_CHUNK_MS, tick);
+    };
+    tick();
+  }
+
   // Board input
 
   private openTerminal(
@@ -675,7 +743,7 @@ export class DemoSimulator {
     const { project } = session;
     const scenario = project.def.scenarios[project.scenarioCursor++ % project.def.scenarios.length];
     if (!scenario) return;
-    session.turn = { scenario, steps: this.rng.int(4, 8), done: 0 };
+    session.turn = { scenario, steps: this.rng.int(...this.pace.steps), done: 0 };
     this.store.updateSession(session.id, {
       title: scenario.title,
       lastAssistantText: null,
@@ -714,7 +782,7 @@ export class DemoSimulator {
     });
     const after = this.doneTodos(turn.scenario, turn.done / turn.steps);
     if (after !== before) this.todoWrite(session, turn.scenario, after);
-    if (this.rng.chance(0.3)) {
+    if (this.rng.chance(this.pace.textChance)) {
       this.streamText(session, this.rng.pick(turn.scenario.texts));
     } else {
       this.runTool(session, this.rng.pick(turn.scenario.tools));
@@ -762,7 +830,7 @@ export class DemoSimulator {
     const call = demoToolCall(session.project.def, tool, this.textRng);
     this.transcript(session, { kind: 'tool_use', toolUseId, name: call.name, input: call.input });
 
-    const duration = tool.tool === 'Bash' ? this.rng.int(2_000, 7_000) : this.rng.int(500, 3_000);
+    const duration = this.rng.int(...(tool.tool === 'Bash' ? this.pace.bashMs : this.pace.toolMs));
     session.terminal.busyUntil = this.now() + duration;
     session.timer = this.after(duration, () => {
       const failed = this.rng.chance(0.06);
@@ -779,7 +847,9 @@ export class DemoSimulator {
       this.addTokens(session, this.rng.int(1_500, 9_000), this.rng.int(80, 900));
       if (!failed && tool.tool === 'Edit') this.markDirty(session.project);
       this.store.setSessionStatus(session.id, { kind: 'working' });
-      session.timer = this.after(this.rng.int(400, 1_200), () => this.nextStep(session));
+      session.timer = this.after(this.rng.int(...this.pace.stepGapMs), () =>
+        this.nextStep(session),
+      );
     });
   }
 
@@ -858,7 +928,7 @@ export class DemoSimulator {
       session.timer = this.after(this.rng.int(2_000, 6_000), () => this.endSession(session));
       return;
     }
-    this.scheduleTurn(session, this.rng.int(5_000, 30_000));
+    this.scheduleTurn(session, this.rng.int(...this.pace.turnGapMs));
   }
 
   private endSession(session: SessionCtx): void {
@@ -1031,9 +1101,11 @@ export class DemoSimulator {
     });
   }
 
-  private addTokens(session: SessionCtx, input: number, output: number): void {
+  private addTokens(session: SessionCtx, rawInput: number, rawOutput: number): void {
     const current = this.store.state.sessions[session.id];
     if (!current) return;
+    const input = Math.round(rawInput * this.pace.tokenScale);
+    const output = Math.round(rawOutput * this.pace.tokenScale);
     const cacheRead = input > 0 ? input * this.rng.int(3, 8) : 0;
     this.store.updateSession(session.id, {
       tokens: {

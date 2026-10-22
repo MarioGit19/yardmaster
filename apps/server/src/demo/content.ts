@@ -29,6 +29,8 @@ export interface DemoTerminal {
   staysDown?: boolean;
   /** A shell nobody has touched for a while: no live commands, no recent history. */
   quiet?: boolean;
+  /** A shell tailing a busy log at this many lines per second (the stress board). */
+  linesPerSecond?: number;
 }
 
 export interface DemoProject {

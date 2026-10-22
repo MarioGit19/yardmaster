@@ -53,13 +53,21 @@ export function startDemoBoard(): Promise<DemoBoard> {
 }
 
 /**
- * Like `startDemoBoard`, optionally without `--demo`: a fresh, empty board whose Claude config
- * dir is a throwaway one too, so it never reads or writes the real `~/.claude`.
+ * Like `startDemoBoard`, optionally without `--demo` (a fresh, empty board) or with
+ * `--demo-stress`. The Claude config dir is a throwaway one too, so it never reads or writes
+ * the real `~/.claude`.
  */
-export async function startBoard({ demo }: { demo: boolean }): Promise<DemoBoard> {
+export async function startBoard({
+  demo,
+  stress = false,
+}: {
+  demo: boolean;
+  stress?: boolean;
+}): Promise<DemoBoard> {
   const home = await mkdtemp(join(tmpdir(), 'c-board-e2e-'));
   const claudeDir = join(home, 'claude');
-  const args = ['src/cli.ts', 'start', ...(demo ? ['--demo'] : []), '--no-open'];
+  const mode = stress ? ['--demo-stress'] : demo ? ['--demo'] : [];
+  const args = ['src/cli.ts', 'start', ...mode, '--no-open'];
   const child = spawn(TSX, args, {
     cwd: SERVER_DIR,
     env: {

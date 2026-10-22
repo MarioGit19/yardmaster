@@ -169,6 +169,13 @@ describe('c-board start', () => {
     expect(calls[0]?.[1].demo).toBe(true);
   });
 
+  it('--demo-stress starts the stress demo board', async () => {
+    const { calls, startServer } = fakeServer(4317);
+    const t = testIo({}, { startServer, openBrowser: async () => true });
+    expect(await runCli(['start', '--demo-stress', '--no-open'], t.io)).toBeNull();
+    expect(calls[0]?.[1].demo).toEqual({ stress: true });
+  });
+
   it('prints the link when the browser cannot be opened', async () => {
     const { startServer } = fakeServer(4317);
     const t = testIo({}, { startServer, openBrowser: async () => false });

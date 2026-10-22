@@ -1,0 +1,120 @@
+import type { Page } from '@playwright/test';
+import { type DemoBoard, startBoard } from './board.js';
+import { test as base, expect, signedInState } from './fixtures.js';
+
+// PRD §9 on the `--demo-stress` board: 10 projects × 6 terminals, two log firehoses at about
+// 200 lines/s and four Claude sessions at about 5 tool calls/s, every animation running.
+const SAMPLE_MS = 10_000;
+const MIN_FPS = 55;
+const LONG_TASK_MS = 50;
+
+/** One stress board for this file, so its load is the only one the browser sees. */
+let board: DemoBoard | undefined;
+
+const test = base.extend<object, { stressBoard: DemoBoard }>({
+  stressBoard: [
+    async ({}, use) => {
+      board ??= await startBoard({ demo: true, stress: true });
+      await use(board);
+    },
+    { scope: 'worker' },
+  ],
+  baseURL: async ({ stressBoard }, use) => use(stressBoard.url),
+  storageState: async ({ stressBoard }, use) =>
+    use(signedInState(stressBoard.url, stressBoard.cookie)),
+});
+
+// Stopped as soon as the file is done, not when the worker exits: the parallel suite runs next.
+test.afterAll(async () => {
+  await board?.stop();
+  board = undefined;
+});
+
+test.use({ viewport: { width: 1440, height: 900 } });
+test.describe.configure({ mode: 'serial' });
+
+interface FrameStats {
+  fps: number;
+  worstFrame: number;
+  longTasks: number[];
+}
+
+/** rAF sampling and long-task observation over `ms`. */
+function measure(page: Page, ms: number): Promise<FrameStats> {
+  return page.evaluate(
+    ({ ms, longTaskMs }) =>
+      new Promise<FrameStats>((resolve) => {
+        const longTasks: number[] = [];
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.duration > longTaskMs) longTasks.push(Math.round(entry.duration));
+          }
+        });
+        observer.observe({ type: 'longtask' });
+        const stamps: number[] = [];
+        const tick = (now: number) => {
+          stamps.push(now);
+          if (now - (stamps[0] ?? now) < ms) {
+            requestAnimationFrame(tick);
+            return;
+          }
+          observer.disconnect();
+          const gaps = stamps.slice(1).map((t, i) => t - (stamps[i] ?? t));
+          const span = (stamps.at(-1) ?? 0) - (stamps[0] ?? 0);
+          resolve({ fps: (gaps.length / span) * 1000, worstFrame: Math.max(...gaps), longTasks });
+        };
+        requestAnimationFrame(tick);
+      }),
+    { ms, longTaskMs: LONG_TASK_MS },
+  );
+}
+
+function report(view: string, stats: FrameStats) {
+  console.log(
+    `stress ${view}: ${stats.fps.toFixed(1)} fps, worst frame ${stats.worstFrame.toFixed(1)} ms, ` +
+      `long tasks > ${LONG_TASK_MS} ms: ${stats.longTasks.length ? stats.longTasks.join(', ') : 'none'}`,
+  );
+}
+
+/** Every animation runs, whatever the machine's reduced-motion setting. */
+async function fullMotion(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('cboard.motion', 'full'));
+}
+
+/** Waits until the board is busy: firehoses streaming and sessions running tools. */
+async function warmUp(page: Page) {
+  await expect(page.locator('[data-pod]')).toHaveCount(10);
+  // Let the boot burst (backfill, dev server banners, transcript seeding) settle.
+  await page.waitForTimeout(3_000);
+}
+
+test('@perf overview keeps 55 fps under the stress load', async ({ page }) => {
+  test.slow();
+  await fullMotion(page);
+  await page.goto('/#/');
+  await warmUp(page);
+
+  const stats = await measure(page, SAMPLE_MS);
+  report('overview', stats);
+  expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+  expect(stats.longTasks).toEqual([]);
+});
+
+test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ page }) => {
+  test.slow();
+  await fullMotion(page);
+  await page.goto('/#/');
+  await warmUp(page);
+  const pod = page.locator('[data-pod]', { hasText: 'acme-shop' }).first();
+  await pod.locator('header a').click();
+  const stack = page.locator('[data-terminal-stack]');
+  await expect(stack).toBeVisible();
+  await stack.getByRole('tab', { name: /logs/ }).click();
+  await expect(stack.locator('[data-xterm]')).toHaveAttribute('data-renderer', /^(webgl|dom)$/);
+  await page.waitForTimeout(1_000);
+
+  const stats = await measure(page, SAMPLE_MS);
+  report('focus', stats);
+  expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+  expect(stats.longTasks).toEqual([]);
+});

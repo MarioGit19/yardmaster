@@ -70,7 +70,7 @@ export interface BuildOptions {
   /** Install token. Defaults to reading (or creating) `<config.home>/token`. */
   token?: string;
   /** Run the synthetic demo board (F12). Its data never touches `board.db`. */
-  demo?: boolean | { seed?: number };
+  demo?: boolean | { seed?: number; stress?: boolean };
   /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`, or `:memory:` in demo mode. */
   dbPath?: string;
   /** UI action handlers. Defaults to the editor bridge for terminal actions and stubs for the rest. */
@@ -194,7 +194,9 @@ export async function buildServer(
   demo = options.demo
     ? new DemoSimulator({
         store,
-        ...(typeof options.demo === 'object' ? { seed: options.demo.seed } : {}),
+        ...(typeof options.demo === 'object'
+          ? { seed: options.demo.seed, stress: options.demo.stress }
+          : {}),
         onActivity: recordActivity,
         onMessage: (message) => gateway.broadcast(message),
       })

@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useRef } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
+import { FrozenBoard } from '../data/index.js';
 import { dur, ease, useMotionLevel } from '../motion.js';
 import { routes } from '../routes.js';
 import { isTypingTarget } from '../shell/railNav.js';
@@ -24,8 +25,9 @@ export function useFocusRoute(): FocusRoute | null {
 
 /**
  * The overview behind the focus view: dimmed, blurred, inert, and offstage, so its orbs,
- * sparklines and mascots stop drawing while covered. It stays mounted so the pod is there to
- * morph from and back into, and the overview keeps its scroll position.
+ * sparklines and mascots stop drawing while covered, and its board is frozen until it is shown
+ * again. It stays mounted so the pod is there to morph from and back into, and the overview
+ * keeps its scroll position.
  */
 export function FocusBackdrop({ dimmed, children }: { dimmed: boolean; children: ReactNode }) {
   return (
@@ -42,7 +44,7 @@ export function FocusBackdrop({ dimmed, children }: { dimmed: boolean; children:
         }
         transition={{ duration: dur.slow, ease: ease.out }}
       >
-        {children}
+        <FrozenBoard frozen={dimmed}>{children}</FrozenBoard>
       </motion.div>
     </OffstageContext.Provider>
   );

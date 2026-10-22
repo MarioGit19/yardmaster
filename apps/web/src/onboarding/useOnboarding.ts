@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  selectHydrated,
-  selectProjects,
-  selectWindowCount,
-  useBoard,
-  useBoardList,
-} from '../data/index.js';
+import { selectHydrated, selectProjectCount, selectWindowCount, useBoard } from '../data/index.js';
 import { usePreference } from '../prefs.js';
 import { useServerStatus } from '../settings/useServerStatus.js';
 import { needsOnboarding, onboardingPreference } from './model.js';
@@ -17,7 +11,7 @@ import { needsOnboarding, onboardingPreference } from './model.js';
 export function useOnboarding(): { show: boolean | null; dismiss(): void } {
   const dismissed = usePreference(onboardingPreference) === 'done';
   const hydrated = useBoard(selectHydrated);
-  const projects = useBoardList(selectProjects).length;
+  const projects = useBoard(selectProjectCount);
   const windows = useBoard(selectWindowCount);
   const [latched, setLatched] = useState(false);
   // Only an empty board can need the guide, so a busy one never asks.

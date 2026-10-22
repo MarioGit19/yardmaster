@@ -1,7 +1,8 @@
 import type { StreamId } from '@c-board/protocol';
-import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
+import { createStore } from 'zustand/vanilla';
 import type { BoardClient, ChunkListener } from './client.js';
 import type { BoardStore, BoardStoreState } from './store.js';
 
@@ -18,6 +19,24 @@ export function BoardProvider({
   children,
 }: BoardContextValue & { children: ReactNode }) {
   return <BoardContext.Provider value={{ client, store }}>{children}</BoardContext.Provider>;
+}
+
+/**
+ * Children read the board through a mirror that stops following it while `frozen` and catches
+ * up when it thaws. For covered content (the overview under the focus view): its pods would
+ * otherwise re-render, restyle and repaint under the blur many times a second.
+ */
+export function FrozenBoard({ frozen, children }: { frozen: boolean; children: ReactNode }) {
+  const { client, store } = useBoardContext();
+  const [mirror] = useState(() => createStore<BoardStoreState>()(() => store.getState()));
+  useEffect(() => {
+    if (frozen) return;
+    mirror.setState(store.getState(), true);
+    return store.subscribe((state) => mirror.setState(state, true));
+  }, [frozen, store, mirror]);
+  return (
+    <BoardContext.Provider value={{ client, store: mirror }}>{children}</BoardContext.Provider>
+  );
 }
 
 function useBoardContext(): BoardContextValue {

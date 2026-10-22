@@ -38,6 +38,8 @@ const variants: Variants = {
  */
 export function PodGrid() {
   const order = useBoardList(selectPodOrder);
+  // Only a reorder measures the slots; any other re-render would measure every pod on the page.
+  const orderKey = order.join('|');
   const level = useMotionLevel();
   const [stagger] = useState(() => !entered && level === 'full');
   const [initial] = useState(() => new Set(order));
@@ -55,6 +57,7 @@ export function PodGrid() {
               <motion.div
                 key={id}
                 layout="position"
+                layoutDependency={orderKey}
                 custom={index}
                 variants={variants}
                 initial={first ? 'stagger' : 'plain'}

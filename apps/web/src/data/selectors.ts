@@ -35,6 +35,8 @@ const newestFirst = <T extends { startedAt: number; id: string }>(a: T, b: T) =>
   b.startedAt - a.startedAt || a.id.localeCompare(b.id);
 
 export const selectProjects = (s: S): Project[] => Object.values(s.board.projects).sort(byName);
+/** The project count alone: projects change on every bit of activity, the count rarely. */
+export const selectProjectCount = (s: S) => Object.keys(s.board.projects).length;
 export const selectWindowCount = (s: S) => Object.keys(s.board.windows).length;
 /** Connected editor windows, oldest connection first. */
 export const selectWindows = (s: S): EditorWindow[] =>

@@ -18,10 +18,17 @@ import { BoardStore } from '../store.js';
 import { generateToken } from '../token.js';
 import { DEMO_PROJECTS } from './content.js';
 import { DEMO_LONG_HISTORY, DemoSimulator } from './simulator.js';
+import {
+  STRESS_LINES_PER_SECOND,
+  STRESS_PROJECTS,
+  STRESS_SESSIONS,
+  STRESS_TERMINALS_PER_PROJECT,
+  STRESS_TOOLS_PER_SECOND,
+} from './stress.js';
 
 const T0 = 1_760_000_000_000;
 
-function run(options: { seed?: number; permissionIntervalMs?: number } = {}) {
+function run(options: { seed?: number; permissionIntervalMs?: number; stress?: boolean } = {}) {
   const store = new BoardStore({ autoFlush: false });
   const activity: ActivityEvent[] = [];
   /** The Pulse backfill, kept apart so assertions about live behavior only see live events. */
@@ -438,6 +445,51 @@ describe('DemoSimulator', () => {
     b.advance(15_000);
     b.sim.stop();
     expect(b.store.state).toEqual(snapshot);
+  });
+});
+
+describe('DemoSimulator stress board', () => {
+  it('runs 10 projects × 6 terminals, two log firehoses and four fast sessions', () => {
+    const { store, sim, activity, advance } = run({ stress: true });
+    const lines = new Map<string, number>();
+    const append = store.appendExecOutput.bind(store);
+    vi.spyOn(store, 'appendExecOutput').mockImplementation((execId, chunk, seq) => {
+      const terminalId = store.state.executions[execId]?.terminalId ?? '';
+      lines.set(terminalId, (lines.get(terminalId) ?? 0) + (chunk.match(/\n/g)?.length ?? 0));
+      return append(execId, chunk, seq);
+    });
+    sim.start();
+    advance(5_000);
+    lines.clear();
+    const from = activity.length;
+    advance(20_000);
+
+    const state = store.state;
+    expect(BoardState.safeParse(state).success).toBe(true);
+    expect(Object.keys(state.projects)).toHaveLength(STRESS_PROJECTS);
+    expect(Object.keys(state.terminals)).toHaveLength(
+      STRESS_PROJECTS * STRESS_TERMINALS_PER_PROJECT,
+    );
+    for (const project of Object.values(state.projects)) {
+      expect(project.path.startsWith('/home/dev/')).toBe(true);
+    }
+
+    const rates = [...lines.values()].map((n) => n / 20).sort((a, b) => b - a);
+    expect(rates[0]).toBeCloseTo(STRESS_LINES_PER_SECOND, -1);
+    expect(rates[1]).toBeCloseTo(STRESS_LINES_PER_SECOND, -1);
+    expect(rates[2]).toBeLessThan(20);
+
+    const sessions = Object.values(state.sessions);
+    expect(sessions).toHaveLength(STRESS_SESSIONS);
+    const toolStarts = activity.slice(from).filter((e) => e.kind === 'tool.start');
+    // Turn gaps, compactions and approvals take some time off the peak rate.
+    expect(toolStarts.length / sessions.length / 20).toBeGreaterThan(STRESS_TOOLS_PER_SECOND * 0.7);
+    for (const session of sessions) {
+      const perSecond = toolStarts.filter((e) => e.sessionId === session.id).length / 20;
+      expect(perSecond).toBeGreaterThan(STRESS_TOOLS_PER_SECOND * 0.4);
+      expect(perSecond).toBeLessThanOrEqual(STRESS_TOOLS_PER_SECOND * 1.2);
+    }
+    sim.stop();
   });
 });
 

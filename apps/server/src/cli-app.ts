@@ -49,6 +49,7 @@ export const USAGE = `Usage: c-board <command> [options]
 
 Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
+        [--demo-stress]        A demo board at the performance target (PRD §9)
   doctor                       Check the setup and print a report
   token --rotate               Replace the install token (signs out every browser)
   hooks install|uninstall|status [--away] [--dry-run] [--yes] [--settings-path <file>]
@@ -83,7 +84,12 @@ function listeningPort(app: FastifyInstance, fallback: number): number {
 }
 
 async function start(args: string[], config: ServerConfig, io: CliIo): Promise<number | null> {
-  const flags = parse(args, { demo: { type: 'boolean' }, 'no-open': { type: 'boolean' } });
+  const flags = parse(args, {
+    demo: { type: 'boolean' },
+    'demo-stress': { type: 'boolean' },
+    'no-open': { type: 'boolean' },
+  });
+  const demo = flags['demo-stress'] ? { stress: true } : (flags.demo ?? false);
   const token = await ensureToken(config.home);
   const webRoot = DEFAULT_WEB_ROOT;
   let app: FastifyInstance;
@@ -92,7 +98,7 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
     const launch = io.startServer ?? (await import('./app.js')).startServer;
     app = await launch(config, {
       token,
-      demo: flags.demo ?? false,
+      demo,
       webRoot,
     });
   } catch (err) {
@@ -106,7 +112,7 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
 
   const url = baseUrl({ host: config.host, port: listeningPort(app, config.port) });
   const authUrl = `${url}/auth?t=${encodeURIComponent(token)}`;
-  if (flags.demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
+  if (demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
   if (!hasWebBuild(webRoot)) {
     io.stdout.write('The web app is not built yet; run `pnpm --filter @c-board/web build`.\n');
   }

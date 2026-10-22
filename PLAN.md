@@ -446,9 +446,13 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 
 ## Phase 10 — Quality, docs, release
 
-- [ ] **10.1 Performance pass**
+- [x] **10.1 Performance pass**
   - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each, and 4 Claude sessions doing roughly 5 tool calls per second), with every activity animation running. Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
   - **Verify:** `pnpm e2e --grep @perf`
+  - Note: Numbers (an M-series Mac, `e2e/stress.spec.ts`, 1440×900, motion Full, 10 s rAF sampling). Before: overview 52 fps with 54 long tasks; focus view (log firehose tab open) 33 fps with 3 long tasks (up to 82 ms) on the headless shell. After: overview 60.0 fps, focus 59.8–60.0 fps, no long tasks over 50 ms. Main thread in the focus view went from about 62% to 33% busy.
+  - Note: Fixes: the overview subscribed to whole project objects for a count, so every activity patch re-rendered the pod grid, whose `layout` slots then re-measured every pod (about 20×/s each); it now reads a count, and the slots measure only on a reorder (`layoutDependency`). The overview under the focus view now reads a frozen board (`FrozenBoard`) that catches up when it is shown again; before, its pods restyled and repainted under the blur many times a second.
+  - Note: The stress tests run in their own `perf-stress` project on full Chromium (`channel: 'chromium'`), which renders with the GPU. The default headless shell uses SwiftShader (software WebGL), where the WebGL terminal and the shaders stall compositor commits; that says nothing about the PRD §9 machine. Server CPU (PRD §9) is not measured by this test.
+  - Note: Flaky under parallel load on main before this task, too: `onboarding.spec` (extension step), `attention.spec` (keyboard approval) and the `composer` shots. They pass when run alone.
 
 - [ ] **10.2 Accessibility pass**
   - Add `@axe-core/playwright` checks on every route (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
