@@ -36,9 +36,9 @@ jobs:
       - run: pnpm build
 
       - name: Upload extension package
-        if: matrix.os == 'ubuntu-latest' && hashFiles('apps/extension/*.vsix') != ''
+        if: matrix.os == 'ubuntu-latest' && hashFiles('apps/extension/dist/*.vsix') != ''
         uses: actions/upload-artifact@v4
         with:
           name: c-board-extension
-          path: apps/extension/*.vsix
+          path: apps/extension/dist/*.vsix
           if-no-files-found: error

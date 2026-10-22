@@ -1,11 +1,73 @@
 {
-  "name": "@c-board/extension",
-  "version": "0.0.0",
+  "name": "c-board-extension",
+  "displayName": "c-board",
+  "description": "Mirrors this window's terminals to the local c-board dashboard.",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "publisher": "c-board",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "terminal",
+    "dashboard",
+    "claude"
+  ],
+  "icon": "media/icon.png",
+  "main": "dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "c-board.openDashboard",
+        "title": "Open Dashboard",
+        "category": "c-board"
+      },
+      {
+        "command": "c-board.reconnect",
+        "title": "Reconnect",
+        "category": "c-board"
+      }
+    ],
+    "configuration": {
+      "title": "c-board",
+      "properties": {
+        "cboard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stream this window's terminals to the local c-board server."
+        },
+        "cboard.port": {
+          "type": "integer",
+          "default": 4317,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port of the local c-board server (it always listens on 127.0.0.1)."
+        }
+      }
+    }
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
+    "icon": "pnpm --filter @c-board/web exec tsx scripts/render-icons.ts --strict",
+    "package": "node scripts/build.mjs --production && pnpm run icon && vsce package --no-dependencies --allow-missing-repository --skip-license --out dist/c-board.vsix",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/vscode": "1.93.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2"
   }
 }

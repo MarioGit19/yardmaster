@@ -183,11 +183,12 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 5 — Editor extension (`apps/extension`)
 
-- [ ] **5.1 Extension scaffold**
+- [x] **5.1 Extension scaffold**
   - `package.json`: `name: c-board`, `publisher: c-board`, `engines.vscode: ^1.93.0`, `@types/vscode@1.93.0`, `activationEvents: ["onStartupFinished"]`, `main: dist/extension.js`, `icon: media/icon.png` (from task 3.5). Settings `cboard.enabled` and `cboard.port`. Commands `c-board.openDashboard` and `c-board.reconnect`. Build with esbuild to a single CJS file (`vscode` external), and `package` via `@vscode/vsce` to `dist/c-board.vsix` (no `repository` warnings; include a LICENSE placeholder note if LICENSE is missing).
   - Isolate pure logic in `src/core/*` (no `vscode` import) so it can be unit tested.
   - **Done when:** `pnpm --filter c-board-extension package` produces a `.vsix`.
   - **Verify:** `pnpm --filter c-board-extension build && pnpm --filter c-board-extension package`
+  - Note: The manifest `name` is `c-board-extension` (display name `c-board`, so the ID is `c-board.c-board-extension`), because the root workspace package is already called `c-board` and the Verify filter targets `c-board-extension`. The package has no `"type": "module"`, so `dist/extension.js` loads as CJS (the Vitest config is now `.mts`). `package` builds a minified bundle, renders `media/icon.png` if it is stale (`--strict`, so it needs Playwright Chromium), then runs `vsce --no-dependencies --allow-missing-repository --skip-license`. The repo has no LICENSE yet, and the extension README says so. `c-board.reconnect` only logs until 5.2 adds the server link. CI now uploads `apps/extension/dist/*.vsix`.
 
 - [ ] **5.2 Server connection**
   - A core `EditorLink` class: reads the token from `~/.c-board/token`, connects to `ws://127.0.0.1:<port>/ws/editor` with the token header, sends `editor.hello` (windowId = uuid persisted in `context.workspaceState`, `vscode.env.appName`, version and workspace folders), runs a heartbeat every 10 s, reconnects with backoff, and queues messages while offline (capped). Server side: an `/ws/editor` handler that registers windows and projects in the store and removes them on disconnect (after a 15 s grace period).
