@@ -191,6 +191,7 @@ export class DemoSimulator {
         extensionVersion: '0.1.0',
         workspaceFolders: members.map((p) => p.def.path),
         projectIds: members.map((p) => p.id),
+        capabilities: { shellExecution: true },
         connectedAt: ts - this.rng.int(5, 240) * 60_000,
         lastSeenAt: ts,
       });
@@ -337,6 +338,7 @@ export class DemoSimulator {
     const { project } = terminal;
     const model = this.rng.pick(DEMO_MODELS);
     const execId = this.startExec(terminal, 'claude');
+    this.store.markExecInteractive(execId);
     terminal.execId = execId;
     terminal.childPid = this.rng.int(20_000, 89_999);
     this.write(terminal, execId, claudeBanner(project.def, model));

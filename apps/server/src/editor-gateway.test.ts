@@ -83,6 +83,7 @@ function hello(socket: WebSocket, folders = [shopPath, apiPath], id = windowId):
     appVersion: '1.93.0',
     workspaceFolders: folders,
     extensionVersion: '0.1.0',
+    capabilities: { shellExecution: true },
   });
 }
 
@@ -119,6 +120,7 @@ describe('/ws/editor', () => {
       extensionVersion: '0.1.0',
       workspaceFolders: [shopPath, apiPath],
       projectIds: [shopId, apiId],
+      capabilities: { shellExecution: true },
     });
     expect(app.store.state.projects[shopId]).toMatchObject({
       path: shopPath,
@@ -327,6 +329,133 @@ describe('/ws/editor', () => {
       await app.editorGateway.idle();
       expect(app.store.state.terminals['other-1']).toMatchObject({ name: 'bash', state: 'open' });
       expect(app.store.state.terminals.missing).toBeUndefined();
+    });
+  });
+
+  describe('executions', () => {
+    const exec = (execId: string, terminalId = 'term-1') => ({
+      execId,
+      terminalId,
+      commandLine: 'pnpm test',
+      confidence: 'high',
+      cwd: shopPath,
+    });
+
+    async function withTerminal() {
+      const { app, port } = await boot();
+      const socket = connect(port);
+      await opened(socket);
+      hello(socket);
+      send(socket, 'terminal.upsert', {
+        terminalId: 'term-1',
+        name: 'zsh',
+        shellPid: 4242,
+        cwd: shopPath,
+        state: 'open',
+        shellIntegration: true,
+        active: true,
+        exitCode: null,
+      });
+      await waitFor(() => app.store.state.terminals['term-1'] !== undefined);
+      return { app, socket };
+    }
+
+    it('records an execution and streams its output to exec: and term: buffers', async () => {
+      const { app, socket } = await withTerminal();
+      send(socket, 'exec.start', exec('exec-1'));
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 0, chunk: '\x1b[32mok\x1b[0m\r\n' });
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 1, chunk: 'done\r\n' });
+      send(socket, 'exec.end', { execId: 'exec-1', exitCode: 0 });
+      await waitFor(() => app.store.state.executions['exec-1']?.endedAt != null);
+
+      expect(app.store.state.executions['exec-1']).toMatchObject({
+        terminalId: 'term-1',
+        commandLine: 'pnpm test',
+        exitCode: 0,
+        outputBytes: 19,
+        interactive: false,
+      });
+      expect(app.store.state.terminals['term-1']?.executionIds).toEqual(['exec-1']);
+      expect(app.store.output.read('exec:exec-1')?.chunks.map((c) => c.chunk)).toEqual([
+        '\x1b[32mok\x1b[0m\r\n',
+        'done\r\n',
+      ]);
+      const activity = app.persistence.listActivity({});
+      expect(activity.map((event) => event.kind).sort()).toEqual(['exec.end', 'exec.start']);
+      expect(activity.every((event) => event.execId === 'exec-1')).toBe(true);
+    });
+
+    it('concatenates every execution of a terminal into its term: stream', async () => {
+      const { app, socket } = await withTerminal();
+      send(socket, 'exec.start', exec('exec-1'));
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 0, chunk: 'first\n' });
+      send(socket, 'exec.end', { execId: 'exec-1', exitCode: 1 });
+      send(socket, 'exec.start', exec('exec-2'));
+      send(socket, 'exec.data', { execId: 'exec-2', seq: 0, chunk: 'second\n' });
+      await waitFor(() => app.store.output.has('exec:exec-2'));
+
+      expect(app.store.output.read('term:term-1')?.chunks).toEqual([
+        { seq: 0, chunk: 'first\n' },
+        { seq: 1, chunk: 'second\n' },
+      ]);
+      expect(app.store.output.read('exec:exec-2')?.chunks).toEqual([{ seq: 0, chunk: 'second\n' }]);
+    });
+
+    it('ignores replayed seqs, data after the end and unknown executions', async () => {
+      const { app, socket } = await withTerminal();
+      send(socket, 'exec.start', exec('exec-1'));
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 0, chunk: 'a' });
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 0, chunk: 'a' });
+      send(socket, 'exec.data', { execId: 'missing', seq: 0, chunk: 'x' });
+      send(socket, 'exec.end', { execId: 'exec-1', exitCode: 0 });
+      send(socket, 'exec.data', { execId: 'exec-1', seq: 1, chunk: 'late' });
+      send(socket, 'exec.start', exec('exec-x', 'missing-term'));
+      send(socket, 'editor.heartbeat', {});
+      await waitFor(() => app.store.state.windows[windowId]?.lastSeenAt !== undefined);
+      await waitFor(() => app.store.state.executions['exec-1']?.endedAt != null);
+      await delay(20);
+      await app.editorGateway.idle();
+
+      expect(app.store.output.read('exec:exec-1')?.chunks.map((c) => c.chunk)).toEqual(['a']);
+      expect(app.store.state.executions['exec-1']?.outputBytes).toBe(1);
+      expect(app.store.state.executions['exec-x']).toBeUndefined();
+      expect(app.store.output.has('exec:missing')).toBe(false);
+    });
+
+    it('marks an execution interactive', async () => {
+      const { app, socket } = await withTerminal();
+      send(socket, 'exec.start', exec('exec-1'));
+      send(socket, 'exec.interactive', { execId: 'exec-1' });
+      await waitFor(() => app.store.state.executions['exec-1']?.interactive === true);
+    });
+
+    it('ends a running execution when a new one starts or the terminal closes', async () => {
+      const { app, socket } = await withTerminal();
+      send(socket, 'exec.start', exec('exec-1'));
+      send(socket, 'exec.start', exec('exec-2'));
+      await waitFor(() => app.store.state.executions['exec-2'] !== undefined);
+      expect(app.store.state.executions['exec-1']).toMatchObject({ exitCode: null });
+      expect(app.store.state.executions['exec-1']?.endedAt).toEqual(expect.any(Number));
+
+      send(socket, 'terminal.closed', { terminalId: 'term-1', exitCode: 130 });
+      await waitFor(() => app.store.state.executions['exec-2']?.endedAt != null);
+    });
+
+    it("ignores executions in another window's terminal", async () => {
+      const { app, socket } = await withTerminal();
+      app.store.upsertTerminal({ id: 'other-1', windowId: 'win-other', name: 'bash' });
+      app.store.startExec({ ...exec('other-exec', 'other-1'), confidence: 'high' });
+      send(socket, 'exec.start', exec('exec-1', 'other-1'));
+      send(socket, 'exec.data', { execId: 'other-exec', seq: 0, chunk: 'hijack' });
+      send(socket, 'exec.end', { execId: 'other-exec', exitCode: 0 });
+      send(socket, 'exec.start', exec('exec-2'));
+      await waitFor(() => app.store.state.executions['exec-2'] !== undefined);
+
+      expect(app.store.state.executions['exec-1']).toBeUndefined();
+      expect(app.store.state.executions['other-exec']).toMatchObject({
+        endedAt: null,
+        outputBytes: 0,
+      });
     });
   });
 });

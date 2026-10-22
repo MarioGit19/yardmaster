@@ -48,6 +48,12 @@ export const Project = z.object({
 });
 export type Project = z.infer<typeof Project>;
 
+export const EditorCapabilities = z.object({
+  /** The editor has the shell-integration execution API; without it only the inventory is mirrored. */
+  shellExecution: z.boolean(),
+});
+export type EditorCapabilities = z.infer<typeof EditorCapabilities>;
+
 export const EditorWindow = z.object({
   id: WindowId,
   appName: z.string(),
@@ -55,6 +61,7 @@ export const EditorWindow = z.object({
   extensionVersion: z.string(),
   workspaceFolders: z.array(z.string()),
   projectIds: z.array(ProjectId),
+  capabilities: EditorCapabilities,
   connectedAt: Timestamp,
   lastSeenAt: Timestamp,
 });
@@ -106,6 +113,8 @@ export const Execution = z.object({
   exitCode: z.number().int().nullable(),
   outputBytes: z.number().int().nonnegative(),
   truncated: z.boolean(),
+  /** The command switched to the alternate screen (a TUI such as htop or claude). */
+  interactive: z.boolean(),
 });
 export type Execution = z.infer<typeof Execution>;
 

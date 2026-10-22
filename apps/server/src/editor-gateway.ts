@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import {
+  type ActivityEvent,
   decodeEditorToServer,
   EDITOR_CLOSE_REPLACED,
   type EditorTerminal,
@@ -7,6 +9,7 @@ import {
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { ensureProject, type PathResolver, resolveDir } from './claude/project-lookup.js';
+import { applyExecEvent, type ExecEvent, endRunning } from './exec-reducer.js';
 import { TOKEN_HEADER } from './security.js';
 import type { BoardStore } from './store.js';
 import { type TerminalEvent, terminalReducer } from './terminal-reducer.js';
@@ -29,6 +32,8 @@ export interface EditorGatewayOptions {
   now?: () => number;
   /** False in demo mode: sockets are accepted (so editors don't retry) but nothing is applied. */
   apply?: boolean;
+  /** Receives `exec.start` / `exec.end` for the Pulse timeline. */
+  onActivity?: (event: ActivityEvent) => void;
 }
 
 interface Connection {
@@ -47,7 +52,7 @@ interface WindowEntry {
 
 /**
  * Accepts extension connections on `/ws/editor`: registers each window and its workspace
- * folders as projects, keeps its terminal inventory, and removes the window (with its terminals) once it has been gone
+ * folders as projects, keeps its terminal inventory and execution output, and removes the window (with its terminals) once it has been gone
  * for the grace period.
  */
 export class EditorGateway {
@@ -58,6 +63,7 @@ export class EditorGateway {
   private readonly resolvePath: PathResolver;
   private readonly now: () => number;
   private readonly apply: boolean;
+  private readonly onActivity: ((event: ActivityEvent) => void) | undefined;
   private readonly connections = new Set<Connection>();
   private readonly windows = new Map<string, WindowEntry>();
 
@@ -69,6 +75,7 @@ export class EditorGateway {
     this.resolvePath = options.resolvePath ?? resolveDir;
     this.now = options.now ?? Date.now;
     this.apply = options.apply ?? true;
+    this.onActivity = options.onActivity;
   }
 
   get connectionCount(): number {
@@ -147,10 +154,41 @@ export class EditorGateway {
         return;
       case 'terminal.sync':
         return this.onSync(connection.windowId, message.payload.terminals);
+      case 'exec.start':
+        return this.applyExec(connection.windowId, { type: 'start', ...message.payload });
+      case 'exec.data':
+        return this.applyExec(connection.windowId, { type: 'data', ...message.payload });
+      case 'exec.interactive':
+        return this.applyExec(connection.windowId, { type: 'interactive', ...message.payload });
+      case 'exec.end':
+        return this.applyExec(connection.windowId, { type: 'end', ...message.payload });
       default:
-        // Executions and command results are handled by later tasks (5.4+).
+        // Command results are handled by 5.5.
         this.log.debug({ type: message.type }, 'editor message not handled yet');
     }
+  }
+
+  private applyExec(windowId: string, event: ExecEvent): void {
+    const ts = this.now();
+    const outcome = applyExecEvent(this.store, windowId, event, ts);
+    if (!outcome.applied) {
+      this.log.debug({ type: event.type, reason: outcome.reason }, 'ignored an execution event');
+      return;
+    }
+    if (event.type !== 'start' && event.type !== 'end') return;
+    const { execution } = outcome;
+    const terminal = this.store.state.terminals[execution.terminalId];
+    this.onActivity?.({
+      id: randomUUID(),
+      ts,
+      kind: event.type === 'start' ? 'exec.start' : 'exec.end',
+      projectId: terminal?.projectId ?? null,
+      sessionId: null,
+      terminalId: execution.terminalId,
+      execId: execution.id,
+      summary: execution.commandLine.slice(0, 200) || null,
+      data: event.type === 'end' ? { exitCode: execution.exitCode } : {},
+    });
   }
 
   private async onHello(
@@ -199,6 +237,7 @@ export class EditorGateway {
       extensionVersion: message.payload.extensionVersion,
       workspaceFolders: message.payload.workspaceFolders,
       projectIds,
+      capabilities: message.payload.capabilities,
       connectedAt: existing && previous === connection ? existing.connectedAt : ts,
       lastSeenAt: ts,
     });
@@ -227,8 +266,9 @@ export class EditorGateway {
       this.log.debug({ type: event.type }, 'ignored a terminal event for an unknown terminal');
       return;
     }
-    const { executionIds: _, ...fields } = next;
+    const { executionIds, ...fields } = next;
     this.store.upsertTerminal(fields);
+    if (next.state === 'closed') endRunning(this.store, executionIds, this.now());
   }
 
   /** Replaces the window's terminal list: listed terminals are upserted, the rest removed. */

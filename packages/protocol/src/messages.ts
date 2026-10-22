@@ -5,6 +5,7 @@ import {
   ApprovalState,
   BoardState,
   CommandConfidence,
+  EditorCapabilities,
   ExecutionId,
   PermissionMode,
   Pid,
@@ -67,6 +68,7 @@ export const EditorHello = envelope(
     appVersion: z.string().max(64),
     workspaceFolders: z.array(Path).max(256),
     extensionVersion: z.string().max(64),
+    capabilities: EditorCapabilities,
   }),
 );
 export const TerminalUpsert = envelope('terminal.upsert', EditorTerminal);
@@ -98,6 +100,8 @@ export const ExecData = envelope(
     chunk: z.string().max(64 * 1024),
   }),
 );
+/** The execution entered the alternate screen; it is rendered as an interactive app. */
+export const ExecInteractive = envelope('exec.interactive', z.object({ execId: ExecutionId }));
 export const ExecEnd = envelope(
   'exec.end',
   z.object({ execId: ExecutionId, exitCode: z.number().int().nullable() }),
@@ -116,6 +120,7 @@ export const EditorToServer = z.discriminatedUnion('type', [
   TerminalClosed,
   ExecStart,
   ExecData,
+  ExecInteractive,
   ExecEnd,
   EditorHeartbeat,
   CmdResult,

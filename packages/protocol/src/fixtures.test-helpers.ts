@@ -38,6 +38,7 @@ export const editorWindow: EditorWindow = {
   extensionVersion: '0.1.0',
   workspaceFolders: ['/home/dev/acme-shop'],
   projectIds: [project.id],
+  capabilities: { shellExecution: true },
   connectedAt: T0,
   lastSeenAt: T0 + 1000,
 };
@@ -70,6 +71,7 @@ export const execution: Execution = {
   exitCode: null,
   outputBytes: 1024,
   truncated: false,
+  interactive: false,
 };
 
 export const session: ClaudeSession = {

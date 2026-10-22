@@ -11,6 +11,7 @@ import {
   resolveConfig,
 } from './core/config.js';
 import { EditorLink, type HelloPayload, type LinkStatus } from './core/editor-link.js';
+import { ExecStreamer } from './core/exec-streamer.js';
 import { STATUS_TEXT, statusTooltip } from './core/status.js';
 import { TerminalTracker } from './core/terminal-tracker.js';
 import { cboardHome, readToken } from './core/token.js';
@@ -56,6 +57,18 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     activeTerminal: () => vscode.window.activeTerminal,
   });
+  // Cursor may lag behind VS Code's API; without shell execution events only the inventory works.
+  const shellExecution = typeof vscode.window.onDidStartTerminalShellExecution === 'function';
+  if (!shellExecution) log.warn('shell execution events are unavailable; output is not mirrored');
+  const executions = new ExecStreamer<vscode.TerminalShellExecution>({
+    sink: {
+      start: (payload) => link?.send('exec.start', payload),
+      data: (execId, seq, chunk) => link?.send('exec.data', { execId, seq, chunk }),
+      interactive: (execId) => link?.send('exec.interactive', { execId }),
+      end: (execId, exitCode) => link?.send('exec.end', { execId, exitCode }),
+    },
+    onError: (message) => log.warn(message),
+  });
   const showStatus = (status: LinkStatus) => {
     statusItem.tooltip = statusTooltip(status, config.port);
     // Every (re)connect gets the full list, so the server drops anything stale.
@@ -72,6 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
       .filter((folder) => folder.uri.scheme === 'file')
       .map((folder) => folder.uri.fsPath),
     extensionVersion,
+    capabilities: { shellExecution },
   });
 
   const startLink = () => {
@@ -95,7 +109,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     log,
     statusItem,
-    { dispose: () => link?.stop() },
+    {
+      dispose: () => {
+        executions.dispose();
+        link?.stop();
+      },
+    },
     vscode.commands.registerCommand(COMMANDS.openDashboard, async () => {
       const url = authUrl(config.port, await readToken(home));
       const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
@@ -113,13 +132,14 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => link?.sendHello()),
     vscode.window.onDidOpenTerminal((terminal) => terminals.opened(terminal)),
-    vscode.window.onDidCloseTerminal((terminal) => terminals.closed(terminal)),
+    vscode.window.onDidCloseTerminal((terminal) => {
+      executions.terminalClosed(terminals.idOf(terminal));
+      terminals.closed(terminal);
+    }),
     vscode.window.onDidChangeTerminalState((terminal) => terminals.changed(terminal)),
     vscode.window.onDidChangeTerminalShellIntegration(({ terminal }) =>
       terminals.changed(terminal),
     ),
-    // The cwd can change with every command; there is no dedicated event for it.
-    vscode.window.onDidEndTerminalShellExecution(({ terminal }) => terminals.changed(terminal)),
     vscode.window.onDidChangeActiveTerminal(() => terminals.activeChanged()),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration(CONFIG_SECTION)) return;
@@ -131,6 +151,21 @@ export function activate(context: vscode.ExtensionContext): void {
       startLink();
     }),
   );
+  if (shellExecution) {
+    context.subscriptions.push(
+      vscode.window.onDidStartTerminalShellExecution(({ terminal, execution }) => {
+        // Make sure the server knows the terminal before its first execution.
+        terminals.changed(terminal);
+        // Reading must start inside this handler, or the first output is lost.
+        executions.started(execution, terminals.idOf(terminal));
+      }),
+      vscode.window.onDidEndTerminalShellExecution(({ terminal, execution, exitCode }) => {
+        executions.ended(execution, exitCode);
+        // The cwd can change with every command; there is no dedicated event for it.
+        terminals.changed(terminal);
+      }),
+    );
+  }
 }
 
 export function deactivate(): void {}

@@ -34,6 +34,7 @@ const editorToServer: EditorToServer[] = [
     appVersion: '3.5.0',
     workspaceFolders: ['/home/dev/acme-shop'],
     extensionVersion: '0.1.0',
+    capabilities: { shellExecution: true },
   }),
   env('terminal.upsert', {
     terminalId: 'term-1',
@@ -55,6 +56,7 @@ const editorToServer: EditorToServer[] = [
     cwd: '/home/dev/acme-shop',
   }),
   env('exec.data', { execId: 'exec-1', seq: 0, chunk: '\u001b[32m✓\u001b[0m 12 passed\r\n' }),
+  env('exec.interactive', { execId: 'exec-1' }),
   env('exec.end', { execId: 'exec-1', exitCode: 1 }),
   env('editor.heartbeat', {}),
   env('cmd.result', { id: 'cmd-1', ok: false, error: 'terminal not found' }),

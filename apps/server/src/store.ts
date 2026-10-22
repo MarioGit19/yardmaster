@@ -184,6 +184,7 @@ export class BoardStore {
       exitCode: null,
       outputBytes: 0,
       truncated: false,
+      interactive: false,
     };
     this.put('executions', execution.id, execution);
 
@@ -217,6 +218,13 @@ export class BoardStore {
     this.recordOutput(execution, this.output.end(execId, execution.terminalId));
     this.lastSourceSeq.delete(execId);
     this.merge('executions', execId, { endedAt: ts, exitCode });
+  }
+
+  markExecInteractive(execId: string): void {
+    const execution = this.state.executions[execId];
+    if (execution && !execution.interactive) {
+      this.set(['executions', execId, 'interactive'], true);
+    }
   }
 
   // Claude sessions

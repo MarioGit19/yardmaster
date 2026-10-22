@@ -11,6 +11,7 @@ const hello: HelloPayload = {
   appVersion: '1.93.0',
   workspaceFolders: ['/home/dev/acme-shop'],
   extensionVersion: '0.1.0',
+  capabilities: { shellExecution: true },
 };
 
 interface Received {

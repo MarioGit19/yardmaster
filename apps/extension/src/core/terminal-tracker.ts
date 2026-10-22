@@ -30,7 +30,7 @@ export interface TerminalTrackerOptions<T extends TerminalLike> {
   newId?: () => string;
 }
 
-function localPath(value: string | UriLike | undefined): string | null {
+export function localPath(value: string | UriLike | undefined): string | null {
   if (value === undefined) return null;
   const path = typeof value === 'string' ? value : value.scheme === 'file' ? value.fsPath : '';
   return path.startsWith('/') && path.length <= MAX_PATH ? path : null;

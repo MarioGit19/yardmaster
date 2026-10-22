@@ -156,6 +156,7 @@ export async function buildServer(
     store,
     logger: logger.child({ component: 'editor-ws' }),
     apply: demo === null,
+    onActivity: (event) => persistence.recordActivity(event),
     ...options.editor,
   });
   app.decorate('editorGateway', editorGateway);

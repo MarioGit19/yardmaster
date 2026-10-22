@@ -32,6 +32,7 @@ const window: EditorWindow = {
   extensionVersion: '0.1.0',
   workspaceFolders: ['/home/dev/acme-shop'],
   projectIds: ['p-acme'],
+  capabilities: { shellExecution: true },
   connectedAt: T0,
   lastSeenAt: T0,
 };
@@ -152,6 +153,7 @@ describe('BoardStore mutators', () => {
       exitCode: 0,
       endedAt: T0 + 99,
       truncated: false,
+      interactive: false,
     });
     store.endExec('e-1', 1, T0 + 200);
     expect(store.state.executions['e-1']?.exitCode).toBe(0);
