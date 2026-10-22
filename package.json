@@ -7,10 +7,21 @@
     "node": ">=22"
   },
   "scripts": {
+    "prepare": "simple-git-hooks",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "check": "scripts/privacy-check.sh && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
-    "typescript": "~6.0.3"
+    "@biomejs/biome": "^2.6.2",
+    "simple-git-hooks": "^2.14.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "scripts/privacy-check.sh --staged && pnpm lint"
   }
 }

@@ -21,11 +21,12 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Done when:** `pnpm install` and `pnpm -r typecheck` succeed.
   - **Verify:** `pnpm install && pnpm -r typecheck`
 
-- [ ] **0.2 Lint, format, test tooling**
+- [x] **0.2 Lint, format, test tooling**
   - Biome 2 at the root (`biome.json`: formatter 2-space, line width 100, recommended rules). Vitest 5 workspace config. Root scripts `lint`, `format`, `test`, `typecheck`, `build`, and `check` (= privacy check + lint + typecheck + test).
   - Add `simple-git-hooks` with a pre-commit hook running `scripts/privacy-check.sh --staged && pnpm lint`.
   - **Done when:** `pnpm check` passes on the empty scaffold, with one trivial passing test per package.
   - **Verify:** `pnpm check`
+  - Note: Vitest 5 uses root `test.projects` (the old workspace file is gone); each package has its own `vitest.config.ts` and `test` script. Builds use `tsconfig.build.json` to keep tests out of `dist`. Biome skips Markdown so the docs stay hand-formatted.
 
 - [ ] **0.3 CI**
   - `.github/workflows/ci.yml`: on push/PR, runs on ubuntu-latest and macos-latest, sets up Node 22 and pnpm, then runs `pnpm install --frozen-lockfile`, `pnpm check` and `pnpm build`. Uploads the extension `.vsix` as an artifact once that exists (guard with `if: hashFiles(...)`).
