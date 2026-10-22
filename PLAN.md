@@ -218,8 +218,9 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter c-board-extension test && pnpm --filter @c-board/server test`
   - Note: Extension: `core/command-handler.ts` (`CommandHandler`, generic over an `EditorFacade`, so tests use a mocked facade). Terminals are looked up by `TerminalTracker.find` (open terminals only). `cmd.rerun` reruns from `ExecStreamer.lookup`, which remembers the last 500 executions of this activation, so an execution from before an editor reload answers `unknown_execution`. A rerun goes through `shellIntegration.executeCommand` when active, else `sendText`. `cmd.createTerminal` shows the new terminal and replies once its command has been dispatched (≤ 3 s, inside the server's 5 s timeout). Server: `editor-router.ts` (`EditorRouter`: terminal → owning window; project → connected window with it as a folder, else the deepest containing folder, ties to the most recently seen), `editor-actions.ts` (the six `terminal.*` UI actions, now the default handlers instead of stubs) and `EditorGateway.sendCommand`/`isConnected`. Errors are codes: `unknown_terminal`, `terminal_closed`, `unknown_execution`, `unknown_project`, `no_editor`, `editor_offline`, `editor_timeout`, `editor_disconnected`, `nothing_to_rerun`. A `cmd.result` is only accepted from the connection the command went to. In demo mode the actions answer `editor_offline`, since demo windows have no socket.
 
-- [ ] **[HUMAN] 5.6 Install the extension in Cursor**
+- [x] **[HUMAN] 5.6 Install the extension in Cursor**
   - Run `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix`, then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Start `pnpm dev`, run something in a terminal, and confirm it shows up in `c-board doctor` and the UI. Note any Cursor-specific quirks under this task, then tick it.
+  - Notes: installed from the .vsix and reloaded the windows; doctor shows 3 Cursor windows connected. No Cursor-specific quirks so far.
 
 ## Phase 6 — Processes, ports, git, linking
 
