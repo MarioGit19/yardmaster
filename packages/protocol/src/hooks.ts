@@ -108,6 +108,39 @@ export const PermissionRequestHook = hook('PermissionRequest', {
   permission_suggestions: z.array(z.unknown()).optional(),
 });
 
+/**
+ * What a `PermissionRequest` hook prints on stdout to decide (verified against
+ * https://code.claude.com/docs/en/hooks on 2026-10-22):
+ *
+ *   { "hookSpecificOutput": { "hookEventName": "PermissionRequest",
+ *       "decision": { "behavior": "allow", "updatedInput"?: {…}, "updatedPermissions"?: [PermissionUpdate] }
+ *                 | { "behavior": "deny", "message"?: string, "interrupt"?: boolean } } }
+ *
+ * Exit 0 with no output leaves the normal permission prompt in place. Deny and ask rules are
+ * still evaluated after an "allow".
+ */
+export const PermissionRequestDecision = z.discriminatedUnion('behavior', [
+  z.object({
+    behavior: z.literal('allow'),
+    updatedInput: z.record(z.string(), z.unknown()).optional(),
+    updatedPermissions: z.array(z.looseObject({ type: z.string() })).optional(),
+  }),
+  z.object({
+    behavior: z.literal('deny'),
+    message: z.string().max(2_000).optional(),
+    interrupt: z.boolean().optional(),
+  }),
+]);
+export type PermissionRequestDecision = z.infer<typeof PermissionRequestDecision>;
+
+export const PermissionRequestOutput = z.object({
+  hookSpecificOutput: z.object({
+    hookEventName: z.literal('PermissionRequest'),
+    decision: PermissionRequestDecision,
+  }),
+});
+export type PermissionRequestOutput = z.infer<typeof PermissionRequestOutput>;
+
 export const KnownHookEvent = z.discriminatedUnion('hook_event_name', [
   SessionStartHook,
   SessionEndHook,

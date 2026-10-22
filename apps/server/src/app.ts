@@ -11,6 +11,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } 
 import { pino } from 'pino';
 import { z } from 'zod';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
+import { AwayApprovals, registerAwayRoutes } from './claude/away.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
@@ -32,6 +33,7 @@ import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
+  awaySettings,
   diskHookSettings,
   EDITOR_SEEN_KEY,
   HOOK_SEEN_KEY,
@@ -104,6 +106,7 @@ declare module 'fastify' {
     /** Updated by the hook ingest; reported by `GET /api/status`. */
     hookStats: HookStats;
     hookIngest: HookIngest;
+    awayApprovals: AwayApprovals;
     transcripts: TranscriptService | null;
     sessionRunner: SessionRunner;
     sessionDiscovery: SessionDiscovery | null;
@@ -270,9 +273,10 @@ export async function buildServer(
     store,
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
-    // Demo approvals come from the simulator, unless a demo board session asked.
+    // Board sessions, then away-mode hooks; demo approvals come from the simulator.
     decideApproval: (decision) => {
-      const result = runner.decideApproval(decision);
+      let result = runner.decideApproval(decision);
+      if (!result.ok) result = awayApprovals.decide(decision);
       return demo && !result.ok ? demo.decideApproval(decision) : result;
     },
     sendToSession: runner.send.bind(runner),
@@ -325,6 +329,20 @@ export async function buildServer(
   });
   app.decorate('hookIngest', hookIngest);
   registerHookRoute(app, hookIngest);
+  const awayApprovals: AwayApprovals = new AwayApprovals({
+    store,
+    ingest: hookIngest,
+    logger: logger.child({ component: 'away' }),
+    status: () => {
+      const { awayMode, awayTimeoutSec } = awaySettings(settings);
+      return { away: awayMode, timeoutSec: awayTimeoutSec };
+    },
+    apply: demo === null,
+    onMessage: (message) => gateway.broadcast(message),
+    onActivity: recordActivity,
+  });
+  app.decorate('awayApprovals', awayApprovals);
+  registerAwayRoutes(app, awayApprovals);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
   app.get('/api/status', async (): Promise<ServerStatus> => {

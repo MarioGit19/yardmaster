@@ -12,8 +12,10 @@ import {
   unifiedDiff,
 } from '@c-board/hook';
 import {
+  AwayTimeoutSec,
   type BoardSettings,
   BoardSettingsPatch,
+  DEFAULT_AWAY_TIMEOUT_SEC,
   DEFAULT_RETENTION_DAYS,
   HooksInstallRequest,
   type HooksInstallResponse,
@@ -29,6 +31,8 @@ import { generateToken, writeToken } from './token.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const RETENTION_KEY = 'retentionDays';
+export const AWAY_MODE_KEY = 'awayMode';
+export const AWAY_TIMEOUT_KEY = 'awayTimeoutSec';
 export const HOOK_SEEN_KEY = 'setup.hookSeen';
 export const EDITOR_SEEN_KEY = 'setup.editorSeen';
 
@@ -88,6 +92,18 @@ export function retentionDays(value: unknown): RetentionDays {
   return parsed.success ? parsed.data : DEFAULT_RETENTION_DAYS;
 }
 
+/** The stored away-mode setting; off unless explicitly turned on. */
+export function awaySettings(settings: Record<string, unknown>): {
+  awayMode: boolean;
+  awayTimeoutSec: number;
+} {
+  const timeout = AwayTimeoutSec.safeParse(settings[AWAY_TIMEOUT_KEY]);
+  return {
+    awayMode: settings[AWAY_MODE_KEY] === true,
+    awayTimeoutSec: timeout.success ? timeout.data : DEFAULT_AWAY_TIMEOUT_SEC,
+  };
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -114,7 +130,14 @@ function settingsError(reply: FastifyReply, err: unknown) {
  */
 export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRoutesOptions): void {
   const { persistence, settings, hookSettings } = options;
-  const current = (): BoardSettings => ({ retentionDays: retentionDays(settings[RETENTION_KEY]) });
+  const current = (): BoardSettings => ({
+    retentionDays: retentionDays(settings[RETENTION_KEY]),
+    ...awaySettings(settings),
+  });
+  const save = (key: string, value: unknown) => {
+    persistence.setSetting(key, value);
+    settings[key] = value;
+  };
 
   app.get('/api/settings', async () => current());
 
@@ -122,10 +145,14 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     const patch = BoardSettingsPatch.safeParse(request.body);
     if (!patch.success) return reply.code(400).send({ error: 'bad_request' });
     if (patch.data.retentionDays !== undefined) {
-      persistence.setSetting(RETENTION_KEY, patch.data.retentionDays);
-      settings[RETENTION_KEY] = patch.data.retentionDays;
+      save(RETENTION_KEY, patch.data.retentionDays);
       persistence.setRetention(retentionMs(patch.data.retentionDays));
     }
+    if (patch.data.awayMode !== undefined) {
+      save(AWAY_MODE_KEY, patch.data.awayMode);
+      app.log.info({ away: patch.data.awayMode }, 'away mode changed');
+    }
+    if (patch.data.awayTimeoutSec !== undefined) save(AWAY_TIMEOUT_KEY, patch.data.awayTimeoutSec);
     return current();
   });
 

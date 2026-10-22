@@ -43,15 +43,31 @@ export const DEFAULT_RETENTION_DAYS = 7;
 export const RetentionDays = z.literal(RETENTION_DAYS);
 export type RetentionDays = z.infer<typeof RetentionDays>;
 
+/** How long the away-mode hook waits for a decision from the board, in seconds (F13). */
+export const AWAY_TIMEOUT_MIN_SEC = 10;
+export const AWAY_TIMEOUT_MAX_SEC = 300;
+export const DEFAULT_AWAY_TIMEOUT_SEC = 120;
+export const AwayTimeoutSec = z.number().int().min(AWAY_TIMEOUT_MIN_SEC).max(AWAY_TIMEOUT_MAX_SEC);
+
 /** `GET /api/settings` (authenticated): settings the server owns. */
 export const BoardSettings = z.object({
   retentionDays: RetentionDays,
+  /** Route `PermissionRequest` hooks from terminal sessions to the board (F13). */
+  awayMode: z.boolean(),
+  awayTimeoutSec: AwayTimeoutSec,
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 
 /** `PUT /api/settings` body: any subset of the settings. */
 export const BoardSettingsPatch = BoardSettings.partial().strict();
 export type BoardSettingsPatch = z.infer<typeof BoardSettingsPatch>;
+
+/** `GET /api/away` (token): polled by `c-board-hook --permission` before it waits on the board. */
+export const AwayStatusResponse = z.object({
+  away: z.boolean(),
+  timeoutSec: AwayTimeoutSec,
+});
+export type AwayStatusResponse = z.infer<typeof AwayStatusResponse>;
 
 /** Observer hook events from the installer, by state. */
 export const HookEventStatus = z.object({

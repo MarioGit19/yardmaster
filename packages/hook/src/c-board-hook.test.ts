@@ -1,6 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
+import {
+  createServer,
+  type IncomingHttpHeaders,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -25,10 +30,14 @@ interface RunResult {
   ms: number;
 }
 
-function runHook(env: Record<string, string>, stdin = PAYLOAD): Promise<RunResult> {
+function runHook(
+  env: Record<string, string>,
+  stdin = PAYLOAD,
+  args: string[] = [],
+): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const started = performance.now();
-    const child = spawn(HOOK, [], {
+    const child = spawn(HOOK, args, {
       env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -201,4 +210,138 @@ describe('c-board-hook', () => {
     expect(result.stdout).toBe('');
     expect(result.status).toBe(0);
   });
+});
+
+const PERMISSION_PAYLOAD = JSON.stringify({
+  session_id: '0f3c2a9e-5b7d-4c1e-9a8f-2d6b4e1c7a35',
+  hook_event_name: 'PermissionRequest',
+  cwd: '/home/dev/acme-shop',
+  permission_mode: 'default',
+  tool_name: 'Bash',
+  tool_input: { command: 'rm -rf node_modules' },
+});
+const DECISION = JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: 'PermissionRequest',
+    decision: { behavior: 'allow' },
+  },
+});
+
+interface BoardBehaviour {
+  /** Body for `GET /api/away`. */
+  away: string;
+  /** Answers `POST /api/hooks/permission`; null leaves the request hanging. */
+  decide: ((res: ServerResponse) => void) | null;
+}
+
+function startBoard(received: Received[], behaviour: BoardBehaviour): Promise<Server> {
+  const server = createServer((req, res) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      received.push({ method: req.method, url: req.url, headers: req.headers, body });
+      if (req.url === '/api/away') {
+        res.writeHead(200, { 'content-type': 'application/json' }).end(behaviour.away);
+      } else if (req.url === '/api/hooks/permission') {
+        behaviour.decide?.(res);
+      } else res.writeHead(404).end();
+    });
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
+}
+
+async function withBoard(
+  behaviour: BoardBehaviour,
+  run: (port: number, received: Received[]) => Promise<void>,
+): Promise<void> {
+  const received: Received[] = [];
+  const server = await startBoard(received, behaviour);
+  try {
+    await run((server.address() as AddressInfo).port, received);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+const runPermission = (port: number) =>
+  runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) }, PERMISSION_PAYLOAD, [
+    '--permission',
+  ]);
+
+describe('c-board-hook --permission', () => {
+  it('exits at once without output or a POST when away mode is off', async () => {
+    await withBoard(
+      { away: '{"away":false,"timeoutSec":120}', decide: (res) => res.end(DECISION) },
+      async (port, received) => {
+        const result = await runPermission(port);
+        expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
+        expect(received.map((r) => r.url)).toEqual(['/api/away']);
+        expect(received[0]?.headers['x-cboard-token']).toBe(TOKEN);
+        expect(result.ms).toBeLessThan(3000);
+      },
+    );
+  });
+
+  it('exits without output when the board is down', async () => {
+    const result = await runPermission(await freePort());
+    expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
+  });
+
+  it('posts the request and prints the decision when away mode is on', async () => {
+    await withBoard(
+      {
+        away: '{"away":true,"timeoutSec":120}',
+        decide: (res) => {
+          setTimeout(() => {
+            res.writeHead(200, { 'content-type': 'application/json' }).end(DECISION);
+          }, 300);
+        },
+      },
+      async (port, received) => {
+        const result = await runPermission(port);
+        expect(result).toMatchObject({ code: 0, stderr: '' });
+        expect(JSON.parse(result.stdout)).toEqual(JSON.parse(DECISION));
+        expect(received.map((r) => r.url)).toEqual(['/api/away', '/api/hooks/permission']);
+        const post = received[1];
+        expect(post?.method).toBe('POST');
+        expect(post?.body).toBe(PERMISSION_PAYLOAD);
+        expect(post?.headers['x-cboard-token']).toBe(TOKEN);
+        expect(post?.headers['x-cboard-claude-pid']).toBe(String(process.pid));
+      },
+    );
+  });
+
+  it('prints nothing when the board has no decision (204)', async () => {
+    await withBoard(
+      { away: '{"away":true,"timeoutSec":120}', decide: (res) => res.writeHead(204).end() },
+      async (port) => {
+        expect(await runPermission(port)).toMatchObject({ code: 0, stdout: '', stderr: '' });
+      },
+    );
+  });
+
+  it('prints nothing for an error or a body that is not a decision', async () => {
+    for (const decide of [
+      (res: ServerResponse) => res.writeHead(500).end(DECISION),
+      (res: ServerResponse) => res.writeHead(200).end('{"ok":true}'),
+    ]) {
+      await withBoard({ away: '{"away":true,"timeoutSec":120}', decide }, async (port) => {
+        expect(await runPermission(port)).toMatchObject({ code: 0, stdout: '', stderr: '' });
+      });
+    }
+  });
+
+  it('gives up silently after the board timeout plus a little slack', async () => {
+    await withBoard({ away: '{"away":true,"timeoutSec":0}', decide: null }, async (port) => {
+      const result = await runPermission(port);
+      expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
+      // timeoutSec 0 → curl waits 5 s.
+      expect(result.ms).toBeGreaterThan(4500);
+      expect(result.ms).toBeLessThan(9000);
+    });
+  }, 15_000);
 });

@@ -1,4 +1,9 @@
-import { type BoardSettings, RETENTION_DAYS, type RetentionDays } from '@c-board/protocol';
+import {
+  type BoardSettings,
+  type BoardSettingsPatch,
+  RETENTION_DAYS,
+  type RetentionDays,
+} from '@c-board/protocol';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
@@ -41,6 +46,7 @@ export function SettingsView() {
   const redact = usePreference(redactPreference);
   const status = useServerStatus(null);
   const demo = status !== null && status !== 'error' && status.demo;
+  const server = useBoardSettings();
   return (
     <Page width="narrow">
       <PageHeader title="Settings" />
@@ -83,19 +89,7 @@ export function SettingsView() {
               onChange={redactPreference.set}
             />
           </SettingRow>
-          <SettingRow
-            title="Away mode"
-            description="Answer Claude Code permission prompts from the board while you are away from the terminal. Coming with the away-mode hook."
-          >
-            <Segmented
-              label="Away mode"
-              options={ON_OFF}
-              labels={ON_OFF_LABEL}
-              value="off"
-              onChange={() => {}}
-              disabled
-            />
-          </SettingRow>
+          <AwayRow server={server} />
         </SettingsSection>
 
         <SettingsSection title="Connections">
@@ -112,7 +106,7 @@ export function SettingsView() {
         </SettingsSection>
 
         <SettingsSection title="Data and security">
-          <RetentionRow />
+          <RetentionRow server={server} />
           <TokenRow demo={demo} />
         </SettingsSection>
       </div>
@@ -253,8 +247,14 @@ const RETENTION_LABEL = Object.fromEntries(
 ) as Record<`${RetentionDays}`, string>;
 const RETENTION_OPTIONS = RETENTION_DAYS.map((days) => `${days}` as const);
 
-/** How long the Pulse activity history is kept in the local database. */
-function RetentionRow() {
+interface ServerSettings {
+  settings: BoardSettings | null;
+  /** Applies a patch optimistically and rolls it back, with a toast, if the save fails. */
+  update: (patch: BoardSettingsPatch, failure: string) => Promise<void>;
+}
+
+/** Settings the server owns, loaded once for every row that shows one. */
+function useBoardSettings(): ServerSettings {
   const [settings, setSettings] = useState<BoardSettings | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -262,17 +262,50 @@ function RetentionRow() {
     return () => controller.abort();
   }, []);
 
-  const change = async (value: `${RetentionDays}`) => {
-    const retentionDays = Number(value) as RetentionDays;
+  const update = async (patch: BoardSettingsPatch, failure: string) => {
     const previous = settings;
-    if (previous) setSettings({ ...previous, retentionDays });
+    if (previous) setSettings({ ...previous, ...patch });
     try {
-      setSettings(await api.updateSettings({ retentionDays }));
+      setSettings(await api.updateSettings(patch));
     } catch {
       setSettings(previous);
-      toast.error('Could not save the retention');
+      toast.error(failure);
     }
   };
+  return { settings, update };
+}
+
+const AWAY_INSTALL = 'c-board hooks install --away';
+
+/** Routes permission prompts from terminal sessions to the board (F13). */
+function AwayRow({ server: { settings, update } }: { server: ServerSettings }) {
+  return (
+    <SettingRow
+      title="Away mode"
+      description={
+        <>
+          Answer Claude Code permission prompts from the board while you are away from the terminal.
+          Needs the permission hook: run{' '}
+          <code className="whitespace-nowrap font-mono text-text-1">{AWAY_INSTALL}</code>.
+        </>
+      }
+    >
+      <Segmented
+        label="Away mode"
+        options={ON_OFF}
+        labels={ON_OFF_LABEL}
+        value={settings?.awayMode ? 'on' : 'off'}
+        onChange={(value) => void update({ awayMode: value === 'on' }, 'Could not save away mode')}
+        disabled={settings === null}
+      />
+    </SettingRow>
+  );
+}
+
+/** How long the Pulse activity history is kept in the local database. */
+function RetentionRow({ server: { settings, update } }: { server: ServerSettings }) {
+  const change = (value: `${RetentionDays}`) =>
+    update({ retentionDays: Number(value) as RetentionDays }, 'Could not save the retention');
 
   return (
     <SettingRow

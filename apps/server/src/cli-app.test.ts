@@ -289,6 +289,28 @@ describe('c-board hooks', () => {
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({});
   });
 
+  it('adds the away-mode permission hook only with --away', async () => {
+    const path = join(home, 'away', 'settings.json');
+    const args = ['--yes', '--settings-path', path];
+    expect(await runCli(['hooks', 'install', ...args], testIo().io)).toBe(0);
+    const plain = testIo();
+    expect(await runCli(['hooks', 'status', '--settings-path', path], plain.io)).toBe(0);
+    expect(plain.out()).toContain('Away-mode permission hook not installed');
+
+    const away = testIo();
+    expect(await runCli(['hooks', 'install', '--away', ...args], away.io)).toBe(0);
+    expect(away.out()).toContain('and the away-mode permission hook');
+    const handler = JSON.parse(await readFile(path, 'utf8')).hooks.PermissionRequest[0].hooks[0];
+    expect(handler.command).toMatch(/c-board-hook --permission$/);
+    expect(handler.async).toBeUndefined();
+    const status = testIo();
+    expect(await runCli(['hooks', 'status', '--settings-path', path], status.io)).toBe(0);
+    expect(status.out()).toContain('Away-mode permission hook installed');
+
+    const misuse = testIo();
+    expect(await runCli(['hooks', 'uninstall', '--away', ...args], misuse.io)).toBe(2);
+  });
+
   it('refuses invalid JSON and rejects unknown actions', async () => {
     const path = join(home, 'bad.json');
     await writeFile(path, '{ nope');

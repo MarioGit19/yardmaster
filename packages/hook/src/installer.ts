@@ -23,6 +23,11 @@ export const OBSERVER_EVENTS = [
 /** Our handlers are recognised by this name in their command. */
 export const HOOK_MARKER = 'c-board-hook';
 export const HOOK_TIMEOUT_S = 5;
+/** Away mode's `PermissionRequest` handler. */
+export const AWAY_EVENT = 'PermissionRequest';
+export const AWAY_FLAG = '--permission';
+/** Above the longest wait the board allows (300 s) plus the script's slack. */
+export const AWAY_HOOK_TIMEOUT_S = 330;
 export const DEFAULT_HOOK_PATH = fileURLToPath(new URL('../bin/c-board-hook', import.meta.url));
 
 export class InvalidSettingsError extends Error {}
@@ -83,12 +88,23 @@ export function parseSettings(raw: string | undefined): Json {
   return value as Json;
 }
 
-function desiredGroup(command: string): Json {
-  return { hooks: [{ type: 'command', command, async: true, timeout: HOOK_TIMEOUT_S }] };
+function desiredGroup(event: string, command: string): Json {
+  // The permission hook is synchronous: Claude Code waits for its decision.
+  return event === AWAY_EVENT
+    ? {
+        hooks: [
+          { type: 'command', command: `${command} ${AWAY_FLAG}`, timeout: AWAY_HOOK_TIMEOUT_S },
+        ],
+      }
+    : { hooks: [{ type: 'command', command, async: true, timeout: HOOK_TIMEOUT_S }] };
 }
 
-function isDesired(group: unknown, command: string): boolean {
-  return JSON.stringify(group) === JSON.stringify(desiredGroup(command));
+function isDesired(group: unknown, event: string, command: string): boolean {
+  return JSON.stringify(group) === JSON.stringify(desiredGroup(event, command));
+}
+
+function isInstalled(groups: unknown[], event: string, command: string): boolean {
+  return countOurs(groups) === 1 && groups.some((group) => isDesired(group, event, command));
 }
 
 /** Removes our handlers from an event's groups, dropping groups we emptied. */
@@ -124,15 +140,27 @@ function plan(raw: string | undefined, settings: Json, changed: boolean): Plan {
   return { before: raw, after: changed ? serialize(settings) : (raw ?? ''), changed };
 }
 
-export function planInstall(raw: string | undefined, command = hookCommand()): Plan {
+export interface InstallOptions {
+  /** Also add the away-mode `PermissionRequest` handler. Without it, that event is left alone. */
+  away?: boolean;
+}
+
+export function planInstall(
+  raw: string | undefined,
+  command = hookCommand(),
+  options: InstallOptions = {},
+): Plan {
   const settings = parseSettings(raw);
   const hooks: HookMap = { ...((settings.hooks as HookMap | undefined) ?? {}) };
   let changed = false;
-  for (const event of OBSERVER_EVENTS) {
+  const events: readonly string[] = options.away
+    ? [...OBSERVER_EVENTS, AWAY_EVENT]
+    : OBSERVER_EVENTS;
+  for (const event of events) {
     const groups = hooks[event] ?? [];
     // Already exactly one handler of ours, in the shape we'd write: leave the event alone.
-    if (countOurs(groups) === 1 && groups.some((group) => isDesired(group, command))) continue;
-    hooks[event] = [...stripOurs(groups), desiredGroup(command)];
+    if (isInstalled(groups, event, command)) continue;
+    hooks[event] = [...stripOurs(groups), desiredGroup(event, command)];
     changed = true;
   }
   return plan(raw, changed ? { ...settings, hooks } : settings, changed);
@@ -173,11 +201,20 @@ export function hookStatus(raw: string | undefined, command = hookCommand()): Ho
   for (const event of OBSERVER_EVENTS) {
     const groups = hooks[event] ?? [];
     if (countOurs(groups) === 0) status.missing.push(event);
-    else if (countOurs(groups) === 1 && groups.some((group) => isDesired(group, command))) {
-      status.installed.push(event);
-    } else status.outdated.push(event);
+    else if (isInstalled(groups, event, command)) status.installed.push(event);
+    else status.outdated.push(event);
   }
   return status;
+}
+
+/** The away-mode handler: absent, installed as an install would write it, or outdated. */
+export function awayHookStatus(
+  raw: string | undefined,
+  command = hookCommand(),
+): 'missing' | 'installed' | 'outdated' {
+  const groups = (parseSettings(raw).hooks as HookMap | undefined)?.[AWAY_EVENT] ?? [];
+  if (countOurs(groups) === 0) return 'missing';
+  return isInstalled(groups, AWAY_EVENT, command) ? 'installed' : 'outdated';
 }
 
 export async function readSettings(path: string): Promise<string | undefined> {

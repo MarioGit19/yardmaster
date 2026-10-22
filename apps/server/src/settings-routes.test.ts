@@ -90,16 +90,19 @@ describe('settings routes', () => {
     }
   });
 
-  it('reads and writes the retention, which survives a restart', async () => {
+  it('reads and writes the retention and away mode, which survive a restart', async () => {
     const { token, config } = await boot();
     expect(BoardSettings.parse((await call('GET', '/api/settings', token)).json())).toEqual({
       retentionDays: 7,
+      awayMode: false,
+      awayTimeoutSec: 120,
     });
     expect((await call('PUT', '/api/settings', token, { retentionDays: 5 })).statusCode).toBe(400);
     expect((await call('PUT', '/api/settings', token, { nope: true })).statusCode).toBe(400);
 
     const res = await call('PUT', '/api/settings', token, { retentionDays: 30 });
-    expect(res.json()).toEqual({ retentionDays: 30 });
+    expect(res.json()).toEqual({ retentionDays: 30, awayMode: false, awayTimeoutSec: 120 });
+    await call('PUT', '/api/settings', token, { awayMode: true, awayTimeoutSec: 45 });
     expect(app?.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
 
     await app?.close();
@@ -110,7 +113,11 @@ describe('settings routes', () => {
       git: false,
       hookSettings: memoryHookSettings(),
     });
-    expect((await call('GET', '/api/settings', token)).json()).toEqual({ retentionDays: 30 });
+    expect((await call('GET', '/api/settings', token)).json()).toEqual({
+      retentionDays: 30,
+      awayMode: true,
+      awayTimeoutSec: 45,
+    });
     expect(app.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
   });
 

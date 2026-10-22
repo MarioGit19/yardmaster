@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
 import {
   applyPlan,
+  awayHookStatus,
   claudeSettingsPath,
   hookStatus,
   InvalidSettingsError,
@@ -50,8 +51,9 @@ Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
   doctor                       Check the setup and print a report
   token --rotate               Replace the install token (signs out every browser)
-  hooks install|uninstall|status [--dry-run] [--yes] [--settings-path <file>]
-                               Manage the c-board hooks in Claude's settings.json
+  hooks install|uninstall|status [--away] [--dry-run] [--yes] [--settings-path <file>]
+                               Manage the c-board hooks in Claude's settings.json.
+                               --away also installs the away-mode permission hook
 
 Options:
   -h, --help                   Show this help
@@ -148,6 +150,7 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
     throw new UsageError(`expected one of ${HOOK_ACTIONS.join(', ')}`);
   }
   const flags = parse(rest, {
+    away: { type: 'boolean' },
     'dry-run': { type: 'boolean' },
     yes: { type: 'boolean', short: 'y' },
     'settings-path': { type: 'string' },
@@ -165,13 +168,22 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
       if (status.outdated.length > 0) {
         io.stdout.write(`  outdated: ${status.outdated.join(', ')}\n`);
       }
+      const away = awayHookStatus(raw);
+      io.stdout.write(
+        away === 'installed'
+          ? 'Away-mode permission hook installed\n'
+          : `Away-mode permission hook ${away === 'missing' ? 'not installed' : 'outdated'} (optional: \`c-board hooks install --away\`)\n`,
+      );
       if (status.installed.length === total) return 0;
       io.stdout.write('Run `c-board hooks install` to fix this.\n');
       return 1;
     }
 
     const install = action === 'install';
-    const plan = install ? planInstall(raw) : planUninstall(raw);
+    if (flags.away && !install) throw new UsageError('--away only applies to install');
+    const plan = install
+      ? planInstall(raw, undefined, { away: flags.away ?? false })
+      : planUninstall(raw);
     if (!plan.changed) {
       io.stdout.write(
         install
@@ -199,7 +211,7 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
     const backup = await applyPlan(path, plan);
     io.stdout.write(
       install
-        ? `Installed the c-board hook for ${OBSERVER_EVENTS.length} events in ${shown}.\n`
+        ? `Installed the c-board hook for ${OBSERVER_EVENTS.length} events${flags.away ? ' and the away-mode permission hook' : ''} in ${shown}.\n`
         : `Removed the c-board hooks from ${shown}.\n`,
     );
     if (backup) io.stdout.write(`Backup: ${tildify(backup, io.home)}\n`);

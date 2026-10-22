@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AWAY_HOOK_TIMEOUT_S,
   applyPlan,
+  awayHookStatus,
   claudeSettingsPath,
   HOOK_TIMEOUT_S,
   hookCommand,
@@ -193,6 +195,49 @@ describe('hook installer', () => {
     const plan = planInstall(undefined, COMMAND);
     await install();
     await expect(applyPlan(path, plan, NOW)).rejects.toThrow(InvalidSettingsError);
+  });
+});
+
+describe('away-mode installer', () => {
+  const away = {
+    hooks: [{ type: 'command', command: `${COMMAND} --permission`, timeout: AWAY_HOOK_TIMEOUT_S }],
+  };
+
+  it('adds a synchronous PermissionRequest handler only with away', async () => {
+    const plain = planInstall(undefined, COMMAND);
+    expect(JSON.parse(plain.after).hooks.PermissionRequest).toBeUndefined();
+    expect(awayHookStatus(plain.after, COMMAND)).toBe('missing');
+
+    const withAway = planInstall(plain.after, COMMAND, { away: true });
+    expect(withAway.changed).toBe(true);
+    const hooks = JSON.parse(withAway.after).hooks;
+    expect(hooks.PermissionRequest).toEqual([away]);
+    // Observer events are untouched; the away handler has no `async`.
+    expect(hooks.Stop).toEqual([ours]);
+    expect(awayHookStatus(withAway.after, COMMAND)).toBe('installed');
+    expect(planInstall(withAway.after, COMMAND, { away: true }).changed).toBe(false);
+    // A plain install neither adds nor removes it.
+    expect(planInstall(withAway.after, COMMAND).changed).toBe(false);
+  });
+
+  it('keeps third-party PermissionRequest hooks and uninstall removes only ours', () => {
+    const raw = JSON.stringify(THIRD_PARTY);
+    const installed = planInstall(raw, COMMAND, { away: true }).after;
+    const hooks = JSON.parse(installed).hooks;
+    expect(hooks.PermissionRequest).toEqual([...THIRD_PARTY.hooks.PermissionRequest, away]);
+    const removed = JSON.parse(planUninstall(installed).after).hooks;
+    expect(removed.PermissionRequest).toEqual(THIRD_PARTY.hooks.PermissionRequest);
+  });
+
+  it('reports an older away handler as outdated and replaces it', () => {
+    const old = JSON.stringify({
+      hooks: {
+        PermissionRequest: [{ hooks: [{ type: 'command', command: `${COMMAND} --permission` }] }],
+      },
+    });
+    expect(awayHookStatus(old, COMMAND)).toBe('outdated');
+    const next = planInstall(old, COMMAND, { away: true }).after;
+    expect(JSON.parse(next).hooks.PermissionRequest).toEqual([away]);
   });
 });
 

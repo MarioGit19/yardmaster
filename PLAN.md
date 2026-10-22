@@ -431,10 +431,11 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 
 ## Phase 9 — Stretch: away mode and terminal reply
 
-- [ ] **9.1 Away-mode permission hook**
+- [x] **9.1 Away-mode permission hook**
   - Re-verify the `PermissionRequest` hook input and decision-output schema at https://code.claude.com/docs/en/hooks and record the verified shape in a code comment with the date. Implement `c-board-hook --permission` (sync) per PRD §6.1, plus the server endpoints `GET /api/away` and `POST /api/hooks/permission` (long-poll). The installer adds the `PermissionRequest` entry only through `hooks install --away`.
   - **Done when:** script tests cover away off (instant exit, no output), away on plus decision, and timeout (no output).
   - **Verify:** `pnpm --filter @c-board/hook test && pnpm --filter @c-board/server test`
+  - Note: The hook output schema was re-verified on 2026-10-22 and is recorded in `packages/protocol/src/hooks.ts` and the script header. Away mode is a server setting (`awayMode`, `awayTimeoutSec` 10–300 s, default 120), and the Settings toggle is now live. A request becomes a `source: 'hook'` approval in the Attention Center. When the hook process exits (the user answered in the terminal) or the board stops, the approval expires and the terminal prompt stays. The installer writes the `PermissionRequest` handler with `timeout: 330` and no `async`.
 
 - [ ] **9.2 Reply into terminal sessions (experimental)**
   - For terminal-origin sessions with a linked terminal and status `waiting_input` or `idle`, the composer offers "Send to terminal" (`cmd.sendText`, execute=true), behind the setting `experimental.terminalReply`.
