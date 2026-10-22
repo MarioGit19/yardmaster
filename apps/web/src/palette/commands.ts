@@ -1,5 +1,6 @@
 import type { BoardState, ClaudeSession, Project, UiAction } from '@c-board/protocol';
 import { isWaiting } from '../attention/attention.js';
+import { terminalName } from '../lanes/lane.js';
 import type { MotionSetting } from '../motion.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
@@ -167,7 +168,7 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
     commands.push({
       id: `terminal:${terminal.id}`,
       group: 'Terminals',
-      label: terminal.name || 'Terminal',
+      label: terminalName(terminal),
       hint: project.name,
       icon: 'terminal',
       run: {

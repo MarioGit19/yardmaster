@@ -522,7 +522,8 @@
 .lane-row {
   position: relative;
   display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) 4rem 3.5rem 3rem;
+  /* The status track fits a crash dot plus a three-digit exit badge ("× 137"). */
+  grid-template-columns: 6.5rem minmax(0, 1fr) 4rem 3.5rem 3.5rem;
   column-gap: 8px;
   align-items: center;
   height: 28px;
@@ -533,6 +534,10 @@
   .lane-row {
     grid-template-columns: 4.75rem minmax(0, 1fr) 2.5rem 3.75rem 2.5rem;
     column-gap: 6px;
+  }
+  /* The rose exit badge already says it crashed; the dot would push it out of its track. */
+  .lane-crash-dot {
+    display: none;
   }
 }
 
@@ -610,6 +615,35 @@
 
 /* Project pod, DESIGN.md §4.3: accent hairline, cursor spotlight, and the amber breathing glow
    (§3 rule 4) on a layer above the static `glow-st-wait`. */
+.pod {
+  container-type: inline-size;
+}
+/* Narrow pods keep the project name readable: the header crew thins out to two, then one. */
+@container (width < 22rem) {
+  .pod-crew > :nth-child(n + 3) {
+    display: none;
+  }
+}
+@container (width < 18rem) {
+  .pod-crew > :nth-child(n + 2) {
+    display: none;
+  }
+}
+/* The git line gives way from the end when the title column is tight: ahead/behind, then the
+   changed-file count. The branch keeps at least a few characters. */
+.pod-title {
+  container: pod-title / inline-size;
+}
+@container pod-title (width < 12rem) {
+  .pod-git-sync {
+    display: none;
+  }
+}
+@container pod-title (width < 6.5rem) {
+  .pod-git-dirty {
+    display: none;
+  }
+}
 .pod::before {
   content: "";
   position: absolute;

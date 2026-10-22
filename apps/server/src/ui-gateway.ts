@@ -12,11 +12,13 @@ import {
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
+import { z } from 'zod';
 import { type ActionDispatcher, type ActionResult, NOT_IMPLEMENTED } from './actions.js';
 import type { ReadResult } from './ring-buffer.js';
 import type { BoardStore } from './store.js';
 
 export const UI_WS_PATH = '/ws/ui';
+const WorstQuery = z.object({ worst: z.string().optional() });
 /** PRD §7: patches reach the UI at most 30 times per second. */
 export const PATCH_INTERVAL_MS = Math.ceil(1000 / 30);
 /** Past this much unsent data a client stops getting live output until it re-subscribes. */
@@ -305,7 +307,12 @@ export class UiGateway {
  * session gets through: the security layer rejects foreign origins, and here an
  * absent Origin is refused too, since browsers always send one on WebSocket upgrades.
  */
-export function registerUiGateway(app: FastifyInstance, gateway: UiGateway): void {
+export function registerUiGateway(
+  app: FastifyInstance,
+  gateway: UiGateway,
+  /** Demo mode's worst-case board, for sockets opened with `?worst=1` (PLAN 7.14). */
+  worst?: UiGateway,
+): void {
   app.get(
     UI_WS_PATH,
     {
@@ -317,9 +324,15 @@ export function registerUiGateway(app: FastifyInstance, gateway: UiGateway): voi
         if (!request.isAuthorized()) return reply.code(401).send({ error: 'unauthorized' });
       },
     },
-    (socket) => gateway.connect(socket),
+    (socket, request) => {
+      const wantsWorst = WorstQuery.safeParse(request.query).data?.worst === '1';
+      (worst && wantsWorst ? worst : gateway).connect(socket);
+    },
   );
-  app.addHook('preClose', async () => gateway.close());
+  app.addHook('preClose', async () => {
+    gateway.close();
+    worst?.close();
+  });
 }
 
 declare module 'fastify' {

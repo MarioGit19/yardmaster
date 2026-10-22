@@ -33,6 +33,10 @@ export const selectLaneExecution =
     return NO_EXECUTION;
   };
 
+/** What a terminal is called on screen: editors allow an empty name, the board never shows one. */
+export const terminalName = (terminal: Pick<Terminal, 'name'>) =>
+  terminal.name.trim() || 'Terminal';
+
 export interface LaneView {
   /** The running or last command; null when the terminal never ran one we know of. */
   command: string | null;
@@ -71,7 +75,7 @@ export function laneView(
     startedAt: running ? execution.startedAt : null,
     exit,
     tone,
-    label: `${terminal.name}${command ? `: ${command}` : ''}, ${status}`,
+    label: `${terminalName(terminal)}${command ? `: ${command}` : ''}, ${status}`,
   };
 }
 

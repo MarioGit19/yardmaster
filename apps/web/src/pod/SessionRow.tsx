@@ -58,6 +58,7 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
           </span>
         </div>
         <p
+          dir="auto"
           data-shimmer={(streaming && line !== null) || undefined}
           title={line ?? undefined}
           className="shimmer relative truncate text-label text-text-3"

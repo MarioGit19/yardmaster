@@ -16,6 +16,7 @@ import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
+import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
 import {
   EditorGateway,
@@ -127,6 +128,7 @@ export async function buildServer(
   app.decorate('settings', persistence.loadSettings());
   app.addHook('onClose', async () => {
     demo?.stop();
+    worst?.stop();
     processScanner?.stop();
     sessionLinker?.stop();
     gitScanner?.stop();
@@ -227,7 +229,17 @@ export async function buildServer(
     ...options.gateway,
   });
   app.decorate('uiGateway', gateway);
-  registerUiGateway(app, gateway);
+  // `?worst=1`: a static board of worst-case data for layout checks, demo mode only.
+  const worst = options.demo ? new WorstBoard() : null;
+  const worstGateway = worst
+    ? new UiGateway({
+        store: worst.store,
+        dispatch: createActionDispatcher(stubActionHandlers()),
+        recentActivity: () => worst.recentActivity(),
+        logger: logger.child({ component: 'ui-ws-worst' }),
+      })
+    : undefined;
+  registerUiGateway(app, gateway, worstGateway);
   const gitOptions = options.demo ? false : (options.git ?? {});
   const gitScanner =
     gitOptions === false
@@ -277,6 +289,8 @@ export async function buildServer(
     const params = ProjectParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: 'bad_request' });
     const { projectId } = params.data;
+    const worstHistory = worst?.sessionHistory(projectId);
+    if (worstHistory) return { sessions: worstHistory } satisfies SessionHistoryResponse;
     if (!store.state.projects[projectId]) return reply.code(404).send({ error: 'unknown_project' });
     const listed = demo
       ? demo.sessionHistory(projectId)
@@ -297,6 +311,7 @@ export async function buildServer(
 
   await app.ready();
   demo?.start();
+  worst?.start(() => (worstGateway?.clientCount ?? 0) > 0);
   discovery?.start();
   sessionLinker?.start();
   processScanner?.start();

@@ -14,7 +14,7 @@ import {
 import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
-import { formatUptime, laneView, selectLaneExecution, uptimePeriod } from './lane.js';
+import { formatUptime, laneView, selectLaneExecution, terminalName, uptimePeriod } from './lane.js';
 import { PortChip } from './PortChip.js';
 import { Sparkline } from './Sparkline.js';
 import { TerminalPeek } from './TerminalPeek.js';
@@ -120,8 +120,11 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                 open && 'rotate-90',
               )}
             />
-            <span className="truncate" title={terminal.name}>
-              {terminal.name}
+            <span
+              className={cx('truncate', !terminal.name.trim() && 'text-text-3')}
+              title={terminalName(terminal)}
+            >
+              {terminalName(terminal)}
             </span>
           </span>
           <LaneCaption command={view.command} running={view.running} error={errorLine} />
@@ -144,7 +147,9 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                 className="inline-flex items-center gap-1.5"
                 exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
               >
-                {crashed && <span aria-hidden className="size-1.5 rounded-full bg-st-err" />}
+                {crashed && (
+                  <span aria-hidden className="lane-crash-dot size-1.5 rounded-full bg-st-err" />
+                )}
                 <ExitBadge code={view.exit.code} />
               </motion.span>
             ) : (
@@ -188,7 +193,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
             <TerminalPeek
               id={peekId}
               terminalId={terminal.id}
-              label={`Latest output of ${terminal.name}`}
+              label={`Latest output of ${terminalName(terminal)}`}
             />
           </motion.div>
         )}

@@ -22,7 +22,7 @@ import { TerminalLane } from '../lanes/TerminalLane.js';
 import { dur, ease, spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
-import { projectTone, toneLabel } from '../status.js';
+import { formatCount, projectTone, toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { isDimmed } from './activity.js';
@@ -164,7 +164,7 @@ export function ProjectPod({ project }: { project: Project }) {
         className="flex min-w-0 items-center gap-3"
       >
         <ProjectAvatar project={project} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="pod-title flex min-w-0 flex-1 flex-col">
           <Link
             href={projectHref(project.id)}
             title={project.name}
@@ -222,31 +222,37 @@ function GitLine({ git }: { git: Project['git'] }) {
   const branch = git.branch ?? (git.head ? git.head.slice(0, 7) : 'no branch');
   return (
     <span className="flex min-w-0 items-center gap-2.5 font-mono text-meta text-text-3 tabular">
-      <span className="flex min-w-0 items-center gap-1" title={branch}>
+      <span className="flex min-w-[min(3rem,100%)] items-center gap-1" title={branch}>
         <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
         <span className="truncate text-text-2">{branch}</span>
       </span>
       {git.dirty > 0 && (
         <span
-          className="flex shrink-0 items-center gap-1"
+          className="pod-git-dirty flex shrink-0 items-center gap-1"
           title={`${git.dirty} changed ${git.dirty === 1 ? 'file' : 'files'}`}
         >
           <span aria-hidden className="size-1.5 rounded-full bg-text-3" />
-          {git.dirty}
+          {formatCount(git.dirty)}
           <span className="sr-only"> changed</span>
         </span>
       )}
       {git.ahead > 0 && (
-        <span className="flex shrink-0 items-center" title={`${git.ahead} ahead of upstream`}>
+        <span
+          className="pod-git-sync flex shrink-0 items-center"
+          title={`${git.ahead} ahead of upstream`}
+        >
           <ArrowUp aria-hidden className="size-3" strokeWidth={1.75} />
-          {git.ahead}
+          {formatCount(git.ahead)}
           <span className="sr-only"> ahead</span>
         </span>
       )}
       {git.behind > 0 && (
-        <span className="flex shrink-0 items-center" title={`${git.behind} behind upstream`}>
+        <span
+          className="pod-git-sync flex shrink-0 items-center"
+          title={`${git.behind} behind upstream`}
+        >
           <ArrowDown aria-hidden className="size-3" strokeWidth={1.75} />
-          {git.behind}
+          {formatCount(git.behind)}
           <span className="sr-only"> behind</span>
         </span>
       )}
@@ -281,7 +287,7 @@ function PodCrew({
   );
   const crew = sessions.length > 0 ? sessions : [null];
   return (
-    <div className="-my-2 flex shrink-0 items-end">
+    <div className="pod-crew -my-2 flex shrink-0 items-end">
       {crew.map((session, i) => (
         <CrewMember
           key={session?.id ?? 'project'}

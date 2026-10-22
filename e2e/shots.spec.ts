@@ -370,6 +370,8 @@ test.describe('tool cards', () => {
     test.describe(theme, () => {
       test.use({ theme });
       test('showcase', async ({ page }) => {
+        // Highlighting runs in a worker that shares the CPU with the other shots.
+        test.slow();
         await page.goto('/#/_tokens');
         const section = showcase(page);
         await section.scrollIntoViewIfNeeded();
@@ -561,5 +563,93 @@ test.describe('activity', () => {
         await shootPod('[data-pod][data-crashed]', 'crashed');
       });
     });
+  }
+});
+
+// The `?worst=1` demo board (PLAN 7.14): worst-case names, counts and missing fields at every
+// width, plus the focus view of the longest project, the Attention Center and a lane peek.
+test.describe('worst case', () => {
+  // Ten heavy pages: one worker, in turn, so the rest of the shots keep their CPU.
+  test.describe.configure({ mode: 'serial' });
+  const WORST_WIDTHS = [
+    { width: 1920, height: 1080 },
+    { width: 1440, height: 900 },
+    { width: 1024, height: 768 },
+    { width: 390, height: 844 },
+    { width: 320, height: 640 },
+  ] as const;
+  const openWorst = async (page: import('@playwright/test').Page, route = '/') => {
+    await page.goto(`/?worst=1#${route}`);
+    await expect(page.locator('a[href^="#/p/"]').first()).toBeVisible();
+  };
+
+  for (const theme of THEMES) {
+    for (const viewport of WORST_WIDTHS) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('overview and focus', async ({ page }) => {
+          test.slow();
+          const shot = (name: string, fullPage = true) =>
+            page.screenshot({
+              path: new URL(`worst-${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              fullPage,
+              animations: 'disabled',
+            });
+          await openWorst(page);
+          await expect(page.locator('[data-pod]')).toHaveCount(6);
+          await page.waitForTimeout(800);
+          await shot('overview');
+          // The board scrolls inside its own column: the lower pods get a shot of their own.
+          await page.locator('main').evaluate((el) => {
+            const scroller = [el, ...el.querySelectorAll('*')].find(
+              (node) =>
+                node.scrollHeight > node.clientHeight + 1 &&
+                getComputedStyle(node).overflowY !== 'visible',
+            );
+            scroller?.scrollTo(0, scroller.scrollHeight);
+          });
+          await page.waitForTimeout(300);
+          await shot('overview-end', false);
+          await page.locator('main').evaluate((el) => {
+            for (const node of [el, ...el.querySelectorAll('*')]) node.scrollTop = 0;
+          });
+
+          const lane = page.locator('[data-lane]').first();
+          await lane.locator('[aria-expanded]').focus();
+          await page.keyboard.press('Enter');
+          await expect(page.locator('[data-peek]')).toBeVisible();
+          await page.waitForTimeout(400);
+          const pod = page.locator('[data-pod]:has([data-open])');
+          const box = await pod.boundingBox();
+          if (box) {
+            await page.screenshot({
+              path: new URL(`worst-peek-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              clip: {
+                x: Math.max(0, box.x - 8),
+                y: box.y - 8,
+                width: Math.min(viewport.width, box.width + 16),
+                height: box.height + 140,
+              },
+            });
+          }
+          await page.keyboard.press('Escape');
+
+          await page.locator('[data-hud="waiting"]').click();
+          await page.waitForTimeout(800);
+          await shot('attention', false);
+          await page.keyboard.press('Escape');
+
+          const longest = await page
+            .locator('[data-pod][aria-label^="northwind"] header a')
+            .getAttribute('href');
+          if (!longest) throw new Error('no pod link');
+          await openWorst(page, longest.slice(1));
+          // No hover tooltip left over from the HUD click.
+          await page.mouse.move(viewport.width / 2, viewport.height - 4);
+          await page.waitForTimeout(1200);
+          await shot('focus');
+        });
+      });
+    }
   }
 });

@@ -68,11 +68,20 @@ export function totalTokens(session: Pick<ClaudeSession, 'tokens'>): number {
   return input + output + cacheRead + cacheCreation;
 }
 
-/** 950 → "950", 12_400 → "12.4k", 3_200_000 → "3.2M". */
+const COUNT_UNITS = [
+  { size: 1e12, suffix: 'T' },
+  { size: 1e9, suffix: 'B' },
+  { size: 1e6, suffix: 'M' },
+  { size: 1e3, suffix: 'k' },
+] as const;
+
+/** 950 → "950", 12_400 → "12.4k", 3_200_000 → "3.2M", 11_400_000_000 → "11.4B". */
 export function formatCount(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 999_950) return `${trim(n / 1000)}k`;
-  return `${trim(n / 1_000_000)}M`;
+  if (!Number.isFinite(n)) return '0';
+  if (Math.abs(n) < 1000) return String(Math.round(n));
+  // A unit takes over once the smaller one would round up to "1000".
+  const unit = COUNT_UNITS.find((u) => Math.abs(n) >= u.size * 0.9995) ?? COUNT_UNITS[3];
+  return `${trim(n / unit.size)}${unit.suffix}`;
 }
 
 const trim = (x: number) =>

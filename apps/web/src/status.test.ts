@@ -45,4 +45,18 @@ describe('formatCount', () => {
     expect(formatCount(999_999)).toBe('1M');
     expect(formatCount(3_250_000)).toBe('3.3M');
   });
+
+  it('rolls over to the next unit instead of showing "1000k"', () => {
+    expect(formatCount(999_499)).toBe('999k');
+    expect(formatCount(999_949)).toBe('1M');
+    expect(formatCount(999_600_000)).toBe('1B');
+    expect(formatCount(11_442_000_000)).toBe('11.4B');
+    expect(formatCount(114_416_000_000)).toBe('114B');
+    expect(formatCount(2_500_000_000_000)).toBe('2.5T');
+  });
+
+  it('never renders NaN', () => {
+    expect(formatCount(Number.NaN)).toBe('0');
+    expect(formatCount(0)).toBe('0');
+  });
 });

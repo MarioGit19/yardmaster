@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { selectWindow, useBoard, useBoardClient, useBoardShallow } from '../data/index.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
-import { laneView, selectLaneExecution } from '../lanes/lane.js';
+import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
 import { spring } from '../motion.js';
 import { usePreference } from '../prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
@@ -271,7 +271,7 @@ function StackTab({
       role="tab"
       aria-selected={selected}
       aria-label={view.label}
-      title={view.command ? `${terminal.name}: ${view.command}` : terminal.name}
+      title={view.command ? `${terminalName(terminal)}: ${view.command}` : terminalName(terminal)}
       tabIndex={selected ? 0 : -1}
       data-tab={terminal.id}
       onClick={onSelect}
@@ -290,7 +290,7 @@ function StackTab({
         />
       )}
       <StatusDot tone={view.tone} label={view.label} className="relative" />
-      <span className="relative truncate">{terminal.name}</span>
+      <span className="relative truncate">{terminalName(terminal)}</span>
       <AnimatePresence initial={false}>
         {view.exit && view.exit.code !== 0 && (
           <ExitBadge key={view.exit.key} code={view.exit.code} className="relative -mr-1" />
@@ -321,7 +321,7 @@ function Pane({
   const kind = paneKind(execution.id === null ? null : execution, terminal);
   return (
     <section
-      aria-label={terminal.name}
+      aria-label={terminalName(terminal)}
       data-pane={terminal.id}
       data-active={(inGrid && active) || undefined}
       onPointerDown={inGrid ? onActivate : undefined}
@@ -336,10 +336,10 @@ function Pane({
         <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-2.5 text-label">
           <StatusDot tone={view.tone} label={view.label} />
           <span
-            title={terminal.name}
+            title={terminalName(terminal)}
             className={cx('max-w-[60%] shrink-0 truncate', active ? 'text-text-1' : 'text-text-2')}
           >
-            {terminal.name}
+            {terminalName(terminal)}
           </span>
           {view.command && (
             <span className="min-w-0 truncate font-mono text-meta text-text-3" title={view.command}>
@@ -361,7 +361,7 @@ function Pane({
             <Suspense fallback={null}>
               <XtermView
                 terminalId={terminal.id}
-                label={`Output of ${terminal.name}`}
+                label={`Output of ${terminalName(terminal)}`}
                 onController={onController}
               />
             </Suspense>
@@ -634,7 +634,7 @@ function CommandLine({
         {running ? '›' : '$'}
       </span>
       <input
-        aria-label={`Send to ${terminal.name}`}
+        aria-label={`Send to ${terminalName(terminal)}`}
         data-command-line={terminal.id}
         disabled={!open}
         value={value}
@@ -642,7 +642,11 @@ function CommandLine({
         autoComplete="off"
         autoCapitalize="off"
         placeholder={
-          !open ? 'Terminal closed' : running ? `Input for ${running}` : `Run in ${terminal.name}`
+          !open
+            ? 'Terminal closed'
+            : running
+              ? `Input for ${running}`
+              : `Run in ${terminalName(terminal)}`
         }
         onChange={(e) => {
           setValue(e.target.value);

@@ -74,9 +74,10 @@ export function Hud() {
       <Link
         href={routes.overview}
         aria-label="c-board overview"
-        className="rounded-chip text-body text-text-1"
+        className="shrink-0 whitespace-nowrap rounded-chip text-body text-text-1"
       >
-        <Wordmark />
+        {/* The smallest phones need the room for the counters; the link keeps its label. */}
+        <Wordmark nameClassName="max-[23rem]:sr-only" />
       </Link>
       <ul
         aria-label="Activity"

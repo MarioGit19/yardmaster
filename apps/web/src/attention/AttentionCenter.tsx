@@ -108,14 +108,23 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
   const caption = sessionCaption(session, approval);
+  const title = session.title?.trim() || null;
   const href = project ? sessionHref(project.id, session.id) : null;
   const body = (
     <>
       {project && <ProjectAvatar project={project} />}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-body-sm text-text-1">
-          {project?.name ?? 'No project'}
-          {session.title && <span className="text-text-3"> · {session.title}</span>}
+        {/* Name and title shrink in proportion, so a long project name can't hide the title. */}
+        <span className="flex min-w-0 text-body-sm">
+          <span className="min-w-0 truncate text-text-1" title={project?.name}>
+            {project?.name ?? 'No project'}
+          </span>
+          {title && (
+            <span className="min-w-0 truncate text-text-3" title={title}>
+              <span aria-hidden>&nbsp;·&nbsp;</span>
+              {title}
+            </span>
+          )}
         </span>
         <StatusDot tone="wait" label={caption.text} showLabel className="text-label text-st-wait" />
       </span>

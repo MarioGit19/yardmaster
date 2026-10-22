@@ -18,11 +18,17 @@ export function Logomark({ className }: { className?: string }) {
 }
 
 /** Logomark plus the `c-board` wordmark in Geist Mono 500 (DESIGN.md §4.9). */
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({
+  className,
+  nameClassName,
+}: {
+  className?: string;
+  nameClassName?: string;
+}) {
   return (
     <span className={cx('inline-flex items-center gap-2 font-medium font-mono', className)}>
       <Logomark className="size-5 text-text-2" />
-      c-board
+      <span className={nameClassName}>c-board</span>
     </span>
   );
 }

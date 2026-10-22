@@ -333,10 +333,13 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: "crashed" = an open terminal whose newest command exited non-zero (Ctrl+C/130 excluded), so a failed test run also turns its pod rose (without reordering it). The demo gained a quiet sixth project (`field-notes`) and a `storybook` server that crashes once and stays down, so each state is on screen.
   - Note: the focus header caption shows from `md` up; on phones the Attention Center carries Allow / Deny. Motion's WAAPI fades don't follow Playwright's fake clock, so the dim e2e finishes the fade before reading the opacity.
 
-- [ ] **7.14 Worst-case data pass (break-ui)**
+- [x] **7.14 Worst-case data pass (break-ui)**
   - Use the `break-ui` skill on ProjectPod (including 6+ sessions, which means 6+ mascots), SessionRow (very long captions), TerminalLane, TerminalPeek, ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
   - **Done when:** the screenshots of `?worst=1` at all widths show no overflow, overlap or broken alignment.
   - **Verify:** `pnpm shots`
+  - Note: `?worst=1` only does something on a `--demo` server: the page passes it to `/ws/ui`, which then serves a separate, mostly static worst-case board (`apps/server/src/demo/worst.ts`). Shots: `worst-*` at 1920/1440/1024/390/320 in both themes.
+  - Note: Fixed: billions shown as "11479M" and 999,949 as "1000k" (`formatCount` now has B/T), emoji names broke the avatar initial (now grapheme-based, skips emoji), the wordmark wrapped at 320 px, the header crew covered the name and git line in narrow pods (the crew thins out and git counts drop away using container queries), unnamed terminals showed a blank label, a long project name hid the session title in the Attention Center, the crash dot pushed 3-digit exit badges out of their track, and RTL assistant lines now get `dir="auto"`.
+  - Note: ApprovalCard doesn't exist yet (8.4), so the Attention Center rows were checked in its place. The header crew is still capped at 3 (`MAX_CREW`), so 6+ sessions show 3 mascots plus "N more sessions". On phones, lane names are cut off at the end ("worker-12…"), so similar names look the same; the full name is in the tooltip and the focus view.
 
 - [ ] **7.15 Motion review pass**
   - Run `review-animations` across `apps/web/src`, then `find-animation-opportunities` for the overview and focus views. Apply the fixes and opportunities that fit DESIGN.md §3–4 (reject the rest, with a one-line reason in a Note). Recheck Reduced/Off motion levels.
