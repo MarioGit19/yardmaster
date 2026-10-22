@@ -148,10 +148,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 4 — Claude observation (hooks and transcripts)
 
-- [ ] **4.1 Hook ingest endpoint**
+- [x] **4.1 Hook ingest endpoint**
   - `POST /api/hooks/claude` (token header). Parse with the protocol schemas, then upsert the project (from `cwd`) and the session, and drive the **status state machine** (PRD §4.2) in a pure, unit-tested `sessionReducer(session, event)`. Record the current tool (name plus a short summary of `tool_input`, such as the command, file path or pattern), the last assistant message (from `Stop.last_assistant_message`), and the error (`StopFailure`). Respond 204 quickly; the processing is async.
   - **Done when:** the reducer table tests cover every transition, and an endpoint test using fixtures updates the store.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: Code is in `apps/server/src/claude/` (`session-reducer.ts`, `hook-ingest.ts`). Events are applied in arrival order through a queue. A cwd maps to the deepest known project that contains it; if none does, a `hook` project is created at the cwd's realpath (no git-root detection yet). The route expects `Content-Type: application/json` (body limit 4 MB), so the 4.2 script must send that header. Activity rows keep `tool_input` with strings clipped to 1 000 chars. In demo mode hooks are counted but not applied. Limitation: terminal sessions get no hook when a permission is granted, so they stay `waiting_permission` until the tool's PostToolUse arrives. `toolFamily()`/`toolInputDetail()` moved into protocol (the demo uses them too).
 
 - [ ] **4.2 Hook script**
   - `packages/hook/bin/c-board-hook` in POSIX sh, per the PRD §6.1 "Observer hook contract". Reads `CBOARD_HOME` (default `~/.c-board`) and `CBOARD_PORT`, sends `X-CBoard-Claude-Pid: $PPID`, uses `curl -s -m 1`, stays silent on stdout, and always exits 0. Run shellcheck if it's available.

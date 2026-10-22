@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { type ActivityEvent, type ActivityKind, Pid, Timestamp } from './domain.js';
+import {
+  type ActivityEvent,
+  type ActivityKind,
+  Pid,
+  Timestamp,
+  type ToolFamily,
+} from './domain.js';
 
 // Claude Code hook stdin payloads, PRD §6.1. Schemas are permissive: unknown fields pass
 // through and event-specific fields are optional, because the payloads change between
@@ -152,9 +158,9 @@ function field(input: unknown, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-/** Short caption for a tool call, e.g. `Bash: pnpm test` or `Edit: src/cart.ts`. */
-export function summarizeToolInput(tool: string, input: unknown): string {
-  const detail =
+/** The most telling `tool_input` field (command, file path, pattern, …), or undefined. */
+export function toolInputDetail(input: unknown): string | undefined {
+  return (
     field(input, 'command') ??
     field(input, 'file_path') ??
     field(input, 'notebook_path') ??
@@ -162,8 +168,35 @@ export function summarizeToolInput(tool: string, input: unknown): string {
     field(input, 'url') ??
     field(input, 'query') ??
     field(input, 'description') ??
-    field(input, 'path');
+    field(input, 'path')
+  );
+}
+
+/** Short caption for a tool call, e.g. `Bash: pnpm test` or `Edit: src/cart.ts`. */
+export function summarizeToolInput(tool: string, input: unknown): string {
+  const detail = toolInputDetail(input);
   return clip(detail ? `${tool}: ${detail}` : tool) ?? tool;
+}
+
+const TOOL_FAMILIES: Record<string, ToolFamily> = {
+  Bash: 'bash',
+  BashOutput: 'bash',
+  Edit: 'edit',
+  Write: 'edit',
+  MultiEdit: 'edit',
+  NotebookEdit: 'edit',
+  Read: 'read',
+  Grep: 'search',
+  Glob: 'search',
+  WebFetch: 'web',
+  WebSearch: 'web',
+  Task: 'task',
+  Agent: 'task',
+  TodoWrite: 'todo',
+};
+
+export function toolFamily(tool: string): ToolFamily {
+  return Object.hasOwn(TOOL_FAMILIES, tool) ? (TOOL_FAMILIES[tool] as ToolFamily) : 'other';
 }
 
 function errorText(error: unknown): string | undefined {

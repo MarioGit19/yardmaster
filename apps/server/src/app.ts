@@ -3,6 +3,7 @@ import websocket from '@fastify/websocket';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
+import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { Persistence } from './persistence.js';
@@ -49,6 +50,7 @@ declare module 'fastify' {
     demo: DemoSimulator | null;
     /** Updated by the hook ingest; reported by `GET /api/status`. */
     hookStats: HookStats;
+    hookIngest: HookIngest;
   }
 }
 
@@ -84,6 +86,7 @@ export async function buildServer(
   app.decorate('settings', persistence.loadSettings());
   app.addHook('onClose', async () => {
     demo?.stop();
+    await hookIngest.idle();
     // Emit any changes made since the last microtask so they reach the database.
     store.flush();
     persistence.close();
@@ -115,7 +118,20 @@ export async function buildServer(
   app.decorate('demo', demo);
 
   const startedAt = Date.now();
-  app.decorate('hookStats', { received: 0, lastAt: null } satisfies HookStats);
+  const hookStats: HookStats = { received: 0, lastAt: null };
+  app.decorate('hookStats', hookStats);
+  const hookIngest = new HookIngest({
+    store,
+    logger: logger.child({ component: 'hooks' }),
+    apply: demo === null,
+    onReceived: (ts) => {
+      hookStats.received += 1;
+      hookStats.lastAt = ts;
+    },
+    onActivity: (event) => persistence.recordActivity(event),
+  });
+  app.decorate('hookIngest', hookIngest);
+  registerHookRoute(app, hookIngest);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
   app.get(

@@ -12,7 +12,7 @@ import {
   type ResumableSessionStatus,
   type ServerToUi,
   type ToolActivity,
-  type ToolFamily,
+  toolFamily,
 } from '@c-board/protocol';
 import type { ActionResult } from '../actions.js';
 import type { BoardStore } from '../store.js';
@@ -86,20 +86,6 @@ interface SessionCtx {
   turn: Turn | null;
   approval: Approval | null;
 }
-
-const TOOL_FAMILIES: Record<string, ToolFamily> = {
-  Bash: 'bash',
-  Edit: 'edit',
-  Write: 'edit',
-  MultiEdit: 'edit',
-  Read: 'read',
-  Grep: 'search',
-  Glob: 'search',
-  WebFetch: 'web',
-  WebSearch: 'web',
-  Task: 'task',
-  TodoWrite: 'todo',
-};
 
 /**
  * Synthetic board for `--demo`: five fictional projects with dev servers, test runs, shells
@@ -464,7 +450,7 @@ export class DemoSimulator {
       id: toolUseId,
       sessionId: session.id,
       tool: tool.tool,
-      family: TOOL_FAMILIES[tool.tool] ?? 'other',
+      family: toolFamily(tool.tool),
       summary: tool.summary,
       startedAt: this.now(),
       endedAt: null,
