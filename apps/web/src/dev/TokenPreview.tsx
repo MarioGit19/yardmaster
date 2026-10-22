@@ -12,6 +12,7 @@ import {
 import { usePreference } from '../prefs.js';
 import { ACCENT_HUES } from '../theme/accents.js';
 import { THEME_SETTINGS, type Theme, useTheme } from '../theme/theme.js';
+import { OrbShowcase } from './OrbShowcase.js';
 
 const SURFACES = ['bg-0', 'bg-1', 'bg-2', 'glass'] as const;
 const LINES = ['line', 'line-strong'] as const;
@@ -369,6 +370,12 @@ export default function TokenPreview() {
             </div>
           </div>
         </Section>
+
+        <div className="lg:col-span-2">
+          <Section title="Claude Orb">
+            <OrbShowcase />
+          </Section>
+        </div>
 
         <Section title="Ambient field">
           <AmbientControls level={level} />

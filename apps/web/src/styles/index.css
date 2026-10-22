@@ -188,6 +188,19 @@
   animation-name: fade-in;
 }
 
+/* Idle orbs breathe on the compositor, so they register no frame callbacks. */
+@keyframes orb-breathe {
+  50% {
+    transform: scale(0.98);
+  }
+}
+.orb-breathe {
+  animation: orb-breathe 4s var(--ease-in-out) infinite;
+}
+[data-motion="reduced"] .orb-breathe {
+  animation: none;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

@@ -252,10 +252,11 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm --filter @c-board/web build && pnpm shots`
   - Note: mounted once in `App` (so `/#/_tokens` gets it too). Reduced/Off and no-WebGL use the static CSS field; energy and attention only cross-fade it. Throughput is derived from `Execution.outputBytes` deltas sampled at 4 Hz. Pods carry `data-pod` so the amber bloom finds the waiting project (falling back to its rail link).
 
-- [ ] **7.2 Shared animation scheduler and ClaudeOrb**
+- [x] **7.2 Shared animation scheduler and ClaudeOrb**
   - A single rAF scheduler (`useFrame(cb, {visible})`) with IntersectionObserver gating. `ClaudeOrb` on canvas implements every state in DESIGN.md §4.2, including tool-family particle colors, subagent satellites, the waiting ripple and countdown ring, and the error glitch. Add a showcase on `/#/_tokens` with every state side by side.
   - **Done when:** the showcase renders all states, and the scheduler is unit tested (registers, unregisters, pauses).
   - **Verify:** `pnpm --filter @c-board/web test && pnpm shots`
+  - Note: idle orbs breathe with a CSS transform and register no frame callbacks (DESIGN.md §4.10); error and ended draw once. Added `--orb-*` family tokens, an `expand` effect so leaving compacting eases back to size, and ✕ / ! glyphs on error and waiting orbs ≥ 36 px as the non-color cue (§8).
 
 - [ ] **7.2b Crew mascot**
   - `CrewMascot` per DESIGN.md §4.11: an original SVG character built from part groups, with every state in the table (sleeping, idle, watching, thinking, typing, reading, running, delegating, waiting, error, done) as Motion variants. Blended transitions, per-instance randomized blinks and look-arounds, three sizes (24/56/120 px) with the detail rules, the session color on the visor and antenna (the antenna tip is `ClaudeOrb`), a mini-crew subagent pop-in and pop-out, pausing when off screen, and static poses for Reduced and Off. Add a pure `mascotStateFor(session, terminals)` mapping with unit tests. Add a "character sheet" on `/#/_tokens` showing every state at every size, with a state switcher. Use the `animate` and `apple-design` skills, and run `review-animations` on it before finishing.

@@ -48,6 +48,12 @@
   --field-floor: rgb(18 28 72 / 0.22);
   --field-amber: rgb(58 37 8 / 0.7);
 
+  /* Orb particle colors per tool family (DESIGN.md §4.2); Bash uses --st-tool. */
+  --orb-edit: oklch(0.72 0.16 300);
+  --orb-read: oklch(0.7 0.15 250);
+  --orb-web: oklch(0.78 0.12 178);
+  --orb-task: oklch(0.74 0.16 350);
+
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
 }
@@ -80,4 +86,9 @@
   --field-violet: rgb(233 224 244 / 0.7);
   --field-floor: rgb(221 227 246 / 0.3);
   --field-amber: rgb(248 226 189 / 0.75);
+
+  --orb-edit: oklch(0.6 0.16 300);
+  --orb-read: oklch(0.58 0.15 250);
+  --orb-web: oklch(0.66 0.12 178);
+  --orb-task: oklch(0.62 0.16 350);
 }

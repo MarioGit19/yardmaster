@@ -63,3 +63,36 @@ test.describe('ambient field', () => {
     await page.screenshot({ path: new URL('ambient-reduced.png', OUT_DIR).pathname });
   });
 });
+
+// Every ClaudeOrb state side by side on /_tokens, in both themes and at Reduced.
+test.describe('claude orb', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+      test('showcase', async ({ page }) => {
+        await page.goto('/#/_tokens');
+        const section = page.locator('section', {
+          has: page.getByRole('heading', { name: 'Claude Orb' }),
+        });
+        await section.scrollIntoViewIfNeeded();
+        await expect(section.locator('[data-orb]')).toHaveCount(18);
+        // Past the entrance effects (state switch at 450 ms, ripple 900 ms).
+        await page.waitForTimeout(1800);
+        await section.screenshot({ path: new URL(`orb-showcase-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+
+  test('reduced', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.goto('/#/_tokens');
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Claude Orb' }),
+    });
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await section.screenshot({ path: new URL('orb-showcase-reduced.png', OUT_DIR).pathname });
+  });
+});
