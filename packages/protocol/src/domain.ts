@@ -292,6 +292,8 @@ export const ClaudeSession = z.object({
   claudePid: Pid.nullable(),
   transcriptPath: z.string().nullable(),
   lastAssistantText: z.string().nullable(),
+  /** Board sessions: the assistant text still streaming in, until its message lands. */
+  draft: z.string().max(100_000).nullable().optional(),
   startedAt: Timestamp,
   updatedAt: Timestamp,
   endedAt: Timestamp.nullable(),

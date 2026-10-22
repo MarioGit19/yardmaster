@@ -386,11 +386,13 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 
 ## Phase 8 — Act: headless sessions and approvals
 
-- [ ] **8.1 SessionRunner (Agent SDK)**
+- [x] **8.1 SessionRunner (Agent SDK)**
   - `apps/server/src/claude/runner.ts`: `startSession({projectId, prompt, model?, permissionMode?})` and `resumeSession(sessionId)`, using `query()` in streaming-input mode (an async queue), `cwd` = project path, `includePartialMessages: true`, and default `settingSources`. Map the `SDKMessage`s (`assistant`, `user`, `result`, `system/session_state_changed`, `stream_event` partials) into the store and transcript stream. Controls: `send`, `interrupt`, `setModel`, `setPermissionMode` and `close`. Expose them as UI actions.
   - Tests mock the SDK module (never call the real API in tests).
   - **Done when:** mocked-SDK tests cover start, multi-turn send, partial streaming, interrupt and resume.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: New sessions get their id up front (`sessionId` option), so the store and transcript stream exist before the SDK answers. SDK messages feed the transcript stream through `TranscriptService.claim/feed/release` (the file isn't tailed while the runner owns the session; tailing resumes from the file's end after close). Prompts are echoed into the transcript by the runner, since the SDK doesn't echo them.
+  - Note: Partial text streams into a new optional `ClaudeSession.draft` field (throttled to 50 ms, cleared when the block's assistant message lands). The UI doesn't render it yet: that's 8.3. `session.resume` gained an optional `projectId` so the history browser can resume sessions the board hasn't seen live. A non-fork resume of a live terminal session is refused (`session_live`); `send` to a stopped board session resumes it first.
 
 - [ ] **8.2 Approvals via canUseTool**
   - The `canUseTool` callback creates an `Approval` (tool, input, suggestions, blockedPath) and awaits the UI decision, honouring `signal` abort. Decisions: allow once, always (returns `updatedPermissions` from `suggestions`), or deny with a message. There's a configurable timeout (default none for board sessions). Add `approval.new` and `approval.resolved` messages.

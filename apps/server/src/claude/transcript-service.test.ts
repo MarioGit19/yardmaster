@@ -243,6 +243,55 @@ describe('TranscriptService', () => {
     expect(store.state.sessions[FIXTURE_SESSION_ID]?.contextTokens).toBeNull();
   });
 
+  it('takes live messages from the runner for a claimed session, then tails after release', async () => {
+    // Complete lines only: the fixture ends mid-line.
+    await writeFile(path, fixture.slice(0, fixture.lastIndexOf('\n') + 1));
+    const watcher = manualWatcher();
+    const history = vi.fn<HistoryLoader>(async () => []);
+    const { store, service } = setup({ watchFile: watcher.watchFile, loadHistory: history });
+    service.claim(FIXTURE_SESSION_ID);
+    store.upsertSession({ id: FIXTURE_SESSION_ID, cwd: FIXTURE_CWD, transcriptPath: path });
+    // Fed before the store's patch arrives: it queues behind the history load.
+    service.feed(FIXTURE_SESSION_ID, [
+      { type: 'user', uuid: 'live-1', message: { role: 'user', content: 'Live prompt' } },
+    ]);
+    await settled(service);
+
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(watcher.watched.has(path)).toBe(false);
+    expect(service.messages(FIXTURE_SESSION_ID).map((m) => m.kind === 'user' && m.text)).toEqual([
+      'Live prompt',
+    ]);
+
+    // Duplicates by uuid are dropped, as with history.
+    service.feed(FIXTURE_SESSION_ID, [
+      { type: 'user', uuid: 'live-1', message: { role: 'user', content: 'Live prompt' } },
+    ]);
+    await settled(service);
+    expect(service.messages(FIXTURE_SESSION_ID)).toHaveLength(1);
+
+    service.release(FIXTURE_SESSION_ID);
+    await settled(service);
+    expect(watcher.watched.has(path)).toBe(true);
+    // The file's existing lines were written by the runner's session: not replayed.
+    expect(service.messages(FIXTURE_SESSION_ID)).toHaveLength(1);
+
+    await appendFile(
+      path,
+      `${JSON.stringify({
+        type: 'user',
+        uuid: '0b1c2d3e-0000-4000-8000-00000000000e',
+        message: { role: 'user', content: 'Typed in a terminal' },
+      })}\n`,
+    );
+    watcher.fire();
+    await settled(service);
+    expect(service.messages(FIXTURE_SESSION_ID).at(-1)).toMatchObject({
+      kind: 'user',
+      text: 'Typed in a terminal',
+    });
+  });
+
   it('follows a real file with the default chokidar watcher', async () => {
     await writeFile(path, `${fixture.split('\n').slice(0, 3).join('\n')}\n`);
     const store = new BoardStore();

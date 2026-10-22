@@ -216,7 +216,7 @@ function stopSubagent(
   );
 }
 
-function toolSummary(input: unknown, cwd: string | null): string | null {
+export function toolSummary(input: unknown, cwd: string | null): string | null {
   let detail = toolInputDetail(input);
   if (detail === undefined) return null;
   if (cwd && detail.startsWith(`${cwd.replace(/\/+$/, '')}/`)) {

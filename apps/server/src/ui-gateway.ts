@@ -42,6 +42,8 @@ export interface UiGatewayOptions {
   dispatch: ActionDispatcher;
   /** Handles `approval.decide`. Defaults to `not_implemented`. */
   decideApproval?: (decision: ApprovalDecision) => ActionResult | Promise<ActionResult>;
+  /** Handles `session.send`. Defaults to `not_implemented`. */
+  sendToSession?: (sessionId: string, text: string) => ActionResult | Promise<ActionResult>;
   /** The Pulse window's events (oldest first), sent to each client after its snapshot. */
   recentActivity?: () => ActivityEvent[];
   logger: FastifyBaseLogger;
@@ -68,6 +70,7 @@ export class UiGateway {
   private readonly transcripts: StreamSource | undefined;
   private readonly dispatch: ActionDispatcher;
   private readonly decideApproval: NonNullable<UiGatewayOptions['decideApproval']>;
+  private readonly sendToSession: NonNullable<UiGatewayOptions['sendToSession']>;
   private readonly recentActivity: () => ActivityEvent[];
   private readonly log: FastifyBaseLogger;
   private readonly patchIntervalMs: number;
@@ -86,6 +89,8 @@ export class UiGateway {
     this.dispatch = options.dispatch;
     this.decideApproval =
       options.decideApproval ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
+    this.sendToSession =
+      options.sendToSession ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
     this.recentActivity = options.recentActivity ?? (() => []);
     this.log = options.logger;
     this.patchIntervalMs = options.patchIntervalMs ?? PATCH_INTERVAL_MS;
@@ -183,19 +188,16 @@ export class UiGateway {
         return;
       }
       case 'approval.decide': {
-        let result: ActionResult;
-        try {
-          result = await this.decideApproval(message.payload);
-        } catch (error) {
-          result = { ok: false, error: error instanceof Error ? error.message : 'action_failed' };
-        }
+        const result = await settle(() => this.decideApproval(message.payload));
         this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
         return;
       }
-      case 'session.send':
-        // Wired up with the session manager (phase 4+).
-        this.reply(client, message.id, false, NOT_IMPLEMENTED);
+      case 'session.send': {
+        const { sessionId, text } = message.payload;
+        const result = await settle(() => this.sendToSession(sessionId, text));
+        this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
         return;
+      }
     }
   }
 
@@ -299,6 +301,14 @@ export class UiGateway {
 
   private sendRaw(client: Client, data: string): void {
     if (client.socket.readyState === client.socket.OPEN) client.socket.send(data);
+  }
+}
+
+async function settle(run: () => ActionResult | Promise<ActionResult>): Promise<ActionResult> {
+  try {
+    return await run();
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'action_failed' };
   }
 }
 

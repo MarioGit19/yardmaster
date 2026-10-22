@@ -248,7 +248,12 @@ export const UiAction = z.discriminatedUnion('kind', [
     model: z.string().min(1).max(128).optional(),
     permissionMode: PermissionMode.optional(),
   }),
-  action('session.resume', { sessionId: SessionId, fork: z.boolean().optional() }),
+  /** `projectId` locates past sessions the board hasn't seen live (the history browser). */
+  action('session.resume', {
+    sessionId: SessionId,
+    projectId: ProjectId.optional(),
+    fork: z.boolean().optional(),
+  }),
   /** Opens a terminal in the project's editor window running `claude --resume <id>` (F17). */
   action('session.resumeInEditor', { projectId: ProjectId, sessionId: SessionId }),
   action('session.interrupt', { sessionId: SessionId }),

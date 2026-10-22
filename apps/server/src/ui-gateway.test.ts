@@ -368,6 +368,21 @@ describe('/ws/ui messages', () => {
   });
 });
 
+describe('/ws/ui session.send', () => {
+  it('routes to the session runner', async () => {
+    const { port, origin } = await boot();
+    const client = await connect(port, origin);
+    await client.nextOf('snapshot');
+
+    client.send('session.send', { sessionId: 'sess-unknown', text: 'hello' }, 'send-1');
+    expect((await client.nextOf('action.result')).payload).toEqual({
+      id: 'send-1',
+      ok: false,
+      error: 'session_not_running',
+    });
+  });
+});
+
 describe('action dispatcher', () => {
   it('turns handler errors into a failed result', async () => {
     const dispatch = createActionDispatcher({

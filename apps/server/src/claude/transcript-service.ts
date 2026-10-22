@@ -75,6 +75,8 @@ export class TranscriptService {
   private readonly maxBytes: number;
   private readonly sessions = new Map<string, Tracked>();
   private readonly listeners = new Set<TranscriptDataListener>();
+  /** Sessions whose live messages come from the SDK runner instead of the file tail. */
+  private readonly fed = new Set<string>();
   private readonly detach: () => void;
   private loads = 0;
   private readonly waiting: (() => void)[] = [];
@@ -119,6 +121,29 @@ export class TranscriptService {
       if (message) out.push(message);
     }
     return out;
+  }
+
+  /**
+   * Hands a session's live messages to the caller (the SDK runner): history still loads,
+   * but the file isn't tailed until `release`. Call before the session reaches the store.
+   */
+  claim(sessionId: string): void {
+    this.fed.add(sessionId);
+  }
+
+  /** Raw SDK messages of a claimed session, queued behind its history load. */
+  feed(sessionId: string, entries: readonly unknown[]): void {
+    // The store's patch (which starts tracking) may not have fired yet.
+    if (!this.sessions.has(sessionId)) this.sync(sessionId);
+    const t = this.sessions.get(sessionId);
+    if (t) this.enqueue(t, async () => this.ingest(t, entries));
+  }
+
+  /** Goes back to tailing the transcript file, from its current end. */
+  release(sessionId: string): void {
+    if (!this.fed.delete(sessionId)) return;
+    const t = this.sessions.get(sessionId);
+    if (t) this.enqueue(t, () => this.tailFromEnd(t));
   }
 
   onData(listener: TranscriptDataListener): () => void {
@@ -177,7 +202,7 @@ export class TranscriptService {
     }
     const t = tracked;
     const path = this.pathFor(session);
-    if (path !== null && path !== t.path && !t.ended) {
+    if (path !== null && path !== t.path && !t.ended && !this.fed.has(id)) {
       // The hook reported the real path after we guessed one from the cwd.
       this.enqueue(t, () => this.repoint(t, path));
     }
@@ -195,7 +220,8 @@ export class TranscriptService {
     if (t.closed || !session) return;
     const path = this.pathFor(session);
     t.path = path;
-    t.tail = path === null ? null : new JsonlTail(path);
+    const fed = this.fed.has(t.id);
+    t.tail = path === null || fed ? null : new JsonlTail(path);
     t.ended ||= session.status.kind === 'ended';
 
     const sizeBefore = path === null ? 0 : await fileSize(path);
@@ -205,6 +231,17 @@ export class TranscriptService {
       await t.tail?.seekToLineEnd(sizeBefore);
     }
     await this.readNew(t);
+    if (!t.ended && !fed) this.startWatching(t);
+  }
+
+  private async tailFromEnd(t: Tracked): Promise<void> {
+    const session = this.store.state.sessions[t.id];
+    if (t.closed || !session || this.fed.has(t.id)) return;
+    const path = this.pathFor(session);
+    t.path = path;
+    if (path === null) return;
+    t.tail = new JsonlTail(path);
+    await t.tail.seekToLineEnd(await fileSize(path));
     if (!t.ended) this.startWatching(t);
   }
 
@@ -303,6 +340,7 @@ export class TranscriptService {
 
   private forget(t: Tracked): void {
     t.closed = true;
+    this.fed.delete(t.id);
     this.sessions.delete(t.id);
     this.enqueue(t, () => this.stopWatching(t));
   }

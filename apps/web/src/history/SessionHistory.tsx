@@ -157,7 +157,10 @@ function HistoryRow({
           icon={<Play strokeWidth={1.5} />}
           tooltipSide="top"
           onClick={() =>
-            run({ kind: 'session.resume', sessionId: entry.id }, `Resuming “${title}”`)
+            run(
+              { kind: 'session.resume', sessionId: entry.id, projectId: entry.projectId },
+              `Resuming “${title}”`,
+            )
           }
         />
         <IconButton

@@ -12,6 +12,7 @@ import { pino } from 'pino';
 import { z } from 'zod';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
+import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
@@ -63,6 +64,8 @@ export interface BuildOptions {
   webRoot?: string;
   /** Transcript reader tuning, for tests. Not started in demo mode. */
   transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
+  /** Board session runner tuning (tests inject a mocked `query`). Not started in demo mode. */
+  runner?: Pick<SessionRunnerOptions, 'query' | 'newId' | 'draftIntervalMs'>;
   /** Session registry discovery tuning, for tests. Not started in demo mode. */
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
   /** Editor link tuning, for tests. */
@@ -87,6 +90,7 @@ declare module 'fastify' {
     hookStats: HookStats;
     hookIngest: HookIngest;
     transcripts: TranscriptService | null;
+    sessionRunner: SessionRunner | null;
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
     sessionLinker: SessionLinker | null;
@@ -132,6 +136,7 @@ export async function buildServer(
     processScanner?.stop();
     sessionLinker?.stop();
     gitScanner?.stop();
+    await runner?.closeAll();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -169,6 +174,15 @@ export async function buildServer(
         ...options.transcripts,
       });
   app.decorate('transcripts', transcripts);
+  const runner = options.demo
+    ? null
+    : new SessionRunner({
+        store,
+        transcripts,
+        logger: logger.child({ component: 'runner' }),
+        ...options.runner,
+      });
+  app.decorate('sessionRunner', runner);
   const discovery = options.demo
     ? null
     : new SessionDiscovery({
@@ -214,6 +228,7 @@ export async function buildServer(
       router: editorRouter,
       send: editorGateway.sendCommand.bind(editorGateway),
     }),
+    ...runner?.actions(),
     // Demo windows have no socket, so the simulator plays the editor's part.
     ...demo?.terminalActions(),
   };
@@ -223,6 +238,7 @@ export async function buildServer(
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
     ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
+    ...(runner ? { sendToSession: runner.send.bind(runner) } : {}),
     recentActivity: () =>
       persistence.listActivity({ since: Date.now() - PULSE_WINDOW_MS, limit: MAX_ACTIVITY_BATCH }),
     logger: logger.child({ component: 'ui-ws' }),
