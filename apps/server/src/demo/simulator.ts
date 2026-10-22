@@ -670,7 +670,9 @@ export class DemoSimulator {
       this.store.setTerminalStats(terminal.id, {
         pid: terminal.shellPid,
         cpu: Math.round(cpu * 10) / 10,
-        rssBytes: Math.round((rssMb + this.rng.int(-30, 60)) * 1024 * 1024 * (busy ? 1 : 0.1)),
+        rssBytes: Math.round(
+          Math.max(rssMb / 2, rssMb + this.rng.int(-30, 60)) * 1024 * 1024 * (busy ? 1 : 0.1),
+        ),
         processCount: busy ? this.rng.int(2, 9) : 1,
         sampledAt: ts,
       });

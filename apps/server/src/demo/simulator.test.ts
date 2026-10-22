@@ -210,6 +210,23 @@ describe('DemoSimulator', () => {
     sim.stop();
   });
 
+  it('keeps every emitted state valid over 30 virtual seconds', () => {
+    for (const seed of [0xc0ffee, 1, 2, 3, 7, 42]) {
+      vi.setSystemTime(T0);
+      const { store, sim } = run({ seed });
+      sim.start();
+      for (let t = 0; t < 30_000; t += 100) {
+        vi.advanceTimersByTime(100);
+        const result = BoardState.safeParse(store.state);
+        expect(result.success, `seed ${seed} at ${t} ms: ${result.error?.message}`).toBe(true);
+      }
+      for (const terminal of Object.values(store.state.terminals)) {
+        if (terminal.stats) expect(terminal.stats.rssBytes).toBeGreaterThan(0);
+      }
+      sim.stop();
+    }
+  });
+
   it('is reproducible for a seed and stops cleanly', () => {
     const a = run({ seed: 7 });
     a.sim.start();
