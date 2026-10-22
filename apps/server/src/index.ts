@@ -20,6 +20,19 @@ export {
   TERMINAL_BUFFER_BYTES,
   terminalStreamId,
 } from './output-buffers.js';
+export {
+  ACTIVITY_RETENTION_MS,
+  type ActivityQuery,
+  DB_FILE,
+  MAX_WRITE_BATCH,
+  Persistence,
+  type PersistenceLogger,
+  type PersistenceOptions,
+  PRUNE_INTERVAL_MS,
+  SessionRecord,
+  toSessionRecord,
+  WRITE_DELAY_MS,
+} from './persistence.js';
 export { type ReadResult, RingBuffer, type StreamChunk } from './ring-buffer.js';
 export {
   createSessionValue,

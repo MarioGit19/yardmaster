@@ -1,7 +1,9 @@
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
 import type { ServerConfig } from './config.js';
+import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
+import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
 import { VERSION } from './version.js';
 
@@ -13,6 +15,17 @@ export interface HealthResponse {
 export interface BuildOptions {
   /** Install token. Defaults to reading (or creating) `<config.home>/token`. */
   token?: string;
+  /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`. */
+  dbPath?: string;
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    store: BoardStore;
+    persistence: Persistence;
+    /** Settings loaded from the database at boot. */
+    settings: Record<string, unknown>;
+  }
 }
 
 export async function buildServer(
@@ -29,6 +42,25 @@ export async function buildServer(
   const app = Fastify({
     loggerInstance: logger,
     logController: new LogController({ disableRequestLogging: true }),
+  });
+
+  const persistence = new Persistence({
+    home: config.home,
+    path: options.dbPath,
+    logger: logger.child({ component: 'db' }),
+  });
+  const store = new BoardStore();
+  for (const project of persistence.loadProjects()) store.upsertProject(project);
+  // Boot state is already on disk; only later changes need writing back.
+  store.flush();
+  persistence.attach(store);
+  app.decorate('store', store);
+  app.decorate('persistence', persistence);
+  app.decorate('settings', persistence.loadSettings());
+  app.addHook('onClose', async () => {
+    // Emit any changes made since the last microtask so they reach the database.
+    store.flush();
+    persistence.close();
   });
 
   registerSecurity(app, { config, token });

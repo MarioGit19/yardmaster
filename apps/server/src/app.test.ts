@@ -30,7 +30,7 @@ afterEach(async () => {
 
 describe('server', () => {
   it('GET /api/health returns ok and the package version', async () => {
-    app = await buildServer(config, { token });
+    app = await buildServer(config, { token, dbPath: ':memory:' });
     const res = await app.inject({ method: 'GET', url: '/api/health', headers: { host } });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -38,7 +38,7 @@ describe('server', () => {
   });
 
   it('returns 404 for unknown routes', async () => {
-    app = await buildServer(config, { token });
+    app = await buildServer(config, { token, dbPath: ':memory:' });
     const res = await app.inject({
       method: 'GET',
       url: '/api/nope',

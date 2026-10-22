@@ -81,10 +81,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `store.ts` (`BoardStore`), `output-buffers.ts` (`OutputBuffers`, stream ids `exec:`/`term:`), `ring-buffer.ts` (byte-capped `RingBuffer`; seqs are assigned by the buffer and keep counting across drops; `read(fromSeq)` reports `truncated`) and `osc.ts` (stateful OSC 633 stripper that handles sequences split across chunks). Patches auto-flush once per microtask (`autoFlush: false` + `flush()` for tests); 2.5 throttles them to ≤ 30/s. `appendExecOutput` ignores replayed sender seqs. Extra: executions are capped at 100 per terminal (oldest dropped with their buffers) so memory stays bounded. `@c-board/protocol` now has `exports` pointing at `src/index.ts`; packaging (2.7) may need a built entry.
 
-- [ ] **2.4 Persistence**
+- [x] **2.4 Persistence**
   - `node:sqlite` database at `~/.c-board/board.db`, with tables `projects`, `sessions` (metadata only), `activity` (events, 7-day retention, pruned hourly) and `settings` (k/v). Load projects and settings on boot. Write activity asynchronously in batches.
   - **Done when:** tests run against a temp `CBOARD_HOME` and verify persistence across restart and pruning.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `persistence.ts` (`Persistence`): JSON rows plus indexed columns, schema version in `PRAGMA user_version` (a newer schema refuses to open), WAL, file 0600. Projects, session records and activity are queued and written in one transaction per batch (250 ms or 500 items); settings write immediately. `attach(store)` mirrors store patches: removed projects are deleted, removed sessions keep their history row. `listActivity(query)` is ready for Pulse. Pruning also runs on open. `buildServer` decorates `app.store`, `app.persistence` and `app.settings`; `BuildOptions.dbPath` (`:memory:` in tests). Node 22–25 prints an `ExperimentalWarning` for `node:sqlite`.
 
 - [ ] **2.5 UI WebSocket gateway**
   - `/ws/ui` (Origin and cookie checked). On connect, send a `snapshot`, then coalesced `patch` batches (≤ 30/s). Support `subscribe {streamId, fromSeq}`: replay the buffer from seq, then stream live `stream.data`. Add backpressure: if `bufferedAmount` exceeds 4 MB, drop live data for that client and send a `resync` marker. Route `action` messages to a typed action dispatcher (stub handlers for now).
