@@ -18,7 +18,8 @@ export type PaletteRun =
   | { kind: 'motion'; next: MotionSetting }
   | { kind: 'theme'; next: ThemeSetting }
   | { kind: 'attention' }
-  | { kind: 'rail' };
+  | { kind: 'rail' }
+  | { kind: 'pulse' };
 
 export type PaletteIcon =
   | 'project'
@@ -34,6 +35,7 @@ export type PaletteIcon =
   | 'settings'
   | 'attention'
   | 'rail'
+  | 'pulse'
   | 'overview';
 
 export interface PaletteCommand {
@@ -332,6 +334,13 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       run: { kind: 'navigate', href: routes.settings },
     },
   );
+  commands.push({
+    id: 'pulse',
+    group: 'Actions',
+    label: 'Toggle the Pulse timeline',
+    icon: 'pulse',
+    run: { kind: 'pulse' },
+  });
   if (context.railToggle) {
     commands.push({
       id: 'rail',

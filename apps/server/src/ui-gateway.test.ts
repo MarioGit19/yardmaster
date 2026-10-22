@@ -1,6 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { AddressInfo } from 'node:net';
-import { applyPatch, emptyBoardState, type PatchOp, type ServerToUi } from '@c-board/protocol';
+import {
+  type ActivityEvent,
+  applyPatch,
+  emptyBoardState,
+  type PatchOp,
+  PULSE_WINDOW_MS,
+  type ServerToUi,
+} from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { pino } from 'pino';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -225,6 +232,38 @@ describe('/ws/ui patches', () => {
     store.removeProject(project.id);
     const patch = await second.nextOf('patch');
     expect(patch.payload.ops).toEqual([{ op: 'delete', path: ['projects', project.id] }]);
+  });
+});
+
+describe('/ws/ui activity', () => {
+  const event = (id: string, ts: number): ActivityEvent => ({
+    id,
+    ts,
+    kind: 'exec.end',
+    projectId: project.id,
+    sessionId: null,
+    terminalId: 'term-1',
+    execId: 'exec-1',
+    summary: 'pnpm test',
+    data: { exitCode: 1 },
+  });
+
+  it('replays the Pulse window after the snapshot, then pushes live batches', async () => {
+    const { port, origin } = await boot();
+    const now = Date.now();
+    app?.persistence.recordActivity(event('old', now - PULSE_WINDOW_MS - 60_000));
+    app?.persistence.recordActivity(event('recent', now - 60_000));
+    const client = await connect(port, origin);
+    expect((await client.next()).type).toBe('snapshot');
+    const replay = await client.next();
+    expect(replay.type).toBe('activity');
+    expect(replay.payload).toEqual({ events: [event('recent', now - 60_000)], replace: true });
+
+    app?.uiGateway.pushActivity(event('live-1', now));
+    app?.uiGateway.pushActivity(event('live-2', now + 1));
+    const live = await client.nextOf('activity');
+    expect(live.payload.replace).toBe(false);
+    expect(live.payload.events.map((e) => e.id)).toEqual(['live-1', 'live-2']);
   });
 });
 

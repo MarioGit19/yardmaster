@@ -463,3 +463,37 @@ test.describe('command palette', () => {
     });
   }
 });
+
+// The Pulse rail with a hovered dot's tooltip, and the Errors filter.
+test.describe('pulse rail', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+
+      test('tooltip', async ({ page }) => {
+        await openRoute(page, '/');
+        const rail = page.locator('[data-pulse]');
+        const canvas = rail.locator('canvas[data-pulse-canvas]');
+        await expect
+          .poll(async () => Number(await canvas.getAttribute('data-dots')))
+          .toBeGreaterThan(0);
+        await rail.getByRole('application').focus();
+        await page.keyboard.press('End');
+        for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowLeft');
+        await expect(rail.locator('[data-pulse-tooltip]')).toBeVisible();
+        await rail.screenshot({
+          path: new URL(`pulse-tooltip-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+        await rail.locator('[data-filter="errors"]').click();
+        await page.waitForTimeout(300);
+        await rail.screenshot({
+          path: new URL(`pulse-errors-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      });
+    });
+  }
+});

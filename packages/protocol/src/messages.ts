@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  ActivityEvent,
   Approval,
   ApprovalId,
   ApprovalState,
@@ -189,6 +190,16 @@ export const Toast = envelope(
     sessionId: SessionId.optional(),
   }),
 );
+/** How far back the Pulse rail looks; the server replays this window on connect. */
+export const PULSE_WINDOW_MS = 15 * 60_000;
+/**
+ * Activity events for the Pulse rail. `replace` carries the recent window on connect and
+ * replaces what the client holds; later batches append.
+ */
+export const ActivityBatch = envelope(
+  'activity',
+  z.object({ events: z.array(ActivityEvent).max(5_000), replace: z.boolean() }),
+);
 export const ApprovalNew = envelope('approval.new', z.object({ approval: Approval }));
 export const ApprovalResolved = envelope(
   'approval.resolved',
@@ -208,6 +219,7 @@ export const ServerToUi = z.discriminatedUnion('type', [
   StreamResync,
   ActionResult,
   Toast,
+  ActivityBatch,
   ApprovalNew,
   ApprovalResolved,
 ]);

@@ -1,4 +1,9 @@
-import type { HealthResponse, ServerStatus } from '@c-board/protocol';
+import {
+  type ActivityEvent,
+  type HealthResponse,
+  PULSE_WINDOW_MS,
+  type ServerStatus,
+} from '@c-board/protocol';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
@@ -24,6 +29,7 @@ import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
 import {
+  MAX_ACTIVITY_BATCH,
   MAX_UI_MESSAGE,
   registerUiGateway,
   UiGateway,
@@ -133,12 +139,18 @@ export async function buildServer(
   await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
   registerSecurity(app, { config, token });
 
+  // Stored for history and pushed live to the Pulse rail. Nothing emits before the app is ready.
+  const recordActivity = (event: ActivityEvent) => {
+    persistence.recordActivity(event);
+    gateway.pushActivity(event);
+  };
+
   // Constructed first so the gateway can route approvals to it; it starts once the app is ready.
   demo = options.demo
     ? new DemoSimulator({
         store,
         ...(typeof options.demo === 'object' ? { seed: options.demo.seed } : {}),
-        onActivity: (event) => persistence.recordActivity(event),
+        onActivity: recordActivity,
         onMessage: (message) => gateway.broadcast(message),
       })
     : null;
@@ -180,7 +192,7 @@ export async function buildServer(
     store,
     logger: logger.child({ component: 'editor-ws' }),
     apply: demo === null,
-    onActivity: (event) => persistence.recordActivity(event),
+    onActivity: recordActivity,
     ...options.editor,
   });
   app.decorate('editorGateway', editorGateway);
@@ -204,6 +216,8 @@ export async function buildServer(
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
     ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
+    recentActivity: () =>
+      persistence.listActivity({ since: Date.now() - PULSE_WINDOW_MS, limit: MAX_ACTIVITY_BATCH }),
     logger: logger.child({ component: 'ui-ws' }),
     ...options.gateway,
   });
@@ -233,7 +247,7 @@ export async function buildServer(
       hookStats.received += 1;
       hookStats.lastAt = ts;
     },
-    onActivity: (event) => persistence.recordActivity(event),
+    onActivity: recordActivity,
     onToolDone: (tool, projectId) => {
       if (projectId !== null && GIT_TOUCHING_TOOLS.has(tool)) gitScanner?.request(projectId);
     },

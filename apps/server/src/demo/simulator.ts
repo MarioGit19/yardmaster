@@ -131,6 +131,8 @@ export class DemoSimulator {
   private readonly rng: Rng;
   /** Transcript wording only, so it doesn't shift the simulation's own random sequence. */
   private readonly textRng: Rng;
+  /** The Pulse backfill only, for the same reason. */
+  private readonly pastRng: Rng;
   private readonly onActivity: (event: ActivityEvent) => void;
   private readonly onMessage: (message: ServerToUi) => void;
   private readonly permissionIntervalMs: number;
@@ -149,6 +151,7 @@ export class DemoSimulator {
     this.store = options.store;
     this.rng = new Rng(options.seed ?? 0xc0ffee);
     this.textRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x5eed);
+    this.pastRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x9a57);
     this.transcripts = options.transcripts ?? new DemoTranscripts();
     this.onActivity = options.onActivity ?? (() => {});
     this.onMessage = options.onMessage ?? (() => {});
@@ -164,7 +167,10 @@ export class DemoSimulator {
     if (this.running) return;
     this.running = true;
     this.seedBoard();
-    for (const terminal of this.terminals) this.bootTerminal(terminal);
+    for (const terminal of this.terminals) {
+      this.backfillTerminal(terminal);
+      this.bootTerminal(terminal);
+    }
     this.every(STATS_INTERVAL_MS, () => this.sampleStats());
     this.every(HEARTBEAT_INTERVAL_MS, () => {
       for (const project of this.projects) this.store.touchWindow(project.windowId);
@@ -321,6 +327,98 @@ export class DemoSimulator {
       case 'claude':
         this.after(this.rng.int(200, 2_000), () => this.launchClaude(terminal));
         return;
+    }
+  }
+
+  // Pulse backfill: the last 15 minutes of synthetic activity, so the rail isn't empty on load.
+
+  private pastEvent(
+    ts: number,
+    kind: ActivityKind,
+    terminal: TerminalCtx,
+    session: SessionCtx | null,
+    summary: string,
+    data: Record<string, unknown> = {},
+  ): void {
+    // A turn that would run into the present is cut off there.
+    if (ts > this.now() - 2_000) return;
+    this.onActivity({
+      id: `demo-past-${++this.seq}`,
+      ts,
+      kind,
+      projectId: terminal.project.id,
+      sessionId: session?.id ?? null,
+      terminalId: terminal.id,
+      execId: null,
+      summary,
+      data,
+    });
+  }
+
+  private backfillTerminal(terminal: TerminalCtx): void {
+    const rng = this.pastRng;
+    const now = this.now();
+    const { kind } = terminal.def;
+    if (kind === 'claude') return;
+    if (kind === 'next' || kind === 'vite' || kind === 'rails') {
+      // One earlier crash and restart for some dev servers.
+      if (!rng.chance(0.4)) return;
+      const command = DEV_SERVERS[kind].command;
+      const at = now - rng.int(6, 13) * 60_000;
+      this.pastEvent(at, 'exec.start', terminal, null, command);
+      this.pastEvent(at + rng.int(60, 240) * 1_000, 'exec.end', terminal, null, command, {
+        exitCode: 1,
+      });
+      return;
+    }
+    let at = now - rng.int(13, 14) * 60_000;
+    while (at < now - 20_000) {
+      const command = kind === 'jest' ? 'pnpm jest' : rng.pick(SHELL_COMMANDS).command;
+      const exitCode = kind === 'jest' && rng.chance(0.25) ? 1 : 0;
+      this.pastEvent(at, 'exec.start', terminal, null, command);
+      this.pastEvent(at + rng.int(800, 6_000), 'exec.end', terminal, null, command, { exitCode });
+      at += rng.int(kind === 'jest' ? 70 : 100, kind === 'jest' ? 160 : 260) * 1_000;
+    }
+  }
+
+  private backfillSession(session: SessionCtx): void {
+    const rng = this.pastRng;
+    const { terminal } = session;
+    const scenarios = session.project.def.scenarios;
+    const now = this.now();
+    let at = now - rng.int(12, 14) * 60_000;
+    this.pastEvent(at, 'session.start', terminal, session, 'Session started');
+    while (at < now - 60_000) {
+      const scenario = rng.pick(scenarios);
+      at += rng.int(10, 40) * 1_000;
+      this.pastEvent(at, 'prompt', terminal, session, scenario.prompt);
+      const tools = scenario.tools.length;
+      for (const tool of scenario.tools.slice(0, rng.int(Math.min(2, tools), tools))) {
+        at += rng.int(4, 18) * 1_000;
+        const label = `${tool.tool} ${tool.summary}`;
+        this.pastEvent(at, 'tool.start', terminal, session, label, { tool_name: tool.tool });
+        at += rng.int(1, 8) * 1_000;
+        const failed = rng.chance(0.06);
+        this.pastEvent(at, failed ? 'tool.error' : 'tool.end', terminal, session, label, {
+          tool_name: tool.tool,
+        });
+      }
+      const permission = scenario.permissions[0];
+      if (permission && rng.chance(0.3)) {
+        at += rng.int(2, 6) * 1_000;
+        this.pastEvent(
+          at,
+          'permission.request',
+          terminal,
+          session,
+          `${permission.tool} needs approval`,
+        );
+        at += rng.int(5, 40) * 1_000;
+        this.pastEvent(at, 'permission.decision', terminal, session, `${permission.tool} allowed`);
+      }
+      at += rng.int(3, 10) * 1_000;
+      this.pastEvent(at, 'stop', terminal, session, scenario.title);
+      at += rng.int(60, 200) * 1_000;
     }
   }
 
@@ -497,6 +595,7 @@ export class DemoSimulator {
     };
     this.sessions.set(id, session);
     this.seedTranscript(session, model);
+    this.backfillSession(session);
     terminal.session = session;
     // No hook yet: the session shows as "unknown, alive" until SessionStart.
     this.store.upsertSession({

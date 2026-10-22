@@ -312,10 +312,11 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm e2e`
   - Note: Own fuzzy matcher (word starts and runs, highlighted) with cmdk's filtering off. Project actions target the focused project; from the overview they appear per project once you type. Terminal sessions are interrupted with Esc sent to their terminal; session.create, session.interrupt and project.openInEditor still answer "Not available yet" until Phase 8 wires them.
 
-- [ ] **7.11 Pulse rail**
+- [x] **7.11 Pulse rail**
   - A bottom collapsible timeline with a 15-min window, project lanes, event dots colored by type that fly in, hover tooltips, click to navigate, filters (Claude, terminals, errors), all on canvas for performance.
   - **Done when:** it renders in the demo, and clicking a dot navigates.
   - **Verify:** `pnpm shots && pnpm e2e`
+  - Note: activity events had no path to the UI. Added an `activity` server→UI message (the 15-min window replayed after the snapshot, then live batches at the patch rate) and a synthetic 15-min backfill in the demo. Toggle from ⌘K ("Toggle the Pulse timeline"); dots are keyboard-navigable (arrows, Home/End, Enter).
 
 - [ ] **7.12 Git panel and session history**
   - `GitPanel` (branch, ahead/behind, changed files grouped by status, last 5 commits). `SessionHistory` per project (SDK-backed list with AI title, date, tokens), with actions "Resume in board" (wired in Phase 8) and "Resume in Cursor" (`cmd.createTerminal` with `claude --resume <id>`).

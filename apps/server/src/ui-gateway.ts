@@ -1,4 +1,5 @@
 import {
+  type ActivityEvent,
   type ApprovalDecision,
   decodeUiToServer,
   encodeServerToUi,
@@ -20,6 +21,8 @@ export const UI_WS_PATH = '/ws/ui';
 export const PATCH_INTERVAL_MS = Math.ceil(1000 / 30);
 /** Past this much unsent data a client stops getting live output until it re-subscribes. */
 export const MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
+/** Most events in one `activity` message. */
+export const MAX_ACTIVITY_BATCH = 5_000;
 /** Largest UI → server message (characters). */
 export const MAX_UI_MESSAGE = 1024 * 1024;
 
@@ -37,6 +40,8 @@ export interface UiGatewayOptions {
   dispatch: ActionDispatcher;
   /** Handles `approval.decide`. Defaults to `not_implemented`. */
   decideApproval?: (decision: ApprovalDecision) => ActionResult | Promise<ActionResult>;
+  /** The Pulse window's events (oldest first), sent to each client after its snapshot. */
+  recentActivity?: () => ActivityEvent[];
   logger: FastifyBaseLogger;
   patchIntervalMs?: number;
   maxBufferedBytes?: number;
@@ -61,6 +66,7 @@ export class UiGateway {
   private readonly transcripts: StreamSource | undefined;
   private readonly dispatch: ActionDispatcher;
   private readonly decideApproval: NonNullable<UiGatewayOptions['decideApproval']>;
+  private readonly recentActivity: () => ActivityEvent[];
   private readonly log: FastifyBaseLogger;
   private readonly patchIntervalMs: number;
   private readonly maxBufferedBytes: number;
@@ -69,6 +75,8 @@ export class UiGateway {
   private pending: PatchOp[] = [];
   private timer: NodeJS.Timeout | undefined;
   private lastPatchAt = 0;
+  private activity: ActivityEvent[] = [];
+  private activityTimer: NodeJS.Timeout | undefined;
 
   constructor(options: UiGatewayOptions) {
     this.store = options.store;
@@ -76,6 +84,7 @@ export class UiGateway {
     this.dispatch = options.dispatch;
     this.decideApproval =
       options.decideApproval ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
+    this.recentActivity = options.recentActivity ?? (() => []);
     this.log = options.logger;
     this.patchIntervalMs = options.patchIntervalMs ?? PATCH_INTERVAL_MS;
     this.maxBufferedBytes = options.maxBufferedBytes ?? MAX_BUFFERED_BYTES;
@@ -113,6 +122,25 @@ export class UiGateway {
     socket.on('error', (error) => this.log.debug({ err: error }, 'ui socket error'));
 
     this.send(client, this.message('snapshot', { state: this.store.state }));
+    let recent: ActivityEvent[] = [];
+    try {
+      recent = this.recentActivity().slice(-MAX_ACTIVITY_BATCH);
+    } catch (error) {
+      this.log.error({ err: error }, 'could not read recent activity');
+    }
+    // Events still queued may repeat in the next live batch; the client drops duplicate ids.
+    this.send(client, this.message('activity', { events: recent, replace: true }));
+  }
+
+  /** Queues a new activity event; clients get them in batches at the patch rate. */
+  pushActivity(event: ActivityEvent): void {
+    if (this.clients.size === 0) return;
+    this.activity.push(event);
+    if (this.activity.length >= MAX_ACTIVITY_BATCH) {
+      this.flushActivity();
+      return;
+    }
+    this.activityTimer ??= setTimeout(() => this.flushActivity(), this.patchIntervalMs);
   }
 
   /** Sends a message (toast, approval, …) to every connected client. */
@@ -125,6 +153,9 @@ export class UiGateway {
   close(): void {
     clearTimeout(this.timer);
     this.timer = undefined;
+    clearTimeout(this.activityTimer);
+    this.activityTimer = undefined;
+    this.activity = [];
     for (const off of this.detach.splice(0)) off();
     for (const client of this.clients) client.socket.close(1001, 'server shutting down');
     this.clients.clear();
@@ -229,6 +260,14 @@ export class UiGateway {
       full ??= this.encode(this.message('patch', { ops }));
       if (full !== undefined) this.sendRaw(client, full);
     }
+  }
+
+  private flushActivity(): void {
+    clearTimeout(this.activityTimer);
+    this.activityTimer = undefined;
+    const events = this.activity;
+    this.activity = [];
+    if (events.length > 0) this.broadcast(this.message('activity', { events, replace: false }));
   }
 
   private reply(client: Client, id: string | undefined, ok: boolean, error?: string): void {

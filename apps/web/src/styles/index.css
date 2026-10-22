@@ -1128,3 +1128,17 @@
 .palette-item[data-selected="true"] .palette-enter {
   opacity: 1;
 }
+
+/* Pulse rail (DESIGN.md §4.7): the plot rises in when the rail expands. Reduced only fades. */
+@keyframes pulse-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.pulse-body {
+  animation: pulse-in 200ms var(--ease-out);
+}
+[data-motion="reduced"] .pulse-body {
+  animation: fade-in 200ms var(--ease-out);
+}

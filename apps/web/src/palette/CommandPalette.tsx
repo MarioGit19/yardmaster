@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Command } from 'cmdk';
 import {
+  Activity,
   ArrowLeft,
   BellDot,
   CheckCheck,
@@ -27,6 +28,7 @@ import { useBoard, useBoardClient } from '../data/index.js';
 import { useFocusRoute } from '../focus/FocusStage.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
+import { togglePulse } from '../pulse/prefs.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY, railPreference } from '../shell/prefs.js';
 import { actionErrorText } from '../terminal/stack.js';
@@ -58,6 +60,7 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   settings: Settings,
   attention: BellDot,
   rail: PanelLeft,
+  pulse: Activity,
   overview: LayoutGrid,
 };
 
@@ -232,6 +235,10 @@ function PaletteBody({
         keepFocus();
         close();
         attentionOpen.set('open');
+        return;
+      case 'pulse':
+        togglePulse();
+        close();
         return;
       case 'rail':
         railPreference.set(railPreference.get() === 'collapsed' ? 'expanded' : 'collapsed');

@@ -533,3 +533,29 @@ describe('BoardClient requests', () => {
     );
   });
 });
+
+describe('activity', () => {
+  it('feeds activity batches into the store', () => {
+    const { store, client, connect } = setup();
+    client.start();
+    const socket = connect();
+    const event = {
+      id: 'evt-1',
+      ts: T0,
+      kind: 'prompt' as const,
+      projectId: 'p-acme',
+      sessionId: null,
+      terminalId: null,
+      execId: null,
+      summary: 'Fix the cart',
+      data: {},
+    };
+    socket.receive(makeMessage<ServerToUi>('activity', { events: [event], replace: true }));
+    expect(store.getState().activity).toEqual([event]);
+    socket.receive(
+      makeMessage<ServerToUi>('activity', { events: [{ ...event, id: 'evt-2' }], replace: false }),
+    );
+    expect(store.getState().activity.map((e) => e.id)).toEqual(['evt-1', 'evt-2']);
+    client.stop();
+  });
+});

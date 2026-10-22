@@ -7,6 +7,7 @@ import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { MotionRoot } from './MotionRoot.js';
 import { CommandPalette } from './palette/CommandPalette.js';
+import { PulseRail } from './pulse/PulseRail.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
@@ -40,7 +41,11 @@ function Screens() {
   const focus = useFocusRoute();
   const board = onOverview || focus !== null;
   return (
-    <AppShell sheet={<AttentionCenter />} stage={board ? <FocusStage focus={focus} /> : undefined}>
+    <AppShell
+      sheet={<AttentionCenter />}
+      stage={board ? <FocusStage focus={focus} /> : undefined}
+      pulse={<PulseRail />}
+    >
       {board ? (
         <FocusBackdrop dimmed={focus !== null}>
           <Overview />

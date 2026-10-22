@@ -289,6 +289,9 @@ export class BoardClient {
         }
         this.store.getState().applyOps(message.payload.ops);
         return;
+      case 'activity':
+        this.store.getState().addActivity(message.payload.events, message.payload.replace);
+        return;
       case 'stream.data':
         this.onStreamData(message.payload.streamId, message.payload.seq, message.payload.chunk);
         return;

@@ -222,7 +222,7 @@ All messages are JSON envelopes `{ v: 1, type, id?, ts, payload }`.
 
 **Server → editor:** `cmd.sendText {terminalId, text, execute}`, `cmd.interrupt {terminalId}`, `cmd.createTerminal {cwd, name, command?}`, `cmd.focusTerminal`, `cmd.disposeTerminal`, `cmd.rerun {execId}`. Each command is acknowledged with `cmd.result {id, ok, error?}`.
 
-**Server → UI** (`/ws/ui`): `snapshot {state}` on connect, then `patch {ops[]}` coalesced to ≤ 30 per second, `stream.data {streamId, seq, chunk}` for subscribed terminal or execution output, `toast`, `approval.new/resolved`.
+**Server → UI** (`/ws/ui`): `snapshot {state}` on connect, then `patch {ops[]}` coalesced to ≤ 30 per second, `stream.data {streamId, seq, chunk}` for subscribed terminal or execution output, `toast`, `approval.new/resolved`, and `activity {events[], replace}` for the Pulse timeline (the last 15 min right after the snapshot, then live batches).
 
 **UI → server:** `subscribe/unsubscribe {streamId, fromSeq?}`, `action {kind, …}` (every user action, validated with zod), `session.send {sessionId, text}`, `approval.decide {approvalId, decision}`.
 

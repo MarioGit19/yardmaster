@@ -84,6 +84,22 @@ const serverToUi: ServerToUi[] = [
   env('stream.resync', { streamId: 'term:term-1', fromSeq: 42 }),
   env('action.result', { id: 'act-1', ok: false, error: 'not_implemented' }),
   env('toast', { level: 'warning', title: 'Approval needed', projectId: 'a1b2c3d4e5f6' }),
+  env('activity', {
+    replace: false,
+    events: [
+      {
+        id: 'evt-1',
+        ts: T0,
+        kind: 'exec.end',
+        projectId: 'a1b2c3d4e5f6',
+        sessionId: null,
+        terminalId: 'term-1',
+        execId: 'exec-1',
+        summary: 'pnpm test',
+        data: { exitCode: 1 },
+      },
+    ],
+  }),
   env('approval.new', { approval }),
   env('approval.resolved', { approvalId: approval.id, state: 'denied', reason: 'not now' }),
 ] as ServerToUi[];
