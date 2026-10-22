@@ -133,3 +133,63 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Tooltips: a quick fade and 2px settle from the trigger side. */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--tooltip-dx, 0), var(--tooltip-dy, 0)) scale(0.97);
+  }
+}
+
+.tooltip {
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation: tooltip-in 120ms var(--ease-out);
+}
+.tooltip[data-side="bottom"] {
+  --tooltip-dy: -2px;
+}
+.tooltip[data-side="top"] {
+  --tooltip-dy: 2px;
+}
+.tooltip[data-side="right"] {
+  --tooltip-dx: -2px;
+}
+.tooltip[data-side="left"] {
+  --tooltip-dx: 2px;
+}
+
+/* Skeleton shimmer: a soft highlight sweeping left to right (transform only). */
+@keyframes skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--glass-shimmer), transparent);
+  animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
+}
+
+/* Reduced motion keeps cross-fades only: skeletons and tooltips hold still. */
+[data-motion="reduced"] .skeleton::after {
+  animation: none;
+  opacity: 0;
+}
+[data-motion="reduced"] .tooltip {
+  animation-name: fade-in;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}

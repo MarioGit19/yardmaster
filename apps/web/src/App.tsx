@@ -1,33 +1,65 @@
-import { lazy, Suspense, useSyncExternalStore } from 'react';
+import { lazy, Suspense } from 'react';
+import { type BaseLocationHook, Route, Router, Switch } from 'wouter';
+import { useHashLocation } from 'wouter/use-hash-location';
 import { MotionRoot } from './MotionRoot.js';
+import { routes } from './routes.js';
+import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
+import { Toasts } from './ui/Toasts.js';
+import { TooltipProvider } from './ui/Tooltip.js';
+import { FocusView } from './views/FocusView.js';
+import { Overview } from './views/Overview.js';
+import { EmptyState, Page } from './views/Page.js';
+import { SettingsView } from './views/SettingsView.js';
 
 const TokenPreview = lazy(() => import('./dev/TokenPreview.js'));
 
-function subscribeHash(onChange: () => void) {
-  window.addEventListener('hashchange', onChange);
-  return () => window.removeEventListener('hashchange', onChange);
-}
-
-// Minimal hash switch until the router lands (3.3).
-function useHashPath(): string {
-  return useSyncExternalStore(subscribeHash, () => window.location.hash.replace(/^#/, '') || '/');
-}
-
-export function App() {
-  useTheme();
-  const path = useHashPath();
+/** The routed screens inside the shell. `/_tokens` is a standalone dev page. */
+export function AppRoutes() {
   return (
-    <MotionRoot>
-      {path === '/_tokens' ? (
+    <Switch>
+      <Route path={routes.tokens}>
         <Suspense fallback={null}>
           <TokenPreview />
         </Suspense>
-      ) : (
-        <main className="grid min-h-dvh place-items-center p-6">
-          <p className="font-mono text-title-sm font-medium text-text-2">c-board</p>
-        </main>
-      )}
+      </Route>
+      <Route>
+        <AppShell>
+          <Switch>
+            <Route path={routes.overview}>
+              <Overview />
+            </Route>
+            <Route path={routes.session}>
+              {(params) => <FocusView projectId={params.projectId} sessionId={params.sessionId} />}
+            </Route>
+            <Route path={routes.project}>
+              {(params) => <FocusView projectId={params.projectId} />}
+            </Route>
+            <Route path={routes.settings}>
+              <SettingsView />
+            </Route>
+            <Route>
+              <Page>
+                <EmptyState title="Nothing here">This page doesn't exist.</EmptyState>
+              </Page>
+            </Route>
+          </Switch>
+        </AppShell>
+      </Route>
+    </Switch>
+  );
+}
+
+export function App({ locationHook = useHashLocation }: { locationHook?: BaseLocationHook }) {
+  useTheme();
+  return (
+    <MotionRoot>
+      <TooltipProvider>
+        <Router hook={locationHook}>
+          <AppRoutes />
+        </Router>
+        <Toasts />
+      </TooltipProvider>
     </MotionRoot>
   );
 }

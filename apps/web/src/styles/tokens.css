@@ -40,6 +40,7 @@
   --accent-9: oklch(0.72 0.14 345);
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --glass-shimmer: rgb(255 255 255 / 0.04);
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
 }
@@ -66,4 +67,5 @@
   --st-idle: #4a4f60;
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.8);
+  --glass-shimmer: rgb(255 255 255 / 0.7);
 }
