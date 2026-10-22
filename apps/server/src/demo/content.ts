@@ -298,3 +298,23 @@ export const lines = (...rows: string[]): string => rows.map((row) => `${row}\r\
 
 /** `HH:MM:SS`, UTC so output doesn't depend on the machine's zone. */
 export const clock = (ts: number): string => new Date(ts).toISOString().slice(11, 19);
+
+/** Changed-file pool for the git panel, beyond each project's test files. */
+export const DEMO_CHANGED_FILES = [
+  'src/index.ts',
+  'README.md',
+  'src/lib/format.ts',
+  'package.json',
+  'src/config.ts',
+  'docs/notes.md',
+] as const;
+
+export const DEMO_COMMITS = [
+  { author: 'Robin Vale', subject: 'Tighten error handling in the sync loop' },
+  { author: 'Sam Ortiz', subject: 'Bump dev dependencies' },
+  { author: 'Robin Vale', subject: 'Add tests for edge-case inputs' },
+  { author: 'Kai Mendel', subject: 'Refactor config loading' },
+  { author: 'Sam Ortiz', subject: 'Fix flaky timer in CI' },
+  { author: 'Kai Mendel', subject: 'Document the release steps' },
+  { author: 'Robin Vale', subject: 'Initial scaffold' },
+] as const;

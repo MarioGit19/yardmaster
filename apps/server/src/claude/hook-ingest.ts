@@ -19,6 +19,8 @@ export interface HookIngestOptions {
   store: BoardStore;
   logger: Pick<FastifyBaseLogger, 'warn' | 'debug'>;
   onActivity?: (event: ActivityEvent) => void;
+  /** Called after a `PostToolUse` event has been applied. */
+  onToolDone?: (tool: string, projectId: string | null) => void;
   /** Called for every delivery, valid or not. */
   onReceived?: (ts: number) => void;
   /** Off in demo mode: hooks are counted but the synthetic board is left alone. */
@@ -89,6 +91,9 @@ export class HookIngest {
       projectId: session.projectId,
       data: compactData(activity.data),
     });
+    if (known.success && known.data.hook_event_name === 'PostToolUse') {
+      this.options.onToolDone?.(known.data.tool_name, session.projectId);
+    }
   }
 }
 

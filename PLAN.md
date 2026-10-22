@@ -240,6 +240,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - Per project, every 5 s while connected UI clients exist (and on hook `PostToolUse` for Edit/Write/Bash), run `git status --porcelain=v2 --branch` and `git log -5 --format=…` through `execFile`. Fill `GitInfo` (branch, upstream ahead/behind, changed files with status, last commits). Skip non-git folders.
   - **Done when:** parser tests on synthetic porcelain output pass.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `GitInfo` gained `upstream`, `files` (path, origPath, status, staged/unstaged; capped at 200, `dirty` counts all) and `commits` (5, newest first), defaulted so older `board.db` rows still parse. `git.ts` parses `status -z` and `log -z`; `GitScanner` (`app.gitScanner`) runs git with `-C`, `--no-optional-locks` and `core.fsmonitor=false` (repo config can't spawn programs), writes only on change, rechecks non-git folders every 60 s, and turns off if git is missing. Hook refreshes (Edit, MultiEdit, Write, NotebookEdit, Bash) are debounced 250 ms and run even without UI clients. One test runs real git in a temp repo. The demo board has synthetic files and commits. Not ticked: the hook package's 500 ms timing test (`c-board-hook.test.ts`, missing token) kept failing `pnpm check` at 510 to 1020 ms. It failed on the baseline (6.2) in the same runs, and the 6.3 changes passed the full suite 3 out of 3 when the machine was quieter. Re-run `pnpm check` and tick once it passes.
 
 ## Phase 7 — Signature UI (build against `pnpm dev:demo`)
 

@@ -194,6 +194,28 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     });
   });
 
+  it('refreshes git info after an edit', async () => {
+    const run = vi.fn(async (_dir: string, args: readonly string[]) =>
+      args[0] === 'status' ? '# branch.oid (initial)\0# branch.head main\0? new.ts\0' : '',
+    );
+    app = await buildServer(config, {
+      token,
+      dbPath: ':memory:',
+      processes: false,
+      git: { run, debounceMs: 0 },
+    });
+    await post(hookFixture('session-start'));
+    await settled();
+    expect(run).not.toHaveBeenCalled();
+    await post(hookFixture('post-tool-use', { tool_name: 'Write' }));
+    await settled();
+    const projectId = projectIdFromPath(FIXTURE_CWD);
+    await vi.waitFor(() =>
+      expect(app?.store.state.projects[projectId]?.git).toMatchObject({ branch: 'main', dirty: 1 }),
+    );
+    expect(run).toHaveBeenCalledWith(FIXTURE_CWD, expect.arrayContaining(['status']));
+  });
+
   it('counts but does not apply hooks in demo mode', async () => {
     app = await buildServer(config, { token, demo: { seed: 7 } });
     const before = Object.keys(app.store.state.sessions).length;
@@ -235,6 +257,22 @@ describe('HookIngest', () => {
     expect(warn).toHaveBeenCalledOnce();
     await ingest.enqueue(hookFixture('user-prompt-submit'), null);
     expect(store.state.sessions[FIXTURE_SESSION_ID]?.status).toEqual({ kind: 'working' });
+  });
+
+  it('reports finished tools with their project', async () => {
+    const store = new BoardStore({ autoFlush: false });
+    const onToolDone = vi.fn();
+    const ingest = new HookIngest({
+      store,
+      logger: { warn: vi.fn(), debug: vi.fn() },
+      resolvePath: async (path) => path,
+      onToolDone,
+    });
+    await ingest.enqueue(hookFixture('pre-tool-use-edit'), null);
+    await ingest.enqueue(hookFixture('post-tool-use-failure'), null);
+    expect(onToolDone).not.toHaveBeenCalled();
+    await ingest.enqueue(hookFixture('post-tool-use', { tool_name: 'Edit' }), null);
+    expect(onToolDone).toHaveBeenCalledExactlyOnceWith('Edit', projectIdFromPath(FIXTURE_CWD));
   });
 
   it('leaves the project empty for a relative cwd', async () => {

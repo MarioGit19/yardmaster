@@ -21,13 +21,57 @@ export const AccentIndex = z
   .min(0)
   .max(ACCENT_COUNT - 1);
 
+export const GitFileStatus = z.enum([
+  'modified',
+  'added',
+  'deleted',
+  'renamed',
+  'copied',
+  'typechange',
+  'untracked',
+  'conflicted',
+]);
+export type GitFileStatus = z.infer<typeof GitFileStatus>;
+
+export const GitFileChange = z.object({
+  /** Relative to the repository root. */
+  path: z.string().min(1),
+  /** Source path of a rename or copy. */
+  origPath: z.string().nullable(),
+  status: GitFileStatus,
+  /** Has changes in the index. */
+  staged: z.boolean(),
+  /** Has changes in the working tree (always true for untracked and conflicted files). */
+  unstaged: z.boolean(),
+});
+export type GitFileChange = z.infer<typeof GitFileChange>;
+
+export const GitCommit = z.object({
+  hash: z.string().min(1),
+  author: z.string(),
+  /** Author date. */
+  at: Timestamp,
+  subject: z.string(),
+});
+export type GitCommit = z.infer<typeof GitCommit>;
+
+/** Files beyond this are counted in `dirty` but not listed. */
+export const GIT_MAX_FILES = 200;
+export const GIT_MAX_COMMITS = 5;
+
 export const GitInfo = z.object({
   branch: z.string().nullable(),
   head: z.string().nullable(),
   detached: z.boolean(),
+  /** Number of changed files, including any beyond the `files` cap. */
   dirty: z.number().int().nonnegative(),
+  /** Upstream branch, e.g. `origin/main`. */
+  upstream: z.string().nullable().default(null),
   ahead: z.number().int().nonnegative(),
   behind: z.number().int().nonnegative(),
+  files: z.array(GitFileChange).max(GIT_MAX_FILES).default([]),
+  /** Newest first. */
+  commits: z.array(GitCommit).max(GIT_MAX_COMMITS).default([]),
   updatedAt: Timestamp,
 });
 export type GitInfo = z.infer<typeof GitInfo>;

@@ -15,6 +15,7 @@ import {
   registerEditorGateway,
 } from './editor-gateway.js';
 import { EditorRouter } from './editor-router.js';
+import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { Persistence } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
@@ -58,7 +59,12 @@ export interface BuildOptions {
   editor?: Pick<EditorGatewayOptions, 'graceMs' | 'idleMs' | 'resolvePath' | 'commandTimeoutMs'>;
   /** Process and port scanner tuning, or false to turn it off. Not started in demo mode. */
   processes?: Omit<ProcessScannerOptions, 'store' | 'logger'> | false;
+  /** Git info tuning, or false to turn it off. Not started in demo mode. */
+  git?: Omit<GitScannerOptions, 'store' | 'logger' | 'active'> | false;
 }
+
+/** Tools whose completion can change a repository's state. */
+const GIT_TOUCHING_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit', 'Bash']);
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -74,6 +80,7 @@ declare module 'fastify' {
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
     sessionLinker: SessionLinker | null;
+    gitScanner: GitScanner | null;
   }
 }
 
@@ -111,6 +118,7 @@ export async function buildServer(
     demo?.stop();
     processScanner?.stop();
     sessionLinker?.stop();
+    gitScanner?.stop();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -199,6 +207,17 @@ export async function buildServer(
   });
   app.decorate('uiGateway', gateway);
   registerUiGateway(app, gateway);
+  const gitOptions = options.demo ? false : (options.git ?? {});
+  const gitScanner =
+    gitOptions === false
+      ? null
+      : new GitScanner({
+          store,
+          logger: logger.child({ component: 'git' }),
+          active: () => gateway.clientCount > 0,
+          ...gitOptions,
+        });
+  app.decorate('gitScanner', gitScanner);
   app.decorate('demo', demo);
 
   const startedAt = Date.now();
@@ -213,6 +232,9 @@ export async function buildServer(
       hookStats.lastAt = ts;
     },
     onActivity: (event) => persistence.recordActivity(event),
+    onToolDone: (tool, projectId) => {
+      if (projectId !== null && GIT_TOUCHING_TOOLS.has(tool)) gitScanner?.request(projectId);
+    },
   });
   app.decorate('hookIngest', hookIngest);
   registerHookRoute(app, hookIngest);
@@ -239,6 +261,7 @@ export async function buildServer(
   discovery?.start();
   sessionLinker?.start();
   processScanner?.start();
+  gitScanner?.start();
   return app;
 }
 

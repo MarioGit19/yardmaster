@@ -5,6 +5,9 @@ import {
   type ApprovalDecision,
   accentIndexForProject,
   type ClaudeSession,
+  GIT_MAX_COMMITS,
+  GIT_MAX_FILES,
+  type GitFileChange,
   type GitInfo,
   makeMessage,
   type PortBinding,
@@ -17,6 +20,8 @@ import {
 import type { ActionResult } from '../actions.js';
 import type { BoardStore } from '../store.js';
 import {
+  DEMO_CHANGED_FILES,
+  DEMO_COMMITS,
   DEMO_HOME,
   DEMO_MODELS,
   DEMO_PROJECTS,
@@ -55,6 +60,8 @@ interface ProjectCtx {
   def: DemoProject;
   windowId: string;
   dirty: number;
+  /** Fixed reference time for the synthetic commit history. */
+  seededAt: number;
   scenarioCursor: number;
 }
 
@@ -165,6 +172,7 @@ export class DemoSimulator {
         def,
         windowId: windowIds[def.window] ?? `demo-window-${def.window}`,
         dirty: this.rng.int(0, 4),
+        seededAt: ts,
         scenarioCursor: 0,
       };
       this.projects.push(project);
@@ -724,13 +732,37 @@ export class DemoSimulator {
   }
 
   private gitInfo(project: ProjectCtx, ts: number): GitInfo {
+    const { def } = project;
+    const pool = [...def.testFiles, ...DEMO_CHANGED_FILES];
+    const files = pool.slice(0, Math.min(project.dirty, GIT_MAX_FILES)).map(
+      (path, index): GitFileChange => ({
+        path,
+        origPath: null,
+        status: index === pool.length - 1 ? 'untracked' : index % 4 === 3 ? 'added' : 'modified',
+        staged: index % 3 === 0,
+        unstaged: index % 3 !== 0 || index === pool.length - 1,
+      }),
+    );
+    const offset = def.name.length % DEMO_COMMITS.length;
+    const commits = Array.from({ length: GIT_MAX_COMMITS }, (_, index) => {
+      const commit = DEMO_COMMITS[(offset + index) % DEMO_COMMITS.length] ?? DEMO_COMMITS[0];
+      return {
+        hash: projectIdFromPath(`${def.path}#${index}`).padEnd(40, '0').slice(0, 40),
+        author: commit.author,
+        at: project.seededAt - (index + 1) * 5_400_000,
+        subject: commit.subject,
+      };
+    });
     return {
-      branch: project.def.branch,
-      head: projectIdFromPath(`${project.def.path}#head`).padEnd(40, '0').slice(0, 40),
+      branch: def.branch,
+      head: commits[0]?.hash ?? null,
       detached: false,
       dirty: project.dirty,
-      ahead: project.def.branch === 'main' ? 0 : 2,
-      behind: project.def.name === 'orbit-api' ? 1 : 0,
+      upstream: `origin/${def.branch}`,
+      ahead: def.branch === 'main' ? 0 : 2,
+      behind: def.name === 'orbit-api' ? 1 : 0,
+      files,
+      commits,
       updatedAt: ts,
     };
   }
