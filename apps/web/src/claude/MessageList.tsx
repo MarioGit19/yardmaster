@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { redact, redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
@@ -105,6 +105,7 @@ export interface MessageListProps {
  * offers a "Jump to latest" pill once the reader scrolls away.
  */
 export function MessageList({ rows, tail, cwd }: MessageListProps) {
+  const still = useMotionLevel() !== 'full';
   const scrollRef = useRef<HTMLDivElement>(null);
   const items: Item[] =
     tail === null ? [...rows] : [...rows, { kind: 'tail', id: TAIL_ID, text: tail }];
@@ -266,11 +267,11 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
                 type="button"
                 onClick={toEnd}
                 // Whole transform strings stay on the compositor while messages stream in.
-                initial={{ opacity: 0, transform: 'translateY(8px) scale(0.96)' }}
-                animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
+                initial={{ opacity: 0, transform: move(still, 'translateY(8px) scale(0.96)') }}
+                animate={{ opacity: 1, transform: move(still, 'translateY(0px) scale(1)') }}
                 exit={{
                   opacity: 0,
-                  transform: 'translateY(4px) scale(0.98)',
+                  transform: move(still, 'translateY(4px) scale(0.98)'),
                   transition: { duration: dur.fast, ease: ease.out },
                 }}
                 transition={spring.snappy}

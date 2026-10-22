@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Logomark } from '../brand/Logo.js';
 import { selectConnection, selectWindowCount, useBoard } from '../data/index.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { Button } from '../ui/Button.js';
@@ -97,6 +97,7 @@ function Step({
  * the board sees a hook event or an editor connection.
  */
 export function OnboardingWizard({ onDone }: { onDone(): void }) {
+  const still = useMotionLevel() !== 'full';
   const connection = useBoard(selectConnection);
   const windows = useBoard(selectWindowCount);
   const status = useServerStatus(POLL_MS);
@@ -123,10 +124,10 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
         data-complete={complete}
         aria-labelledby="onboarding-title"
         className="onboarding-card flex w-full max-w-lg flex-col gap-6 rounded-modal border border-line p-6 shadow-raised"
-        initial={{ opacity: 0, transform: 'translateY(8px)', filter: 'blur(4px)' }}
+        initial={{ opacity: 0, transform: move(still, 'translateY(8px)'), filter: 'blur(4px)' }}
         animate={{
           opacity: 1,
-          transform: 'translateY(0px)',
+          transform: move(still, 'translateY(0px)'),
           filter: 'blur(0px)',
           transition: spring.smooth,
           transitionEnd: { filter: 'none' },

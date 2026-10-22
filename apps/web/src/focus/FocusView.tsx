@@ -18,7 +18,7 @@ import {
 } from '../data/index.js';
 import { GitPanel } from '../git/GitPanel.js';
 import { SessionHistory } from '../history/SessionHistory.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease, spring, tabGlide } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
 import { podSessions } from '../pod/model.js';
@@ -227,6 +227,7 @@ interface TabPanel {
 /** Narrow screens: one column at a time, Claude first. */
 function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }) {
   const [active, setActive] = useState(show ?? 'claude');
+  const [byKeyboard, setByKeyboard] = useState(false);
   // A panel asked for from outside (a terminal picked in ⌘K).
   useEffect(() => {
     if (show) setActive(show);
@@ -242,6 +243,7 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
     if (!step) return;
     e.preventDefault();
     const next = (index + step + panels.length) % panels.length;
+    setByKeyboard(true);
     setActive(panels[next]?.id ?? active);
     tabRefs.current[next]?.focus();
   };
@@ -268,7 +270,11 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
               aria-selected={selected}
               aria-controls={`focus-panel-${panel.id}`}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setActive(panel.id)}
+              onClick={(e) => {
+                // detail 0: Enter or Space, not a pointer.
+                setByKeyboard(e.detail === 0);
+                setActive(panel.id);
+              }}
               className={cx(
                 'relative h-10 rounded-control px-3 text-body-sm transition-colors duration-150',
                 selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
@@ -278,7 +284,7 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
               {selected && (
                 <motion.span
                   layoutId="focus-tab-indicator"
-                  transition={spring.snappy}
+                  transition={tabGlide(byKeyboard)}
                   aria-hidden
                   className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-text-1"
                 />

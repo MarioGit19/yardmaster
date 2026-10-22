@@ -2,7 +2,7 @@ import { type ToolFamily, toolFamily } from '@c-board/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useInView } from '../anim/useFrame.js';
-import { dur, ease, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
 import { resolveColor } from './colors.js';
@@ -31,7 +31,7 @@ const STATUS_TOKEN: Record<OrbState, string> = {
 };
 
 /** The tool chip's slide as a transform string (compositor-only); Reduced fades it in place. */
-const chipShift = (moving: boolean, px: number) => `translateX(${moving ? px : 0}px)`;
+const chipShift = (moving: boolean, px: number) => move(!moving, `translateX(${px}px)`);
 
 export interface ClaudeOrbProps {
   state: OrbState;

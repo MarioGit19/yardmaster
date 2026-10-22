@@ -1,6 +1,6 @@
 import { Check, X } from 'lucide-react';
 import { motion } from 'motion/react';
-import { dur, ease, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { cx } from './cx.js';
 
 /**
@@ -10,14 +10,14 @@ import { cx } from './cx.js';
 export function ExitBadge({ code, className }: { code: number; className?: string }) {
   const label = code === 0 ? 'Exited 0' : `Exit code ${code}`;
   // Reduced fades in place.
-  const from = useMotionLevel() === 'full' ? 'scale(0.9)' : 'none';
+  const still = useMotionLevel() !== 'full';
   return (
     <motion.span
       role="img"
       aria-label={label}
       title={label}
       data-exit={code}
-      initial={{ opacity: 0, transform: from }}
+      initial={{ opacity: 0, transform: move(still, 'scale(0.9)') }}
       animate={{ opacity: 1, transform: 'none' }}
       exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
       transition={spring.snappy}

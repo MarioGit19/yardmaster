@@ -15,7 +15,7 @@ import { type ReactNode, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useBoardClient } from '../data/index.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { sessionHref } from '../routes.js';
 import { useBoardSettings } from '../settings/boardSettings.js';
 import { actionErrorText } from '../terminal/stack.js';
@@ -305,6 +305,7 @@ const SEND_LABEL: Record<SendButtonMode, string> = {
 
 /** One button that morphs between send, sending and stop, so the target never moves. */
 function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolean }) {
+  const still = useMotionLevel() !== 'full';
   const icon =
     mode === 'stop' ? (
       <Square className="size-3 fill-current" strokeWidth={1.5} />
@@ -331,11 +332,11 @@ function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolea
           <motion.span
             key={mode}
             className="flex"
-            initial={{ opacity: 0, transform: 'scale(0.6)', filter: 'blur(2px)' }}
-            animate={{ opacity: 1, transform: 'scale(1)', filter: 'blur(0px)' }}
+            initial={{ opacity: 0, transform: move(still, 'scale(0.6)'), filter: 'blur(2px)' }}
+            animate={{ opacity: 1, transform: move(still, 'scale(1)'), filter: 'blur(0px)' }}
             exit={{
               opacity: 0,
-              transform: mode === 'send' ? 'translateY(-8px)' : 'scale(0.6)',
+              transform: move(still, mode === 'send' ? 'translateY(-8px)' : 'scale(0.6)'),
               filter: 'blur(2px)',
               transition: { duration: dur.fast, ease: ease.out },
             }}

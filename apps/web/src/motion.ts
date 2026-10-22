@@ -20,10 +20,24 @@ export const ease = {
 } as const satisfies Record<string, readonly [number, number, number, number]>;
 
 /**
+ * A transform animate target that holds still at Reduced. Motion's `reducedMotion` only drops
+ * `x`/`y`/`scale`-style keys, not a whole transform string, so every `transform:` target in an
+ * `initial`/`animate`/`exit` goes through this (or `slide`); `motion.test.ts` enforces it.
+ */
+export const move = (still: boolean, transform: string) => (still ? 'none' : transform);
+
+/**
  * A vertical slide as a full transform string, which keeps it on the compositor while the board
  * streams; `still` (Reduced) keeps it in place so only opacity changes.
  */
-export const slide = (still: boolean, y: string) => `translateY(${still ? '0%' : y})`;
+export const slide = (still: boolean, y: string) => move(still, `translateY(${y})`);
+
+/**
+ * A tab indicator's hand-off: it glides to a clicked tab but snaps for keyboard navigation, where
+ * the eye is already on the focus ring and a glide per arrow press lags behind.
+ */
+export const tabGlide = (byKeyboard: boolean): Transition =>
+  byKeyboard ? { duration: 0 } : spring.snappy;
 
 export const MOTION_SETTINGS = ['system', 'full', 'reduced', 'off'] as const;
 export type MotionSetting = (typeof MOTION_SETTINGS)[number];
@@ -51,6 +65,17 @@ export function useMotionLevel(): MotionLevel {
   const setting = usePreference(motionPreference);
   const osPrefersReduced = useMediaQuery(PREFERS_REDUCED_MOTION);
   return resolveMotionLevel(setting, osPrefersReduced);
+}
+
+/**
+ * Sets `data-motion` before React's first paint (like `applyInitialTheme`), so Reduced and Off
+ * never see a frame of Full CSS motion. `MotionRoot` keeps it current afterwards.
+ */
+export function applyInitialMotion(root: HTMLElement = document.documentElement): MotionLevel {
+  const osPrefersReduced = globalThis.matchMedia?.(PREFERS_REDUCED_MOTION).matches ?? false;
+  const level = resolveMotionLevel(motionPreference.get(), osPrefersReduced);
+  root.dataset.motion = level;
+  return level;
 }
 
 /**

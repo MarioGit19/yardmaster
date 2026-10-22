@@ -192,6 +192,10 @@
 [data-motion="reduced"] .tooltip {
   animation-name: fade-in;
 }
+/* Moving between triggers while tooltips are warm opens the next one instantly: no entrance. */
+.tooltip[data-state="instant-open"] {
+  animation: none;
+}
 
 /* Idle orbs breathe on the compositor, so they register no frame callbacks. */
 @keyframes orb-breathe {
@@ -546,12 +550,8 @@
   }
 }
 
-/* Flow light: a comet along the bottom edge while the lane streams (transform only). */
-@keyframes lane-comet {
-  to {
-    transform: translateX(260%);
-  }
-}
+/* Flow light: a comet along the bottom edge while the lane streams (transform only). The loop is
+   a WAAPI animation (`TerminalLane`'s `COMET`) whose playback rate eases with the lane's level. */
 .lane-row::after {
   content: "";
   position: absolute;
@@ -567,27 +567,9 @@
 }
 [data-streaming] > .lane-row::after {
   opacity: 0.85;
-  animation: lane-comet var(--lane-comet, 2.4s) linear infinite;
-}
-/* The comet runs faster the more the lane writes. */
-[data-level="2"] > .lane-row {
-  --lane-comet: 1.6s;
-}
-[data-level="3"] > .lane-row {
-  --lane-comet: 1s;
 }
 
-/* The running dot pulses faster the more the lane writes. */
-@keyframes lane-pulse {
-  from {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  to {
-    transform: scale(2.8);
-    opacity: 0;
-  }
-}
+/* The running dot's pulse ring, driven the same way (`PULSE`). */
 .lane-dot {
   position: relative;
 }
@@ -597,13 +579,7 @@
   inset: 0;
   border-radius: inherit;
   background: currentColor;
-  animation: lane-pulse var(--lane-pulse, 1.6s) var(--ease-out) infinite;
-}
-.lane-dot[data-level="2"] {
-  --lane-pulse: 1.1s;
-}
-.lane-dot[data-level="3"] {
-  --lane-pulse: 0.75s;
+  opacity: 0;
 }
 
 /* Reduced: lanes keep their colors and a static comet glow, nothing travels or pulses. */

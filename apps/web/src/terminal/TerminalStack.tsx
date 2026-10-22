@@ -24,7 +24,7 @@ import type { BoardStoreState } from '../data/store.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
-import { spring } from '../motion.js';
+import { tabGlide } from '../motion.js';
 import { usePreference } from '../prefs.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { isTypingTarget } from '../shell/railNav.js';
@@ -81,6 +81,7 @@ export function TerminalStack({
   }, [renderersReady]);
   const ordered = useMemo(() => stackOrder(terminals), [terminals]);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [byKeyboard, setByKeyboard] = useState(false);
   // A terminal picked in ⌘K opens here once.
   const target = useTerminalTarget(projectId);
   useEffect(() => {
@@ -123,6 +124,7 @@ export function TerminalStack({
     e.preventDefault();
     const next = stepTab(ordered, activeId, step);
     if (next === null) return;
+    setByKeyboard(true);
     setChosen(next);
     tabRefs.current.get(next)?.focus();
   };
@@ -175,11 +177,15 @@ export function TerminalStack({
                 terminal={terminal}
                 projectId={projectId}
                 selected={terminal.id === activeId}
+                byKeyboard={byKeyboard}
                 tabRef={(el) => {
                   if (el) tabRefs.current.set(terminal.id, el);
                   else tabRefs.current.delete(terminal.id);
                 }}
-                onSelect={() => setChosen(terminal.id)}
+                onSelect={(viaKeyboard) => {
+                  setByKeyboard(viaKeyboard);
+                  setChosen(terminal.id);
+                }}
               />
             ))}
           </div>
@@ -274,14 +280,17 @@ function StackTab({
   terminal,
   projectId,
   selected,
+  byKeyboard,
   tabRef,
   onSelect,
 }: {
   terminal: Terminal;
   projectId: string;
   selected: boolean;
+  /** The selection came from the keyboard: the indicator snaps instead of gliding. */
+  byKeyboard: boolean;
   tabRef: (el: HTMLButtonElement | null) => void;
-  onSelect: () => void;
+  onSelect: (byKeyboard: boolean) => void;
 }) {
   const { view } = useTerminalView(terminal);
   const closed = terminal.state === 'closed';
@@ -295,7 +304,8 @@ function StackTab({
       title={view.command ? `${terminalName(terminal)}: ${view.command}` : terminalName(terminal)}
       tabIndex={selected ? 0 : -1}
       data-tab={terminal.id}
-      onClick={onSelect}
+      // detail 0: Enter or Space, not a pointer.
+      onClick={(e) => onSelect(e.detail === 0)}
       className={cx(
         'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-150',
         selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
@@ -305,7 +315,7 @@ function StackTab({
       {selected && (
         <motion.span
           layoutId={`terminal-tab-${projectId}`}
-          transition={spring.snappy}
+          transition={tabGlide(byKeyboard)}
           aria-hidden
           className="absolute inset-0 rounded-control border border-line bg-bg-2 shadow-raised"
         />

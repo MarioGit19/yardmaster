@@ -101,6 +101,7 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     slide.current = null;
     if (animate && !quiet && typeof canvas.animate === 'function') {
       slide.current = canvas.animate(
+        // motion-still: only `animate` (Full) slides; still sparklines take the branch below.
         [{ transform: 'translateX(0)' }, { transform: `translateX(${-step}px)` }],
         { duration: SAMPLE_MS, easing: 'linear', fill: 'forwards' },
       );

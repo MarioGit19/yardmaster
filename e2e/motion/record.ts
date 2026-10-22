@@ -1,5 +1,5 @@
 /**
- * `pnpm motion:record [scenario] [--no-ffmpeg]`: records a scripted walkthrough of the demo
+ * `pnpm motion:record [scenario] [--reduced] [--no-ffmpeg]`: records a scripted walkthrough of the demo
  * board at motion Full and turns each moment into a contact sheet in `artifacts/motion/`.
  * See `README.md` next to this file for how to read the sheets.
  */
@@ -321,9 +321,12 @@ async function contactSheet(video: string, out: string, m: Moment, phone: boolea
   return { fps };
 }
 
-async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean) {
+async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean, reduced: boolean) {
+  // Reduced runs write `<scenario>-reduced-*`, so a Full run keeps them and vice versa.
+  const tag = reduced ? `${scenario}-reduced` : scenario;
   for (const file of await readdir(OUT_DIR)) {
-    if (file.startsWith(`${scenario}-`) || file === `${scenario}.webm`) {
+    const ours = file.startsWith(`${tag}-`) || file === `${tag}.webm`;
+    if (ours && (reduced || !file.startsWith(`${scenario}-reduced`))) {
       await rm(join(OUT_DIR, file));
     }
   }
@@ -342,34 +345,37 @@ async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean) {
   };
   try {
     const context = await browser.newContext(options);
-    await context.addInitScript(() => {
-      localStorage.setItem('cboard.theme', 'dark');
-      localStorage.setItem('cboard.motion', 'full');
-    });
+    await context.addInitScript(
+      (level) => {
+        localStorage.setItem('cboard.theme', 'dark');
+        localStorage.setItem('cboard.motion', level);
+      },
+      reduced ? 'reduced' : 'full',
+    );
     const page = await context.newPage();
-    const recorder = new Recorder(page, scenario, ffmpeg);
+    const recorder = new Recorder(page, tag, ffmpeg);
     try {
       await SCENARIOS[scenario](recorder);
     } finally {
       await context.close();
     }
 
-    console.log(`\n${scenario}`);
+    console.log(`\n${tag}`);
     if (!ffmpeg) {
       for (const m of recorder.moments) {
-        console.log(`  ${scenario}-${m.name}-NN.png  ${m.note}`);
+        console.log(`  ${tag}-${m.name}-NN.png  ${m.note}`);
       }
       return;
     }
-    const webm = join(OUT_DIR, `${scenario}.webm`);
+    const webm = join(OUT_DIR, `${tag}.webm`);
     await page.video()?.saveAs(webm);
     for (const m of recorder.moments) {
-      const file = `${scenario}-${m.name}.png`;
+      const file = `${tag}-${m.name}.png`;
       const { fps } = await contactSheet(webm, join(OUT_DIR, file), m, phone);
       const span = `${m.start.toFixed(1)}–${m.end.toFixed(1)} s`;
       console.log(`  ${file.padEnd(32)} ${span.padEnd(13)} ${fps.toFixed(1)} fps  ${m.note}`);
     }
-    console.log(`  ${`${scenario}.webm`.padEnd(32)} the full recording`);
+    console.log(`  ${`${tag}.webm`.padEnd(32)} the full recording`);
   } finally {
     await board.stop();
   }
@@ -384,13 +390,14 @@ async function main() {
   }
   const scenarios = wanted === 'all' ? NAMES : [wanted as Scenario];
   const ffmpeg = !args.includes('--no-ffmpeg') && (await hasFfmpeg());
+  const reduced = args.includes('--reduced');
   if (!ffmpeg) console.warn('motion:record: ffmpeg not found; taking screenshot bursts instead');
   await mkdir(OUT_DIR, { recursive: true });
 
   // Full Chromium (new headless) renders with the GPU, like the perf-stress project.
   const browser = await chromium.launch({ channel: 'chromium' });
   try {
-    for (const scenario of scenarios) await record(browser, scenario, ffmpeg);
+    for (const scenario of scenarios) await record(browser, scenario, ffmpeg, reduced);
   } finally {
     await browser.close();
   }

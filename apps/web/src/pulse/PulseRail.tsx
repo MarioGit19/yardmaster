@@ -20,6 +20,7 @@ import type { Tone } from '../status.js';
 import { terminalTarget } from '../terminal/target.js';
 import { useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
+import { NumberTicker } from '../ui/NumberTicker.js';
 import {
   buildLanes,
   eventLabel,
@@ -140,7 +141,7 @@ export function PulseRail() {
           )}
           <span className="font-medium text-text-1">Pulse</span>
           <span className="tabular hidden text-text-2 sm:inline">
-            {count} {count === 1 ? 'event' : 'events'} · 15 min
+            <NumberTicker value={count} /> {count === 1 ? 'event' : 'events'} · 15 min
           </span>
         </button>
         {!collapsed && <FilterToggle />}

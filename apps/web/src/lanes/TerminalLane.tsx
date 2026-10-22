@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNow } from '../anim/clock.js';
+import { type RateLoopSpec, useRateLoop } from '../anim/useRateLoop.js';
 import {
   activityKey,
   isCrashExit,
@@ -11,7 +12,7 @@ import {
   useBoardList,
   useBoardShallow,
 } from '../data/index.js';
-import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, move, slide, spring, useMotionLevel } from '../motion.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
 import { formatUptime, laneView, selectLaneExecution, terminalName, uptimePeriod } from './lane.js';
@@ -23,6 +24,29 @@ import { useErrorLine } from './useErrorLine.js';
 /** Hovering across lanes shouldn't flash a peek for every lane the pointer crosses. */
 const PEEK_DELAY_MS = 140;
 const PEEK_IN_S = 0.18;
+
+// The flow-light comet along the lane's bottom edge and the running dot's pulse, both faster the
+// more the lane writes (§4.10). Rates are per activity step, relative to step 1.
+const COMET: RateLoopSpec = {
+  // motion-still: only runs at Full; Reduced shows the static CSS glow.
+  keyframes: [{ transform: 'translateX(-100%)' }, { transform: 'translateX(260%)' }],
+  durationMs: 2400,
+  easing: 'linear',
+  pseudoElement: '::after',
+};
+const COMET_RATE = [1, 1, 1.5, 2.4] as const;
+const PULSE: RateLoopSpec = {
+  keyframes: [
+    // motion-still: only runs at Full; Reduced hides the pulse.
+    { transform: 'scale(1)', opacity: 0.55 },
+    // motion-still: as above.
+    { transform: 'scale(2.8)', opacity: 0 },
+  ],
+  durationMs: 1600,
+  easing: `cubic-bezier(${ease.out.join(', ')})`,
+  pseudoElement: '::after',
+};
+const PULSE_RATE = [1, 1, 1.45, 2.15] as const;
 
 export interface TerminalLaneProps {
   terminal: Terminal;
@@ -39,6 +63,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const ports = useBoardList(selectPortsByTerminal(terminal.id));
   const view = laneView(terminal, execution);
+  const still = useMotionLevel() !== 'full';
+  const rowRef = useRef<HTMLDivElement>(null);
   // Pulse speed and comet follow the store's activity level for the terminal (§4.10).
   const level = useActivityStep(activityKey.terminal(terminal.id));
   const crashed = isCrashExit(view.exit?.code);
@@ -69,6 +95,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   };
 
   const streaming = level > 0;
+  useRateLoop(rowRef, COMET, COMET_RATE[level], streaming && !still);
   const [port, ...morePorts] = ports;
 
   return (
@@ -93,7 +120,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
         }
       }}
     >
-      <div className="lane-row">
+      <div ref={rowRef} className="lane-row">
         <button
           type="button"
           aria-expanded={open}
@@ -165,14 +192,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                 exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
                 className="inline-flex items-center gap-1.5"
               >
-                <span
-                  aria-hidden
-                  data-level={view.running && streaming ? level : undefined}
-                  className={cx(
-                    'lane-dot pod-dim size-1.5 rounded-full',
-                    view.running ? 'bg-st-ok text-st-ok' : 'bg-st-idle text-st-idle',
-                  )}
-                />
+                <LaneDot running={view.running} level={streaming ? level : 0} />
                 {uptime && <span title={`Running for ${uptime}`}>{uptime}</span>}
               </motion.span>
             )}
@@ -185,11 +205,11 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
           <motion.div
             key="peek"
             // A full transform string stays on the compositor while the board streams.
-            initial={{ opacity: 0, transform: 'translateY(-4px) scaleY(0.96)' }}
-            animate={{ opacity: 1, transform: 'translateY(0px) scaleY(1)' }}
+            initial={{ opacity: 0, transform: move(still, 'translateY(-4px) scaleY(0.96)') }}
+            animate={{ opacity: 1, transform: move(still, 'translateY(0px) scaleY(1)') }}
             exit={{
               opacity: 0,
-              transform: 'translateY(-2px) scaleY(0.98)',
+              transform: move(still, 'translateY(-2px) scaleY(0.98)'),
               transition: { duration: dur.fast, ease: ease.out },
             }}
             transition={{ duration: PEEK_IN_S, ease: ease.out }}
@@ -211,6 +231,25 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
  * The lane's command column. After a crash the error line slides up into its place (§4.10),
  * in rose; the command stays in the tooltip.
  */
+/** The uptime dot; while the lane streams, a ring pulses out of it. */
+function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const full = useMotionLevel() === 'full';
+  const pulsing = running && level > 0;
+  useRateLoop(ref, PULSE, PULSE_RATE[level], pulsing && full);
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      data-level={pulsing ? level : undefined}
+      className={cx(
+        'lane-dot pod-dim size-1.5 rounded-full',
+        running ? 'bg-st-ok text-st-ok' : 'bg-st-idle text-st-idle',
+      )}
+    />
+  );
+}
+
 function LaneCaption({
   command,
   running,

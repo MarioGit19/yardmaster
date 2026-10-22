@@ -12,7 +12,7 @@ import {
   useBoardList,
   useBoardStore,
 } from '../data/index.js';
-import { dur, ease, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { sessionHref } from '../routes.js';
@@ -21,6 +21,7 @@ import { NARROW_QUERY } from '../shell/prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { IconButton } from '../ui/IconButton.js';
+import { NumberTicker } from '../ui/NumberTicker.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { ApprovalCard } from './ApprovalCard.js';
 import {
@@ -43,7 +44,7 @@ export function AttentionCenter() {
   // Reduced cross-fades in place; Off mounts the sheet already at rest.
   const level = useMotionLevel();
   const still = level !== 'full';
-  const offscreen = still ? 'none' : narrow ? 'translateY(100%)' : 'translateX(100%)';
+  const offscreen = move(still, narrow ? 'translateY(100%)' : 'translateX(100%)');
   return (
     <AnimatePresence>
       {open && (
@@ -171,7 +172,7 @@ function SheetBody() {
           className="flex-1 text-body text-text-1 outline-none"
         >
           Needs you
-          <span className="ml-2 text-text-2 tabular-nums">{count}</span>
+          <NumberTicker value={count} className="ml-2 text-text-2" />
         </h2>
         <IconButton
           label="Close"

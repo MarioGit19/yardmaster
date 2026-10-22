@@ -14,6 +14,9 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `phone`    | `entrance`, `scroll`, `focus-open` (tap), `focus-close` (back)               |
 | `all`      | every scenario above, each on a fresh demo board                             |
 
+`--reduced` records at motion Reduced instead and names everything `<scenario>-reduced-*`, so
+the two sets sit side by side: at Reduced nothing should travel, scale or loop, only fade.
+
 The run prints which sheet covers which moment, with its time window in the recording and its
 frame rate.
 
