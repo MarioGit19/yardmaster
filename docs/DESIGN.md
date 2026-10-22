@@ -175,6 +175,7 @@ The rule: **if something is doing work, it moves, and if it's not, it's still.**
 
 | What | Idle | Active | Needs you / broke |
 |---|---|---|---|
+| **Crew mascot** (§4.11) | idle fidgets, or asleep after 5 min | acts out the work: typing, reading, running a command, delegating, thinking | raises a hand with an amber "!" / sweats with ×-eyes |
 | **Claude session** (orb, §4.2) | dim, slow breathing | swirling core while thinking, orbiting particles while running a tool (colored by tool family) | amber ripple then breathing glow / rose glitch |
 | **Session row caption** | the last turn's summary in `--text-3` | a live caption of the current action ("✎ Editing src/cart.ts", "⌕ Searching \"totals\"", "▶ pnpm test") that swaps with a quick vertical slide and a shimmer sweep across it | "Waiting for approval: Bash(pnpm test)" in amber |
 | **Terminal lane** | flat sparkline, grey dot | sparkline scrolling with output rate, a pulsing green dot (pulse speed ∝ lines/s, capped), and a comet light running along the lane's bottom edge | rose dot, exit badge pops in, the last error line slides into the caption |
@@ -188,9 +189,38 @@ Implementation notes:
 - Everything runs on the shared scheduler with transform, opacity and conic-gradient angle only. Idle entities register no frame callbacks, so a board of mostly idle projects costs close to nothing.
 - At the Reduced motion level, active states use color and a static glow (no movement), and captions still update. At Off, nothing moves.
 
+### 4.11 Crew mascot
+
+Every project has a small original character, the **crew member**, that acts out what is happening in that project. It's the most readable activity signal on the board: you see someone typing, someone waiting with a raised hand, or someone asleep.
+
+**Look.** An original vector character (inline SVG, no third-party art): a rounded capsule body in `--bg-2` with a 1px `--line-strong` outline, and a dark glass visor with two glowing eye dots. On top is a short antenna whose tip is the **ClaudeOrb** (§4.2), so the orb and the character are one system. The visor glow and the antenna orb take the session color (project accent for the main session). Simple stub arms and legs, no mouth, so expressions come from eyes, posture and props. It must not resemble Anthropic's or any other existing mascot, and it uses no brand colors.
+
+**Who gets one.** One crew member per Claude session, shown in its session row and in the pod header. A subagent appears as a **mini crew member** that pops out next to its parent (scale 0→1 with a small particle puff) and leaves the same way. A project with no Claude session still gets one crew member, whose state follows the terminals ("watching" or "sleeping").
+
+| State | Trigger | Acting |
+|---|---|---|
+| sleeping | no activity at all for 5 min | eyes closed (two short lines), slow breathing, a small "z" drifting up every 3 s |
+| idle | session idle, nothing running | breathing, a random blink every 2–6 s, a look-around (eyes and head tilt) every 8–15 s |
+| watching | Claude idle while a terminal is streaming | leaning back, eyes slowly tracking downward as if following a scrolling log, with a tiny monitor prop that flickers with the output rate |
+| thinking | working, no tool yet | hand to visor, eyes up, a "…" bubble pulsing, and the antenna orb swirling |
+| typing | Edit / MultiEdit / Write / NotebookEdit | leaning over a floating keyboard, alternating hand taps (about 8 Hz), small code glyphs rising off the keys |
+| reading | Read / Grep / Glob / WebFetch / WebSearch | holding a small page or magnifier, eyes scanning left↔right |
+| running | Bash | presses a key once, then watches a tiny terminal prop whose lines scroll |
+| delegating | Task (subagent started) | points to the side, and a mini crew member pops out there |
+| waiting | permission or input needed | turns toward the viewer, raises a hand, an amber "!" bubble, a small bounce every 2 s |
+| error | StopFailure or a failed tool | a quick shake, then a sweat drop. Eyes become "×" for 600 ms, then a worried look until the error is acknowledged |
+| done | turn finished | arms up with a small sparkle burst, played once, then idle |
+
+**Animation rules.**
+- Built from separate SVG part groups (body, visor/eyes, arms, legs, prop layer) animated with Motion variants and keyframes. Use transforms and opacity only.
+- State changes **blend** (200–300 ms, `smooth`) and never snap. Props enter and leave with a quick scale and fade.
+- Idle variety (blinks, look-arounds) is randomized per instance so a board of characters never moves in sync.
+- Sizes: 24 px (session row: eyes, antenna orb and posture only, no props), 56 px (pod header: full acting), and 120 px (focus-view header: full acting plus props in detail).
+- Characters off screen or in hidden tabs are paused. At the Reduced motion level each state is a static pose. At Off it's a static pose without bubbles.
+
 ## 5. Component inventory
 
-`AppShell, AmbientField, Hud, ProjectRail, PodGrid, ProjectPod, SessionRow, ClaudeOrb, TerminalLane, Sparkline, PortChip, StatusDot, AttentionCenter, ApprovalCard, FocusView, ClaudePanel, MessageList, ToolCard(*), DiffView, Composer, TerminalStack, XtermView, GitPanel, PulseRail, CommandPalette, Toasts, SettingsSheet, OnboardingWizard, EmptyState, Skeleton, Kbd, Tooltip, NumberTicker`.
+`AppShell, AmbientField, Hud, ProjectRail, PodGrid, ProjectPod, SessionRow, ClaudeOrb, CrewMascot, TerminalLane, Sparkline, PortChip, StatusDot, AttentionCenter, ApprovalCard, FocusView, ClaudePanel, MessageList, ToolCard(*), DiffView, Composer, TerminalStack, XtermView, GitPanel, PulseRail, CommandPalette, Toasts, SettingsSheet, OnboardingWizard, EmptyState, Skeleton, Kbd, Tooltip, NumberTicker`.
 
 ## 6. Empty, loading and error states
 

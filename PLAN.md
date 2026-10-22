@@ -219,13 +219,18 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Done when:** the showcase renders all states, and the scheduler is unit tested (registers, unregisters, pauses).
   - **Verify:** `pnpm --filter @c-board/web test && pnpm shots`
 
+- [ ] **7.2b Crew mascot**
+  - `CrewMascot` per DESIGN.md §4.11: an original SVG character built from part groups, with every state in the table (sleeping, idle, watching, thinking, typing, reading, running, delegating, waiting, error, done) as Motion variants. Blended transitions, per-instance randomized blinks and look-arounds, three sizes (24/56/120 px) with the detail rules, the session color on the visor and antenna (the antenna tip is `ClaudeOrb`), a mini-crew subagent pop-in and pop-out, pausing when off screen, and static poses for Reduced and Off. Add a pure `mascotStateFor(session, terminals)` mapping with unit tests. Add a "character sheet" on `/#/_tokens` showing every state at every size, with a state switcher. Use the `animate` and `apple-design` skills, and run `review-animations` on it before finishing.
+  - **Done when:** the character sheet screenshot shows every state clearly distinguishable at 56 px, the mapping tests pass, and 30 mascots on screen keep 60 fps (Playwright FPS sample).
+  - **Verify:** `pnpm --filter @c-board/web test && pnpm shots && pnpm e2e`
+
 - [ ] **7.3 Sparkline, TerminalLane, PortChip**
   - A canvas `Sparkline` (60 samples, slide-in, accent tint, rose on error), `TerminalLane` (name, command, sparkline, port chips, uptime, exit badge, streaming "comet" border, aligned columns), `PortChip` (click copies `localhost:port`, hover shows the process), and `TerminalPeek` (a live 6-line output preview on lane hover or focus, per DESIGN.md §4.3).
   - **Done when:** the lanes render in the demo with correct alignment across pods (screenshot check).
   - **Verify:** `pnpm shots`
 
 - [ ] **7.4 ProjectPod and PodGrid (overview)**
-  - Pod anatomy per DESIGN.md §4.3: accent hairline, header (avatar ring, name, branch, dirty, ahead), SessionRows (orb, typewriter status text, last-line shimmer, tokens) and TerminalLanes. Cursor spotlight and lift on hover. The border takes the priority status color. `PodGrid` is responsive (1/2/3/4 columns), with attention-first ordering animated via `layout` and a staggered enter.
+  - Pod anatomy per DESIGN.md §4.3: accent hairline, header (avatar ring, name, branch, dirty, ahead, and the project's 56 px crew mascots per §4.11), SessionRows (orb, typewriter status text, last-line shimmer, tokens) and TerminalLanes. Cursor spotlight and lift on hover. The border takes the priority status color. `PodGrid` is responsive (1/2/3/4 columns), with attention-first ordering animated via `layout` and a staggered enter.
   - **Done when:** the overview looks finished in demo mode at all three widths, in dark and light.
   - **Verify:** `pnpm shots && pnpm e2e`
 
@@ -270,12 +275,12 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm shots && pnpm --filter @c-board/server test`
 
 - [ ] **7.13 Activity animation system**
-  - Per DESIGN.md §4.10: per-entity activity levels in the store (a decaying event rate), the live session caption (action text from hook tool events, slide-swap plus shimmer), terminal lane activity (pulse speed and comet tied to output rate, crash state), the pod activity border (rotating light, speed ∝ activity), hairline event particles, a one-time "turn done" sweep, idle dimming, and the focus-view header caption with elapsed time and inline Allow / Deny. Idle entities register no frame callbacks.
+  - Per DESIGN.md §4.10: per-entity activity levels in the store (a decaying event rate), crew mascot states wired to live session and terminal data (including subagent mini-crews), the live session caption (action text from hook tool events, slide-swap plus shimmer), terminal lane activity (pulse speed and comet tied to output rate, crash state), the pod activity border (rotating light, speed ∝ activity), hairline event particles, a one-time "turn done" sweep, idle dimming, and the focus-view header caption with elapsed time and inline Allow / Deny. Idle entities register no frame callbacks.
   - **Done when:** in demo mode, busy, idle, waiting and crashed projects are distinguishable at a glance in the screenshots. An e2e test with fake timers checks that the done sweep plays once and that idle pods dim after 5 minutes. Reduced mode shows no movement.
   - **Verify:** `pnpm e2e && pnpm shots`
 
 - [ ] **7.14 Worst-case data pass (break-ui)**
-  - Use the `break-ui` skill on ProjectPod, SessionRow (very long captions), TerminalLane, TerminalPeek, ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
+  - Use the `break-ui` skill on ProjectPod (including 6+ sessions, which means 6+ mascots), SessionRow (very long captions), TerminalLane, TerminalPeek, ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
   - **Done when:** the screenshots of `?worst=1` at all widths show no overflow, overlap or broken alignment.
   - **Verify:** `pnpm shots`
 
