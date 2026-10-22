@@ -7,8 +7,8 @@
     "c-board": "./dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx watch src/cli.ts start --no-open",
-    "dev:demo": "tsx watch src/cli.ts start --demo --no-open",
+    "dev": "CBOARD_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --no-open",
+    "dev:demo": "CBOARD_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --demo --no-open",
     "start": "node dist/cli.js start",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",

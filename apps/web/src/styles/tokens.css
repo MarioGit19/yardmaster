@@ -1,0 +1,69 @@
+/* Design tokens, DESIGN.md §2. Dark "Night" is the default; light "Daylight" via [data-theme=light]. */
+
+:root {
+  color-scheme: dark;
+
+  --bg-0: #05060a;
+  --bg-1: #0a0c12;
+  --bg-2: #10131b;
+  --glass: rgb(255 255 255 / 0.03);
+  --glass-blur: 16px;
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.14);
+  --text-1: #edeff5;
+  --text-2: #a3a9b8;
+  --text-3: #6b7183;
+
+  --st-work: #7c9cff;
+  --st-tool: #5ee7ff;
+  --st-wait: #ffb547;
+  --st-ok: #3ddc97;
+  --st-err: #ff5c7a;
+  --st-idle: #6b7183;
+  --st-work-glow: color-mix(in srgb, var(--st-work) 35%, transparent);
+  --st-tool-glow: color-mix(in srgb, var(--st-tool) 35%, transparent);
+  --st-wait-glow: color-mix(in srgb, var(--st-wait) 35%, transparent);
+  --st-ok-glow: color-mix(in srgb, var(--st-ok) 35%, transparent);
+  --st-err-glow: color-mix(in srgb, var(--st-err) 35%, transparent);
+  --st-idle-glow: color-mix(in srgb, var(--st-idle) 35%, transparent);
+
+  /* Project accents: OKLCH L=0.72 C=0.14, hues kept ≥15° away from every status hue (accents.ts). */
+  --accent-0: oklch(0.72 0.14 35);
+  --accent-1: oklch(0.72 0.14 50);
+  --accent-2: oklch(0.72 0.14 95);
+  --accent-3: oklch(0.72 0.14 115);
+  --accent-4: oklch(0.72 0.14 135);
+  --accent-5: oklch(0.72 0.14 185);
+  --accent-6: oklch(0.72 0.14 240);
+  --accent-7: oklch(0.72 0.14 295);
+  --accent-8: oklch(0.72 0.14 320);
+  --accent-9: oklch(0.72 0.14 345);
+
+  --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --focus-ring:
+    0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-0: #f7f7f4;
+  --bg-1: #ffffff;
+  --bg-2: #efefeb;
+  --glass: rgb(255 255 255 / 0.7);
+  --line: rgb(0 0 0 / 0.08);
+  --line-strong: rgb(0 0 0 / 0.16);
+  --text-1: #0e1116;
+  --text-2: #4a505e;
+  --text-3: #686e7b;
+
+  /* Status colors with OKLCH lightness lowered by 0.12 for contrast on light surfaces. */
+  --st-work: #5a77d6;
+  --st-tool: #28c0d7;
+  --st-wait: #d68f06;
+  --st-ok: #00b573;
+  --st-err: #d43157;
+  --st-idle: #4a4f60;
+
+  --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.8);
+}

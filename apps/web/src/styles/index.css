@@ -1,0 +1,135 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "./tokens.css";
+
+/* Tokens only: Tailwind's default palette and type scale are cleared so utilities stay on-system. */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-glass: var(--glass);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+
+  --color-st-work: var(--st-work);
+  --color-st-tool: var(--st-tool);
+  --color-st-wait: var(--st-wait);
+  --color-st-ok: var(--st-ok);
+  --color-st-err: var(--st-err);
+  --color-st-idle: var(--st-idle);
+  --color-st-work-glow: var(--st-work-glow);
+  --color-st-tool-glow: var(--st-tool-glow);
+  --color-st-wait-glow: var(--st-wait-glow);
+  --color-st-ok-glow: var(--st-ok-glow);
+  --color-st-err-glow: var(--st-err-glow);
+  --color-st-idle-glow: var(--st-idle-glow);
+
+  --font-*: initial;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-*: initial;
+  --text-meta: 11px;
+  --text-meta--line-height: 16px;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 20px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-title-sm: 16px;
+  --text-title-sm--line-height: 24px;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-display--letter-spacing: -0.02em;
+  --text-hero: 44px;
+  --text-hero--line-height: 48px;
+  --text-hero--letter-spacing: -0.03em;
+
+  --spacing: 4px;
+
+  --radius-*: initial;
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-panel: 16px;
+  --radius-modal: 24px;
+  --radius-full: 9999px;
+
+  --shadow-*: initial;
+  --shadow-raised: var(--highlight-inset);
+  --shadow-focus: var(--focus-ring);
+
+  --blur-glass: var(--glass-blur);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Emphasis glow, DESIGN.md §2: `glow-st-wait`, `glow-st-err`, … */
+@utility glow-* {
+  box-shadow:
+    0 0 0 1px --value(--color-*),
+    0 8px 40px -8px color-mix(in srgb, --value(--color-*) 35%, transparent);
+}
+
+@utility glass {
+  background-color: var(--glass);
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  html {
+    background-color: var(--bg-0);
+    color: var(--text-1);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  ::selection {
+    background-color: var(--st-work-glow);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+
+  /* Motion level "off": nothing moves, including CSS transitions and keyframes. */
+  [data-motion="off"] *,
+  [data-motion="off"] *::before,
+  [data-motion="off"] *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat any component-level animation. */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above. */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above. */
+    scroll-behavior: auto !important;
+  }
+}

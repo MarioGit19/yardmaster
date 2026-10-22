@@ -2,8 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "rootDir": "src",
-    "outDir": "dist"
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }
