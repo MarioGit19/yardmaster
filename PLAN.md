@@ -140,10 +140,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm e2e && pnpm shots`
   - Note: `e2e/` holds the Playwright config (projects `e2e` and `shots`), a global setup that spawns `tsx src/cli.ts start --demo --no-open` with `CBOARD_PORT=0` and a temp `CBOARD_HOME`, reads the sign-in URL from stdout, signs in through `/auth?t=` and passes origin + cookie to workers via env, and fixtures for a signed-in page with a `theme` option (sets `cboard.theme` and `colorScheme`). `pnpm e2e`/`pnpm shots` build the web app first. Shots are full-page, named `<screen>-<w>x<h>-<theme>.png`. Root `typecheck` now also checks `e2e/`; biome turns off `noEmptyPattern` there (Playwright fixtures need `{}`). CI does not run e2e yet (it would need `playwright install chromium`). One `pnpm check` run failed in vitest once and didn't reproduce in 7 reruns; watch for a flaky unit test.
 
-- [ ] **3.5 Brand assets**
+- [x] **3.5 Brand assets**
   - Per DESIGN.md §4.9: create the `logo.svg` logomark and the `c-board` wordmark component. Add a live SVG favicon driven by the store (idle, waiting with amber dot, error with rose), plus the `(n) c-board` title count. Add a build script that renders `apps/web/public/favicon.png` (32/180 px) and `apps/extension/media/icon.png` (128 px) from the SVG with Playwright. Generated PNGs are build outputs (gitignored), except where packaging requires them.
   - **Done when:** the favicon changes state in demo mode (e2e checks `link[rel=icon]` href changes) and the icon script outputs the PNGs.
   - **Verify:** `pnpm --filter @c-board/web build && pnpm e2e`
+  - Note: `pnpm icons` (also run by the web build, skipped when up to date) writes `favicon.png` (32), `apple-touch-icon.png` (180) and `apps/extension/media/icon.png` (128); all gitignored. Without Chromium the build warns and skips them; extension packaging should run `pnpm icons` first.
 
 ## Phase 4 — Claude observation (hooks and transcripts)
 

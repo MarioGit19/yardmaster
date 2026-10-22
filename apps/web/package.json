@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:demo": "vite",
-    "build": "tsc -p tsconfig.build.json && vite build",
+    "build": "tsx scripts/render-icons.ts && tsc -p tsconfig.build.json && vite build",
+    "icons": "tsx scripts/render-icons.ts --force --strict",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "happy-dom": "^21.0.4",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "vite": "^8.3.5"
   }
 }

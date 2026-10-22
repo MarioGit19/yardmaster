@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="c-board">
+  <defs>
+    <radialGradient id="cb-glow" cx="12" cy="12" r="7.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0.3" stop-color="#7c9cff" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#7c9cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.5" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="12" cy="12" r="7.5" fill="url(#cb-glow)"/>
+  <circle cx="12" cy="12" r="3.25" fill="#7c9cff"/>
+  <circle cx="10.9" cy="10.9" r="1.1" fill="#fff" fill-opacity="0.55"/>
+</svg>

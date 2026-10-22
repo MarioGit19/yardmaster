@@ -31,3 +31,8 @@ loop/.state/
 # third-party skills (installed by scripts/setup-skills.sh) and personal Claude settings
 .claude/skills/
 .claude/settings.local.json
+
+# brand PNGs rendered from apps/web/src/brand/logo.svg (pnpm icons)
+apps/web/public/favicon.png
+apps/web/public/apple-touch-icon.png
+apps/extension/media/

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
+import { LiveFavicon } from './brand/LiveFavicon.js';
 import { MotionRoot } from './MotionRoot.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
@@ -59,6 +60,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <AppRoutes />
         </Router>
         <Toasts />
+        <LiveFavicon />
       </TooltipProvider>
     </MotionRoot>
   );

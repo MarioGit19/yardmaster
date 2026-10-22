@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { Link } from 'wouter';
+import { Wordmark } from '../brand/Logo.js';
 import { type ConnectionState, selectConnection, useBoard } from '../data/index.js';
 import { routes } from '../routes.js';
 import type { Tone } from '../status.js';
@@ -43,11 +44,8 @@ export function Hud() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-line border-b bg-bg-1 px-4">
-      <Link
-        href={routes.overview}
-        className="rounded-chip font-medium font-mono text-body text-text-1"
-      >
-        c-board
+      <Link href={routes.overview} className="rounded-chip text-body text-text-1">
+        <Wordmark />
       </Link>
       <div className="flex-1" />
       <output aria-live="polite" className="flex items-center text-label text-text-2">
