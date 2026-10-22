@@ -96,3 +96,33 @@ test.describe('claude orb', () => {
     await section.screenshot({ path: new URL('orb-showcase-reduced.png', OUT_DIR).pathname });
   });
 });
+
+// The crew mascot's character sheet on /_tokens: every state at 120/56/24 px.
+test.describe('crew mascot', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const sheet = (page: import('@playwright/test').Page) =>
+    page.locator('section', { has: page.getByRole('heading', { name: 'Crew mascot' }) });
+
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+      test('character sheet', async ({ page }) => {
+        await page.goto('/#/_tokens');
+        const section = sheet(page);
+        await section.scrollIntoViewIfNeeded();
+        await expect(section.locator('[data-crew]')).toHaveCount(36);
+        await page.waitForTimeout(1200);
+        await section.screenshot({ path: new URL(`crew-sheet-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+
+  test('reduced', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.goto('/#/_tokens');
+    const section = sheet(page);
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await section.screenshot({ path: new URL('crew-sheet-reduced.png', OUT_DIR).pathname });
+  });
+});

@@ -237,3 +237,266 @@
   background-size: 128px 128px;
   opacity: 0.03;
 }
+
+/* Crew mascot loops, DESIGN.md §4.11. Poses blend in Motion; these repeat underneath them.
+   Each instance breathes at a random phase (--crew-delay). Paused off screen, gone at Reduced,
+   where the base styles below are the static pose. */
+.crew-anim {
+  transform-box: fill-box;
+}
+.crew[data-crew-paused] .crew-anim {
+  animation-play-state: paused;
+}
+.crew-shell {
+  fill: var(--bg-2);
+  stroke: var(--line-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.crew-limb {
+  fill: var(--bg-2);
+  stroke: var(--line-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.crew-prop {
+  fill: var(--bg-1);
+  stroke: var(--line-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.crew-outline {
+  stroke: var(--line-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes crew-breathe {
+  50% {
+    transform: scaleY(1.02);
+  }
+}
+@keyframes crew-sleep {
+  50% {
+    transform: scaleY(1.035);
+  }
+}
+@keyframes crew-hop {
+  0%,
+  20%,
+  100% {
+    transform: translateY(0);
+  }
+  10% {
+    transform: translateY(-4%);
+  }
+}
+.crew-body-idle,
+.crew-body-watching,
+.crew-body-thinking,
+.crew-body-typing,
+.crew-body-reading,
+.crew-body-running,
+.crew-body-delegating {
+  transform-origin: 50% 88%;
+  animation: crew-breathe 4s var(--ease-in-out) infinite;
+  animation-delay: var(--crew-delay, 0s);
+}
+.crew-body-sleeping {
+  transform-origin: 50% 88%;
+  animation: crew-sleep 5s var(--ease-in-out) infinite;
+  animation-delay: var(--crew-delay, 0s);
+}
+.crew-body-waiting {
+  animation: crew-hop 2s var(--ease-out) infinite;
+}
+
+@keyframes crew-scan {
+  from {
+    transform: translateX(-3px);
+  }
+  to {
+    transform: translateX(3px);
+  }
+}
+@keyframes crew-track {
+  from {
+    transform: translateY(-1px);
+  }
+  to {
+    transform: translateY(3px);
+  }
+}
+.crew-eyes-reading {
+  animation: crew-scan 1.1s var(--ease-in-out) infinite alternate;
+}
+.crew-eyes-watching {
+  animation: crew-track 1.6s var(--ease-in-out) infinite;
+}
+.crew-magnifier {
+  animation: crew-scan 1.1s var(--ease-in-out) infinite alternate;
+}
+
+/* Typing: alternating hand taps at 8 Hz between the two hands. */
+@keyframes crew-tap-l {
+  50% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes crew-tap-r {
+  50% {
+    transform: rotate(9deg);
+  }
+}
+@keyframes crew-wave {
+  50% {
+    transform: rotate(-8deg);
+  }
+}
+.crew-arm-l-typing,
+.crew-arm-r-typing,
+.crew-arm-r-waiting {
+  transform-origin: 50% 12%;
+}
+.crew-arm-l-typing {
+  animation: crew-tap-l 0.25s linear infinite;
+}
+.crew-arm-r-typing {
+  animation: crew-tap-r 0.25s linear infinite;
+  animation-delay: -0.125s;
+}
+.crew-arm-r-waiting {
+  animation: crew-wave 2s var(--ease-in-out) infinite;
+}
+
+@keyframes crew-rise {
+  0% {
+    transform: translateY(2px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
+.crew-glyph {
+  animation: crew-rise 1.2s var(--ease-out) infinite;
+}
+
+@keyframes crew-flicker {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  40% {
+    opacity: 0.45;
+  }
+  60% {
+    opacity: 0.7;
+  }
+}
+.crew-flicker {
+  opacity: 0.7;
+  animation: crew-flicker 1.2s steps(3, jump-none) infinite;
+}
+
+@keyframes crew-scroll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+.crew-scroll {
+  animation: crew-scroll 1.6s linear infinite;
+}
+[data-crew-detail="detailed"] .crew-scroll {
+  animation-duration: 3.2s;
+}
+
+@keyframes crew-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.crew-dot {
+  animation: crew-dot 1.2s var(--ease-in-out) infinite;
+}
+
+.crew-bounce {
+  animation: crew-hop 2s var(--ease-out) infinite;
+}
+
+@keyframes crew-z {
+  0% {
+    transform: translate(0, 2px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(6px, -14px);
+    opacity: 0;
+  }
+}
+.crew-z {
+  animation: crew-z 3s var(--ease-out) infinite;
+}
+
+@keyframes crew-sweat {
+  0%,
+  30% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(5px);
+    opacity: 0;
+  }
+}
+.crew-sweat {
+  animation: crew-sweat 1.6s var(--ease-in-out) infinite;
+}
+
+/* Done: one sparkle burst. The character sheet holds it, so there it repeats. */
+@keyframes crew-spark {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes crew-spark-hold {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  50%,
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+.crew-spark {
+  transform-origin: center;
+  opacity: 0;
+  animation: crew-spark 0.8s var(--ease-out) both;
+}
+.crew[data-crew-hold] .crew-spark {
+  animation: crew-spark-hold 1.6s var(--ease-out) infinite;
+}
+:root[data-motion="reduced"] .crew-anim {
+  animation: none;
+}
+:root[data-motion="reduced"] .crew-spark {
+  opacity: 1;
+}
