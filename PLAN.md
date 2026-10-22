@@ -160,10 +160,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/hook test`
   - Note: the token header is passed to curl through a here-doc on fd 3 (`-H @/dev/fd/3`) so it never appears in `ps`; curl runs with `-q --noproxy '*'`. shellcheck was not installed, so its test is skipped here.
 
-- [ ] **4.3 Hook installer**
+- [x] **4.3 Hook installer**
   - `c-board hooks install|uninstall|status [--dry-run] [--yes]`, implemented in `packages/hook/src/installer.ts` and wired into the CLI. It merges into `~/.claude/settings.json` (path overridable through `CLAUDE_CONFIG_DIR` or a `--settings-path` flag for tests). It registers the observer hook (`"async": true`) for the events listed in PRD §6.1, except `PermissionRequest`. It's idempotent, keeps every other key and hook untouched, makes a timestamped backup, prints a diff for `--dry-run`, and refuses to write if the existing JSON is invalid.
   - **Done when:** tests on temp files cover a fresh install, an install over existing third-party hooks, a second install (no change), uninstall (restores exactly the other hooks), and invalid JSON (refused).
   - **Verify:** `pnpm --filter @c-board/hook test`
+  - Note: the handler command is the absolute path of `packages/hook/bin/c-board-hook` (shell-quoted if needed), with `async: true` and `timeout: 5`. An event counts as installed only with exactly one c-board handler of that shape; otherwise install replaces ours in place and leaves third-party groups where they are. Uninstall removes every c-board handler, including an away-mode `PermissionRequest` one, and drops the `hooks` key if it ends up empty. The file is rewritten with 2-space JSON (atomic rename, same mode), and the write is refused if the file changed between planning and writing. Without `--yes` it asks on a TTY and refuses when there is none. `claudeSettingsPath` now lives in `@c-board/hook` (doctor reuses it).
 
 - [ ] **[HUMAN] 4.4 Install hooks on your machine**
   - Run `pnpm --filter @c-board/server exec tsx src/cli.ts hooks install --dry-run`, review the diff, then run it without `--dry-run`. Start the server (`pnpm dev`), use Claude in any project, and check that `c-board doctor` reports hook events received. Then tick this box.

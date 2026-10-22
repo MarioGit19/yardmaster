@@ -16,6 +16,7 @@
     "cli": "tsx src/cli.ts"
   },
   "dependencies": {
+    "@c-board/hook": "workspace:*",
     "@c-board/protocol": "workspace:*",
     "@fastify/websocket": "^11.3.4",
     "fastify": "^5.12.7",

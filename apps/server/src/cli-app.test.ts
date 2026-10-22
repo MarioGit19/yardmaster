@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -231,5 +231,74 @@ describe('browserCommand', () => {
       'rundll32',
       ['url.dll,FileProtocolHandler', url],
     ]);
+  });
+});
+
+describe('c-board hooks', () => {
+  const settingsAt = () => join(home, 'cfg', 'settings.json');
+  const env = () => ({ CLAUDE_CONFIG_DIR: join(home, 'cfg') });
+
+  it('shows a diff for --dry-run and writes nothing', async () => {
+    const run = testIo(env());
+    expect(await runCli(['hooks', 'install', '--dry-run'], run.io)).toBe(0);
+    expect(run.out()).toContain('+++ ');
+    expect(run.out()).toContain('c-board-hook');
+    expect(run.out()).toContain('Dry run: nothing was written.');
+    await expect(stat(settingsAt())).rejects.toThrow();
+  });
+
+  it('asks before writing, and refuses without a terminal unless --yes', async () => {
+    const noTty = testIo(env());
+    expect(await runCli(['hooks', 'install'], noTty.io)).toBe(1);
+    expect(noTty.err()).toContain('--yes');
+
+    const declined = testIo(env(), { confirm: async () => false });
+    expect(await runCli(['hooks', 'install'], declined.io)).toBe(1);
+    expect(declined.out()).toContain('Nothing was written.');
+    await expect(stat(settingsAt())).rejects.toThrow();
+
+    const confirm = vi.fn(async () => true);
+    const accepted = testIo(env(), { confirm });
+    expect(await runCli(['hooks', 'install'], accepted.io)).toBe(0);
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(accepted.out()).toContain('Installed the c-board hook for 13 events');
+  });
+
+  it('installs, reports status, and uninstalls through --settings-path', async () => {
+    const path = join(home, 'elsewhere', 'settings.json');
+    const before = testIo();
+    expect(await runCli(['hooks', 'status', '--settings-path', path], before.io)).toBe(1);
+    expect(before.out()).toContain('0/13 hook events installed');
+
+    expect(await runCli(['hooks', 'install', '--yes', '--settings-path', path], testIo().io)).toBe(
+      0,
+    );
+    const again = testIo();
+    expect(await runCli(['hooks', 'install', '-y', '--settings-path', path], again.io)).toBe(0);
+    expect(again.out()).toContain('already installed');
+
+    const status = testIo();
+    expect(await runCli(['hooks', 'status', '--settings-path', path], status.io)).toBe(0);
+    expect(status.out()).toContain('13/13 hook events installed');
+
+    const removed = testIo();
+    expect(await runCli(['hooks', 'uninstall', '--yes', '--settings-path', path], removed.io)).toBe(
+      0,
+    );
+    expect(removed.out()).toContain('Backup: ');
+    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({});
+  });
+
+  it('refuses invalid JSON and rejects unknown actions', async () => {
+    const path = join(home, 'bad.json');
+    await writeFile(path, '{ nope');
+    const bad = testIo();
+    expect(await runCli(['hooks', 'install', '--yes', '--settings-path', path], bad.io)).toBe(1);
+    expect(bad.err()).toContain('is not valid JSON');
+    expect(await readFile(path, 'utf8')).toBe('{ nope');
+
+    const unknown = testIo();
+    expect(await runCli(['hooks', 'wipe'], unknown.io)).toBe(2);
+    expect(unknown.err()).toContain('expected one of install, uninstall, status');
   });
 });

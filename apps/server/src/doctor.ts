@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { access, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { delimiter, join } from 'node:path';
+import { claudeSettingsPath, HOOK_MARKER } from '@c-board/hook';
 import { HealthResponse, ServerStatus } from '@c-board/protocol';
 import type { ServerConfig } from './config.js';
 import { TOKEN_HEADER } from './security.js';
@@ -48,7 +49,6 @@ export interface DoctorDeps {
 }
 
 export const MIN_NODE = [22, 5] as const;
-const HOOK_MARKER = 'c-board-hook';
 const HTTP_TIMEOUT_MS = 1_500;
 
 export function defaultDoctorDeps(home: string, env: NodeJS.ProcessEnv = process.env): DoctorDeps {
@@ -232,11 +232,7 @@ async function fetchStatus(
   return status.success ? status.data : undefined;
 }
 
-/** `CLAUDE_CONFIG_DIR` or `~/.claude`. Only `settings.json` is read there, never credentials. */
-export function claudeSettingsPath(env: NodeJS.ProcessEnv, home: string): string {
-  const dir = env.CLAUDE_CONFIG_DIR?.trim();
-  return join(dir ? dir : join(home, '.claude'), 'settings.json');
-}
+export { claudeSettingsPath };
 
 /** Hook events whose handlers run the c-board hook script. */
 export function installedHookEvents(settings: unknown): string[] {

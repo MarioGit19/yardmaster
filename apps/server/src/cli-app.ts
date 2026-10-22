@@ -1,5 +1,18 @@
 import { homedir } from 'node:os';
-import { parseArgs } from 'node:util';
+import { resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
+import {
+  applyPlan,
+  claudeSettingsPath,
+  hookStatus,
+  InvalidSettingsError,
+  OBSERVER_EVENTS,
+  planInstall,
+  planUninstall,
+  readSettings,
+  unifiedDiff,
+} from '@c-board/hook';
 import type { FastifyInstance } from 'fastify';
 import type { BuildOptions } from './app.js';
 import { ConfigError, loadConfig, type ServerConfig } from './config.js';
@@ -27,6 +40,8 @@ export interface CliIo {
   doctorDeps?: (config: ServerConfig) => DoctorDeps;
   /** Called once a started server is listening, e.g. to install signal handlers. */
   onStarted?: (app: FastifyInstance) => void;
+  /** Asks a yes/no question. Absent when there is no terminal to ask on. */
+  confirm?: (question: string) => Promise<boolean>;
 }
 
 export const USAGE = `Usage: c-board <command> [options]
@@ -35,17 +50,20 @@ Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
   doctor                       Check the setup and print a report
   token --rotate               Replace the install token (signs out every browser)
+  hooks install|uninstall|status [--dry-run] [--yes] [--settings-path <file>]
+                               Manage the c-board hooks in Claude's settings.json
 
 Options:
   -h, --help                   Show this help
   -v, --version                Print the version
 
-Environment: CBOARD_PORT (4317), CBOARD_HOME (~/.c-board), CBOARD_HOST (127.0.0.1)
+Environment: CBOARD_PORT (4317), CBOARD_HOME (~/.c-board), CBOARD_HOST (127.0.0.1),
+  CLAUDE_CONFIG_DIR (~/.claude)
 `;
 
 class UsageError extends Error {}
 
-function parse<T extends Record<string, { type: 'boolean' }>>(args: string[], options: T) {
+function parse<T extends ParseArgsOptionsConfig>(args: string[], options: T) {
   try {
     return parseArgs({ args, options, strict: true, allowPositionals: false }).values;
   } catch (err) {
@@ -122,7 +140,78 @@ async function token(args: string[], config: ServerConfig, io: CliIo): Promise<n
   return 0;
 }
 
-const COMMANDS = { start, doctor, token } as const;
+const HOOK_ACTIONS = ['install', 'uninstall', 'status'] as const;
+
+async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<number> {
+  const [action, ...rest] = args;
+  if (!HOOK_ACTIONS.includes(action as (typeof HOOK_ACTIONS)[number])) {
+    throw new UsageError(`expected one of ${HOOK_ACTIONS.join(', ')}`);
+  }
+  const flags = parse(rest, {
+    'dry-run': { type: 'boolean' },
+    yes: { type: 'boolean', short: 'y' },
+    'settings-path': { type: 'string' },
+  });
+  const path = resolve(flags['settings-path'] ?? claudeSettingsPath(io.env, io.home));
+  const shown = tildify(path, io.home);
+
+  try {
+    const raw = await readSettings(path);
+    if (action === 'status') {
+      const status = hookStatus(raw);
+      const total = OBSERVER_EVENTS.length;
+      io.stdout.write(`${status.installed.length}/${total} hook events installed in ${shown}\n`);
+      if (status.missing.length > 0) io.stdout.write(`  missing: ${status.missing.join(', ')}\n`);
+      if (status.outdated.length > 0) {
+        io.stdout.write(`  outdated: ${status.outdated.join(', ')}\n`);
+      }
+      if (status.installed.length === total) return 0;
+      io.stdout.write('Run `c-board hooks install` to fix this.\n');
+      return 1;
+    }
+
+    const install = action === 'install';
+    const plan = install ? planInstall(raw) : planUninstall(raw);
+    if (!plan.changed) {
+      io.stdout.write(
+        install
+          ? `The c-board hooks are already installed in ${shown}. Nothing changed.\n`
+          : `No c-board hooks found in ${shown}. Nothing changed.\n`,
+      );
+      return 0;
+    }
+    const diff = unifiedDiff(plan.before ?? '', plan.after, shown, shown);
+    if (flags['dry-run']) {
+      io.stdout.write(`${diff}Dry run: nothing was written.\n`);
+      return 0;
+    }
+    if (!flags.yes) {
+      if (!io.confirm) {
+        io.stderr.write(`c-board hooks: no terminal to confirm on; pass --yes to edit ${shown}.\n`);
+        return 1;
+      }
+      io.stdout.write(diff);
+      if (!(await io.confirm(`Write these changes to ${shown}?`))) {
+        io.stdout.write('Nothing was written.\n');
+        return 1;
+      }
+    }
+    const backup = await applyPlan(path, plan);
+    io.stdout.write(
+      install
+        ? `Installed the c-board hook for ${OBSERVER_EVENTS.length} events in ${shown}.\n`
+        : `Removed the c-board hooks from ${shown}.\n`,
+    );
+    if (backup) io.stdout.write(`Backup: ${tildify(backup, io.home)}\n`);
+    return 0;
+  } catch (err) {
+    if (!(err instanceof InvalidSettingsError)) throw err;
+    io.stderr.write(`c-board hooks: ${shown} ${err.message}. Nothing was written.\n`);
+    return 1;
+  }
+}
+
+const COMMANDS = { start, doctor, token, hooks } as const;
 
 /** Runs one CLI invocation. Resolves to an exit code, or null when the server keeps running. */
 export async function runCli(argv: string[], io: CliIo): Promise<number | null> {
@@ -158,6 +247,21 @@ export async function runCli(argv: string[], io: CliIo): Promise<number | null> 
   }
 }
 
+async function askTty(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim());
+  } finally {
+    rl.close();
+  }
+}
+
 export function processIo(): CliIo {
-  return { stdout: process.stdout, stderr: process.stderr, env: process.env, home: homedir() };
+  return {
+    stdout: process.stdout,
+    stderr: process.stderr,
+    env: process.env,
+    home: homedir(),
+    ...(process.stdin.isTTY && process.stdout.isTTY ? { confirm: askTty } : {}),
+  };
 }
