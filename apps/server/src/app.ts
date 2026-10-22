@@ -4,6 +4,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } 
 import { pino } from 'pino';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
+import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
@@ -42,6 +43,8 @@ export interface BuildOptions {
   webRoot?: string;
   /** Transcript reader tuning, for tests. Not started in demo mode. */
   transcripts?: Pick<TranscriptServiceOptions, 'loadHistory' | 'watchFile' | 'claudeConfigDir'>;
+  /** Session registry discovery tuning, for tests. Not started in demo mode. */
+  discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
 }
 
 declare module 'fastify' {
@@ -55,6 +58,7 @@ declare module 'fastify' {
     hookStats: HookStats;
     hookIngest: HookIngest;
     transcripts: TranscriptService | null;
+    sessionDiscovery: SessionDiscovery | null;
   }
 }
 
@@ -90,6 +94,7 @@ export async function buildServer(
   app.decorate('settings', persistence.loadSettings());
   app.addHook('onClose', async () => {
     demo?.stop();
+    await discovery?.stop();
     await hookIngest.idle();
     await transcripts?.close();
     // Emit any changes made since the last microtask so they reach the database.
@@ -119,6 +124,14 @@ export async function buildServer(
         ...options.transcripts,
       });
   app.decorate('transcripts', transcripts);
+  const discovery = options.demo
+    ? null
+    : new SessionDiscovery({
+        store,
+        logger: logger.child({ component: 'discovery' }),
+        ...options.discovery,
+      });
+  app.decorate('sessionDiscovery', discovery);
   const gateway: UiGateway = new UiGateway({
     store,
     ...(transcripts ? { transcripts } : {}),
@@ -166,6 +179,7 @@ export async function buildServer(
 
   await app.ready();
   demo?.start();
+  discovery?.start();
   return app;
 }
 

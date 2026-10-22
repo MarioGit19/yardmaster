@@ -1,16 +1,13 @@
-import { realpath } from 'node:fs/promises';
-import { basename, resolve, sep } from 'node:path';
 import {
   type ActivityEvent,
-  accentIndexForProject,
   HookCommon,
   KnownHookEvent,
   normalizeHookEvent,
   Pid,
-  projectIdFromPath,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { BoardStore } from '../store.js';
+import { type PathResolver, projectForCwd, resolveDir } from './project-lookup.js';
 import { sessionReducer } from './session-reducer.js';
 
 export const HOOK_ROUTE = '/api/hooks/claude';
@@ -27,7 +24,7 @@ export interface HookIngestOptions {
   /** Off in demo mode: hooks are counted but the synthetic board is left alone. */
   apply?: boolean;
   now?: () => number;
-  resolvePath?: (path: string) => Promise<string>;
+  resolvePath?: PathResolver;
 }
 
 /**
@@ -37,7 +34,7 @@ export interface HookIngestOptions {
 export class HookIngest {
   private queue: Promise<void> = Promise.resolve();
   private readonly now: () => number;
-  private readonly resolvePath: (path: string) => Promise<string>;
+  private readonly resolvePath: PathResolver;
 
   constructor(private readonly options: HookIngestOptions) {
     this.now = options.now ?? Date.now;
@@ -72,7 +69,9 @@ export class HookIngest {
       this.options.logger.debug({ event: common.data.hook_event_name }, 'unrecognised hook event');
     }
     const cwd = common.data.cwd;
-    const projectId = cwd ? await this.projectFor(cwd, ts) : null;
+    const projectId = cwd
+      ? await projectForCwd(this.options.store, cwd, ts, this.resolvePath)
+      : null;
 
     const { store } = this.options;
     const session = sessionReducer(store.state.sessions[common.data.session_id], {
@@ -90,33 +89,6 @@ export class HookIngest {
       projectId: session.projectId,
       data: compactData(activity.data),
     });
-  }
-
-  /** The known project containing `cwd` (deepest match), or a new `hook` project for it. */
-  private async projectFor(cwd: string, ts: number): Promise<string | null> {
-    const path = await this.resolvePath(cwd).catch(() => null);
-    if (!path) return null;
-    const { store } = this.options;
-    let best: { id: string; depth: number } | null = null;
-    for (const project of Object.values(store.state.projects)) {
-      const root = project.path.replace(/\/+$/, '');
-      if (path !== root && !path.startsWith(root === '' ? sep : `${root}${sep}`)) continue;
-      if (!best || root.length > best.depth) best = { id: project.id, depth: root.length };
-    }
-    if (best) return best.id;
-
-    const id = projectIdFromPath(path);
-    store.upsertProject({
-      id,
-      path,
-      name: basename(path) || path,
-      accent: accentIndexForProject(id),
-      source: 'hook',
-      git: null,
-      createdAt: ts,
-      lastActivityAt: ts,
-    });
-    return id;
   }
 }
 
@@ -137,12 +109,6 @@ function compactData(data: Record<string, unknown>): Record<string, unknown> {
   );
   const fits = JSON.stringify(trimmed).length <= MAX_INPUT_JSON;
   return { ...data, toolInput: fits ? trimmed : null };
-}
-
-/** Realpath when the folder exists, else the normalized absolute path. */
-async function resolveDir(path: string): Promise<string> {
-  if (!path.startsWith('/')) throw new Error('cwd is not absolute');
-  return realpath(path).catch(() => resolve(path));
 }
 
 export function parseClaudePid(header: string | string[] | undefined): number | null {
