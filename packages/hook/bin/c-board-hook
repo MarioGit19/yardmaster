@@ -6,6 +6,8 @@
 exec >/dev/null 2>&1
 
 home="${CBOARD_HOME:-$HOME/.c-board}"
+# A literal "~" in CBOARD_HOME is expanded here on purpose.
+# shellcheck disable=SC2088
 case "$home" in
   "~") home="$HOME" ;;
   "~/"*) home="$HOME/${home#\~/}" ;;
