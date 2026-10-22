@@ -16,6 +16,7 @@ import {
 } from './editor-gateway.js';
 import { EditorRouter } from './editor-router.js';
 import { Persistence } from './persistence.js';
+import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
 import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
@@ -54,6 +55,8 @@ export interface BuildOptions {
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
   /** Editor link tuning, for tests. */
   editor?: Pick<EditorGatewayOptions, 'graceMs' | 'idleMs' | 'resolvePath' | 'commandTimeoutMs'>;
+  /** Process and port scanner tuning, or false to turn it off. Not started in demo mode. */
+  processes?: Omit<ProcessScannerOptions, 'store' | 'logger'> | false;
 }
 
 declare module 'fastify' {
@@ -68,6 +71,7 @@ declare module 'fastify' {
     hookIngest: HookIngest;
     transcripts: TranscriptService | null;
     sessionDiscovery: SessionDiscovery | null;
+    processScanner: ProcessScanner | null;
   }
 }
 
@@ -103,6 +107,7 @@ export async function buildServer(
   app.decorate('settings', persistence.loadSettings());
   app.addHook('onClose', async () => {
     demo?.stop();
+    processScanner?.stop();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -142,6 +147,15 @@ export async function buildServer(
         ...options.discovery,
       });
   app.decorate('sessionDiscovery', discovery);
+  const processScanner =
+    options.demo || options.processes === false
+      ? null
+      : new ProcessScanner({
+          store,
+          logger: logger.child({ component: 'processes' }),
+          ...options.processes,
+        });
+  app.decorate('processScanner', processScanner);
   const editorGateway = new EditorGateway({
     store,
     logger: logger.child({ component: 'editor-ws' }),
@@ -211,6 +225,7 @@ export async function buildServer(
   await app.ready();
   demo?.start();
   discovery?.start();
+  processScanner?.start();
   return app;
 }
 

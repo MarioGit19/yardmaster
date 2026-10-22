@@ -36,6 +36,7 @@ async function boot(): Promise<{ app: FastifyInstance; port: number }> {
   app = await startServer(config, {
     token,
     dbPath: ':memory:',
+    processes: false,
     editor: { resolvePath: async (path) => path, commandTimeoutMs: TIMEOUT_MS },
   });
   return { app, port: (app.server.address() as AddressInfo).port };

@@ -31,7 +31,7 @@ afterEach(async () => {
 
 describe('server', () => {
   it('GET /api/health returns ok and the package version', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const res = await app.inject({ method: 'GET', url: '/api/health', headers: { host } });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -39,7 +39,7 @@ describe('server', () => {
   });
 
   it('GET /api/status needs auth and reports editors and hook stats', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const denied = await app.inject({ method: 'GET', url: '/api/status', headers: { host } });
     expect(denied.statusCode).toBe(401);
 
@@ -61,8 +61,27 @@ describe('server', () => {
     });
   });
 
+  it('runs the process scanner outside demo mode', async () => {
+    const run = async (file: string) =>
+      file === 'ps'
+        ? `${process.pid} 1 0.0 1024 node\n`
+        : `p${process.pid}\ncnode\nn127.0.0.1:4999\n`;
+    app = await buildServer(config, {
+      token,
+      dbPath: ':memory:',
+      processes: { platform: 'darwin', run },
+    });
+    expect(app.processScanner).not.toBeNull();
+    await app.processScanner?.scanProcesses();
+    await app.processScanner?.scanPorts();
+    expect(app.store.state.ports['127.0.0.1:4999']).toMatchObject({ pid: process.pid });
+    await app.close();
+    app = await buildServer(config, { token, demo: { seed: 1 } });
+    expect(app.processScanner).toBeNull();
+  });
+
   it('returns 404 for unknown routes', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const res = await app.inject({
       method: 'GET',
       url: '/api/nope',
@@ -73,7 +92,7 @@ describe('server', () => {
 
   it('listens on loopback and serves health over HTTP', async () => {
     tmpHome = await mkdtemp(join(tmpdir(), 'cboard-app-'));
-    app = await startServer({ ...config, port: 0, home: tmpHome });
+    app = await startServer({ ...config, port: 0, home: tmpHome }, { processes: false });
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('expected a TCP address');
     expect(address.address).toBe('127.0.0.1');

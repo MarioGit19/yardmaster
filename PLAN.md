@@ -224,10 +224,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 6 — Processes, ports, git, linking
 
-- [ ] **6.1 Process and port scanner**
+- [x] **6.1 Process and port scanner**
   - `ProcessScanner`: every 2 s, run `ps` (via `execFile`) to build a pid tree. Every 5 s, run `lsof -nP -iTCP -sTCP:LISTEN -F pcn` (Linux fallback `ss -ltnp`). Aggregate CPU and RSS per terminal subtree and attach listening ports to terminals and projects. Diff before mutating the store, so nothing changes when nothing changed.
   - **Done when:** parser tests run on captured synthetic outputs for macOS and Linux, and aggregation tests pass.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `ps` runs without `etime` (unused); Linux uses `ps -eo …,args=`. CPU is rounded to 0.1 % and RSS to 64 KiB so sampling noise doesn't produce patches. Ports of processes outside a terminal get no project (no cwd lookup). Server tests that build a real server pass `processes: false`. The hook package's 500 ms timing test is occasionally flaky under full-suite load (also seen on the baseline with another test).
 
 - [ ] **6.2 Session ↔ terminal linking**
   - Using `X-CBoard-Claude-Pid` and the pid tree, walk the ancestors until one matches a terminal `processId`. Set `session.terminalId`, and re-evaluate when terminals or processes change. Also map `~/.claude/sessions` registry pids the same way.

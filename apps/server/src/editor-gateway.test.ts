@@ -38,6 +38,7 @@ async function boot(idleMs?: number): Promise<{ app: FastifyInstance; port: numb
   app = await startServer(config, {
     token,
     dbPath: ':memory:',
+    processes: false,
     editor: { graceMs: GRACE_MS, resolvePath: async (path) => path, idleMs },
   });
   return { app, port: (app.server.address() as AddressInfo).port };

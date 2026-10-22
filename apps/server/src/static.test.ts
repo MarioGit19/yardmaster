@@ -41,7 +41,7 @@ const get = (url: string, headers: Record<string, string> = {}) =>
 
 describe('static web app', () => {
   beforeEach(async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:', webRoot: root });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false, webRoot: root });
   });
 
   it('serves index.html at /', async () => {
@@ -101,7 +101,7 @@ describe('static web app', () => {
 describe('without a web build', () => {
   it('registers nothing and leaves unknown routes as 404', async () => {
     await rm(join(root, 'index.html'));
-    app = await buildServer(config, { token, dbPath: ':memory:', webRoot: root });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false, webRoot: root });
     expect((await get('/'))?.statusCode).toBe(404);
   });
 });

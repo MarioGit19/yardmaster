@@ -48,7 +48,7 @@ async function settled(): Promise<void> {
 
 describe(`POST ${HOOK_ROUTE}`, () => {
   it('requires the token', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const res = await app.inject({
       method: 'POST',
       url: HOOK_ROUTE,
@@ -62,7 +62,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
   });
 
   it('replies 204 and drives a session through a turn', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
 
     const start = await post(hookFixture('session-start'), { 'x-cboard-claude-pid': '4321' });
     expect(start.statusCode).toBe(204);
@@ -115,7 +115,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
   });
 
   it('records activity and the session row', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     await post(hookFixture('session-start'));
     await post(
       hookFixture('pre-tool-use-edit', {
@@ -140,7 +140,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
 
   it('maps a cwd inside a known project to that project', async () => {
     tmp = await realpath(await mkdtemp(join(tmpdir(), 'cboard-hooks-')));
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const outer = projectIdFromPath(tmp);
     const inner = projectIdFromPath(join(tmp, 'packages'));
     for (const [id, path] of [
@@ -171,7 +171,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
   });
 
   it('skips malformed payloads without failing the request', async () => {
-    app = await buildServer(config, { token, dbPath: ':memory:' });
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     for (const body of [[1, 2], 'text', { hook_event_name: 'Stop' }, { session_id: '' }]) {
       expect((await post(body)).statusCode).toBe(204);
     }

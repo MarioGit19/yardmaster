@@ -30,7 +30,10 @@ afterEach(async () => {
 });
 
 async function server(overrides: Partial<ServerConfig> = {}): Promise<FastifyInstance> {
-  app = await buildServer({ ...config, ...overrides }, { token, dbPath: ':memory:' });
+  app = await buildServer(
+    { ...config, ...overrides },
+    { token, dbPath: ':memory:', processes: false },
+  );
   return app;
 }
 
@@ -93,7 +96,10 @@ describe('Host allowlist', () => {
   });
 
   it('uses the real port when listening on an ephemeral one', async () => {
-    app = await startServer({ ...config, port: 0 }, { token, dbPath: ':memory:' });
+    app = await startServer(
+      { ...config, port: 0 },
+      { token, dbPath: ':memory:', processes: false },
+    );
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('expected a TCP address');
     const ok = await fetch(`http://127.0.0.1:${address.port}/api/health`);

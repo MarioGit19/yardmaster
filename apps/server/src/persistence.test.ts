@@ -290,19 +290,19 @@ describe('server boot', () => {
   const token = generateToken();
 
   it('loads projects and settings from CBOARD_HOME across restarts', async () => {
-    let app = await buildServer(config(), { token });
+    let app = await buildServer(config(), { token, processes: false });
     expect(app.store.state.projects).toEqual({});
     app.store.upsertProject(project('acme-shop'));
     app.persistence.setSetting('motion', 'off');
     await app.close();
 
-    app = await buildServer(config(), { token });
+    app = await buildServer(config(), { token, processes: false });
     expect(app.store.state.projects).toEqual({ 'acme-shop': project('acme-shop') });
     expect(app.settings).toEqual({ motion: 'off' });
     app.store.removeProject('acme-shop');
     await app.close();
 
-    app = await buildServer(config(), { token });
+    app = await buildServer(config(), { token, processes: false });
     expect(app.store.state.projects).toEqual({});
     await app.close();
   });

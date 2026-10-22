@@ -45,7 +45,7 @@ afterEach(async () => {
 });
 
 async function boot(actions?: ActionHandlers): Promise<{ port: number; origin: string }> {
-  app = await startServer(config, { token, dbPath: ':memory:', actions });
+  app = await startServer(config, { token, dbPath: ':memory:', actions, processes: false });
   const { port } = app.server.address() as AddressInfo;
   return { port, origin: `http://127.0.0.1:${port}` };
 }

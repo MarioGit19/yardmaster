@@ -269,7 +269,11 @@ describe('demo server', () => {
   });
 
   it('is off by default', async () => {
-    const app = await buildServer(config, { token: generateToken(), dbPath: ':memory:' });
+    const app = await buildServer(config, {
+      token: generateToken(),
+      dbPath: ':memory:',
+      processes: false,
+    });
     expect(app.demo).toBeNull();
     await app.close();
   });
