@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+out/
+*.vsix
+*.tsbuildinfo
+coverage/
+.vite/
+artifacts/
+test-results/
+playwright-report/
+
+# local runtime data / secrets
+.c-board/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# build loop runtime (logs contain full transcripts)
+loop/logs/
+loop/.state/
+
+# personal terms for scripts/privacy-check.sh (never commit)
+.privacy-denylist
+
+.DS_Store
+.idea/

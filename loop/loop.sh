@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Unattended build loop: runs headless Claude Code once per PLAN.md task until done or blocked.
+#
+#   loop/loop.sh                 run until all tasks are done / a [HUMAN] task / blocked
+#   MAX_ITERS=5 loop/loop.sh     cap iterations
+#   touch loop/.state/STOP       stop gracefully after the current iteration
+#
+# Env:
+#   CBOARD_LOOP_PERMISSION_MODE  permission mode for claude -p (default: auto)
+#   CBOARD_LOOP_MODEL            model alias/name (default: your Claude Code default)
+#   CBOARD_LOOP_PUSH             1 = push after each successful iteration (default: 1)
+#   MAX_ITERS                    default 200
+#   MAX_STALLS                   consecutive iterations without a ticked task before stopping (default 2)
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+mkdir -p loop/logs loop/.state
+rm -f loop/.state/BLOCKED loop/.state/STOP
+
+MODE="${CBOARD_LOOP_PERMISSION_MODE:-auto}"
+PUSH="${CBOARD_LOOP_PUSH:-1}"
+MAX_ITERS="${MAX_ITERS:-200}"
+MAX_STALLS="${MAX_STALLS:-2}"
+model_args=()
+[ -n "${CBOARD_LOOP_MODEL:-}" ] && model_args=(--model "$CBOARD_LOOP_MODEL")
+
+next_task() { grep -m1 -E '^- \[ \] ' PLAN.md || true; }
+done_count() { grep -cE '^- \[x\] ' PLAN.md || true; }
+
+stalls=0
+for ((i = 1; i <= MAX_ITERS; i++)); do
+  task="$(next_task)"
+  if [ -z "$task" ]; then echo "✓ All tasks in PLAN.md are done."; exit 0; fi
+  if [[ "$task" == *"[HUMAN]"* ]]; then
+    echo "⏸  Next task needs you:"; echo "   $task"
+    echo "   Do it, tick it in PLAN.md, commit, then re-run loop/loop.sh"; exit 0
+  fi
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "✗ Working tree is dirty. Commit or stash before running the loop."; git status --short; exit 1
+  fi
+
+  before_done="$(done_count)"
+  before_head="$(git rev-parse HEAD 2>/dev/null || echo none)"
+  ts="$(date +%Y%m%d-%H%M%S)"
+  log="loop/logs/$ts-iter$i.jsonl"
+  echo "▶ [$i] $task"
+  echo "  log: $log"
+
+  claude -p "$(cat loop/PROMPT.md)" \
+    --permission-mode "$MODE" \
+    --output-format stream-json --verbose \
+    ${model_args[@]+"${model_args[@]}"} >"$log" 2>&1
+  code=$?
+
+  # Show the final result line, if any
+  tail -n 1 "$log" | python3 -c 'import sys,json
+try:
+  o=json.loads(sys.stdin.read()); r=o.get("result") or ""
+  print("  result:", (r[:400]+"…") if len(r)>400 else r)
+  if "total_cost_usd" in o: print("  cost: $%.2f" % o["total_cost_usd"])
+except Exception: pass' || true
+
+  if [ $code -ne 0 ]; then echo "✗ claude exited with code $code (see $log)"; exit $code; fi
+  if [ -f loop/.state/BLOCKED ]; then echo "⏸  Blocked: $(cat loop/.state/BLOCKED)"; exit 0; fi
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "✗ Iteration left uncommitted changes; stopping for review."; git status --short; exit 1
+  fi
+
+  after_head="$(git rev-parse HEAD 2>/dev/null || echo none)"
+  if [ "$after_head" != "$before_head" ]; then
+    if ! scripts/privacy-check.sh --range "${before_head}..${after_head}"; then
+      echo "✗ Privacy check failed on new commits. NOT pushing. Fix history before continuing."; exit 1
+    fi
+    if [ "$PUSH" = "1" ]; then git push -q origin HEAD || { echo "✗ push failed"; exit 1; }; fi
+  fi
+
+  if [ "$(done_count)" -gt "$before_done" ]; then stalls=0; else
+    stalls=$((stalls + 1)); echo "⚠ No task ticked this iteration ($stalls/$MAX_STALLS)."
+    [ "$stalls" -ge "$MAX_STALLS" ] && { echo "✗ Stalled; stopping."; exit 1; }
+  fi
+  if [ -f loop/.state/STOP ]; then echo "⏹  STOP file found; stopping."; exit 0; fi
+done
+echo "Reached MAX_ITERS=$MAX_ITERS."
