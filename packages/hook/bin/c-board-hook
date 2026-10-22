@@ -1,0 +1,40 @@
+#!/bin/sh
+# c-board observer hook for Claude Code (PRD §6.1).
+# Forwards the hook payload on stdin to the local board. It never writes to stdout
+# (Claude Code could read that as a hook decision) and always exits 0.
+
+exec >/dev/null 2>&1
+
+home="${CBOARD_HOME:-$HOME/.c-board}"
+case "$home" in
+  "~") home="$HOME" ;;
+  "~/"*) home="$HOME/${home#\~/}" ;;
+esac
+
+port="${CBOARD_PORT:-4317}"
+case "$port" in
+  '' | *[!0-9]*) exit 0 ;;
+esac
+
+token=''
+[ -r "$home/token" ] && IFS= read -r token <"$home/token"
+token="${token%"${token##*[![:space:]]}"}"
+case "$token" in
+  '' | *[!A-Za-z0-9_-]*) exit 0 ;;
+esac
+
+command -v curl || exit 0
+
+# The token goes in through a here-doc instead of argv so it doesn't show up in `ps`.
+# -q skips ~/.curlrc; --noproxy keeps a configured proxy from intercepting loopback.
+curl -q -s -m 1 --noproxy '*' -o /dev/null \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -H "X-CBoard-Claude-Pid: $PPID" \
+  -H @/dev/fd/3 \
+  --data-binary @- \
+  "http://127.0.0.1:$port/api/hooks/claude" 3<<HEADERS
+X-CBoard-Token: $token
+HEADERS
+
+exit 0

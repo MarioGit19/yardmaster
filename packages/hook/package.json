@@ -3,9 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "c-board-hook": "./bin/c-board-hook"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22"
   }
 }

@@ -154,10 +154,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: Code is in `apps/server/src/claude/` (`session-reducer.ts`, `hook-ingest.ts`). Events are applied in arrival order through a queue. A cwd maps to the deepest known project that contains it; if none does, a `hook` project is created at the cwd's realpath (no git-root detection yet). The route expects `Content-Type: application/json` (body limit 4 MB), so the 4.2 script must send that header. Activity rows keep `tool_input` with strings clipped to 1 000 chars. In demo mode hooks are counted but not applied. Limitation: terminal sessions get no hook when a permission is granted, so they stay `waiting_permission` until the tool's PostToolUse arrives. `toolFamily()`/`toolInputDetail()` moved into protocol (the demo uses them too).
 
-- [ ] **4.2 Hook script**
+- [x] **4.2 Hook script**
   - `packages/hook/bin/c-board-hook` in POSIX sh, per the PRD §6.1 "Observer hook contract". Reads `CBOARD_HOME` (default `~/.c-board`) and `CBOARD_PORT`, sends `X-CBoard-Claude-Pid: $PPID`, uses `curl -s -m 1`, stays silent on stdout, and always exits 0. Run shellcheck if it's available.
   - **Done when:** a test runs the script against a local test server and receives the payload and headers. With the server down, it exits 0 within about 1.2 s and prints nothing. With no token file, it exits 0 immediately.
   - **Verify:** `pnpm --filter @c-board/hook test`
+  - Note: the token header is passed to curl through a here-doc on fd 3 (`-H @/dev/fd/3`) so it never appears in `ps`; curl runs with `-q --noproxy '*'`. shellcheck was not installed, so its test is skipped here.
 
 - [ ] **4.3 Hook installer**
   - `c-board hooks install|uninstall|status [--dry-run] [--yes]`, implemented in `packages/hook/src/installer.ts` and wired into the CLI. It merges into `~/.claude/settings.json` (path overridable through `CLAUDE_CONFIG_DIR` or a `--settings-path` flag for tests). It registers the observer hook (`"async": true`) for the events listed in PRD §6.1, except `PermissionRequest`. It's idempotent, keeps every other key and hook untouched, makes a timestamped backup, prints a diff for `--dry-run`, and refuses to write if the existing JSON is invalid.
