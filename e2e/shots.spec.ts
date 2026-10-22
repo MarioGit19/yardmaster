@@ -767,3 +767,106 @@ test.describe('hooks install dialog', () => {
     }
   }
 });
+
+// The fx effects on /_tokens (DESIGN.md §3 "Third-party effects") at every motion level: text
+// effects after each has played, every background, and the phone interactions mid-gesture.
+test.describe('fx showcase', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const section = (page: import('@playwright/test').Page, name: string) =>
+    page.locator('section', { has: page.getByRole('heading', { name }) });
+  const BACKGROUNDS = ['DarkVeil', 'SoftAurora', 'FaultyTerminal', 'RippleGrid', 'LightTunnel'];
+
+  for (const level of ['full', 'reduced', 'off'] as const) {
+    test(level, async ({ page }) => {
+      test.slow();
+      await page.addInitScript((value) => localStorage.setItem('cboard.motion', value), level);
+      await page.goto('/#/_tokens');
+
+      const text = section(page, 'Text effects');
+      await text.scrollIntoViewIfNeeded();
+      await text.getByRole('button', { name: 'Raise an error' }).click();
+      await text.getByRole('button', { name: 'Next status' }).click();
+      await text.getByRole('button', { name: 'Next caption' }).click();
+      // Mid-resolve and mid-flip at Full; already settled below.
+      await page.waitForTimeout(120);
+      await text.screenshot({ path: new URL(`fx-text-mid-${level}.png`, OUT_DIR).pathname });
+      await page.waitForTimeout(900);
+      await text.screenshot({ path: new URL(`fx-text-${level}.png`, OUT_DIR).pathname });
+
+      const backgrounds = section(page, 'Backgrounds');
+      await backgrounds.scrollIntoViewIfNeeded();
+      for (const name of BACKGROUNDS) {
+        await backgrounds.getByRole('button', { name, exact: true }).click();
+        if (name === 'RippleGrid' && level === 'full') {
+          await backgrounds.getByRole('button', { name: 'Ripple', exact: true }).click();
+        }
+        if (name === 'LightTunnel' && level === 'full') {
+          await backgrounds.getByRole('button', { name: 'Dive', exact: true }).click();
+        }
+        await page.waitForTimeout(level === 'full' ? 600 : 300);
+        await backgrounds.screenshot({
+          path: new URL(`fx-bg-${name}-${level}.png`, OUT_DIR).pathname,
+        });
+      }
+
+      const phone = section(page, 'Phone interactions');
+      await phone.scrollIntoViewIfNeeded();
+      const hold = phone.getByRole('button', { name: /Hold to stop/ });
+      await hold.hover();
+      await page.mouse.down();
+      await page.waitForTimeout(600);
+      await phone.screenshot({ path: new URL(`fx-phone-holding-${level}.png`, OUT_DIR).pathname });
+      await page.mouse.up();
+      // Drag the approval two thirds of the way to Allow, without letting go.
+      const card = phone.getByText('pnpm db:migrate');
+      const box = await card.boundingBox();
+      if (box) {
+        await page.mouse.move(box.x + 20, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + 140, box.y + box.height / 2, { steps: 8 });
+        await page.waitForTimeout(150);
+        await phone.screenshot({ path: new URL(`fx-phone-swipe-${level}.png`, OUT_DIR).pathname });
+        await page.mouse.up();
+      }
+    });
+  }
+
+  test('light', async ({ page }) => {
+    test.slow();
+    await page.addInitScript(() => {
+      localStorage.setItem('cboard.theme', 'light');
+      localStorage.setItem('cboard.motion', 'full');
+    });
+    await page.goto('/#/_tokens');
+    const backgrounds = section(page, 'Backgrounds');
+    await backgrounds.scrollIntoViewIfNeeded();
+    for (const name of BACKGROUNDS) {
+      await backgrounds.getByRole('button', { name, exact: true }).click();
+      await page.waitForTimeout(600);
+      await backgrounds.screenshot({ path: new URL(`fx-bg-${name}-light.png`, OUT_DIR).pathname });
+    }
+    const text = section(page, 'Text effects');
+    await text.scrollIntoViewIfNeeded();
+    await text.screenshot({ path: new URL('fx-text-light.png', OUT_DIR).pathname });
+  });
+});
+
+// The alternative ambient styles behind the overview, idle-ish demo board.
+test.describe('ambient styles', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  for (const style of ['veil', 'aurora', 'none'] as const) {
+    test(style, async ({ page }) => {
+      await page.addInitScript((value) => {
+        localStorage.setItem('cboard.ambient', value);
+        localStorage.setItem('cboard.motion', 'full');
+      }, style);
+      await openRoute(page, '/');
+      if (style !== 'none') {
+        await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'webgl');
+        await expect(page.locator('[data-ambient] canvas[data-ready]')).toBeAttached();
+      }
+      await page.waitForTimeout(2500);
+      await page.screenshot({ path: new URL(`ambient-${style}.png`, OUT_DIR).pathname });
+    });
+  }
+});

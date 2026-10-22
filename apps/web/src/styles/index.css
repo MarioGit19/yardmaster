@@ -1637,3 +1637,216 @@
   ) {
   transition: none;
 }
+
+/* fx effects adapted from React Bits (apps/web/src/fx, DESIGN.md §3 "Third-party effects"). */
+
+/* A WebGL stage fades in over its static fallback on the first frame, like the ambient canvas. */
+.fx-canvas {
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.fx-canvas[data-ready] {
+  opacity: 1;
+}
+
+/* Static fallbacks: what each background is at Off or without WebGL2. */
+.fx-terminal-fallback {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--retro-fg) 5%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    radial-gradient(
+      120% 90% at 50% 40%,
+      color-mix(in srgb, var(--retro-fg) 8%, var(--retro-bg)),
+      var(--retro-bg) 75%
+    );
+}
+.fx-terminal-fallback[data-phosphor="amber"] {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--retro-amber) 5%, transparent) 0 1px,
+      transparent 1px 3px
+    ),
+    radial-gradient(
+      120% 90% at 50% 40%,
+      color-mix(in srgb, var(--retro-amber) 8%, var(--retro-bg)),
+      var(--retro-bg) 75%
+    );
+}
+.fx-grid-fallback {
+  --fx-grid-line: color-mix(in srgb, var(--grid-neon) 16%, transparent);
+  background:
+    linear-gradient(var(--fx-grid-line) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, var(--fx-grid-line) 1px, transparent 1px) 0 0 / 48px 48px;
+  mask-image: radial-gradient(75% 75% at 50% 50%, #000 40%, transparent);
+}
+.fx-tunnel-fallback {
+  background: radial-gradient(
+    closest-side,
+    transparent 20%,
+    color-mix(in srgb, var(--grid-neon) 10%, transparent) 60%,
+    transparent
+  );
+}
+
+/* GlitchText: two offset slices over the title, only visible during a burst (WAAPI). */
+.fx-glitch-slice {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.fx-glitch-a {
+  color: var(--st-err);
+  text-shadow: -1px 0 var(--st-err-glow);
+}
+.fx-glitch-b {
+  color: var(--grid-neon);
+  text-shadow: 1px 0 color-mix(in srgb, var(--grid-neon) 35%, transparent);
+}
+
+/* SplitFlapText: station-board tiles. A flip is a leaf pair: the old top half falls away, then
+   the new bottom half swings down into place (transform and filter only, `dur.fast`). */
+.fx-flap {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.fx-flap-tile {
+  position: relative;
+  display: inline-block;
+  width: 1.05ch;
+  height: 1.45em;
+  padding: 0 0.12em;
+  box-sizing: content-box;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--bg-2);
+  box-shadow:
+    var(--highlight-inset),
+    inset 0 0 0 1px var(--line);
+  perspective: 6em;
+}
+.fx-flap-tile::after {
+  content: "";
+  position: absolute;
+  inset: calc(50% - 0.5px) 0 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--bg-0) 70%, transparent);
+  z-index: 3;
+}
+.fx-flap-half,
+.fx-flap-leaf {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: var(--bg-2);
+  backface-visibility: hidden;
+}
+.fx-flap-top,
+.fx-flap-front {
+  top: 0;
+}
+.fx-flap-bottom,
+.fx-flap-back {
+  bottom: 0;
+}
+.fx-flap-char {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fx-flap-top .fx-flap-char,
+.fx-flap-front .fx-flap-char {
+  top: 0;
+}
+.fx-flap-bottom .fx-flap-char,
+.fx-flap-back .fx-flap-char {
+  bottom: 0;
+}
+.fx-flap-leaf {
+  z-index: 2;
+}
+.fx-flap-front {
+  transform-origin: center bottom;
+  animation: fx-flap-front var(--dur-fast) linear both;
+}
+.fx-flap-back {
+  transform-origin: center top;
+  transform: rotateX(90deg);
+  animation: fx-flap-back var(--dur-fast) linear both;
+}
+@keyframes fx-flap-front {
+  0% {
+    transform: rotateX(0deg);
+    filter: brightness(1.08);
+    animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  }
+  50%,
+  100% {
+    transform: rotateX(-90deg);
+    filter: brightness(0.55);
+  }
+}
+@keyframes fx-flap-back {
+  0%,
+  50% {
+    transform: rotateX(90deg);
+    filter: brightness(0.6);
+    animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  100% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+
+/* HoldButton: the fill grows from the left at Full (WAAPI scaleX), fades in at Reduced, and is
+   simply on while held at Off. The label cross-fades to the done label. */
+.fx-hold-fill {
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+/* A pointer press sinks the button a little (keyboard holds don't move). */
+[data-fx="hold-button"] {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+[data-motion="full"] [data-fx="hold-button"][data-phase="holding"][data-input="pointer"] {
+  transform: scale(0.98);
+}
+[data-motion="reduced"] .fx-hold-fill {
+  transform: none;
+  opacity: 0;
+}
+[data-motion="off"] .fx-hold-fill {
+  transform: none;
+  opacity: 0;
+}
+[data-motion="off"]
+  [data-fx="hold-button"]:is([data-phase="holding"], [data-phase="done"])
+  .fx-hold-fill {
+  opacity: 1;
+}
+.fx-hold-label,
+.fx-hold-done {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.fx-hold-done {
+  opacity: 0;
+}
+[data-fx="hold-button"][data-phase="done"] .fx-hold-label {
+  opacity: 0;
+}
+[data-fx="hold-button"][data-phase="done"] .fx-hold-done {
+  opacity: 1;
+}

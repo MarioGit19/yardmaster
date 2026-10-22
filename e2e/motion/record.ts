@@ -377,6 +377,123 @@ const SCENARIOS = {
     await r.moment('idle', 'activity', 'every state, 10 s of idle life', hold(page, 10_000), clip);
   },
 
+  async fx(r: Recorder) {
+    const { page } = r;
+    await page.goto('/#/_tokens');
+    const section = (name: string) =>
+      page.locator('section', { has: page.getByRole('heading', { name }) });
+    const clipOf = async (name: string) => {
+      const box = await section(name).boundingBox();
+      return box ? visible(box, DESKTOP) : undefined;
+    };
+
+    const text = section('Text effects');
+    await text.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    let clip = await clipOf('Text effects');
+    await r.moment(
+      'text',
+      'transition',
+      'a caption resolves, an error glitches, a status board flips',
+      async () => {
+        await text.getByRole('button', { name: 'Next caption' }).click();
+        await page.waitForTimeout(600);
+        await text.getByRole('button', { name: 'Raise an error' }).click();
+        await page.waitForTimeout(500);
+        await text.getByRole('button', { name: 'Next status' }).click();
+        await page.waitForTimeout(900);
+      },
+      clip,
+    );
+
+    const backgrounds = section('Backgrounds');
+    await backgrounds.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    clip = await clipOf('Backgrounds');
+    const pick = (name: string) => backgrounds.getByRole('button', { name, exact: true }).click();
+    const energy = backgrounds.getByLabel('Effect energy');
+    for (const [name, note] of [
+      ['DarkVeil', 'the Veil field, energy 0.1 → 1'],
+      ['SoftAurora', 'the Aurora field, energy 0.1 → 1'],
+      ['FaultyTerminal', 'the Retro backdrop, energy 0.1 → 1'],
+    ] as const) {
+      await pick(name);
+      await energy.fill('0.1');
+      await page.waitForTimeout(800);
+      await r.moment(
+        name.toLowerCase(),
+        'activity',
+        note,
+        async () => {
+          await page.waitForTimeout(3000);
+          await energy.fill('1');
+          await page.waitForTimeout(4000);
+        },
+        clip,
+      );
+    }
+    await pick('RippleGrid');
+    await energy.fill('0.5');
+    await page.waitForTimeout(800);
+    await r.moment(
+      'ripplegrid',
+      'transition',
+      'two ripples cross the Grid floor',
+      async () => {
+        await backgrounds.getByRole('button', { name: 'Ripple', exact: true }).click();
+        await page.waitForTimeout(500);
+        await backgrounds.getByRole('button', { name: 'Ripple', exact: true }).click();
+        await page.waitForTimeout(1600);
+      },
+      clip,
+    );
+    await pick('LightTunnel');
+    await page.waitForTimeout(800);
+    await r.moment(
+      'lighttunnel',
+      'transition',
+      'a dive (900 ms) and a surge down the tunnel',
+      async () => {
+        await backgrounds.getByRole('button', { name: 'Dive', exact: true }).click();
+        await page.waitForTimeout(1500);
+        await backgrounds.getByRole('button', { name: 'Surge', exact: true }).click();
+        await page.waitForTimeout(1200);
+      },
+      clip,
+    );
+
+    const phone = section('Phone interactions');
+    await phone.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    clip = await clipOf('Phone interactions');
+    await r.moment(
+      'phone',
+      'transition',
+      'a short swipe springs back, a long one allows; a hold completes',
+      async () => {
+        const card = await phone.getByText('pnpm db:migrate').boundingBox();
+        if (card) {
+          const y = card.y + card.height / 2;
+          await page.mouse.move(card.x + 10, y);
+          await page.mouse.down();
+          await page.mouse.move(card.x + 80, y, { steps: 10 });
+          await page.mouse.up();
+          await page.waitForTimeout(500);
+          await page.mouse.down();
+          await page.mouse.move(card.x + 280, y, { steps: 14 });
+          await page.mouse.up();
+          await page.waitForTimeout(700);
+        }
+        await phone.getByRole('button', { name: /Hold to stop/ }).hover();
+        await page.mouse.down();
+        await page.waitForTimeout(1500);
+        await page.mouse.up();
+        await page.waitForTimeout(500);
+      },
+      clip,
+    );
+  },
+
   async phone(r: Recorder) {
     const { page } = r;
     await r.moment('entrance', 'transition', 'first paint and the entrance at 390 px', async () => {

@@ -103,6 +103,25 @@ test('@perf overview keeps 55 fps under the stress load', async ({ page }) => {
   expect(stats.longTasks).toEqual([]);
 });
 
+// The alternative ambient styles (Settings → Appearance → Ambient) under the same load.
+for (const ambient of ['veil', 'aurora'] as const) {
+  test(`@perf overview keeps 55 fps under the stress load (${ambient} ambient)`, async ({
+    page,
+  }) => {
+    test.slow();
+    await fullMotion(page);
+    await page.addInitScript((style) => localStorage.setItem('cboard.ambient', style), ambient);
+    await page.goto('/#/');
+    await warmUp(page);
+    await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'webgl');
+
+    const stats = await measure(page, SAMPLE_MS);
+    report(`overview (${ambient})`, stats);
+    expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+    expect(stats.longTasks).toEqual([]);
+  });
+}
+
 test('@perf overview main-thread time under the stress load', async ({ page }) => {
   test.slow();
   await fullMotion(page);

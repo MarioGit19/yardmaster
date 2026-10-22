@@ -13,6 +13,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `close` (Esc) |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
+| `fx`       | `text` (decrypt, glitch, split-flap), `darkveil`, `softaurora`, `faultyterminal` (energy 0.1 → 1), `ripplegrid`, `lighttunnel` (dive and surge), `phone` (swipe and hold), cropped to the `/#/_tokens` fx sections |
 | `phone`    | `entrance`, `scroll`, `focus-open` (tap), `focus-close` (back)               |
 | `all`      | every scenario above, each on a fresh demo board                             |
 

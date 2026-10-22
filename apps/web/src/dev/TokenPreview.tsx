@@ -2,6 +2,12 @@ import { motion } from 'motion/react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { ambientOverride, useAmbientOverride } from '../ambient/debug.js';
 import {
+  AMBIENT_STYLE_LABEL,
+  AMBIENT_STYLES,
+  type AmbientStyle,
+  ambientStylePreference,
+} from '../ambient/style.js';
+import {
   dur,
   MOTION_SETTINGS,
   type MotionSetting,
@@ -13,6 +19,7 @@ import { usePreference } from '../prefs.js';
 import { ACCENT_HUES } from '../theme/accents.js';
 import { THEME_SETTINGS, type Theme, useTheme } from '../theme/theme.js';
 import { CrewSheet } from './CrewSheet.js';
+import { BackgroundShowcase, PhoneShowcase, TextEffectsShowcase } from './FxShowcase.js';
 import { OrbShowcase } from './OrbShowcase.js';
 import { ToolShowcase } from './ToolShowcase.js';
 
@@ -194,9 +201,16 @@ const SPRING_NAMES = Object.keys(spring) as (keyof typeof spring)[];
 /** Debug controls for the ambient field behind this page; "Live" hands it back to the board. */
 function AmbientControls({ level }: { level: string }) {
   const { energy, attention } = useAmbientOverride();
+  const style = usePreference(ambientStylePreference);
   const live = energy === null && attention === null;
   return (
     <div className="space-y-3">
+      <Segmented<AmbientStyle>
+        label="Ambient style"
+        options={AMBIENT_STYLES}
+        value={style}
+        onChange={ambientStylePreference.set}
+      />
       <label className="flex items-center gap-4">
         <span className="w-16 font-mono text-label text-text-2">energy</span>
         <input
@@ -231,7 +245,11 @@ function AmbientControls({ level }: { level: string }) {
           Live
         </button>
         <span className="ml-auto font-mono text-meta text-text-3">
-          {level === 'full' ? 'shader · 30 fps · 0.5× DPR' : 'static field'}
+          {style === 'none'
+            ? 'no field'
+            : level === 'full'
+              ? `${AMBIENT_STYLE_LABEL[style]} · 30 fps · 0.5× DPR`
+              : 'static field'}
         </span>
       </div>
     </div>
@@ -405,6 +423,24 @@ export default function TokenPreview() {
             fast {dur.fast * 1000}ms · base {dur.base * 1000}ms · slow {dur.slow * 1000}ms
           </p>
         </Section>
+
+        <div className="lg:col-span-2">
+          <Section title="Text effects">
+            <TextEffectsShowcase />
+          </Section>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Section title="Backgrounds">
+            <BackgroundShowcase />
+          </Section>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Section title="Phone interactions">
+            <PhoneShowcase />
+          </Section>
+        </div>
       </div>
     </div>
   );

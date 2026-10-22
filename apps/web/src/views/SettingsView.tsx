@@ -2,6 +2,7 @@ import { RETENTION_DAYS, type RetentionDays } from '@c-board/protocol';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
+import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../ambient/style.js';
 import { notificationsPreference } from '../attention/attention.js';
 import { selectWindows, useBoardList } from '../data/index.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
@@ -39,6 +40,7 @@ const ON_OFF_LABEL = { off: 'Off', on: 'On' } as const;
 export function SettingsView() {
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
+  const ambient = usePreference(ambientStylePreference);
   const redact = usePreference(redactPreference);
   const status = useServerStatus(null);
   const demo = status !== null && status !== 'error' && status.demo;
@@ -67,6 +69,18 @@ export function SettingsView() {
               labels={MOTION_LABEL}
               value={motion}
               onChange={motionPreference.set}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Ambient"
+            description="The light behind the board. Every style brightens and flows faster as work picks up."
+          >
+            <Segmented
+              label="Ambient"
+              options={AMBIENT_STYLES}
+              labels={AMBIENT_STYLE_LABEL}
+              value={ambient}
+              onChange={ambientStylePreference.set}
             />
           </SettingRow>
         </SettingsSection>

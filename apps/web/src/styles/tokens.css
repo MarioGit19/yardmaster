@@ -66,6 +66,13 @@
   /* Crew mascot visor glass, DESIGN.md §4.11; dark in both themes so the eyes glow. */
   --crew-visor: #05070c;
 
+  /* Layout worlds (DESIGN.md §10), used by the fx effects: Grid's one structural neon, and Retro's
+     phosphor (green, or amber as the option) on its screen. */
+  --grid-neon: #4cc8ff;
+  --retro-fg: #4dff8f;
+  --retro-amber: #ffb000;
+  --retro-bg: #030805;
+
   /* Code highlighting (shiki css-variables theme), built from the tokens above. */
   --shiki-foreground: var(--text-1);
   --shiki-background: transparent;
@@ -141,4 +148,10 @@
   --orb-task: oklch(0.62 0.16 350);
 
   --crew-visor: #1b1f29;
+
+  /* Daylight: Grid's neon as ink, Retro as a line printer (dark ink on warm paper, no glow). */
+  --grid-neon: #0b7fb3;
+  --retro-fg: #1f3a24;
+  --retro-amber: #6b4300;
+  --retro-bg: #f3efe3;
 }
