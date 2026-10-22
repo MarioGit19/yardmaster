@@ -27,6 +27,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
 import type { Persistence } from './persistence.js';
 import { setSessionCookie } from './security.js';
+import { TERMINAL_REPLY_KEY } from './terminal-reply.js';
 import { generateToken, writeToken } from './token.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -104,6 +105,11 @@ export function awaySettings(settings: Record<string, unknown>): {
   };
 }
 
+/** The stored `experimental.terminalReply` flag; off unless explicitly turned on. */
+export function terminalReplyEnabled(settings: Record<string, unknown>): boolean {
+  return settings[TERMINAL_REPLY_KEY] === true;
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -133,6 +139,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
   const current = (): BoardSettings => ({
     retentionDays: retentionDays(settings[RETENTION_KEY]),
     ...awaySettings(settings),
+    experimentalTerminalReply: terminalReplyEnabled(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -153,6 +160,9 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
       app.log.info({ away: patch.data.awayMode }, 'away mode changed');
     }
     if (patch.data.awayTimeoutSec !== undefined) save(AWAY_TIMEOUT_KEY, patch.data.awayTimeoutSec);
+    if (patch.data.experimentalTerminalReply !== undefined) {
+      save(TERMINAL_REPLY_KEY, patch.data.experimentalTerminalReply);
+    }
     return current();
   });
 

@@ -55,6 +55,8 @@ export const BoardSettings = z.object({
   /** Route `PermissionRequest` hooks from terminal sessions to the board (F13). */
   awayMode: z.boolean(),
   awayTimeoutSec: AwayTimeoutSec,
+  /** `experimental.terminalReply`: reply into a terminal session's terminal (F14). */
+  experimentalTerminalReply: z.boolean(),
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 

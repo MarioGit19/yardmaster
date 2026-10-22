@@ -684,7 +684,11 @@ test.describe('composer', () => {
           await openRoute(page, await firstProjectRoute(page));
           const narrow = viewport.width < 1024;
           if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-          const forkable = page.locator('[data-focus] a[data-session]').first();
+          // Parallel shots start board sessions in this project too.
+          const forkable = page
+            .locator('[data-focus] a[data-session]')
+            .filter({ hasNot: page.locator('[data-origin="board"]') })
+            .first();
           await forkable.click();
           if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
           await expect(page.locator('[data-fork-bar]')).toBeVisible();
@@ -702,6 +706,37 @@ test.describe('composer', () => {
           await expect(tail).toBeVisible({ timeout: 15_000 });
           await page.waitForTimeout(1_200);
           await shot('composer-streaming');
+        });
+
+        test('terminal reply', async ({ page }) => {
+          // Only this page sees the flag on, so parallel shots keep the plain fork bar.
+          await page.route('**/api/settings', async (route) => {
+            if (route.request().method() !== 'GET') return route.fallback();
+            const response = await route.fetch();
+            await route.fulfill({
+              response,
+              json: { ...(await response.json()), experimentalTerminalReply: true },
+            });
+          });
+          await openRoute(page, '/');
+          await openRoute(page, await firstProjectRoute(page));
+          const narrow = viewport.width < 1024;
+          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
+          await page
+            .locator('[data-focus] a[data-session]')
+            .filter({ hasNot: page.locator('[data-origin="board"]') })
+            .first()
+            .click();
+          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
+          const reply = page.locator('[data-terminal-reply]');
+          await expect(reply).toBeVisible();
+          await reply.getByRole('textbox').fill('Yes, use the second option');
+          await page.waitForTimeout(600);
+          await page.screenshot({
+            path: new URL(`composer-terminal-reply-${viewport.width}-${theme}.png`, OUT_DIR)
+              .pathname,
+            animations: 'disabled',
+          });
         });
       });
     }

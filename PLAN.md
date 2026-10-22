@@ -437,10 +437,12 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm --filter @c-board/hook test && pnpm --filter @c-board/server test`
   - Note: The hook output schema was re-verified on 2026-10-22 and is recorded in `packages/protocol/src/hooks.ts` and the script header. Away mode is a server setting (`awayMode`, `awayTimeoutSec` 10–300 s, default 120), and the Settings toggle is now live. A request becomes a `source: 'hook'` approval in the Attention Center. When the hook process exits (the user answered in the terminal) or the board stops, the approval expires and the terminal prompt stays. The installer writes the `PermissionRequest` handler with `timeout: 330` and no `async`.
 
-- [ ] **9.2 Reply into terminal sessions (experimental)**
+- [x] **9.2 Reply into terminal sessions (experimental)**
   - For terminal-origin sessions with a linked terminal and status `waiting_input` or `idle`, the composer offers "Send to terminal" (`cmd.sendText`, execute=true), behind the setting `experimental.terminalReply`.
   - **Done when:** the routing test passes and the UI flag hides and shows the control.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm e2e`
+  - Note: The flag is a server setting (stored as `experimental.terminalReply`, `experimentalTerminalReply` in `/api/settings`, off by default), toggled under Settings → Experimental. A new action `session.replyInTerminal {sessionId, text}` (`terminal-reply.ts`) checks the flag and `terminalReplyBlock()` (protocol, shared with the UI), then goes through `terminal.sendText`, so it routes like the board's terminal input (the demo simulator in `--demo`). Errors: `terminal_reply_disabled`, `unknown_session`, `not_terminal_session`, `no_linked_terminal`, `session_busy`, `empty_reply`. The text is sent as one line: control characters, newlines included, become spaces, so nothing submits early or drives the TUI. The web app now shares server settings through `settings/boardSettings.ts`.
+  - Note: The control sits on top of the terminal session's fork bar whenever the flag is on. Outside idle or waiting-for-input it stays visible but can't send, with a hint, so it doesn't flicker with the session status. The e2e test only toggles the control: sending waits on the demo's turn timing, so routing is covered by the server tests (unit plus a socket-to-socket test). The composer fork shot now picks a terminal session (parallel shots start board sessions). New shots: `composer-terminal-reply-*`. At load 35–45, `pnpm e2e` failed only the known `messages.spec` long-task test, `focus.spec` (both also fail on a clean `main`) and `onboarding.spec` (passes alone).
 
 ## Phase 10 — Quality, docs, release
 

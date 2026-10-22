@@ -1,4 +1,4 @@
-import type { ClaudeSession, PermissionMode } from '@c-board/protocol';
+import { type ClaudeSession, type PermissionMode, terminalReplyBlock } from '@c-board/protocol';
 import {
   ArrowUp,
   ChevronDown,
@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   ShieldCheck,
   Square,
+  SquareTerminal,
   TriangleAlert,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -16,6 +17,7 @@ import { useLocation } from 'wouter';
 import { useBoardClient } from '../data/index.js';
 import { dur, ease, spring } from '../motion.js';
 import { sessionHref } from '../routes.js';
+import { useBoardSettings } from '../settings/boardSettings.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
@@ -38,6 +40,10 @@ const ERRORS: Record<string, string> = {
   session_live: 'The session is still running in its terminal',
   unknown_session: 'The session is gone',
   unknown_project: 'The project is gone',
+  terminal_reply_disabled: 'Reply in terminal is turned off in Settings',
+  session_busy: 'Claude is busy. Reply when it is idle or waiting for you',
+  no_linked_terminal: 'The session has no linked terminal',
+  empty_reply: 'Nothing to send',
 };
 const errorText = (code: string, fallback: string) =>
   ERRORS[code] ?? actionErrorText(code, fallback);
@@ -352,6 +358,7 @@ function ForkBar({ session }: { session: ClaudeSession }) {
   const [, navigate] = useLocation();
   const [forking, setForking] = useState(false);
   const live = isSessionLive(session.status);
+  const replyEnabled = useBoardSettings().settings?.experimentalTerminalReply === true;
 
   const fork = async () => {
     setForking(true);
@@ -374,8 +381,9 @@ function ForkBar({ session }: { session: ClaudeSession }) {
   return (
     <div data-fork-bar className="shrink-0 px-5 pt-2 pb-4">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 py-2.5 shadow-raised">
-        <div className="flex min-w-0 items-center gap-3">
-          <p className="min-w-0 flex-1 text-body-sm text-text-2">
+        {replyEnabled && session.terminalId !== null && <TerminalReply session={session} />}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="min-w-0 flex-1 basis-56 text-body-sm text-text-2">
             This session runs in a terminal. Continue it here as a board session that starts from
             this conversation.
           </p>
@@ -407,5 +415,77 @@ function ForkBar({ session }: { session: ClaudeSession }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * F14 (experimental): types a line into the session's terminal and submits it, as if typed at
+ * Claude's prompt. Only while Claude is idle or waiting, so it never lands mid-turn.
+ */
+function TerminalReply({ session }: { session: ClaudeSession }) {
+  const client = useBoardClient();
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const ready = terminalReplyBlock(session) === null;
+  const canSend = ready && !sending && text.trim() !== '';
+
+  const send = async () => {
+    if (!canSend) return;
+    setSending(true);
+    const result = await client.action({
+      kind: 'session.replyInTerminal',
+      sessionId: session.id,
+      text: text.trim(),
+    });
+    setSending(false);
+    if (result.ok) setText('');
+    else toast.error(errorText(result.error, 'Could not send to the terminal'));
+    inputRef.current?.focus();
+  };
+
+  return (
+    <form
+      data-terminal-reply
+      data-ready={ready}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void send();
+      }}
+      className="flex min-w-0 flex-col gap-1.5 border-line border-b pb-2.5"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          aria-label="Reply in the terminal"
+          aria-describedby={`terminal-reply-hint-${session.id}`}
+          placeholder="Reply in the terminal…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          autoComplete="off"
+          spellCheck
+          className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none"
+        />
+        <button
+          type="submit"
+          disabled={!canSend}
+          aria-busy={sending}
+          className={cx(buttonClass('secondary', 'sm'), 'shrink-0 disabled:opacity-40')}
+        >
+          {sending ? (
+            <LoaderCircle className="hud-spin size-3.5" strokeWidth={1.5} />
+          ) : (
+            <SquareTerminal className="size-3.5" strokeWidth={1.5} />
+          )}
+          <span className="max-sm:sr-only">Send to terminal</span>
+        </button>
+      </div>
+      <p id={`terminal-reply-hint-${session.id}`} className="text-meta text-text-3">
+        {ready
+          ? 'Enter types it at Claude’s prompt in the terminal. Experimental.'
+          : 'Claude is busy. You can send once it is idle or waiting for you.'}
+      </p>
+    </form>
   );
 }

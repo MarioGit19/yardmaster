@@ -125,6 +125,7 @@ const uiToServer: UiToServer[] = [
   env('action', { kind: 'session.close', sessionId: 'sess-1' }),
   env('action', { kind: 'session.setModel', sessionId: 'sess-1', model: 'claude-sonnet-5-5' }),
   env('action', { kind: 'session.setPermissionMode', sessionId: 'sess-1', permissionMode: 'plan' }),
+  env('action', { kind: 'session.replyInTerminal', sessionId: 'sess-1', text: 'yes, go ahead' }),
   env('action', { kind: 'project.add', path: '/home/dev/acme-shop' }),
   env('action', { kind: 'project.remove', projectId: 'a1b2c3d4e5f6' }),
   env('action', { kind: 'project.openInEditor', projectId: 'a1b2c3d4e5f6' }),

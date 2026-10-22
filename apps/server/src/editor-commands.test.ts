@@ -9,6 +9,7 @@ import { INVALID_SESSION_ID } from './editor-actions.js';
 import { COMMAND_ERRORS, EDITOR_WS_PATH } from './editor-gateway.js';
 import { ROUTE_ERRORS } from './editor-router.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
+import { TERMINAL_REPLY_DISABLED } from './terminal-reply.js';
 import { generateToken } from './token.js';
 import { UI_WS_PATH } from './ui-gateway.js';
 
@@ -216,6 +217,54 @@ describe('editor commands', () => {
       ok: false,
       error: ROUTE_ERRORS.unknownProject,
     });
+  });
+
+  it("types a terminal session's reply into its terminal once the flag is on", async () => {
+    const { app, port } = await boot();
+    const ed = await editor(port);
+    await ready(app);
+    const client = await ui(port);
+    const sessionId = '2d4f6a8c-0e1b-4c3d-9e5f-7a9b1c3d5e7f';
+    app.store.upsertSession({
+      id: sessionId,
+      origin: 'terminal',
+      terminalId: 'term-1',
+      status: { kind: 'waiting_input' },
+    });
+    const reply = { kind: 'session.replyInTerminal', sessionId, text: 'run the tests' };
+
+    client.send('action', reply, 'reply-1');
+    expect((await client.next()).payload).toEqual({
+      id: 'reply-1',
+      ok: false,
+      error: TERMINAL_REPLY_DISABLED,
+    });
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { host: `127.0.0.1:${port}`, [TOKEN_HEADER]: token },
+      payload: { experimentalTerminalReply: true },
+    });
+    expect(put.json()).toMatchObject({ experimentalTerminalReply: true });
+    client.send('action', reply, 'reply-2');
+    const command = await ed.next();
+    expect(command).toMatchObject({
+      type: 'cmd.sendText',
+      payload: { terminalId: 'term-1', text: 'run the tests', execute: true },
+    });
+    ed.send('cmd.result', { id: command.id, ok: true });
+    expect((await client.next()).payload).toEqual({ id: 'reply-2', ok: true });
+
+    // Mid-turn, the line would land in Claude's input box half-typed: refused.
+    app.store.setSessionStatus(sessionId, { kind: 'working' });
+    client.send('action', reply, 'reply-3');
+    expect((await client.next()).payload).toEqual({
+      id: 'reply-3',
+      ok: false,
+      error: 'session_busy',
+    });
+    await expect(ed.next(50)).rejects.toThrow('timed out');
   });
 
   it('times out when the editor never answers', async () => {

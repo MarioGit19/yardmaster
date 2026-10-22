@@ -1,9 +1,4 @@
-import {
-  type BoardSettings,
-  type BoardSettingsPatch,
-  RETENTION_DAYS,
-  type RetentionDays,
-} from '@c-board/protocol';
+import { RETENTION_DAYS, type RetentionDays } from '@c-board/protocol';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
@@ -14,6 +9,7 @@ import { hooksInstalled } from '../onboarding/model.js';
 import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
 import { api } from '../settings/api.js';
+import { type ServerSettings, useBoardSettings } from '../settings/boardSettings.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { redactPreference } from '../settings/prefs.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
@@ -108,6 +104,10 @@ export function SettingsView() {
         <SettingsSection title="Data and security">
           <RetentionRow server={server} />
           <TokenRow demo={demo} />
+        </SettingsSection>
+
+        <SettingsSection title="Experimental">
+          <TerminalReplyRow server={server} />
         </SettingsSection>
       </div>
     </Page>
@@ -247,34 +247,6 @@ const RETENTION_LABEL = Object.fromEntries(
 ) as Record<`${RetentionDays}`, string>;
 const RETENTION_OPTIONS = RETENTION_DAYS.map((days) => `${days}` as const);
 
-interface ServerSettings {
-  settings: BoardSettings | null;
-  /** Applies a patch optimistically and rolls it back, with a toast, if the save fails. */
-  update: (patch: BoardSettingsPatch, failure: string) => Promise<void>;
-}
-
-/** Settings the server owns, loaded once for every row that shows one. */
-function useBoardSettings(): ServerSettings {
-  const [settings, setSettings] = useState<BoardSettings | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    api.settings(controller.signal).then(setSettings, () => {});
-    return () => controller.abort();
-  }, []);
-
-  const update = async (patch: BoardSettingsPatch, failure: string) => {
-    const previous = settings;
-    if (previous) setSettings({ ...previous, ...patch });
-    try {
-      setSettings(await api.updateSettings(patch));
-    } catch {
-      setSettings(previous);
-      toast.error(failure);
-    }
-  };
-  return { settings, update };
-}
-
 const AWAY_INSTALL = 'c-board hooks install --away';
 
 /** Routes permission prompts from terminal sessions to the board (F13). */
@@ -296,6 +268,31 @@ function AwayRow({ server: { settings, update } }: { server: ServerSettings }) {
         labels={ON_OFF_LABEL}
         value={settings?.awayMode ? 'on' : 'off'}
         onChange={(value) => void update({ awayMode: value === 'on' }, 'Could not save away mode')}
+        disabled={settings === null}
+      />
+    </SettingRow>
+  );
+}
+
+/** F14: a terminal session's bar can type a reply into its terminal (`experimental.terminalReply`). */
+function TerminalReplyRow({ server: { settings, update } }: { server: ServerSettings }) {
+  return (
+    <SettingRow
+      title="Reply in terminal"
+      description="Type a reply into a terminal session's terminal from the board, when Claude is idle or waiting for you. The line is sent as if typed at its prompt."
+      data="terminal-reply"
+    >
+      <Segmented
+        label="Reply in terminal"
+        options={ON_OFF}
+        labels={ON_OFF_LABEL}
+        value={settings?.experimentalTerminalReply ? 'on' : 'off'}
+        onChange={(value) =>
+          void update(
+            { experimentalTerminalReply: value === 'on' },
+            'Could not save the terminal reply setting',
+          )
+        }
         disabled={settings === null}
       />
     </SettingRow>

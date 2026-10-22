@@ -84,4 +84,47 @@ test.describe('composer', () => {
     await expect(fork.locator('header [data-origin="board"]')).toBeVisible();
     await expect(fork.locator('form[data-composer]')).toBeVisible();
   });
+  test('Reply in terminal is offered only while its setting is on', async ({ page }) => {
+    // Four route changes through Settings.
+    test.slow();
+    const setReply = async (value: 'On' | 'Off') => {
+      await openRoute(page, '/settings');
+      const row = page.locator('[data-setting="terminal-reply"]');
+      await expect(row.getByRole('button', { name: 'Off' })).toBeEnabled();
+      await row.getByRole('button', { name: value }).click();
+      await expect(row.getByRole('button', { name: value })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    };
+
+    try {
+      await setReply('Off');
+      await openFirstProject(page);
+      const terminalSession = page
+        .locator('[data-focus] a[data-session]')
+        .filter({ hasNot: page.locator('[data-origin="board"]') })
+        .first();
+      const route = (await terminalSession.getAttribute('href'))?.slice(1);
+      if (!route) throw new Error('no terminal session');
+      await terminalSession.click();
+      await expect(page.locator('[data-fork-bar]')).toBeVisible();
+      await expect(page.locator('[data-terminal-reply]')).toHaveCount(0);
+
+      await setReply('On');
+      await openRoute(page, route);
+      const reply = page.locator('[data-terminal-reply]');
+      await expect(reply).toBeVisible();
+      // Sending waits on the demo's turn timing, so the routing is covered by the server tests.
+      await expect(reply.getByRole('textbox', { name: 'Reply in the terminal' })).toBeVisible();
+      await expect(reply.getByRole('button', { name: 'Send to terminal' })).toBeDisabled();
+
+      await setReply('Off');
+      await openRoute(page, route);
+      await expect(page.locator('[data-fork-bar]')).toBeVisible();
+      await expect(page.locator('[data-terminal-reply]')).toHaveCount(0);
+    } finally {
+      await setReply('Off');
+    }
+  });
 });

@@ -14,6 +14,7 @@ import {
   SessionStatus,
   Terminal,
   ToolActivity,
+  terminalReplyBlock,
 } from './domain.js';
 import {
   approval,
@@ -138,5 +139,42 @@ describe('SessionStatus', () => {
     ],
   ])('rejects %s', (_name, status) => {
     expect(SessionStatus.safeParse(status).success).toBe(false);
+  });
+});
+
+describe('terminalReplyBlock', () => {
+  const at = (status: SessionStatus) => ({
+    origin: 'terminal' as const,
+    terminalId: 't-1',
+    status,
+  });
+
+  it.each([{ kind: 'idle' }, { kind: 'waiting_input' }] as SessionStatus[])(
+    'allows a linked terminal session that is $kind',
+    (status) => {
+      expect(terminalReplyBlock(at(status))).toBeNull();
+    },
+  );
+
+  it.each([
+    { kind: 'working' },
+    { kind: 'tool', tool: 'Bash', toolUseId: null },
+    { kind: 'waiting_permission', approvalId: null },
+    { kind: 'compacting', previous: { kind: 'idle' } },
+    { kind: 'unknown', alive: true },
+    { kind: 'error', message: null },
+    { kind: 'ended' },
+  ] as SessionStatus[])('refuses a session that is $kind', (status) => {
+    expect(terminalReplyBlock(at(status))).toBe('session_busy');
+  });
+
+  it('refuses board sessions and unlinked terminal sessions', () => {
+    const idle: SessionStatus = { kind: 'idle' };
+    expect(terminalReplyBlock({ origin: 'board', terminalId: null, status: idle })).toBe(
+      'not_terminal_session',
+    );
+    expect(terminalReplyBlock({ origin: 'terminal', terminalId: null, status: idle })).toBe(
+      'no_linked_terminal',
+    );
   });
 });

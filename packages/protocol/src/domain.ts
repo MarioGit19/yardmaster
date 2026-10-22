@@ -300,6 +300,19 @@ export const ClaudeSession = z.object({
 });
 export type ClaudeSession = z.infer<typeof ClaudeSession>;
 
+/** Why a session can't take a reply in its terminal, or null when it can (F14). */
+export type TerminalReplyBlock = 'not_terminal_session' | 'no_linked_terminal' | 'session_busy';
+
+/** Only a terminal session at its prompt (idle, or waiting for input) gets typed into. */
+export function terminalReplyBlock(
+  session: Pick<ClaudeSession, 'origin' | 'terminalId' | 'status'>,
+): TerminalReplyBlock | null {
+  if (session.origin !== 'terminal') return 'not_terminal_session';
+  if (session.terminalId === null) return 'no_linked_terminal';
+  const { kind } = session.status;
+  return kind === 'idle' || kind === 'waiting_input' ? null : 'session_busy';
+}
+
 export const ApprovalSource = z.enum(['sdk', 'hook']);
 export type ApprovalSource = z.infer<typeof ApprovalSource>;
 

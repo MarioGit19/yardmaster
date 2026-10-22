@@ -34,6 +34,7 @@ export function stubActionHandlers(): ActionHandlers {
     'session.close': notImplemented,
     'session.setModel': notImplemented,
     'session.setPermissionMode': notImplemented,
+    'session.replyInTerminal': notImplemented,
     'project.add': notImplemented,
     'project.remove': notImplemented,
     'project.openInEditor': notImplemented,

@@ -44,9 +44,11 @@ import {
   retentionDays,
   retentionMs,
   rotateTokenFile,
+  terminalReplyEnabled,
 } from './settings-routes.js';
 import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
+import { createTerminalReply } from './terminal-reply.js';
 import { ensureToken } from './token.js';
 import {
   MAX_ACTIVITY_BATCH,
@@ -258,16 +260,27 @@ export async function buildServer(
     state: () => store.state,
     isConnected: (windowId) => editorGateway.isConnected(windowId),
   });
-  const actions = options.actions ?? {
-    ...stubActionHandlers(),
-    ...createEditorActions({
-      router: editorRouter,
-      send: editorGateway.sendCommand.bind(editorGateway),
-    }),
-    ...runner.actions(),
-    // Demo windows have no socket, so the simulator plays the editor's part.
-    ...demo?.terminalActions(),
-  };
+  const actions = options.actions ?? defaultActions();
+  function defaultActions(): ActionHandlers {
+    const handlers: ActionHandlers = {
+      ...stubActionHandlers(),
+      ...createEditorActions({
+        router: editorRouter,
+        send: editorGateway.sendCommand.bind(editorGateway),
+      }),
+      ...runner.actions(),
+      // Demo windows have no socket, so the simulator plays the editor's part.
+      ...demo?.terminalActions(),
+    };
+    return {
+      ...handlers,
+      ...createTerminalReply({
+        state: () => store.state,
+        enabled: () => terminalReplyEnabled(settings),
+        sendText: handlers['terminal.sendText'],
+      }),
+    };
+  }
 
   const gateway: UiGateway = new UiGateway({
     store,
