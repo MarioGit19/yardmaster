@@ -41,6 +41,9 @@
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.04);
   --glass-shimmer: rgb(255 255 255 / 0.04);
+  /* Pod hover spotlight (§4.3) and the streaming line's shimmer band. */
+  --spotlight: rgb(255 255 255 / 0.06);
+  --text-shimmer: rgb(255 255 255 / 0.07);
 
   /* Ambient field (DESIGN.md §4.1): the static CSS composition, matching the shader palette. */
   --field-deep: rgb(18 28 72 / 0.55);
@@ -84,6 +87,8 @@
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.8);
   --glass-shimmer: rgb(255 255 255 / 0.7);
+  --spotlight: rgb(14 17 22 / 0.035);
+  --text-shimmer: rgb(255 255 255 / 0.8);
 
   --field-deep: rgb(221 227 246 / 0.7);
   --field-violet: rgb(233 224 244 / 0.7);

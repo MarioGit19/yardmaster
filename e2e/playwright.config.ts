@@ -15,7 +15,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'e2e', testIgnore: /shots\.spec\.ts$/ },
+    // Frame-rate samples run alone, before the parallel suite, so other browsers don't skew them.
+    { name: 'perf', testMatch: /crew\.spec\.ts$/ },
+    { name: 'e2e', testIgnore: /(shots|crew)\.spec\.ts$/, dependencies: ['perf'] },
     { name: 'shots', testMatch: /shots\.spec\.ts$/ },
   ],
 });

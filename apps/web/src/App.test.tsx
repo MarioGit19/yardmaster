@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
+import { MotionGlobalConfig } from 'motion/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Router } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { AppRoutes } from './App.js';
@@ -13,6 +14,11 @@ import { TooltipProvider } from './ui/Tooltip.js';
 
 let container: HTMLDivElement;
 let root: Root;
+
+beforeAll(() => {
+  // happy-dom's WAAPI rejects Motion's cancelled animations; the pod grid only needs to mount.
+  MotionGlobalConfig.skipAnimations = true;
+});
 
 beforeEach(() => {
   container = document.createElement('div');

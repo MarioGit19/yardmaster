@@ -587,3 +587,96 @@
   animation: none;
   opacity: 0;
 }
+
+/* Project pod, DESIGN.md §4.3: accent hairline, cursor spotlight, and the amber breathing glow
+   (§3 rule 4) on a layer above the static `glow-st-wait`. */
+.pod::before {
+  content: "";
+  position: absolute;
+  inset-inline: 16px;
+  top: 0;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.7;
+}
+.pod::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--st-wait),
+    0 10px 48px -6px var(--st-wait-glow);
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes pod-breathe {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.pod[data-tone="wait"]::after {
+  animation: pod-breathe 2.4s var(--ease-in-out) infinite;
+}
+[data-motion="reduced"] .pod[data-tone="wait"]::after {
+  animation: none;
+  opacity: 0.5;
+}
+
+.pod-spotlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, var(--spotlight), transparent);
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .pod:hover .pod-spotlight {
+    opacity: 1;
+  }
+}
+
+/* Session caption: characters type in on a CSS delay (opacity only). */
+@keyframes type-in {
+  from {
+    opacity: 0;
+  }
+}
+.typewriter > [aria-hidden] {
+  animation: type-in 80ms linear backwards;
+  animation-delay: calc(var(--i) * 10ms);
+}
+[data-motion="reduced"] .typewriter > [aria-hidden] {
+  animation: none;
+}
+[data-motion="reduced"] .typewriter {
+  animation: fade-in 220ms var(--ease-out);
+}
+
+/* The last assistant line shimmers while the session streams (transform only). */
+@keyframes shimmer-sweep {
+  to {
+    transform: translateX(360%);
+  }
+}
+.shimmer[data-shimmer]::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 36%;
+  background: linear-gradient(90deg, transparent, var(--text-shimmer), transparent);
+  transform: translateX(-100%);
+  animation: shimmer-sweep 2.4s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+[data-motion="reduced"] .shimmer[data-shimmer]::after {
+  animation: none;
+  opacity: 0;
+}

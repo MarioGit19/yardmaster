@@ -1,0 +1,50 @@
+import { expect, openRoute, test } from './fixtures.js';
+
+const COLUMNS = [
+  { width: 390, height: 844, columns: 1 },
+  { width: 1440, height: 900, columns: 3 },
+  { width: 1920, height: 1080, columns: 4 },
+] as const;
+
+for (const { columns, ...viewport } of COLUMNS) {
+  test(`the pod grid has ${columns} column(s) at ${viewport.width} px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openRoute(page, '/');
+    const pods = page.locator('[data-pod]');
+    await expect(pods.first()).toBeVisible();
+    const lefts = await pods.evaluateAll((els) =>
+      els.map((el) => Math.round(el.getBoundingClientRect().left)),
+    );
+    expect(new Set(lefts).size).toBe(Math.min(columns, lefts.length));
+  });
+}
+
+test('every pod has a header crew, session rows or a placeholder, and lanes', async ({ page }) => {
+  await openRoute(page, '/');
+  const pods = page.locator('[data-pod]');
+  await expect(pods.first()).toBeVisible();
+  for (const pod of await pods.all()) {
+    await expect(pod.locator('header [data-crew]').first()).toBeVisible();
+    await expect(pod.locator('[data-session], :text("No Claude sessions")').first()).toBeVisible();
+  }
+  await expect(page.locator('[data-session]').first()).toBeVisible();
+  await expect(page.locator('[data-lane]').first()).toBeVisible();
+});
+
+test('a project waiting for approval moves to the front and glows amber', async ({ page }) => {
+  test.slow();
+  await openRoute(page, '/');
+  // The demo's first permission request arrives 8–14 s in.
+  const waiting = page.locator('[data-pod][data-tone="wait"]');
+  await expect(waiting.first()).toBeVisible({ timeout: 30_000 });
+  // Let the layout spring settle, then the first pod in the grid must be a waiting one.
+  await page.waitForTimeout(800);
+  const tones = await page.locator('[data-pod]').evaluateAll((els) =>
+    els
+      .map((el) => ({ tone: el.getAttribute('data-tone'), box: el.getBoundingClientRect() }))
+      .sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left)
+      .map((p) => p.tone),
+  );
+  expect(tones[0]).toBe('wait');
+  await expect(waiting.first().locator('[data-session]').first()).toContainText('Waiting');
+});

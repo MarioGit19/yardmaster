@@ -152,3 +152,21 @@ test.describe('terminal lanes', () => {
     });
   }
 });
+
+// A pod waiting for approval: attention-first order and the amber glow.
+test.describe('waiting pod', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('overview', async ({ page }) => {
+        test.slow();
+        await openRoute(page, '/');
+        await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
+          timeout: 30_000,
+        });
+        await page.waitForTimeout(1200);
+        await page.screenshot({ path: new URL(`overview-waiting-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+});
