@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Pid, SessionId, Timestamp } from './domain.js';
+import { Pid, SessionId, Timestamp, TokenUsage } from './domain.js';
 
 /**
  * One `~/.claude/sessions/<pid>.json` file, PRD §6.4. Undocumented and version-dependent:
@@ -28,5 +28,13 @@ export const SessionHistoryEntry = z.object({
   createdAt: Timestamp.nullable(),
   updatedAt: Timestamp,
   fileSize: z.number().int().nonnegative().nullable(),
+  /** Known only for sessions the board has seen live; the SDK listing carries no usage. */
+  tokens: TokenUsage.nullable().default(null),
 });
 export type SessionHistoryEntry = z.infer<typeof SessionHistoryEntry>;
+
+/**
+ * Claude Code session ids are UUIDs. Anything placed on a shell command line (`claude --resume`)
+ * must match this, so a hostile id can't smuggle shell syntax into a terminal.
+ */
+export const RESUMABLE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;

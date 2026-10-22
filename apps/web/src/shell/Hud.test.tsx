@@ -2,7 +2,7 @@
 import { MotionGlobalConfig } from 'motion/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Router } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { AppRoutes } from '../App.js';
@@ -13,6 +13,11 @@ import { makeSession, sampleBoard } from '../test/board.js';
 import { TooltipProvider } from '../ui/Tooltip.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// The focus view's history list loads over HTTP; there is no server here.
+vi.mock('../history/api.js', () => ({
+  useSessionHistory: () => ({ state: { status: 'ready', sessions: [] }, retry: () => {} }),
+}));
 
 let container: HTMLDivElement;
 let root: Root;

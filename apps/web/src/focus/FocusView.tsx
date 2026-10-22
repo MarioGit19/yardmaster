@@ -1,7 +1,7 @@
-import type { ClaudeSession, GitFileStatus, Project } from '@c-board/protocol';
-import { ArrowDown, ArrowLeft, ArrowUp, GitBranch, GitCommitHorizontal } from 'lucide-react';
+import type { ClaudeSession, Project } from '@c-board/protocol';
+import { ArrowLeft, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import {
@@ -14,6 +14,8 @@ import {
   useBoard,
   useBoardList,
 } from '../data/index.js';
+import { GitPanel } from '../git/GitPanel.js';
+import { SessionHistory } from '../history/SessionHistory.js';
 import { dur, ease, spring } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
@@ -31,13 +33,14 @@ import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { EmptyState } from '../views/Page.js';
+import { ColumnHeading } from './ColumnHeading.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
 
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
 
-const LABELS = { left: 'Sessions and git', center: 'Claude', right: 'Terminals' } as const;
+const LABELS = { left: 'Sessions, history and git', center: 'Claude', right: 'Terminals' } as const;
 
 export interface FocusViewProps {
   projectId: string;
@@ -279,15 +282,6 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
   );
 }
 
-function ColumnHeading({ children, meta }: { children: ReactNode; meta?: ReactNode }) {
-  return (
-    <h2 className="mb-3 flex min-w-0 items-baseline gap-2 font-medium text-body text-text-1">
-      <span className="truncate">{children}</span>
-      {meta !== undefined && <span className="tabular text-meta text-text-3">{meta}</span>}
-    </h2>
-  );
-}
-
 function SessionsColumn({
   project,
   sessions,
@@ -305,6 +299,7 @@ function SessionsColumn({
   const live = podSessions(sessions);
   const ended = sessions.filter((s) => s.status.kind === 'ended');
   const ordered = [...live, ...ended];
+  const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -327,7 +322,13 @@ function SessionsColumn({
           </ul>
         )}
       </div>
-      <GitSummary git={project.git} />
+      <SessionHistory
+        projectId={project.id}
+        knownIds={knownIds}
+        refreshKey={ended.length}
+        branch={project.git?.branch ?? null}
+      />
+      <GitPanel git={project.git} now={Date.now()} />
     </div>
   );
 }
@@ -395,81 +396,6 @@ function SessionLink({
         </span>
       </span>
     </Link>
-  );
-}
-
-const FILE_MARK: Record<GitFileStatus, { mark: string; className: string }> = {
-  modified: { mark: 'M', className: 'text-st-work' },
-  added: { mark: 'A', className: 'text-st-ok' },
-  deleted: { mark: 'D', className: 'text-st-err' },
-  renamed: { mark: 'R', className: 'text-st-work' },
-  copied: { mark: 'C', className: 'text-st-work' },
-  typechange: { mark: 'T', className: 'text-st-work' },
-  untracked: { mark: 'U', className: 'text-text-3' },
-  conflicted: { mark: '!', className: 'text-st-err' },
-};
-
-/** Interim git summary; 7.12 replaces it with the full `GitPanel`. */
-const MAX_FILES = 8;
-
-function GitSummary({ git }: { git: Project['git'] }) {
-  if (!git) {
-    return (
-      <div>
-        <ColumnHeading>Git</ColumnHeading>
-        <p className="text-body-sm text-text-3">Not a git repository</p>
-      </div>
-    );
-  }
-  const branch = git.branch ?? (git.head ? git.head.slice(0, 7) : 'no branch');
-  const last = git.commits[0];
-  const hidden = git.dirty - Math.min(git.files.length, MAX_FILES);
-  return (
-    <div className="flex flex-col gap-3">
-      <ColumnHeading meta={git.dirty ? `${git.dirty} changed` : undefined}>Git</ColumnHeading>
-      <p className="-mt-2 flex min-w-0 items-center gap-2.5 font-mono text-meta text-text-3 tabular">
-        <span className="flex min-w-0 items-center gap-1" title={branch}>
-          <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
-          <span className="truncate text-text-2">{branch}</span>
-        </span>
-        {git.ahead > 0 && (
-          <span className="flex shrink-0 items-center" title={`${git.ahead} ahead`}>
-            <ArrowUp aria-hidden className="size-3" strokeWidth={1.75} />
-            {git.ahead}
-          </span>
-        )}
-        {git.behind > 0 && (
-          <span className="flex shrink-0 items-center" title={`${git.behind} behind`}>
-            <ArrowDown aria-hidden className="size-3" strokeWidth={1.75} />
-            {git.behind}
-          </span>
-        )}
-      </p>
-      {git.files.length > 0 && (
-        <ul className="flex flex-col gap-1 font-mono text-label">
-          {git.files.slice(0, MAX_FILES).map((file) => {
-            const { mark, className } = FILE_MARK[file.status];
-            return (
-              <li key={file.path} className="flex min-w-0 items-center gap-2" title={file.path}>
-                <span aria-hidden className={cx('w-3 shrink-0 text-center', className)}>
-                  {mark}
-                </span>
-                <span className="sr-only">{file.status}: </span>
-                <span className="truncate text-text-2">{file.path}</span>
-              </li>
-            );
-          })}
-          {hidden > 0 && <li className="pl-5 text-meta text-text-3 tabular">{hidden} more</li>}
-        </ul>
-      )}
-      {last && (
-        <p className="flex min-w-0 items-center gap-2 text-label text-text-3" title={last.subject}>
-          <GitCommitHorizontal aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
-          <span className="shrink-0 font-mono">{last.hash.slice(0, 7)}</span>
-          <span className="truncate text-text-2">{last.subject}</span>
-        </p>
-      )}
-    </div>
   );
 }
 

@@ -120,6 +120,7 @@ const uiToServer: UiToServer[] = [
     permissionMode: 'acceptEdits',
   }),
   env('action', { kind: 'session.resume', sessionId: 'sess-1', fork: true }),
+  env('action', { kind: 'session.resumeInEditor', projectId: 'p1', sessionId: 'sess-1' }),
   env('action', { kind: 'session.interrupt', sessionId: 'sess-1' }),
   env('action', { kind: 'session.close', sessionId: 'sess-1' }),
   env('action', { kind: 'session.setModel', sessionId: 'sess-1', model: 'claude-sonnet-5-5' }),

@@ -1,12 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ServerStatus } from '@c-board/protocol';
+import { projectIdFromPath, ServerStatus, SessionHistoryResponse } from '@c-board/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
 import { buildServer, startServer } from './app.js';
 import type { ServerConfig } from './config.js';
+import { toSessionRecord } from './persistence.js';
 import { generateToken } from './token.js';
 
 const config: ServerConfig = {
@@ -94,6 +95,88 @@ describe('server', () => {
     app.store.upsertSession({ id: 'sess-1', claudePid: 4300 });
     await app.processScanner?.scanProcesses();
     expect(app.store.state.sessions['sess-1']?.terminalId).toBe('t-1');
+  });
+
+  it('GET /api/projects/:id/sessions lists past sessions with known token usage', async () => {
+    const path = '/home/dev/acme-shop';
+    const projectId = projectIdFromPath(path);
+    const ids = [
+      '0b6f6a52-3c1e-4d7a-9f0e-5a1b2c3d4e01',
+      '0b6f6a52-3c1e-4d7a-9f0e-5a1b2c3d4e02',
+      '0b6f6a52-3c1e-4d7a-9f0e-5a1b2c3d4e03',
+    ];
+    app = await buildServer(config, {
+      token,
+      dbPath: ':memory:',
+      processes: false,
+      git: false,
+      discovery: {
+        registryDir: '/nonexistent/c-board-test',
+        listHistory: async (dir) =>
+          dir === path
+            ? [
+                { sessionId: ids[2], summary: 'Oldest', lastModified: 100 },
+                { sessionId: ids[0], customTitle: 'Live one', lastModified: 300 },
+                { sessionId: ids[1], summary: 'Stored one', lastModified: 200 },
+                { lastModified: 50 },
+              ]
+            : [],
+      },
+    });
+    app.store.upsertProject({
+      id: projectId,
+      path,
+      name: 'acme-shop',
+      accent: 0,
+      source: 'manual',
+      git: null,
+      createdAt: 1,
+      lastActivityAt: null,
+    });
+    const usage = (input: number) => ({ input, output: 1, cacheRead: 0, cacheCreation: 0 });
+    const live = app.store.upsertSession({ id: ids[0] as string, projectId, tokens: usage(10) });
+    app.persistence.saveSession({
+      ...toSessionRecord(live),
+      id: ids[1] as string,
+      tokens: usage(20),
+    });
+
+    const url = `/api/projects/${projectId}/sessions`;
+    expect((await app.inject({ method: 'GET', url, headers: { host } })).statusCode).toBe(401);
+    const res = await app.inject({
+      method: 'GET',
+      url,
+      headers: { host, 'x-cboard-token': token },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sessions } = SessionHistoryResponse.parse(res.json());
+    expect(sessions.map((s) => [s.id, s.title, s.tokens?.input ?? null])).toEqual([
+      [ids[0], 'Live one', 10],
+      [ids[1], 'Stored one', 20],
+      [ids[2], 'Oldest', null],
+    ]);
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/projects/nope/sessions',
+      headers: { host, 'x-cboard-token': token },
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it('serves a synthetic session history in demo mode', async () => {
+    app = await buildServer(config, { token, demo: { seed: 1 } });
+    const projectId = Object.keys(app.store.state.projects)[0];
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/sessions`,
+      headers: { host, 'x-cboard-token': token },
+    });
+    const { sessions } = SessionHistoryResponse.parse(res.json());
+    expect(sessions.length).toBeGreaterThanOrEqual(5);
+    expect(sessions.every((s) => s.projectId === projectId)).toBe(true);
+    const times = sessions.map((s) => s.updatedAt);
+    expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 
   it('returns 404 for unknown routes', async () => {

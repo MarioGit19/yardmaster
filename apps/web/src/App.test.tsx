@@ -12,6 +12,30 @@ import { TooltipProvider } from './ui/Tooltip.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// The focus view's history list loads over HTTP; tests get a fixed listing instead.
+vi.mock('./history/api.js', () => ({
+  useSessionHistory: (projectId: string) => ({
+    state: {
+      status: 'ready',
+      sessions: [
+        {
+          id: '9d2e7c41-5a3b-4f6e-8c1d-2b3a4c5d6e7f',
+          projectId,
+          title: 'Paginate the index',
+          firstPrompt: 'paginate the index endpoint',
+          cwd: null,
+          gitBranch: 'main',
+          createdAt: null,
+          updatedAt: 1_760_000_000_000,
+          fileSize: null,
+          tokens: null,
+        },
+      ],
+    },
+    retry: () => {},
+  }),
+}));
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -90,6 +114,13 @@ describe('routes', () => {
     expect(backdrop()?.hasAttribute('inert')).toBe(true);
     expect(backdrop()?.getAttribute('aria-hidden')).toBe('true');
     expect(backdrop()?.querySelector('[data-pod="p-orbit"]')).not.toBeNull();
+    // The left column lists past sessions with resume actions, and the git panel.
+    const row = container.querySelector('[data-focus] [data-history]');
+    expect(row?.textContent).toContain('Paginate the index');
+    expect(row?.querySelectorAll('button')).toHaveLength(2);
+    expect(container.querySelector('[data-focus] [data-git-panel]')?.textContent).toContain(
+      'Up to date with origin/main',
+    );
   });
 
   it('lands keyboard focus on the project heading', () => {

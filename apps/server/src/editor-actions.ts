@@ -1,3 +1,4 @@
+import { RESUMABLE_SESSION_ID } from '@c-board/protocol';
 import type { ActionHandlers, ActionResult } from './actions.js';
 import type { CommandPayloads } from './editor-gateway.js';
 import type { EditorRouter } from './editor-router.js';
@@ -16,13 +17,21 @@ export type TerminalActionKind =
   | 'terminal.focus'
   | 'terminal.close';
 
+export type EditorActionKind = TerminalActionKind | 'session.resumeInEditor';
+
 export const NOTHING_TO_RERUN = 'nothing_to_rerun';
+export const INVALID_SESSION_ID = 'invalid_session_id';
+
+/** The shell command that resumes a Claude Code session; null for an id unsafe to put in it. */
+export function resumeCommand(sessionId: string): string | null {
+  return RESUMABLE_SESSION_ID.test(sessionId) ? `claude --resume ${sessionId}` : null;
+}
 
 /** Terminal actions from the board, turned into editor commands for the owning window. */
 export function createEditorActions(options: {
   router: EditorRouter;
   send: CommandSender;
-}): Pick<ActionHandlers, TerminalActionKind> {
+}): Pick<ActionHandlers, EditorActionKind> {
   const { router, send } = options;
   return {
     'terminal.sendText': ({ terminalId, text, execute }) => {
@@ -59,6 +68,17 @@ export function createEditorActions(options: {
       const route = router.forTerminal(terminalId);
       if (!route.ok) return route;
       return send(route.windowId, 'cmd.disposeTerminal', { terminalId });
+    },
+    'session.resumeInEditor': ({ projectId, sessionId }) => {
+      const command = resumeCommand(sessionId);
+      if (command === null) return { ok: false, error: INVALID_SESSION_ID };
+      const route = router.forProject(projectId);
+      if (!route.ok) return route;
+      return send(route.windowId, 'cmd.createTerminal', {
+        cwd: route.project.path,
+        name: `claude · ${route.project.name}`,
+        command,
+      });
     },
   };
 }

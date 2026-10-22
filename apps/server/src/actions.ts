@@ -28,6 +28,7 @@ export function stubActionHandlers(): ActionHandlers {
     'terminal.close': notImplemented,
     'session.create': notImplemented,
     'session.resume': notImplemented,
+    'session.resumeInEditor': notImplemented,
     'session.interrupt': notImplemented,
     'session.close': notImplemented,
     'session.setModel': notImplemented,

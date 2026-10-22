@@ -318,3 +318,14 @@ export const DEMO_COMMITS = [
   { author: 'Kai Mendel', subject: 'Document the release steps' },
   { author: 'Robin Vale', subject: 'Initial scaffold' },
 ] as const;
+
+/** Titles of past sessions in the history list, beyond each project's own scenarios. */
+export const DEMO_PAST_SESSIONS = [
+  { title: 'Explain the build pipeline', prompt: 'walk me through how the build works' },
+  { title: 'Upgrade the test runner', prompt: 'upgrade the test runner and fix what breaks' },
+  { title: 'Tidy up lint warnings', prompt: 'fix the lint warnings in src/' },
+  { title: null, prompt: 'why does the dev server restart twice on save?' },
+  { title: 'Draft release notes', prompt: 'draft release notes from the last 20 commits' },
+  { title: 'Add a health check endpoint', prompt: 'add /health with a version field' },
+  { title: 'Profile the slow startup', prompt: 'startup takes 4s, find out why' },
+] as const;

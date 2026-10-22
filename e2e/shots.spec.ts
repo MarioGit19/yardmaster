@@ -497,3 +497,43 @@ test.describe('pulse rail', () => {
     });
   }
 });
+
+// The focus view's left column: live sessions, the session history (one row hovered so its
+// resume actions show) and the git panel; plus the Sessions tab on a phone.
+test.describe('git and history', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 1100 } });
+      test('left column', async ({ page }) => {
+        await openRoute(page, '/');
+        await openRoute(page, await firstProjectRoute(page));
+        const history = page.locator('[data-history-list]');
+        await expect(history.locator('[data-history]').first()).toBeVisible();
+        await expect(page.locator('[data-git-panel]')).toBeVisible();
+        await history.locator('[data-history]').nth(1).hover();
+        await page.waitForTimeout(400);
+        const column = page.locator('.focus-col').filter({ has: history });
+        await column.screenshot({
+          path: new URL(`git-history-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      });
+    });
+  }
+
+  test.describe('phone', () => {
+    test.use({ theme: 'dark', viewport: { width: 390, height: 844 } });
+    test('sessions tab', async ({ page }) => {
+      await openRoute(page, '/');
+      await openRoute(page, await firstProjectRoute(page));
+      await page.getByRole('tab', { name: 'Sessions' }).click();
+      await expect(page.locator('[data-history]').first()).toBeVisible();
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: new URL('git-history-390-dark.png', OUT_DIR).pathname,
+        fullPage: true,
+        animations: 'disabled',
+      });
+    });
+  });
+});

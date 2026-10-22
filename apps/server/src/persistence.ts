@@ -169,6 +169,25 @@ export class Persistence {
     );
   }
 
+  /** Token usage of a project's stored sessions, including writes not yet flushed. */
+  sessionTokens(projectId: string): Map<string, SessionRecord['tokens']> {
+    const tokens = new Map<string, SessionRecord['tokens']>();
+    this.flush();
+    if (this.closed) return tokens;
+    const rows = this.db
+      .prepare('SELECT id, data FROM sessions WHERE project_id = ?')
+      .all(projectId);
+    for (const row of rows) {
+      try {
+        const record = SessionRecord.safeParse(JSON.parse(String(row.data)));
+        if (record.success) tokens.set(record.data.id, record.data.tokens);
+      } catch {
+        // An unreadable row only costs that session its token count.
+      }
+    }
+    return tokens;
+  }
+
   loadSettings(): Record<string, unknown> {
     const settings: Record<string, unknown> = {};
     for (const row of this.db.prepare('SELECT key, value FROM settings').all()) {

@@ -14,6 +14,7 @@ import {
   projectIdFromPath,
   type ResumableSessionStatus,
   type ServerToUi,
+  type SessionHistoryEntry,
   type ToolActivity,
   toolFamily,
 } from '@c-board/protocol';
@@ -25,6 +26,7 @@ import {
   DEMO_COMMITS,
   DEMO_HOME,
   DEMO_MODELS,
+  DEMO_PAST_SESSIONS,
   DEMO_PROJECTS,
   DEMO_WINDOWS,
   type DemoProject,
@@ -133,6 +135,8 @@ export class DemoSimulator {
   private readonly textRng: Rng;
   /** The Pulse backfill only, for the same reason. */
   private readonly pastRng: Rng;
+  private readonly historySeed: number;
+  private readonly history = new Map<string, SessionHistoryEntry[]>();
   private readonly onActivity: (event: ActivityEvent) => void;
   private readonly onMessage: (message: ServerToUi) => void;
   private readonly permissionIntervalMs: number;
@@ -152,6 +156,7 @@ export class DemoSimulator {
     this.rng = new Rng(options.seed ?? 0xc0ffee);
     this.textRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x5eed);
     this.pastRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x9a57);
+    this.historySeed = (options.seed ?? 0xc0ffee) ^ 0x4157;
     this.transcripts = options.transcripts ?? new DemoTranscripts();
     this.onActivity = options.onActivity ?? (() => {});
     this.onMessage = options.onMessage ?? (() => {});
@@ -235,6 +240,18 @@ export class DemoSimulator {
       'terminal.create': offline,
       'terminal.close': offline,
     };
+  }
+
+  /** Synthetic past sessions of a project, newest first; made once, stable after that. */
+  sessionHistory(projectId: string): SessionHistoryEntry[] {
+    const project = this.projects.find((p) => p.id === projectId);
+    if (!project) return [];
+    let entries = this.history.get(projectId);
+    if (!entries) {
+      entries = this.pastSessions(project);
+      this.history.set(projectId, entries);
+    }
+    return entries;
   }
 
   // Setup
@@ -1040,6 +1057,46 @@ export class DemoSimulator {
       commits,
       updatedAt: ts,
     };
+  }
+
+  private pastSessions(project: ProjectCtx): SessionHistoryEntry[] {
+    let seed = this.historySeed;
+    for (const char of project.def.name) seed = (Math.imul(seed, 31) + char.charCodeAt(0)) >>> 0;
+    const rng = new Rng(seed);
+    // The first scenario is the one running live, so past work starts with the others.
+    const pool = [
+      ...project.def.scenarios.slice(1).map((s) => ({ title: s.title, prompt: s.prompt })),
+      ...DEMO_PAST_SESSIONS,
+    ];
+    const count = Math.min(pool.length, 5 + (project.def.name.length % 4));
+    let at = project.seededAt - rng.int(2, 6) * 3_600_000;
+    return pool.slice(0, count).map(({ title, prompt }) => {
+      const input = rng.int(4, 220) * 1_000;
+      const createdAt = at - rng.int(10, 160) * 60_000;
+      const entry: SessionHistoryEntry = {
+        id: rng.uuid(),
+        projectId: project.id,
+        title,
+        firstPrompt: prompt,
+        cwd: project.def.path,
+        gitBranch: project.def.branch,
+        createdAt,
+        updatedAt: at,
+        fileSize: input * 9,
+        // Older sessions predate the board, so it never saw their usage.
+        tokens:
+          rng.next() < 0.75
+            ? {
+                input,
+                output: Math.round(input / rng.int(6, 14)),
+                cacheRead: input * rng.int(2, 9),
+                cacheCreation: Math.round(input / 4),
+              }
+            : null,
+      };
+      at = createdAt - rng.int(1, 40) * 3_600_000;
+      return entry;
+    });
   }
 
   private doneTodos(scenario: DemoScenario, progress: number): number {

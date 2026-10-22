@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SessionHistoryEntry } from './claude-sessions.js';
 import { Timestamp } from './domain.js';
 
 // JSON bodies of the server's HTTP routes, shared by the CLI, the web app and tests.
@@ -24,3 +25,9 @@ export const ServerStatus = z.object({
   }),
 });
 export type ServerStatus = z.infer<typeof ServerStatus>;
+
+/** `GET /api/projects/:projectId/sessions` (authenticated): past sessions, newest first (F17). */
+export const SessionHistoryResponse = z.object({
+  sessions: z.array(SessionHistoryEntry),
+});
+export type SessionHistoryResponse = z.infer<typeof SessionHistoryResponse>;

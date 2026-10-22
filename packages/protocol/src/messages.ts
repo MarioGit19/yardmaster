@@ -249,6 +249,8 @@ export const UiAction = z.discriminatedUnion('kind', [
     permissionMode: PermissionMode.optional(),
   }),
   action('session.resume', { sessionId: SessionId, fork: z.boolean().optional() }),
+  /** Opens a terminal in the project's editor window running `claude --resume <id>` (F17). */
+  action('session.resumeInEditor', { projectId: ProjectId, sessionId: SessionId }),
   action('session.interrupt', { sessionId: SessionId }),
   action('session.close', { sessionId: SessionId }),
   action('session.setModel', { sessionId: SessionId, model: z.string().min(1).max(128) }),

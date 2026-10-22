@@ -321,6 +321,7 @@ describe('SessionDiscovery history', () => {
         createdAt: 400,
         updatedAt: 500,
         fileSize: null,
+        tokens: null,
       },
       {
         id: OTHER_ID,
@@ -332,6 +333,7 @@ describe('SessionDiscovery history', () => {
         createdAt: null,
         updatedAt: 100,
         fileSize: 2048,
+        tokens: null,
       },
     ]);
   });
@@ -353,6 +355,20 @@ describe('SessionDiscovery history', () => {
     await service.tick();
     expect(listHistory).toHaveBeenCalledTimes(2);
     expect(service.history(projectId).map((e) => e.id)).toEqual([LIVE_ID]);
+  });
+
+  it('lists on demand only when the cached listing is stale', async () => {
+    const listHistory = vi.fn<HistoryLister>(async () => [
+      { sessionId: LIVE_ID, summary: 'Work', lastModified: 1 },
+    ]);
+    const { store, service, advance } = setup({ listHistory });
+    const projectId = withProject(store);
+    expect((await service.freshHistory(projectId)).map((e) => e.id)).toEqual([LIVE_ID]);
+    await service.freshHistory(projectId);
+    expect(listHistory).toHaveBeenCalledTimes(1);
+    advance(60_000);
+    await service.freshHistory(projectId);
+    expect(listHistory).toHaveBeenCalledTimes(2);
   });
 
   it('returns nothing for unknown projects', async () => {

@@ -115,6 +115,13 @@ export class SessionDiscovery {
     return this.histories.get(projectId)?.entries ?? [];
   }
 
+  /** The cached list while it is fresh, else a new listing. */
+  async freshHistory(projectId: string): Promise<SessionHistoryEntry[]> {
+    const cached = this.histories.get(projectId);
+    if (cached && this.now() - cached.at < this.historyTtlMs) return cached.entries;
+    return this.loadHistory(projectId);
+  }
+
   /** Lists a project's recent sessions through the SDK now. */
   async loadHistory(projectId: string): Promise<SessionHistoryEntry[]> {
     const project = this.store.state.projects[projectId];
@@ -332,6 +339,7 @@ function toHistoryEntry(projectId: string, info: SdkSessionInfo): SessionHistory
     createdAt: info.createdAt ?? null,
     updatedAt: info.lastModified,
     fileSize: info.fileSize ?? null,
+    tokens: null,
   };
 }
 

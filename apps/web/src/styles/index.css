@@ -1142,3 +1142,22 @@
 [data-motion="reduced"] .pulse-body {
   animation: fade-in 200ms var(--ease-out);
 }
+
+/* Session history: where hover exists, row actions float over the row's end on hover or
+   keyboard focus, so titles keep the full width the rest of the time. */
+@media (hover: hover) {
+  .history-actions {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    padding-inline: 1.5rem 0.25rem;
+    border-radius: inherit;
+    background: linear-gradient(to right, transparent, var(--bg-2) 1.5rem);
+    opacity: 0;
+    transition: opacity 150ms var(--ease-out);
+  }
+  .group:hover .history-actions,
+  .group:focus-within .history-actions {
+    opacity: 1;
+  }
+}

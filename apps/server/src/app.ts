@@ -1,12 +1,15 @@
 import {
   type ActivityEvent,
   type HealthResponse,
+  ProjectId,
   PULSE_WINDOW_MS,
   type ServerStatus,
+  type SessionHistoryResponse,
 } from '@c-board/protocol';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
+import { z } from 'zod';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
@@ -89,6 +92,8 @@ declare module 'fastify' {
     gitScanner: GitScanner | null;
   }
 }
+
+const ProjectParams = z.object({ projectId: ProjectId });
 
 export async function buildServer(
   config: ServerConfig,
@@ -267,6 +272,24 @@ export async function buildServer(
       hooks: { ...app.hookStats },
     }),
   );
+
+  app.get('/api/projects/:projectId/sessions', async (request, reply) => {
+    const params = ProjectParams.safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: 'bad_request' });
+    const { projectId } = params.data;
+    if (!store.state.projects[projectId]) return reply.code(404).send({ error: 'unknown_project' });
+    const listed = demo
+      ? demo.sessionHistory(projectId)
+      : ((await discovery?.freshHistory(projectId)) ?? []);
+    // The SDK listing carries no usage: fill it in for sessions the board has seen live.
+    const stored = demo ? new Map() : persistence.sessionTokens(projectId);
+    const sessions = listed.map((entry) => ({
+      ...entry,
+      tokens:
+        entry.tokens ?? store.state.sessions[entry.id]?.tokens ?? stored.get(entry.id) ?? null,
+    }));
+    return { sessions } satisfies SessionHistoryResponse;
+  });
 
   if (options.webRoot !== undefined && !registerStatic(app, options.webRoot)) {
     app.log.debug({ webRoot: options.webRoot }, 'no web build to serve');

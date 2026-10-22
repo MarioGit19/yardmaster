@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { startServer } from './app.js';
 import type { ServerConfig } from './config.js';
+import { INVALID_SESSION_ID } from './editor-actions.js';
 import { COMMAND_ERRORS, EDITOR_WS_PATH } from './editor-gateway.js';
 import { ROUTE_ERRORS } from './editor-router.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
@@ -172,6 +173,49 @@ describe('editor commands', () => {
     });
     ed.send('cmd.result', { id: create.id, ok: false, error: 'cwd_missing' });
     expect((await client.next()).payload).toEqual({ id: 'act-2', ok: false, error: 'cwd_missing' });
+  });
+
+  it('resumes a past session in a new editor terminal', async () => {
+    const { app, port } = await boot();
+    const ed = await editor(port);
+    await ready(app);
+    const client = await ui(port);
+    const sessionId = '6f1c2a9e-0d3b-4c55-9a77-1b2c3d4e5f60';
+
+    client.send(
+      'action',
+      { kind: 'session.resumeInEditor', projectId: projectIdOf(app), sessionId },
+      'r-1',
+    );
+    const create = await ed.next();
+    expect(create).toMatchObject({
+      type: 'cmd.createTerminal',
+      payload: {
+        cwd: shopPath,
+        name: 'claude · acme-shop',
+        command: `claude --resume ${sessionId}`,
+      },
+    });
+    ed.send('cmd.result', { id: create.id, ok: true });
+    expect((await client.next()).payload).toEqual({ id: 'r-1', ok: true });
+
+    // An id that isn't a plain token never reaches a shell.
+    client.send(
+      'action',
+      { kind: 'session.resumeInEditor', projectId: projectIdOf(app), sessionId: 'x; touch pwned' },
+      'r-2',
+    );
+    expect((await client.next()).payload).toEqual({
+      id: 'r-2',
+      ok: false,
+      error: INVALID_SESSION_ID,
+    });
+    client.send('action', { kind: 'session.resumeInEditor', projectId: 'nope', sessionId }, 'r-3');
+    expect((await client.next()).payload).toEqual({
+      id: 'r-3',
+      ok: false,
+      error: ROUTE_ERRORS.unknownProject,
+    });
   });
 
   it('times out when the editor never answers', async () => {
