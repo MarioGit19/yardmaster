@@ -75,10 +75,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `token.ts` (`ensureToken` creates/reuses `<home>/token`, dir 0700, tightens loose perms, replaces invalid content) and `security.ts` (`registerSecurity`, `request.isAuthorized()`). The cookie is hand-signed (HMAC-SHA256 keyed by the token, so rotating the token invalidates sessions) with no `@fastify/cookie` dependency, and it is a browser-session cookie (no Max-Age), per PRD §8. Absent `Origin` is allowed (curl, hook, extension), and those requests still need the token. Added `CBOARD_DEV_ORIGINS` (comma-separated loopback http origins) to allow the Vite dev server's Host and Origin. `buildServer(config, { token })` skips the token file in tests.
 
-- [ ] **2.3 State store**
+- [x] **2.3 State store**
   - An in-memory `BoardStore` holding `BoardState` with typed mutators (`upsertProject`, `upsertTerminal`, `appendExec`, `setSessionStatus`, …), a change emitter carrying patch ops (from 1.4), and `OutputBuffers` (ring buffer per execution, 2 MB, and per terminal, 8 MB, with seq numbers and a truncated flag). Strip OSC 633 sequences and keep ANSI.
   - **Done when:** unit tests cover the mutators, patch emission, ring-buffer truncation and seq continuity, and OSC stripping.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `store.ts` (`BoardStore`), `output-buffers.ts` (`OutputBuffers`, stream ids `exec:`/`term:`), `ring-buffer.ts` (byte-capped `RingBuffer`; seqs are assigned by the buffer and keep counting across drops; `read(fromSeq)` reports `truncated`) and `osc.ts` (stateful OSC 633 stripper that handles sequences split across chunks). Patches auto-flush once per microtask (`autoFlush: false` + `flush()` for tests); 2.5 throttles them to ≤ 30/s. `appendExecOutput` ignores replayed sender seqs. Extra: executions are capped at 100 per terminal (oldest dropped with their buffers) so memory stays bounded. `@c-board/protocol` now has `exports` pointing at `src/index.ts`; packaging (2.7) may need a built entry.
 
 - [ ] **2.4 Persistence**
   - `node:sqlite` database at `~/.c-board/board.db`, with tables `projects`, `sessions` (metadata only), `activity` (events, 7-day retention, pruned hourly) and `settings` (k/v). Load projects and settings on boot. Write activity asynchronously in batches.

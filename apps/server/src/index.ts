@@ -8,6 +8,19 @@ export {
   loadConfig,
   type ServerConfig,
 } from './config.js';
+export { createOscStripper, type OscStripper, stripOsc633 } from './osc.js';
+export {
+  type AppendResult,
+  EXEC_BUFFER_BYTES,
+  execStreamId,
+  OutputBuffers,
+  type OutputBuffersOptions,
+  type OutputStreamId,
+  type StreamDataListener,
+  TERMINAL_BUFFER_BYTES,
+  terminalStreamId,
+} from './output-buffers.js';
+export { type ReadResult, RingBuffer, type StreamChunk } from './ring-buffer.js';
 export {
   createSessionValue,
   registerSecurity,
@@ -16,5 +29,14 @@ export {
   TOKEN_HEADER,
   verifySessionValue,
 } from './security.js';
+export {
+  BoardStore,
+  type BoardStoreOptions,
+  type ExecStartInput,
+  MAX_EXECUTIONS_PER_TERMINAL,
+  type PatchListener,
+  type SessionInput,
+  type TerminalInput,
+} from './store.js';
 export { ensureToken, generateToken, isValidToken, tokenPath, writeToken } from './token.js';
 export { VERSION } from './version.js';

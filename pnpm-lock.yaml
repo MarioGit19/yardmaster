@@ -25,6 +25,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@c-board/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       fastify:
         specifier: ^5.12.7
         version: 5.12.7

@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@c-board/protocol": "workspace:*",
     "fastify": "^5.12.7",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
