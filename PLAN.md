@@ -55,10 +55,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/protocol test`
   - Note: Event-specific fields are all optional (StopFailure/PostCompact shapes were not re-verified against the hooks reference). A known event with a malformed field normalizes to `unknown`. `normalizeHookEvent` takes an optional third `{ now, id }` argument for deterministic tests.
 
-- [ ] **1.4 Patch format**
+- [x] **1.4 Patch format**
   - A minimal patch op set for `BoardState` (`set`, `merge`, `delete` at a path of ids), plus `applyPatch(state, ops)` (immutable, structural sharing) and a `diffCollector` that records ops when the store mutates.
   - **Done when:** property-style tests show that applying the collected ops to the old state equals the new state.
   - **Verify:** `pnpm --filter @c-board/protocol test`
+  - Note: the collector applies mutations immediately and computes coalesced ops on `flush()` by diffing the baseline against the current state (identity-skipping via structural sharing), so redundant ops never reach the wire. Objects whose `kind` changes are replaced whole. Added `fast-check` (dev) for property tests.
 
 ## Phase 2 — Server core (`apps/server`)
 
