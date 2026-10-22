@@ -57,9 +57,12 @@ scan() { # label, extended-regex, [flags]
 
 # --- machine identity (built at runtime, so this script itself contains nothing personal) --
 esc() { printf '%s' "$1" | sed 's#[][\.*^$|()+?{}]#\\&#g'; }
-user="$(id -un)"
-scan "home directory path" "$(esc "$HOME")"
-if [ "${#user}" -ge 5 ]; then scan "local username" "$(esc "$user")" -i; fi
+# Skipped on CI runners: their home/username (e.g. "runner") are generic, not personal data.
+if [ -z "${CI:-}" ]; then
+  user="$(id -un)"
+  scan "home directory path" "$(esc "$HOME")"
+  if [ "${#user}" -ge 5 ]; then scan "local username" "$(esc "$user")" -i; fi
+fi
 
 # --- emails (allow noreply + reserved example domains) --------------------------------------
 emails="$(grep -v 'privacy-check:allow' "$tmp" | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' |
