@@ -48,7 +48,7 @@ Three words: **calm, precise, alive.** Never noisy or gamer-RGB. Think Linear ×
 - UI: **Geist Variable**. Mono: **Geist Mono Variable** (terminals, commands, ports, numbers in tables).
 - Scale (px): 11 meta · 12 label · 13 body-sm · 14 body · 16 title-sm · 20 title · 28 display · 44 hero-number.
 - Numbers use `font-variant-numeric: tabular-nums` everywhere they update.
-- Labels are uppercase only for 11px meta with +0.06em tracking.
+- No all-caps labels and no decorative eyebrow labels above self-explanatory content. Meta text is 11px `--text-3`.
 
 ### Space, radius, elevation
 
@@ -74,7 +74,7 @@ export const ease = { out: [0.16, 1, 0.3, 1], inOut: [0.65, 0, 0.35, 1] };
 
 ### Choreography rules
 
-1. **Enter:** fade 0→1 plus y 8→0 plus blur 4→0, `smooth`. Lists stagger children by 30–40 ms (max 8 staggered, then the rest together).
+1. **One orchestrated entrance:** only the first load of the overview staggers pods in (fade, y 8→0, blur 4→0, `smooth`, 30–40 ms apart, max 8). After that, new items enter with a plain fade plus a 4px rise, without stagger. Never animate sections in on scroll. Ambient motion must always encode real state (see §4), never decorate.
 2. **Exit:** faster than enter (`dur.fast`), with no stagger.
 3. **Layout:** pods reorder with `layout` plus `smooth` when attention ranking changes. Going from pod to focus view is a **shared-element transition** (`layoutId` on the pod container, header and orb).
 4. **Attention:** a status change to `waiting` triggers a one-time "ripple" ring (scale 1→1.6, opacity .6→0, 900 ms), then a slow amber breathing glow (2.4 s loop) until resolved.
@@ -96,7 +96,7 @@ export const ease = { out: [0.16, 1, 0.3, 1], inOut: [0.65, 0, 0.35, 1] };
 - A full-viewport WebGL fragment shader: a slow, dark aurora / nebula noise field (2–3 layered fbm noise octaves) in deep blue and violet at very low luminance (max L ≈ 12%).
 - **Reacts to real activity:** a uniform `uEnergy` (0..1) is derived from the number of working sessions and the output throughput. The field brightens and flows faster as energy rises. A `uAttention` uniform tints a soft amber bloom toward the position of the pod that is waiting.
 - Renders at 0.5× device pixel ratio, is capped at 30 fps, pauses on `visibilitychange`, and uses a single context. The fallback is a CSS radial-gradient composition.
-- Subtle film grain overlay (static PNG noise, 3% opacity) to avoid banding.
+- Subtle film grain overlay (3% opacity) to avoid banding. It's generated procedurally once at startup (canvas noise turned into an object URL), so there's no binary asset.
 
 ### 4.2 Claude Orb
 
@@ -129,7 +129,7 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 └───────────────────────────────────────────────────────────┘
 ```
 
-- Hover: a cursor-following spotlight (radial gradient at the pointer position, 6% white) plus border brightening. Lift via `translateY(-2px)`.
+- Hover: a cursor-following spotlight (radial gradient at the pointer position, 6% white) plus border brightening. No lift or scale: hover feedback stays quiet so status motion stands out.
 - Throughput sparkline: a 60-sample rolling canvas line. New samples slide in from the right. Its color is the project accent, and it turns rose on error output.
 - **Flow light:** when a lane is streaming, a thin gradient "comet" travels along its bottom border (CSS keyframe on a pseudo-element, transform only).
 - The pod border takes the highest-priority status color of its children (wait > err > work).
@@ -158,6 +158,15 @@ A collapsible bottom rail: a horizontal time axis covering the last 15 min. Each
 ### 4.8 Command palette (⌘K)
 
 Built on cmdk, inside a glass modal with a scale 0.96→1 and blur-in. Groups: Projects, Sessions, Terminals, Actions. Fuzzy search highlights matched characters. Selecting a destination triggers its normal transition.
+
+### 4.9 Brand, icons, sound
+
+- **Name and wordmark:** `c-board`, lowercase, in Geist Mono 500.
+- **Logomark:** an inline SVG with a small glowing orb (the ClaudeOrb motif) inside a rounded-square ring, 1.5px stroke, using `currentColor` plus one accent. It's one source file (`apps/web/src/brand/logo.svg`), and every other brand asset is generated from it.
+- **Favicon:** the SVG favicon is **live**. It turns amber with a dot when anything is waiting and rose when something has crashed. The document title shows the count, for example `(2) c-board`. A PNG fallback is generated at build.
+- **Extension icon:** a 128×128 PNG rendered from the logomark at build time (Playwright screenshot of the SVG). It isn't hand-drawn and isn't committed as a binary if it can be generated.
+- **Icons:** `lucide-react` only, 1.5px stroke, 16/20 px. Tool families map to fixed icons (Bash → `terminal`, Edit/Write → `file-pen`, Read → `file-text`, Grep/Glob → `search`, Web → `globe`, Task → `git-fork`, Todo → `list-checks`). **Never** use third-party brand logos (Claude, Cursor, VS Code); use text labels instead.
+- **Sound (optional, off by default):** synthesized with WebAudio, using soft sine or triangle chimes with a short envelope: "waiting" is two rising notes, "error" one low note, "done" a single soft tick. No audio files, so there's no licensing to manage.
 
 ## 5. Component inventory
 

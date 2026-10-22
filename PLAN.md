@@ -118,6 +118,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Done when:** `pnpm e2e` passes and `pnpm shots` writes the PNGs.
   - **Verify:** `pnpm e2e && pnpm shots`
 
+- [ ] **3.5 Brand assets**
+  - Per DESIGN.md §4.9: create the `logo.svg` logomark and the `c-board` wordmark component. Add a live SVG favicon driven by the store (idle, waiting with amber dot, error with rose), plus the `(n) c-board` title count. Add a build script that renders `apps/web/public/favicon.png` (32/180 px) and `apps/extension/media/icon.png` (128 px) from the SVG with Playwright. Generated PNGs are build outputs (gitignored), except where packaging requires them.
+  - **Done when:** the favicon changes state in demo mode (e2e checks `link[rel=icon]` href changes) and the icon script outputs the PNGs.
+  - **Verify:** `pnpm --filter @c-board/web build && pnpm e2e`
+
 ## Phase 4 — Claude observation (hooks and transcripts)
 
 - [ ] **4.1 Hook ingest endpoint**
@@ -151,7 +156,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 ## Phase 5 — Editor extension (`apps/extension`)
 
 - [ ] **5.1 Extension scaffold**
-  - `package.json`: `name: c-board`, `publisher: c-board`, `engines.vscode: ^1.93.0`, `@types/vscode@1.93.0`, `activationEvents: ["onStartupFinished"]`, `main: dist/extension.js`. Settings `cboard.enabled` and `cboard.port`. Commands `c-board.openDashboard` and `c-board.reconnect`. Build with esbuild to a single CJS file (`vscode` external), and `package` via `@vscode/vsce` to `dist/c-board.vsix` (no `repository` warnings; include a LICENSE placeholder note if LICENSE is missing).
+  - `package.json`: `name: c-board`, `publisher: c-board`, `engines.vscode: ^1.93.0`, `@types/vscode@1.93.0`, `activationEvents: ["onStartupFinished"]`, `main: dist/extension.js`, `icon: media/icon.png` (from task 3.5). Settings `cboard.enabled` and `cboard.port`. Commands `c-board.openDashboard` and `c-board.reconnect`. Build with esbuild to a single CJS file (`vscode` external), and `package` via `@vscode/vsce` to `dist/c-board.vsix` (no `repository` warnings; include a LICENSE placeholder note if LICENSE is missing).
   - Isolate pure logic in `src/core/*` (no `vscode` import) so it can be unit tested.
   - **Done when:** `pnpm --filter c-board-extension package` produces a `.vsix`.
   - **Verify:** `pnpm --filter c-board-extension build && pnpm --filter c-board-extension package`
