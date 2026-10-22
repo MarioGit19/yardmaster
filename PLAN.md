@@ -166,7 +166,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/hook test`
   - Note: the handler command is the absolute path of `packages/hook/bin/c-board-hook` (shell-quoted if needed), with `async: true` and `timeout: 5`. An event counts as installed only with exactly one c-board handler of that shape; otherwise install replaces ours in place and leaves third-party groups where they are. Uninstall removes every c-board handler, including an away-mode `PermissionRequest` one, and drops the `hooks` key if it ends up empty. The file is rewritten with 2-space JSON (atomic rename, same mode), and the write is refused if the file changed between planning and writing. Without `--yes` it asks on a TTY and refuses when there is none. `claudeSettingsPath` now lives in `@c-board/hook` (doctor reuses it).
 
-- [ ] **[HUMAN] 4.4 Install hooks on your machine**
+- [x] **[HUMAN] 4.4 Install hooks on your machine**
   - Run `pnpm --filter @c-board/server exec tsx src/cli.ts hooks install --dry-run`, review the diff, then run it without `--dry-run`. Start the server (`pnpm dev`), use Claude in any project, and check that `c-board doctor` reports hook events received. Then tick this box.
 
 - [ ] **4.5 Transcript reader**

@@ -45,6 +45,7 @@ Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a dif
 - `pnpm dev`: server and web in watch mode. `pnpm dev:demo` does the same with synthetic data.
 - `pnpm check`: privacy check, lint, typecheck and tests. It must pass before a task is ticked.
 - `pnpm e2e` / `pnpm shots`: Playwright tests and screenshots (into `artifacts/shots/`, gitignored).
+- When you start the server yourself (`c-board start`, `src/cli.ts start`), always pass `--no-open`. Never open the maintainer's browser.
 
 ## Git
 
