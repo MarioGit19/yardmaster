@@ -1,3 +1,13 @@
+export {
+  type ActionDispatcher,
+  type ActionHandler,
+  type ActionHandlers,
+  type ActionOf,
+  type ActionResult,
+  createActionDispatcher,
+  NOT_IMPLEMENTED,
+  stubActionHandlers,
+} from './actions.js';
 export { type BuildOptions, buildServer, type HealthResponse, startServer } from './app.js';
 export {
   ConfigError,
@@ -52,4 +62,13 @@ export {
   type TerminalInput,
 } from './store.js';
 export { ensureToken, generateToken, isValidToken, tokenPath, writeToken } from './token.js';
+export {
+  MAX_BUFFERED_BYTES,
+  MAX_UI_MESSAGE,
+  PATCH_INTERVAL_MS,
+  registerUiGateway,
+  UI_WS_PATH,
+  UiGateway,
+  type UiGatewayOptions,
+} from './ui-gateway.js';
 export { VERSION } from './version.js';

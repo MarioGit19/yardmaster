@@ -78,6 +78,8 @@ const serverToUi: ServerToUi[] = [
     ],
   }),
   env('stream.data', { streamId: 'exec:exec-1', seq: 7, chunk: 'ok\n' }),
+  env('stream.resync', { streamId: 'term:term-1', fromSeq: 42 }),
+  env('action.result', { id: 'act-1', ok: false, error: 'not_implemented' }),
   env('toast', { level: 'warning', title: 'Approval needed', projectId: 'a1b2c3d4e5f6' }),
   env('approval.new', { approval }),
   env('approval.resolved', { approvalId: approval.id, state: 'denied', reason: 'not now' }),

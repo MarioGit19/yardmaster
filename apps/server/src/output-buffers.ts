@@ -63,6 +63,11 @@ export class OutputBuffers {
     return this.rings.get(streamId)?.read(fromSeq);
   }
 
+  /** Seq the stream's next chunk will get (0 for a stream with no output yet). */
+  nextSeq(streamId: OutputStreamId): number {
+    return this.rings.get(streamId)?.nextSeq ?? 0;
+  }
+
   has(streamId: OutputStreamId): boolean {
     return this.rings.has(streamId);
   }

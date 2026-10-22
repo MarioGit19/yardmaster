@@ -157,6 +157,14 @@ export const StreamData = envelope(
   'stream.data',
   z.object({ streamId: StreamId, seq: z.number().int().nonnegative(), chunk: z.string() }),
 );
+/**
+ * Live output for the stream was dropped (the client fell behind). The server stops
+ * streaming it; the client re-subscribes with `fromSeq` to replay from the buffer.
+ */
+export const StreamResync = envelope(
+  'stream.resync',
+  z.object({ streamId: StreamId, fromSeq: z.number().int().nonnegative() }),
+);
 export const Toast = envelope(
   'toast',
   z.object({
@@ -173,10 +181,18 @@ export const ApprovalResolved = envelope(
   z.object({ approvalId: ApprovalId, state: ApprovalState, reason: ShortText.nullable() }),
 );
 
+/** Reply to a UI message that carried an envelope `id`. */
+export const ActionResult = envelope(
+  'action.result',
+  z.object({ id: MessageId, ok: z.boolean(), error: ShortText.optional() }),
+);
+
 export const ServerToUi = z.discriminatedUnion('type', [
   Snapshot,
   Patch,
   StreamData,
+  StreamResync,
+  ActionResult,
   Toast,
   ApprovalNew,
   ApprovalResolved,

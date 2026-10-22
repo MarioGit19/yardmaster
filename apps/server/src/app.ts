@@ -1,10 +1,18 @@
+import websocket from '@fastify/websocket';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
+import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import type { ServerConfig } from './config.js';
 import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
 import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
+import {
+  MAX_UI_MESSAGE,
+  registerUiGateway,
+  UiGateway,
+  type UiGatewayOptions,
+} from './ui-gateway.js';
 import { VERSION } from './version.js';
 
 export interface HealthResponse {
@@ -17,6 +25,10 @@ export interface BuildOptions {
   token?: string;
   /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`. */
   dbPath?: string;
+  /** UI action handlers. Defaults to stubs. */
+  actions?: ActionHandlers;
+  /** Gateway tuning, for tests. */
+  gateway?: Pick<UiGatewayOptions, 'patchIntervalMs' | 'maxBufferedBytes'>;
 }
 
 declare module 'fastify' {
@@ -63,7 +75,19 @@ export async function buildServer(
     persistence.close();
   });
 
+  // Before the security layer and any route: it claims upgrade requests, and its onRequest
+  // hook must run first so sockets rejected by security are cleaned up.
+  await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
   registerSecurity(app, { config, token });
+
+  const gateway = new UiGateway({
+    store,
+    dispatch: createActionDispatcher(options.actions ?? stubActionHandlers()),
+    logger: logger.child({ component: 'ui-ws' }),
+    ...options.gateway,
+  });
+  app.decorate('uiGateway', gateway);
+  registerUiGateway(app, gateway);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
 
