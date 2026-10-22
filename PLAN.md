@@ -264,6 +264,20 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Done when:** both render with demo data, and the "Resume in Cursor" action is routed (server test).
   - **Verify:** `pnpm shots && pnpm --filter @c-board/server test`
 
+- [ ] **7.13 Worst-case data pass (break-ui)**
+  - Use the `break-ui` skill on ProjectPod, SessionRow, TerminalLane, ApprovalCard and the HUD. Add a `?worst=1` demo variant (very long project names, branches and commands, 0 and 99+ sessions or terminals, huge token counts, non-Latin text, emoji, missing fields) and fix everything that breaks.
+  - **Done when:** the screenshots of `?worst=1` at all widths show no overflow, overlap or broken alignment.
+  - **Verify:** `pnpm shots`
+
+- [ ] **7.14 Motion review pass**
+  - Run `review-animations` across `apps/web/src`, then `find-animation-opportunities` for the overview and focus views. Apply the fixes and opportunities that fit DESIGN.md §3–4 (reject the rest, with a one-line reason in a Note). Recheck Reduced/Off motion levels.
+  - **Done when:** the review comes back without blocking issues, and the motion levels still behave as specified.
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **7.15 Impeccable design critique**
+  - Run an `impeccable` critique and audit of the overview, focus view, Attention Center and settings, using the screenshots plus the code. Fix the top issues (hierarchy, spacing, typography, contrast, states) without leaving DESIGN.md's direction. If more than about 10 issues remain, add follow-up task `7.15b`.
+  - **Verify:** `pnpm shots && pnpm check`
+
 ## Phase 8 — Act: headless sessions and approvals
 
 - [ ] **8.1 SessionRunner (Agent SDK)**
@@ -325,7 +339,7 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - **Verify:** `pnpm check`
 
 - [ ] **10.4 Visual polish sweep**
-  - Run `pnpm shots` and review every screenshot against DESIGN.md §9. Fix up to 10 issues per iteration; if more remain, add a follow-up task `10.4b` below this one.
+  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `10.4b` below this one.
   - **Verify:** `pnpm shots`
 
 - [ ] **10.5 README and docs**

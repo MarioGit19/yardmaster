@@ -27,3 +27,7 @@ loop/.state/
 
 .DS_Store
 .idea/
+
+# third-party skills (installed by scripts/setup-skills.sh) and personal Claude settings
+.claude/skills/
+.claude/settings.local.json

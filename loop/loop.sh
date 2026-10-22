@@ -27,6 +27,11 @@ model_args=()
 next_task() { grep -m1 -E '^- \[ \] ' PLAN.md || true; }
 done_count() { grep -cE '^- \[x\] ' PLAN.md || true; }
 
+for bin in claude git pnpm node python3; do
+  command -v "$bin" >/dev/null || { echo "✗ '$bin' not found on PATH"; exit 1; }
+done
+[ -f .claude/skills/SOURCES.txt ] || scripts/setup-skills.sh
+
 stalls=0
 for ((i = 1; i <= MAX_ITERS; i++)); do
   task="$(next_task)"

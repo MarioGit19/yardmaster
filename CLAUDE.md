@@ -20,6 +20,26 @@ c-board is a local dashboard that mirrors every Cursor/VS Code terminal and Clau
 - UI: follow `docs/DESIGN.md` exactly (tokens, springs, performance rules). Animate only transform, opacity and filter. Respect the motion level.
 - Keep comments sparse and useful. Match the style of the surrounding code.
 
+## Skills & tools
+
+Installed for this project: the plugins in `.claude/settings.json`, and the skills in `.claude/skills/` (run `scripts/setup-skills.sh` to install or refresh them). Use them as follows:
+
+| When | Use |
+|---|---|
+| Any library API you aren't 100% sure of (Motion 14, Vite 8, Tailwind 4, xterm 6, zod 4, Fastify 5, Agent SDK, VS Code API) | **Context7** MCP: resolve the library, then fetch docs for the exact version in `package.json`. Our stack is newer than your training data. |
+| Building any UI component or view | `frontend-design` + `emil-design-eng` |
+| Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth |
+| After finishing a UI task | `review-animations` on the motion you added, plus an `impeccable` critique of the screen. Fix what they flag, if it doesn't contradict DESIGN.md. |
+| Charts, sparklines, stat tiles, HUD counters | `dataviz` |
+| Performance work (10.1) or a janky animation | `animation-performance` + `react-best-practices` |
+| Polish, a11y and audit tasks (10.2, 10.4) | `web-design-guidelines` + `impeccable` audit/polish |
+| Edge-case hardening of data-heavy components | `break-ui` |
+| Looking for places that should animate but don't | `find-animation-opportunities` (proposes only; you implement what fits DESIGN.md) |
+
+`review-animations` is user-invocable only (`disable-model-invocation`). To use it, Read `.claude/skills/review-animations/SKILL.md` and follow it.
+
+Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a different font, palette or aesthetic, keep ours.
+
 ## Commands (available once Phase 0 is done)
 
 - `pnpm dev`: server and web in watch mode. `pnpm dev:demo` does the same with synthetic data.
