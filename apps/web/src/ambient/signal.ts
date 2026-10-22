@@ -131,3 +131,49 @@ export function viewportPoint(
     y: clamp((rect.top + rect.height / 2) / viewport.height),
   };
 }
+
+/** After the pods reorder, the point is re-measured for this long: their layout animation. */
+export const REORDER_SETTLE_MS = 1_200;
+/** A layout shift nothing reports (the sidebar folding) is picked up within this long. */
+export const ATTENTION_POINT_MAX_AGE_MS = 2_000;
+
+/**
+ * The waiting element's viewport point, measured only when something could have moved it: another
+ * element, a resize or scroll (`invalidate`), or a change of pod order, after which it is measured
+ * on every read until the reorder animation has settled. Otherwise it is refreshed only when old.
+ */
+export class AttentionPoint<E> {
+  private element: E | null = null;
+  private point: Point | null = null;
+  private order: string | null = null;
+  private settleUntil = 0;
+  private measuredAt = 0;
+
+  invalidate(): void {
+    this.point = null;
+  }
+
+  read(element: E | null, order: string, now: number, measure: (element: E) => Point): Point {
+    if (order !== this.order) {
+      if (this.order !== null) this.settleUntil = now + REORDER_SETTLE_MS;
+      this.order = order;
+      this.point = null;
+    }
+    if (element === null) {
+      this.element = null;
+      this.point = null;
+      return DEFAULT_ATTENTION_POINT;
+    }
+    if (
+      element !== this.element ||
+      this.point === null ||
+      now < this.settleUntil ||
+      now - this.measuredAt >= ATTENTION_POINT_MAX_AGE_MS
+    ) {
+      this.element = element;
+      this.point = measure(element);
+      this.measuredAt = now;
+    }
+    return this.point;
+  }
+}

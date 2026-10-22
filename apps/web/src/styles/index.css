@@ -382,7 +382,8 @@
   animation: crew-scan 1.1s var(--ease-in-out) infinite alternate;
 }
 
-/* Typing: alternating hand taps at 8 Hz between the two hands. */
+/* Typing: alternating hand taps at 8 Hz between the two hands, 4 Hz in a crowd (more than 10
+   crew on screen). Arms are HTML layers turning about the shoulder (set inline). */
 @keyframes crew-tap-l {
   50% {
     transform: rotate(-9deg);
@@ -398,11 +399,6 @@
     transform: rotate(-8deg);
   }
 }
-.crew-arm-l-typing,
-.crew-arm-r-typing,
-.crew-arm-r-waiting {
-  transform-origin: 50% 12%;
-}
 .crew-arm-l-typing {
   animation: crew-tap-l 0.25s linear infinite;
 }
@@ -412,6 +408,13 @@
 }
 .crew-arm-r-waiting {
   animation: crew-wave 2s var(--ease-in-out) infinite;
+}
+:root[data-crew-crowd] .crew-arm-l-typing {
+  animation-duration: 0.5s; /* loop: the crowd's half rate */
+}
+:root[data-crew-crowd] .crew-arm-r-typing {
+  animation-duration: 0.5s; /* loop: the crowd's half rate */
+  animation-delay: -0.25s;
 }
 
 @keyframes crew-rise {
@@ -695,7 +698,7 @@
 }
 
 /* Activity border, DESIGN.md §4.10: a soft light travels around the edge while the project
-   works. The ring is a 1px mask over a rotating conic layer, so each frame is one transform. */
+   works. The ring is a 1px mask over a rotating conic layer, spun on the compositor. */
 .pod-ring {
   position: absolute;
   inset: -1px;
@@ -726,11 +729,11 @@
     color-mix(in srgb, var(--accent) 70%, white) 88%,
     transparent 96%
   );
-  will-change: transform;
 }
-/* Reduced and Off: a still light where the spin would be. */
-.pod-ring[data-activity-border="still"] .pod-ring-light {
-  will-change: auto;
+/* Its own layer only while it spins (a WAAPI rotation); the still light at Reduced and Off and
+   a quiet pod's hidden ring cost no layer. */
+.pod-ring[data-activity-border="spin"] .pod-ring-light {
+  will-change: transform;
 }
 /* Wait and error own the border with their steady glow. */
 .pod[data-tone="wait"] .pod-ring,
@@ -908,6 +911,13 @@
 [data-motion="reduced"] .shimmer[data-shimmer]::after {
   animation: none;
   opacity: 0;
+}
+
+/* CSS loops (orb and pod breathing, shimmer) pause off screen, like the crew (`useInView`). */
+[data-offscreen],
+[data-offscreen]::before,
+[data-offscreen]::after {
+  animation-play-state: paused;
 }
 
 /* Focus view, DESIGN.md §4.6. The overview behind it holds still while it's covered. */

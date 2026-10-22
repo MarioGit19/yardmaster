@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../data/index.js';
 import { useMotionLevel } from '../motion.js';
+import { selectPodOrder } from '../pod/model.js';
 import { projectHref } from '../routes.js';
 import { useTheme } from '../theme/theme.js';
 import { ambientOverride } from './debug.js';
 import { grainUrl } from './grain.js';
 import { createFieldRenderer, FIELD_PALETTES } from './renderer.js';
 import {
+  AttentionPoint,
   activeSessionCount,
   approach,
   attentionProjectId,
@@ -71,6 +73,9 @@ export function AmbientField() {
   // Samples the board a few times a second into `target` and the CSS field's variables.
   useEffect(() => {
     const meter = new ThroughputMeter();
+    // The waiting pod's position is cached; only these, or a reorder, can move it.
+    const attentionPoint = new AttentionPoint<Element>();
+    const moved = () => attentionPoint.invalidate();
     const sample = () => {
       const { board } = store.getState();
       const override = ambientOverride.get();
@@ -80,12 +85,13 @@ export function AmbientField() {
         energyFrom(activeSessionCount(board), runningExecutionCount(board), rate);
       const projectId = attentionProjectId(board);
       const element = projectId === null ? null : attentionElement(projectId);
-      const point = element
-        ? viewportPoint(element.getBoundingClientRect(), {
-            width: window.innerWidth,
-            height: window.innerHeight,
-          })
-        : DEFAULT_ATTENTION_POINT;
+      const order = projectId === null ? '' : selectPodOrder(store.getState()).join(' ');
+      const point = attentionPoint.read(element, order, performance.now(), (target) =>
+        viewportPoint(target.getBoundingClientRect(), {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }),
+      );
       const attention = (override.attention ?? projectId !== null) ? 1 : 0;
       target.current = { energy, attention, ...point };
 
@@ -104,11 +110,17 @@ export function AmbientField() {
       if (!document.hidden) sample();
     }, SAMPLE_MS);
     const unsubscribe = ambientOverride.subscribe(sample);
-    window.addEventListener('resize', sample);
+    const resized = () => {
+      moved();
+      sample();
+    };
+    window.addEventListener('resize', resized);
+    window.addEventListener('scroll', moved, { capture: true, passive: true });
     return () => {
       clearInterval(timer);
       unsubscribe();
-      window.removeEventListener('resize', sample);
+      window.removeEventListener('resize', resized);
+      window.removeEventListener('scroll', moved, { capture: true });
     };
   }, [store]);
 

@@ -4,6 +4,7 @@ import { useInView } from '../anim/useFrame.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { cx } from '../ui/cx.js';
+import { useCrewCrowd } from './crowd.js';
 import {
   BLINK_EVERY_MS,
   between,
@@ -43,11 +44,15 @@ export interface CrewMascotProps {
 type EyeShape = 'open' | 'closed' | 'x' | 'worried';
 
 const ORB_Y = 17;
+/** Where each arm hangs from, in viewBox units: the top centre of its limb. */
+const SHOULDER = { l: { x: 23.5, y: 55.5 }, r: { x: 76.5, y: 55.5 } } as const;
 
 /**
  * The crew member, DESIGN.md §4.11: an original SVG character that acts out its session.
  * Poses blend through Motion variants; the repeating loops (breathing, taps, scanning) are
- * CSS keyframes, paused off screen and dropped at Reduced.
+ * CSS keyframes, paused off screen and dropped at Reduced. The fastest loops (typing arms, the
+ * terminal's scroll, the monitor's flicker) run on HTML layers, which the compositor animates,
+ * rather than inside the SVG, which would repaint every frame.
  */
 export function CrewMascot({
   state,
@@ -63,6 +68,7 @@ export function CrewMascot({
   const rootRef = useRef<HTMLSpanElement>(null);
   const inView = useInView(rootRef);
   const live = level === 'full' && inView;
+  useCrewCrowd(live);
   const detail = mascotDetail(size);
   const id = useId();
 
@@ -244,18 +250,9 @@ export function CrewMascot({
                   </Prop>
                 )}
               </AnimatePresence>
-
-              <motion.g variants={armLVariants} style={{ originX: 0.5, originY: 0.12 }}>
-                <g className={cx('crew-anim', `crew-arm-l-${shown}`)}>
-                  <rect x="19" y="53" width="9" height="21" rx="4.5" className="crew-limb" />
-                </g>
-              </motion.g>
-              <motion.g variants={armRVariants} style={{ originX: 0.5, originY: 0.12 }}>
-                <g className={cx('crew-anim', `crew-arm-r-${shown}`)}>
-                  <rect x="72" y="53" width="9" height="21" rx="4.5" className="crew-limb" />
-                </g>
-              </motion.g>
             </svg>
+            <Arm side="l" shown={shown} />
+            <Arm side="r" shown={shown} />
             <span
               className="absolute"
               style={{
@@ -280,8 +277,8 @@ export function CrewMascot({
         <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
           <AnimatePresence initial={false}>
             {shown === 'typing' && <Keyboard key="keys" detail={detail} color={color} />}
-            {shown === 'watching' && <Monitor key="mon" detail={detail} activity={activity} />}
-            {shown === 'running' && <TerminalProp key="term" detail={detail} clip={`${id}t`} />}
+            {shown === 'watching' && <Monitor key="mon" />}
+            {shown === 'running' && <TerminalProp key="term" />}
             {bubbles && shown === 'thinking' && <ThinkBubble key="think" />}
             {bubbles && shown === 'waiting' && <AlertBubble key="alert" />}
             {bubbles && shown === 'sleeping' && <Snore key="z" detail={detail} />}
@@ -292,6 +289,12 @@ export function CrewMascot({
 
       {props && (
         <span aria-hidden className="pointer-events-none absolute inset-0">
+          <AnimatePresence initial={false}>
+            {shown === 'watching' && (
+              <MonitorScreen key="mon" detail={detail} activity={activity} size={size} />
+            )}
+            {shown === 'running' && <TerminalScreen key="term" detail={detail} />}
+          </AnimatePresence>
           <AnimatePresence initial={false}>
             {Array.from({ length: minis }, (_, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: mini crew members are interchangeable.
@@ -350,6 +353,46 @@ function Eyes({ shape, color }: { shape: EyeShape; color: string }) {
   );
 }
 
+/**
+ * An arm on its own HTML layer over the body: its pose rotates it about the shoulder, and its
+ * loop (typing taps, the waiting wave) is a compositor transform.
+ */
+function Arm({ side, shown }: { side: 'l' | 'r'; shown: MascotState }) {
+  const shoulder = SHOULDER[side];
+  return (
+    <motion.div
+      aria-hidden
+      className="absolute inset-0"
+      style={{ originX: shoulder.x / 100, originY: shoulder.y / 100 }}
+      variants={side === 'l' ? armLVariants : armRVariants}
+    >
+      <div
+        className={cx('crew-anim absolute inset-0', `crew-arm-${side}-${shown}`)}
+        style={{ transformOrigin: `${shoulder.x}% ${shoulder.y}%` }}
+      >
+        <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
+          <rect x={shoulder.x - 4.5} y="53" width="9" height="21" rx="4.5" className="crew-limb" />
+        </svg>
+      </div>
+    </motion.div>
+  );
+}
+
+/** HTML parts of a prop enter and leave like `Prop`. */
+const PROP_LAYER = {
+  initial: { opacity: 0, scale: 0.92 },
+  animate: { opacity: 1, scale: 1, transition: spring.snappy },
+  exit: { opacity: 0, scale: 0.9, transition: { duration: dur.fast, ease: ease.out } },
+};
+
+/** Places an HTML layer over a viewBox rectangle (the mascot's box is square). */
+const box = (x: number, y: number, width: number, height: number): CSSProperties => ({
+  left: `${x}%`,
+  top: `${y}%`,
+  width: `${width}%`,
+  height: `${height}%`,
+});
+
 /** Props and bubbles enter and leave with a quick scale and fade. */
 function Prop({ children, origin = 'center' }: { children: ReactNode; origin?: string }) {
   return (
@@ -391,10 +434,7 @@ function Keyboard({ detail, color }: { detail: MascotDetail; color: string }) {
   );
 }
 
-function Monitor({ detail, activity }: { detail: MascotDetail; activity: number }) {
-  // Busier output, faster flicker: 1.2 s at rest down to 0.25 s.
-  const rate = Math.min(1, Math.max(0, activity));
-  const flicker = `${(1.2 - 0.95 * rate).toFixed(2)}s`;
+function Monitor() {
   return (
     <Prop>
       <line x1="16" y1="80" x2="16" y2="86" stroke="var(--line-strong)" strokeWidth="2" />
@@ -408,38 +448,49 @@ function Monitor({ detail, activity }: { detail: MascotDetail; activity: number 
         fill="var(--crew-visor)"
         className="crew-outline"
       />
-      <rect
-        x="4"
-        y="64"
-        width="24"
-        height="14"
-        rx="1.5"
-        fill="var(--st-ok)"
-        className="crew-anim crew-flicker"
-        style={{ animationDuration: flicker }}
-      />
-      {detail === 'detailed' && (
-        <g stroke="var(--crew-visor)" strokeWidth="1.2" opacity="0.7">
-          <line x1="7" y1="68" x2="20" y2="68" />
-          <line x1="7" y1="71.5" x2="24" y2="71.5" />
-          <line x1="7" y1="75" x2="16" y2="75" />
-        </g>
-      )}
     </Prop>
   );
 }
 
-function TerminalProp({ detail, clip }: { detail: MascotDetail; clip: string }) {
-  const lines = detail === 'detailed' ? [12, 8, 14, 6, 11, 9, 13, 7] : [12, 8, 14, 9];
-  // Two copies, so scrolling by half loops seamlessly.
-  const rows = [...lines, ...lines].map((w, i) => ({ w, y: 52 + i * 4.5, dim: i % 3 === 2 }));
+/** The monitor's screen, over the frame `Monitor` draws: its flicker is a compositor opacity. */
+function MonitorScreen({
+  detail,
+  activity,
+  size,
+}: {
+  detail: MascotDetail;
+  activity: number;
+  size: number;
+}) {
+  // Busier output, faster flicker: 1.2 s at rest down to 0.25 s.
+  const rate = Math.min(1, Math.max(0, activity));
+  const flicker = `${(1.2 - 0.95 * rate).toFixed(2)}s`;
+  return (
+    <motion.span className="absolute" style={box(4, 64, 24, 14)} {...PROP_LAYER}>
+      <span
+        className="crew-anim crew-flicker absolute inset-0"
+        style={{
+          background: 'var(--st-ok)',
+          borderRadius: (size * 1.5) / 100,
+          animationDuration: flicker,
+        }}
+      />
+      {detail === 'detailed' && (
+        <svg aria-hidden viewBox="0 0 24 14" className="absolute inset-0 size-full">
+          <g stroke="var(--crew-visor)" strokeWidth="1.2" opacity="0.7">
+            <line x1="3" y1="4" x2="16" y2="4" />
+            <line x1="3" y1="7.5" x2="20" y2="7.5" />
+            <line x1="3" y1="11" x2="12" y2="11" />
+          </g>
+        </svg>
+      )}
+    </motion.span>
+  );
+}
+
+function TerminalProp() {
   return (
     <Prop>
-      <defs>
-        <clipPath id={clip}>
-          <rect x="77" y="50" width="20" height="15" />
-        </clipPath>
-      </defs>
       <rect
         x="74"
         y="46"
@@ -449,19 +500,42 @@ function TerminalProp({ detail, clip }: { detail: MascotDetail; clip: string }) 
         fill="var(--crew-visor)"
         className="crew-outline"
       />
-      <g clipPath={`url(#${clip})`}>
-        <g
-          className="crew-anim crew-scroll"
+    </Prop>
+  );
+}
+
+const TERMINAL_LINE_GAP = 4.5;
+
+/** The terminal's output, scrolling inside the frame `TerminalProp` draws (compositor). */
+function TerminalScreen({ detail }: { detail: MascotDetail }) {
+  const lines = detail === 'detailed' ? [12, 8, 14, 6, 11, 9, 13, 7] : [12, 8, 14, 9];
+  // Two copies, so scrolling by half loops seamlessly.
+  const rows = [...lines, ...lines].map((w, i) => ({
+    w,
+    y: 2 + i * TERMINAL_LINE_GAP,
+    dim: i % 3 === 2,
+  }));
+  const height = rows.length * TERMINAL_LINE_GAP;
+  return (
+    <motion.span className="absolute overflow-hidden" style={box(77, 50, 20, 15)} {...PROP_LAYER}>
+      <span
+        className="crew-anim crew-scroll absolute inset-x-0 top-0"
+        style={{ height: `${(height / 15) * 100}%` }}
+      >
+        <svg
+          aria-hidden
+          viewBox={`0 0 20 ${height}`}
+          className="absolute inset-0 size-full"
           stroke="var(--st-tool)"
           strokeWidth="1.6"
           strokeLinecap="round"
         >
           {rows.map(({ w, y, dim }) => (
-            <line key={y} x1="78" y1={y} x2={78 + w} y2={y} opacity={dim ? 0.5 : 0.9} />
+            <line key={y} x1="1" y1={y} x2={1 + w} y2={y} opacity={dim ? 0.5 : 0.9} />
           ))}
-        </g>
-      </g>
-    </Prop>
+        </svg>
+      </span>
+    </motion.span>
   );
 }
 

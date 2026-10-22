@@ -1,9 +1,10 @@
 import type { ClaudeSession, Project, Terminal } from '@c-board/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
-import { type PointerEvent, useRef, useState } from 'react';
+import { type PointerEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
+import { useInView } from '../anim/useFrame.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { type CrewTerminal, miniCrewCount } from '../crew/model.js';
 import {
@@ -87,14 +88,32 @@ export function ProjectPod({ project }: { project: Project }) {
   const spotRef = useRef<HTMLDivElement>(null);
   // While it morphs back from the focus view, the pod flies over its neighbours.
   const podRef = useRef<HTMLElement>(null);
+  // A waiting pod's breathing glow pauses off screen.
+  const onScreen = useInView(podRef);
   const raise = (on: boolean) => {
     const slot = podRef.current?.parentElement;
     if (slot) slot.style.zIndex = on ? '20' : '';
   };
+  // The pod's box, measured on pointer enter rather than per move; a scroll, a resize or a
+  // layout animation moves the pod, so they drop it and the next move measures again.
+  const spotBox = useRef<DOMRect | null>(null);
+  useEffect(() => {
+    if (!engaged) return;
+    const forget = () => {
+      spotBox.current = null;
+    };
+    window.addEventListener('resize', forget);
+    window.addEventListener('scroll', forget, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('resize', forget);
+      window.removeEventListener('scroll', forget, { capture: true });
+    };
+  }, [engaged]);
   const onPointerMove = (e: PointerEvent<HTMLElement>) => {
     const spot = spotRef.current;
     if (!spot || e.pointerType !== 'mouse') return;
-    const box = e.currentTarget.getBoundingClientRect();
+    spotBox.current ??= e.currentTarget.getBoundingClientRect();
+    const box = spotBox.current;
     const x = e.clientX - box.left - SPOTLIGHT_PX / 2;
     const y = e.clientY - box.top - SPOTLIGHT_PX / 2;
     spot.style.transform = `translate3d(${x}px, ${y}px, 0)`;
@@ -108,20 +127,30 @@ export function ProjectPod({ project }: { project: Project }) {
       layoutId={sharedId.container(project.id)}
       layoutDependency={POD_LAYOUT_DEPENDENCY}
       transition={spring.smooth}
-      onPointerEnter={() => setEngaged(true)}
+      onPointerEnter={(e) => {
+        spotBox.current = e.currentTarget.getBoundingClientRect();
+        setEngaged(true);
+      }}
       onPointerLeave={() => setEngaged(false)}
       onFocus={() => setEngaged(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEngaged(false);
       }}
-      onLayoutAnimationStart={() => raise(true)}
-      onLayoutAnimationComplete={() => raise(false)}
+      onLayoutAnimationStart={() => {
+        spotBox.current = null;
+        raise(true);
+      }}
+      onLayoutAnimationComplete={() => {
+        spotBox.current = null;
+        raise(false);
+      }}
       ref={podRef}
       data-pod={project.id}
       data-tone={tone}
       data-crashed={crashed || undefined}
       data-dim={dim || undefined}
       data-faded={faded || undefined}
+      data-offscreen={!onScreen || undefined}
       aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
       onPointerMove={onPointerMove}
       style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}

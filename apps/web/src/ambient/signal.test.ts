@@ -2,12 +2,15 @@ import type { Approval, Execution } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession, sampleBoard } from '../test/board.js';
 import {
+  ATTENTION_POINT_MAX_AGE_MS,
+  AttentionPoint,
   activeSessionCount,
   approach,
   attentionProjectId,
   DEFAULT_ATTENTION_POINT,
   energyFrom,
   frameDue,
+  REORDER_SETTLE_MS,
   runningExecutionCount,
   ThroughputMeter,
   totalOutputBytes,
@@ -199,5 +202,63 @@ describe('viewportPoint', () => {
     expect(viewportPoint({ left: 0, top: 0, width: 1, height: 1 }, { width: 0, height: 0 })).toBe(
       DEFAULT_ATTENTION_POINT,
     );
+  });
+});
+
+describe('AttentionPoint', () => {
+  const pod = { id: 'pod' };
+  const other = { id: 'other' };
+  const counting = () => {
+    let calls = 0;
+    return {
+      measure: () => {
+        calls++;
+        return { x: calls / 10, y: 0.5 };
+      },
+      calls: () => calls,
+    };
+  };
+
+  it('measures once per element until invalidated', () => {
+    const point = new AttentionPoint<object>();
+    const m = counting();
+    expect(point.read(pod, 'a', 0, m.measure)).toEqual({ x: 0.1, y: 0.5 });
+    point.read(pod, 'a', 250, m.measure);
+    point.read(pod, 'a', 500, m.measure);
+    expect(m.calls()).toBe(1);
+    point.invalidate();
+    expect(point.read(pod, 'a', 750, m.measure)).toEqual({ x: 0.2, y: 0.5 });
+    point.read(other, 'a', 1000, m.measure);
+    expect(m.calls()).toBe(3);
+  });
+
+  it('keeps measuring while the pods reorder, then settles', () => {
+    const point = new AttentionPoint<object>();
+    const m = counting();
+    point.read(pod, 'a', 0, m.measure);
+    point.read(pod, 'b', 100, m.measure);
+    point.read(pod, 'b', 350, m.measure);
+    point.read(pod, 'b', 100 + REORDER_SETTLE_MS - 1, m.measure);
+    expect(m.calls()).toBe(4);
+    point.read(pod, 'b', 100 + REORDER_SETTLE_MS, m.measure);
+    point.read(pod, 'b', 100 + REORDER_SETTLE_MS + 250, m.measure);
+    expect(m.calls()).toBe(4);
+  });
+
+  it('refreshes a point that has grown old', () => {
+    const point = new AttentionPoint<object>();
+    const m = counting();
+    point.read(pod, 'a', 0, m.measure);
+    point.read(pod, 'a', ATTENTION_POINT_MAX_AGE_MS - 1, m.measure);
+    expect(m.calls()).toBe(1);
+    point.read(pod, 'a', ATTENTION_POINT_MAX_AGE_MS, m.measure);
+    expect(m.calls()).toBe(2);
+  });
+
+  it('falls back without an element', () => {
+    const point = new AttentionPoint<object>();
+    const m = counting();
+    expect(point.read(null, 'a', 0, m.measure)).toBe(DEFAULT_ATTENTION_POINT);
+    expect(m.calls()).toBe(0);
   });
 });

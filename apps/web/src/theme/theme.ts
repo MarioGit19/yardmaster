@@ -25,8 +25,13 @@ export function resolveTheme(setting: ThemeSetting, prefersLight: boolean): Them
   return setting;
 }
 
-/** Dark is the default, so only light sets the attribute. */
+/**
+ * Dark is the default, so only light sets the attribute. Touches the DOM only when the theme
+ * actually changes, so callers that must apply it before drawing can call it freely.
+ */
 export function applyTheme(root: HTMLElement, theme: Theme): void {
+  const applied: Theme = root.dataset.theme === 'light' ? 'light' : 'dark';
+  if (applied === theme) return;
   if (theme === 'light') root.dataset.theme = 'light';
   else delete root.dataset.theme;
 }

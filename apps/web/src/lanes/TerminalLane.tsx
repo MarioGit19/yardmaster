@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNow } from '../anim/clock.js';
+import { useInView } from '../anim/useFrame.js';
 import { type RateLoopSpec, useRateLoop } from '../anim/useRateLoop.js';
 import {
   activityKey,
@@ -94,7 +95,9 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   };
 
   const streaming = level > 0;
-  useRateLoop(rowRef, COMET, COMET_RATE[level], streaming && !still);
+  // The comet and the dot's pulse run only on screen.
+  const onScreen = useInView(rowRef);
+  useRateLoop(rowRef, COMET, COMET_RATE[level], streaming && !still && onScreen);
   const [port, ...morePorts] = ports;
 
   return (
@@ -235,7 +238,8 @@ function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 })
   const ref = useRef<HTMLSpanElement>(null);
   const full = useMotionLevel() === 'full';
   const pulsing = running && level > 0;
-  useRateLoop(ref, PULSE, PULSE_RATE[level], pulsing && full);
+  const onScreen = useInView(ref);
+  useRateLoop(ref, PULSE, PULSE_RATE[level], pulsing && full && onScreen);
   return (
     <span
       ref={ref}

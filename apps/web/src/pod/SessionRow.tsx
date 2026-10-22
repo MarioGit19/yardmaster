@@ -1,5 +1,7 @@
 import type { ClaudeSession } from '@c-board/protocol';
 import { motion } from 'motion/react';
+import { useRef } from 'react';
+import { useInView } from '../anim/useFrame.js';
 import { selectApproval, useBoard } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { spring } from '../motion.js';
@@ -20,6 +22,8 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
   const approval = useBoard(selectApproval(approvalId ?? ''));
   const caption = sessionCaption(session, approval);
   const line = lastLine(session.lastAssistantText);
+  const lineRef = useRef<HTMLParagraphElement>(null);
+  const lineOnScreen = useInView(lineRef);
   const title = session.title?.trim() || null;
   // Untitled sessions with no reply yet would read the same: their start time and short id
   // (what `claude --resume` takes) tell them apart.
@@ -69,8 +73,10 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
           )}
         </div>
         <p
+          ref={lineRef}
           dir="auto"
           data-shimmer={(streaming && line !== null) || undefined}
+          data-offscreen={!lineOnScreen || undefined}
           title={line ?? undefined}
           className="shimmer relative truncate text-label text-text-2"
         >

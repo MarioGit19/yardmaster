@@ -18,7 +18,7 @@ import { resolveColor } from '../orb/colors.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
 import { terminalTarget } from '../terminal/target.js';
-import { useTheme } from '../theme/theme.js';
+import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
 import {
@@ -72,9 +72,22 @@ const rgba = (value: string, alpha: number) => {
   return `rgb(${r} ${g} ${b} / ${alpha})`;
 };
 
-/** A token's computed value, alpha included (the hairline tokens are translucent). */
-const token = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || 'transparent';
+const tokenCache = new Map<string, string>();
+
+/**
+ * A token's computed value, alpha included (the hairline tokens are translucent). Read once per
+ * applied theme, like `resolveColor`, so a redraw never recalculates styles.
+ */
+function token(name: string): string {
+  const key = `${document.documentElement.dataset.theme ?? 'dark'}|${name}`;
+  let value = tokenCache.get(key);
+  if (value === undefined) {
+    value =
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim() || 'transparent';
+    tokenCache.set(key, value);
+  }
+  return value;
+}
 
 function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): string {
   if (ctx.measureText(text).width <= max) return text;
@@ -378,6 +391,8 @@ function PulsePlot() {
     canvas.height = Math.round(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    // useTheme applies a new theme in an effect, after this one; the tokens must match it now.
+    applyTheme(document.documentElement, theme);
     draw();
   }, [width, height, dpr, filter, level, active, theme, draw]);
 

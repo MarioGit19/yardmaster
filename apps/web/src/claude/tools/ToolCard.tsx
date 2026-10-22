@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, type ReactNode, useId, useMemo, useRef } from 'react';
+import { useInView } from '../../anim/useFrame.js';
 import { dur, ease, useMotionLevel } from '../../motion.js';
 import { usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
@@ -793,9 +794,7 @@ function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
         )}
         {row.result === null ? (
           <p className="text-body-sm text-text-2">
-            <span data-shimmer className="shimmer relative inline-block overflow-hidden">
-              Subagent working…
-            </span>
+            <Shimmer>Subagent working…</Shimmer>
           </p>
         ) : row.result.isError ? (
           <ResultText text={stripAnsi(row.result.text)} tone="error" />
@@ -849,5 +848,21 @@ function OtherCard({ row, cwd }: CardProps) {
         </div>
       )}
     </Card>
+  );
+}
+
+/** A label that shimmers while its work runs; the sweep pauses off screen. */
+function Shimmer({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const onScreen = useInView(ref);
+  return (
+    <span
+      ref={ref}
+      data-shimmer
+      data-offscreen={!onScreen || undefined}
+      className="shimmer relative inline-block overflow-hidden"
+    >
+      {children}
+    </span>
   );
 }

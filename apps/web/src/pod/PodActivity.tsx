@@ -18,11 +18,19 @@ const MAX_SPARKS = 5;
 const SPARK_MS = moment.spark * 1000;
 /** Where the border light starts, so a fresh pod's light isn't always at the same spot. */
 const START_ANGLE = 210;
+const CENTER = 'translate(-50%, -50%)';
+
+/** One turn of the light at playback rate 1, so the rate is the speed in units of 36°/s. */
+const TURN_MS = 10_000;
+const BASE_SPEED = 360 / (TURN_MS / 1000);
+/** Smaller changes than these aren't pushed to the compositor or the style. */
+const RATE_STEP = 0.01;
+const OPACITY_STEP = 0.01;
 
 /**
- * The rotating border light. Runs on the shared scheduler only while the project is busy and on
- * screen; its speed and brightness follow the activity level every frame. Reduced and Off show
- * a still light instead.
+ * The rotating border light. The spin is a WAAPI rotation on the compositor; while the project
+ * is busy and on screen, a frame callback eases its speed and brightness toward the activity
+ * level and pushes them only when they change. Reduced and Off show a still light instead.
  */
 export function ActivityBorder({ pulseKey, working }: { pulseKey: string; working: number }) {
   const store = useBoardStore();
@@ -32,22 +40,62 @@ export function ActivityBorder({ pulseKey, working }: { pulseKey: string; workin
   const ringRef = useRef<HTMLDivElement>(null);
   const lightRef = useRef<HTMLDivElement>(null);
   const visible = useInView(ringRef);
-  const angle = useRef(START_ANGLE);
+  const spin = useRef<Animation | null>(null);
   const speed = useRef(0);
+  const pushed = useRef({ rate: 0, opacity: -1 });
   const spinning = active && motion === 'full';
+
+  useEffect(() => {
+    const light = lightRef.current;
+    if (!spinning || !light || typeof light.animate !== 'function') return;
+    const loop = light.animate(
+      // motion-still: the spin only runs at Full; Reduced and Off render the still light.
+      [{ transform: `${CENTER} rotate(0deg)` }, { transform: `${CENTER} rotate(360deg)` }],
+      { duration: TURN_MS, iterations: Number.POSITIVE_INFINITY },
+    );
+    loop.finished?.catch(() => {});
+    loop.currentTime = (START_ANGLE / 360) * TURN_MS;
+    loop.playbackRate = 0;
+    pushed.current = { rate: 0, opacity: -1 };
+    spin.current = loop;
+    return () => {
+      // The still light stays where the spin left it.
+      const at = Number(loop.currentTime ?? 0) % TURN_MS;
+      light.style.transform = `${CENTER} rotate(${(at / TURN_MS) * 360}deg)`;
+      loop.cancel();
+      spin.current = null;
+    };
+  }, [spinning]);
 
   useFrame(
     (_now, dt) => {
       const level = levelAt(store.getState().pulses[pulseKey], Date.now());
       speed.current = approach(speed.current, borderSpeed(level, working), dt);
-      angle.current = (angle.current + (speed.current * dt) / 1000) % 360;
-      const light = lightRef.current;
+      const rate = speed.current / BASE_SPEED;
+      const opacity = borderOpacity(Math.max(level, working > 0 ? 0.3 : 0));
+      const last = pushed.current;
+      const loop = spin.current;
+      if (loop && Math.abs(rate - last.rate) >= RATE_STEP * Math.max(1, last.rate)) {
+        loop.updatePlaybackRate(rate);
+        last.rate = rate;
+      }
       const ring = ringRef.current;
-      if (light) light.style.transform = `translate(-50%, -50%) rotate(${angle.current}deg)`;
-      if (ring) ring.style.opacity = String(borderOpacity(Math.max(level, working > 0 ? 0.3 : 0)));
+      if (ring && Math.abs(opacity - last.opacity) >= OPACITY_STEP) {
+        ring.style.opacity = opacity.toFixed(3);
+        last.opacity = opacity;
+      }
     },
     { visible, enabled: spinning },
   );
+
+  useEffect(() => {
+    // Off screen the light holds still; back on screen it eases up to speed again.
+    if (!visible && spin.current) {
+      spin.current.updatePlaybackRate(0);
+      pushed.current.rate = 0;
+      speed.current = 0;
+    }
+  }, [visible]);
 
   useEffect(() => {
     // Leaving the spin (quiet, or the motion level changed) hands opacity back to CSS.
@@ -65,7 +113,7 @@ export function ActivityBorder({ pulseKey, working }: { pulseKey: string; workin
       <div
         ref={lightRef}
         className="pod-ring-light"
-        style={{ transform: `translate(-50%, -50%) rotate(${angle.current}deg)` }}
+        style={{ transform: `${CENTER} rotate(${START_ANGLE}deg)` }}
       />
     </div>
   );

@@ -185,6 +185,7 @@ export function ClaudeOrb({
       <canvas
         ref={canvasRef}
         aria-hidden
+        data-offscreen={!inView || undefined}
         className={cx(
           'pointer-events-none absolute',
           state === 'idle' && satellites === 0 && 'orb-breathe',

@@ -68,7 +68,6 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     if (!canvas || !ring || !size || size.width === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    if (typeof document !== 'undefined') applyTheme(document.documentElement, theme);
     const [r, g, b] = resolveColor(tint);
     const { width, height } = size;
     const step = sparkStep(width);
@@ -120,6 +119,10 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     ringRef.current = ring;
     if (live.current.inView) drawRef.current(live.current.moving);
   });
+
+  // useTheme applies a new theme in an effect, after the redraw below; the colors the draw
+  // resolves must already match it. Once per theme change, not per sample.
+  useLayoutEffect(() => applyTheme(document.documentElement, theme), [theme]);
 
   // Size, color, theme or motion changed, or the sparkline came back on screen.
   // biome-ignore lint/correctness/useExhaustiveDependencies: redraw whenever any drawn input changes.

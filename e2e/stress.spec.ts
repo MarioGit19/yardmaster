@@ -1,12 +1,15 @@
 import type { Page } from '@playwright/test';
 import { type DemoBoard, startBoard } from './board.js';
 import { test as base, expect, signedInState } from './fixtures.js';
+import { formatMainThread, mainThread } from './perf.js';
 
 // PRD §9 on the `--demo-stress` board: 10 projects × 6 terminals, two log firehoses at about
 // 200 lines/s and four Claude sessions at about 5 tool calls/s, every animation running.
 const SAMPLE_MS = 10_000;
 const MIN_FPS = 55;
 const LONG_TASK_MS = 50;
+/** The overview may keep the main thread busy for at most this share of the wall clock. */
+const MAX_MAIN_THREAD_SHARE = 0.6;
 
 /** One stress board for this file, so its load is the only one the browser sees. */
 let board: DemoBoard | undefined;
@@ -98,6 +101,17 @@ test('@perf overview keeps 55 fps under the stress load', async ({ page }) => {
   report('overview', stats);
   expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
   expect(stats.longTasks).toEqual([]);
+});
+
+test('@perf overview main-thread time under the stress load', async ({ page }) => {
+  test.slow();
+  await fullMotion(page);
+  await page.goto('/#/');
+  await warmUp(page);
+
+  const stats = await mainThread(page, SAMPLE_MS);
+  console.log(`stress main thread: ${formatMainThread(stats)}`);
+  expect(stats.task).toBeLessThan(1000 * MAX_MAIN_THREAD_SHARE);
 });
 
 test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ page }) => {
