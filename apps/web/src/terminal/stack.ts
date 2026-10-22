@@ -86,9 +86,10 @@ const ERRORS: Record<string, string> = {
   offline: 'c-board is offline',
   disconnected: 'c-board is offline',
   timeout: 'No answer from c-board',
+  not_implemented: 'Not available yet',
 };
 
 /** A server error code as a sentence for a toast. */
-export function actionErrorText(code: string): string {
-  return ERRORS[code] ?? 'The terminal command failed';
+export function actionErrorText(code: string, fallback = 'The terminal command failed'): string {
+  return ERRORS[code] ?? fallback;
 }

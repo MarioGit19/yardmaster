@@ -5,6 +5,13 @@ export const THEME_SETTINGS = ['dark', 'light', 'system'] as const;
 export type ThemeSetting = (typeof THEME_SETTINGS)[number];
 export type Theme = 'dark' | 'light';
 
+/** The next setting in the HUD toggle's cycle. */
+export const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = {
+  dark: 'light',
+  light: 'system',
+  system: 'dark',
+};
+
 export const PREFERS_LIGHT = '(prefers-color-scheme: light)';
 
 export const themePreference = createPreference<ThemeSetting>(

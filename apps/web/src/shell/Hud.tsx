@@ -8,11 +8,12 @@ import {
   useBoard,
   useBoardShallow,
 } from '../data/index.js';
-import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
+import { type MotionSetting, motionPreference, nextMotion } from '../motion.js';
+import { paletteOpen } from '../palette/palette.js';
 import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
 import { formatCount, type Tone } from '../status.js';
-import { type ThemeSetting, useTheme } from '../theme/theme.js';
+import { NEXT_THEME, type ThemeSetting, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Kbd } from '../ui/Kbd.js';
@@ -20,11 +21,6 @@ import { NumberTicker } from '../ui/NumberTicker.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { selectHudCounts } from './counts.js';
 
-const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = {
-  dark: 'light',
-  light: 'system',
-  system: 'dark',
-};
 const THEME_ICON = { dark: Moon, light: Sun, system: Monitor } as const;
 const THEME_NAME: Record<ThemeSetting, string> = {
   dark: 'Dark',
@@ -44,8 +40,6 @@ const MOTION_NAME: Record<MotionSetting, string> = {
   reduced: 'Reduced',
   off: 'Off',
 };
-const nextMotion = (setting: MotionSetting): MotionSetting =>
-  MOTION_SETTINGS[(MOTION_SETTINGS.indexOf(setting) + 1) % MOTION_SETTINGS.length] ?? 'system';
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -124,10 +118,17 @@ export function Hud() {
       <div className="flex-1" />
       <Connection />
       <Tooltip content="Command palette">
-        <span className="flex items-center gap-0.5 max-md:hidden" data-hud="palette-hint">
+        <button
+          type="button"
+          aria-label="Open the command palette"
+          aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
+          onClick={() => paletteOpen.set('open')}
+          className="flex items-center gap-0.5 rounded-control p-1 transition-colors duration-150 hover:bg-bg-2 max-md:hidden"
+          data-hud="palette-hint"
+        >
           <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd>
           <Kbd>K</Kbd>
-        </span>
+        </button>
       </Tooltip>
       <div className="flex items-center gap-1">
         <IconButton

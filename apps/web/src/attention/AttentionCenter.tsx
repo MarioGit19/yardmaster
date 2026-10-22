@@ -55,7 +55,7 @@ function SheetBody() {
     const opener = document.activeElement;
     heading.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || isTypingTarget(event.target)) return;
+      if (event.key !== 'Escape' || event.defaultPrevented || isTypingTarget(event.target)) return;
       event.preventDefault();
       close();
     };

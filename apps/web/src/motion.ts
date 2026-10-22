@@ -25,6 +25,10 @@ export type MotionLevel = Exclude<MotionSetting, 'system'>;
 
 export const PREFERS_REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
+/** The next setting in the HUD toggle's cycle. */
+export const nextMotion = (setting: MotionSetting): MotionSetting =>
+  MOTION_SETTINGS[(MOTION_SETTINGS.indexOf(setting) + 1) % MOTION_SETTINGS.length] ?? 'system';
+
 export const motionPreference = createPreference<MotionSetting>(
   'cboard.motion',
   MOTION_SETTINGS,

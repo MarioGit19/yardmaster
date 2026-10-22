@@ -23,6 +23,7 @@ import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
+import { useTerminalTarget } from '../terminal/target.js';
 import { buttonClass } from '../ui/Button.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
@@ -93,6 +94,7 @@ function ProjectFocus({
   const session = selected?.projectId === project.id ? selected : sessionId ? undefined : live[0];
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
+  const terminalRequested = useTerminalTarget(project.id) !== null;
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -170,6 +172,7 @@ function ProjectFocus({
       <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
         {tabs ? (
           <FocusTabs
+            show={terminalRequested ? 'terminals' : null}
             panels={[
               { id: 'sessions', label: 'Sessions', content: sessionsColumn },
               { id: 'claude', label: 'Claude', content: claudeColumn },
@@ -198,8 +201,12 @@ interface TabPanel {
 }
 
 /** Narrow screens: one column at a time, Claude first. */
-function FocusTabs({ panels }: { panels: TabPanel[] }) {
-  const [active, setActive] = useState('claude');
+function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }) {
+  const [active, setActive] = useState(show ?? 'claude');
+  // A panel asked for from outside (a terminal picked in ⌘K).
+  useEffect(() => {
+    if (show) setActive(show);
+  }, [show]);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const index = Math.max(
     0,

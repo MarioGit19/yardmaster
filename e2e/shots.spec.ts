@@ -401,3 +401,65 @@ test.describe('tool cards', () => {
     await section.screenshot({ path: new URL('tool-cards-enter-mid.png', OUT_DIR).pathname });
   });
 });
+
+// The command palette: browsing over the overview, a fuzzy search in the focus view, the
+// new-session prompt, the phone layout and a frame of the entrance.
+test.describe('command palette', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test.describe(`${viewport.width}`, () => {
+          test.use({ theme, viewport });
+          test('palette', async ({ page }) => {
+            const shot = (name: string) =>
+              page.screenshot({
+                path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+                animations: 'disabled',
+              });
+            const palette = page.getByRole('dialog', { name: 'Command palette' });
+            const input = palette.getByRole('combobox');
+
+            await openRoute(page, '/');
+            await page.waitForTimeout(600);
+            await page.keyboard.press('ControlOrMeta+K');
+            await expect(palette).toBeVisible();
+            await page.waitForTimeout(400);
+            await shot('palette-browse');
+
+            await input.fill('acme');
+            await page.waitForTimeout(200);
+            await shot('palette-search');
+            await page.keyboard.press('Escape');
+
+            await openRoute(page, await firstProjectRoute(page));
+            await page.waitForTimeout(800);
+            await page.keyboard.press('ControlOrMeta+K');
+            await input.fill('re');
+            await page.waitForTimeout(300);
+            await shot('palette-focus');
+
+            await input.fill('new session');
+            await page.keyboard.press('Enter');
+            await page.keyboard.type('Add a coupon field to the checkout');
+            await page.waitForTimeout(200);
+            await shot('palette-prompt');
+            await page.keyboard.press('Escape');
+            await page.keyboard.press('Escape');
+            await expect(palette).toBeHidden();
+
+            if (viewport.width === 1440) {
+              await page.keyboard.press('ControlOrMeta+K');
+              await page.waitForTimeout(70);
+              await page.screenshot({
+                path: new URL(`palette-enter-mid-${theme}.png`, OUT_DIR).pathname,
+              });
+            }
+          });
+        });
+      }
+    });
+  }
+});

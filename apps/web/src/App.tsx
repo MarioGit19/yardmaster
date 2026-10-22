@@ -6,6 +6,7 @@ import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { MotionRoot } from './MotionRoot.js';
+import { CommandPalette } from './palette/CommandPalette.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
@@ -68,6 +69,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
       <TooltipProvider>
         <Router hook={locationHook}>
           <AppRoutes />
+          <CommandPalette />
         </Router>
         <Toasts />
         <LiveFavicon />

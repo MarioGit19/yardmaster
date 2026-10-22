@@ -7,7 +7,7 @@ export function ProjectAvatar({
   size = 'md',
 }: {
   project: Pick<Project, 'name' | 'accent'>;
-  size?: 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
 }) {
   const initial = Array.from(project.name.trim())[0]?.toUpperCase() ?? '?';
   return (
@@ -16,7 +16,9 @@ export function ProjectAvatar({
       style={{ '--ring': `var(--accent-${project.accent})` } as React.CSSProperties}
       className={cx(
         'grid shrink-0 place-items-center rounded-full bg-bg-2 font-mono font-medium text-text-1 shadow-[inset_0_0_0_1.5px_var(--ring)]',
-        size === 'md' ? 'size-6 text-meta' : 'size-10 text-title-sm',
+        size === 'sm' && 'size-5 text-meta',
+        size === 'md' && 'size-6 text-meta',
+        size === 'lg' && 'size-10 text-title-sm',
       )}
     >
       {initial}

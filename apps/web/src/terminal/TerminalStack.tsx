@@ -40,6 +40,7 @@ import {
   stackOrder,
   stepTab,
 } from './stack.js';
+import { terminalTarget, useTerminalTarget } from './target.js';
 import type { XtermController } from './XtermView.js';
 
 // xterm and its renderers load with the first focus view, not with the overview.
@@ -75,6 +76,13 @@ export function TerminalStack({
   }, [renderersReady]);
   const ordered = useMemo(() => stackOrder(terminals), [terminals]);
   const [chosen, setChosen] = useState<string | null>(null);
+  // A terminal picked in ⌘K opens here once.
+  const target = useTerminalTarget(projectId);
+  useEffect(() => {
+    if (target === null || !ordered.some((t) => t.id === target)) return;
+    setChosen(target);
+    terminalTarget.set(null);
+  }, [target, ordered]);
   const activeId = resolveActive(ordered, chosen);
   const active = ordered.find((t) => t.id === activeId) ?? null;
   const layout = usePreference(stackLayoutPreference);
