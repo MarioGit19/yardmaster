@@ -46,7 +46,9 @@ import {
   DemoTranscripts,
   demoAssistantText,
   demoHistory,
+  demoTodos,
   demoToolCall,
+  TODO_RESULT,
 } from './transcripts.js';
 
 /** PRD F12: a permission request roughly every 45 s. */
@@ -140,6 +142,7 @@ export class DemoSimulator {
   private readonly ports = new Map<string, PortBinding>();
   private running = false;
   private longHistory = false;
+  private todoCalls = 0;
   private seq = 0;
 
   constructor(options: DemoSimulatorOptions) {
@@ -548,6 +551,7 @@ export class DemoSimulator {
         text: `I'll start with the todo list: ${scenario.todos.join('; ')}.`,
       });
     }
+    this.todoWrite(session, scenario, 0);
     session.timer = this.after(this.rng.int(600, 1_500), () => this.nextStep(session));
   }
 
@@ -563,10 +567,13 @@ export class DemoSimulator {
       this.compact(session, { kind: 'working' });
       return;
     }
+    const before = this.doneTodos(turn.scenario, turn.done / turn.steps);
     turn.done += 1;
     this.store.updateSession(session.id, {
       todos: this.todos(turn.scenario, turn.done / turn.steps),
     });
+    const after = this.doneTodos(turn.scenario, turn.done / turn.steps);
+    if (after !== before) this.todoWrite(session, turn.scenario, after);
     if (this.rng.chance(0.3)) {
       this.streamText(session, this.rng.pick(turn.scenario.texts));
     } else {
@@ -613,7 +620,7 @@ export class DemoSimulator {
     });
     if (tool.tool === 'Task') this.spawnSubagent(session, tool.summary);
     const call = demoToolCall(session.project.def, tool, this.textRng);
-    this.transcript(session, { kind: 'tool_use', toolUseId, name: tool.tool, input: call.input });
+    this.transcript(session, { kind: 'tool_use', toolUseId, name: call.name, input: call.input });
 
     const duration = tool.tool === 'Bash' ? this.rng.int(2_000, 7_000) : this.rng.int(500, 3_000);
     session.terminal.busyUntil = this.now() + duration;
@@ -622,7 +629,7 @@ export class DemoSimulator {
       this.transcript(session, {
         kind: 'tool_result',
         toolUseId,
-        text: failed ? `Error: ${tool.tool} failed` : call.result,
+        text: failed ? call.error : call.result,
         isError: failed,
       });
       this.activity(failed ? 'tool.error' : 'tool.end', session, `${tool.tool} ${tool.summary}`, {
@@ -936,8 +943,21 @@ export class DemoSimulator {
     };
   }
 
+  private doneTodos(scenario: DemoScenario, progress: number): number {
+    return Math.min(scenario.todos.length, Math.floor(progress * scenario.todos.length));
+  }
+
+  /** Mirrors a todo update into the transcript as a TodoWrite call. */
+  private todoWrite(session: SessionCtx, scenario: DemoScenario, done: number): void {
+    if (scenario.todos.length === 0) return;
+    const toolUseId = `toolu_demo_todo_${(this.todoCalls++).toString(36)}`;
+    const input = demoTodos(scenario, done);
+    this.transcript(session, { kind: 'tool_use', toolUseId, name: 'TodoWrite', input });
+    this.transcript(session, { kind: 'tool_result', toolUseId, text: TODO_RESULT, isError: false });
+  }
+
   private todos(scenario: DemoScenario, progress: number): ClaudeSession['todos'] {
-    const doneCount = Math.min(scenario.todos.length, Math.floor(progress * scenario.todos.length));
+    const doneCount = this.doneTodos(scenario, progress);
     return scenario.todos.map((content, index) => ({
       content,
       status: index < doneCount ? 'completed' : index === doneCount ? 'in_progress' : 'pending',

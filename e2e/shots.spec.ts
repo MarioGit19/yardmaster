@@ -271,6 +271,8 @@ test.describe('terminal stack', () => {
     test.describe(theme, () => {
       test.use({ theme, viewport: { width: 1440, height: 900 } });
       test('stack', async ({ page }) => {
+        // Many steps, and it shares the CPU with the other shots.
+        test.slow();
         await openRoute(page, '/');
         await openRoute(page, await firstProjectRoute(page));
         const stack = page.locator('[data-terminal-stack]');
@@ -356,4 +358,46 @@ test.describe('claude panel', () => {
       }
     });
   }
+});
+
+// Every tool card variant on /_tokens: as they first render, then opened with the split diff.
+test.describe('tool cards', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const showcase = (page: import('@playwright/test').Page) =>
+    page.locator('section', { has: page.getByRole('heading', { name: 'Tool cards' }) });
+
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+      test('showcase', async ({ page }) => {
+        await page.goto('/#/_tokens');
+        const section = showcase(page);
+        await section.scrollIntoViewIfNeeded();
+        await expect(section.locator('[data-tool-kind]')).toHaveCount(14);
+        // Code highlights in a worker; give it a moment.
+        await expect(
+          section.locator('[data-tool-kind="edit"] [data-diff] span[style]').first(),
+        ).toBeVisible();
+        await page.waitForTimeout(400);
+        await section.screenshot({ path: new URL(`tool-cards-${theme}.png`, OUT_DIR).pathname });
+
+        const closed = section.locator('button[aria-expanded="false"]:not([disabled])');
+        for (let i = 0; i < 20 && (await closed.count()) > 0; i++) await closed.first().click();
+        await section.getByRole('radio', { name: 'split' }).first().click();
+        await page.waitForTimeout(500);
+        await section.screenshot({
+          path: new URL(`tool-cards-open-${theme}.png`, OUT_DIR).pathname,
+        });
+      });
+    });
+  }
+
+  test('replay', async ({ page }) => {
+    await page.goto('/#/_tokens');
+    const section = showcase(page);
+    await section.scrollIntoViewIfNeeded();
+    await section.getByRole('button', { name: 'Replay entrance' }).click();
+    await page.waitForTimeout(90);
+    await section.screenshot({ path: new URL('tool-cards-enter-mid.png', OUT_DIR).pathname });
+  });
 });

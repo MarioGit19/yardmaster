@@ -14,6 +14,7 @@ import { ACCENT_HUES } from '../theme/accents.js';
 import { THEME_SETTINGS, type Theme, useTheme } from '../theme/theme.js';
 import { CrewSheet } from './CrewSheet.js';
 import { OrbShowcase } from './OrbShowcase.js';
+import { ToolShowcase } from './ToolShowcase.js';
 
 const SURFACES = ['bg-0', 'bg-1', 'bg-2', 'glass'] as const;
 const LINES = ['line', 'line-strong'] as const;
@@ -381,6 +382,12 @@ export default function TokenPreview() {
         <div className="lg:col-span-2">
           <Section title="Crew mascot">
             <CrewSheet />
+          </Section>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Section title="Tool cards">
+            <ToolShowcase />
           </Section>
         </div>
 

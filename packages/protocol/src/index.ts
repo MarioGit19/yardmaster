@@ -7,4 +7,5 @@ export * from './http.js';
 export * from './messages.js';
 export * from './patch.js';
 export * from './project.js';
+export * from './tools.js';
 export * from './transcript.js';

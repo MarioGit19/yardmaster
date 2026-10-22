@@ -837,6 +837,88 @@
   animation-name: msg-fade;
 }
 
+/* Tool cards enter with a scale 0.98→1 and fade (§4.6); a cross-fade at Reduced. */
+@keyframes tool-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.tool-enter {
+  transform-origin: 0 0;
+  animation: tool-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+[data-motion="reduced"] .tool-enter {
+  animation-name: msg-fade;
+}
+.tool-head {
+  transition: background-color 150ms ease-out;
+}
+.tool-head:not(:disabled):hover {
+  background: var(--bg-2);
+}
+.tool-head:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+.todo-progress {
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.task-thread {
+  border-color: color-mix(in srgb, var(--orb-task) 45%, transparent);
+}
+
+/* DiffView: tinted rows, stronger tint on the words that changed. */
+.diff-row {
+  min-height: 20px;
+}
+.diff-add {
+  background: color-mix(in srgb, var(--st-ok) 9%, transparent);
+}
+.diff-del {
+  background: color-mix(in srgb, var(--st-err) 9%, transparent);
+}
+.diff-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--text-3) 7%, transparent) 4px 5px
+  );
+}
+.diff-add .diff-mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--st-ok) 26%, transparent);
+}
+.diff-del .diff-mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--st-err) 26%, transparent);
+}
+.diff-no {
+  color: var(--text-3);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.diff-sign {
+  color: var(--text-3);
+  user-select: none;
+}
+.diff-add .diff-sign,
+.diff-add .diff-no {
+  color: var(--st-ok);
+}
+.diff-del .diff-sign,
+.diff-del .diff-no {
+  color: var(--st-err);
+}
+.diff-gap,
+.diff-more {
+  border-block: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-2) 60%, transparent);
+}
+.diff-more {
+  border-bottom: 0;
+}
+
 /* Assistant markdown, on the type scale. */
 .md {
   font-size: 14px;
@@ -941,6 +1023,19 @@
 }
 .md .md-code pre {
   tab-size: 2;
+}
+
+/* Smaller markdown inside tool cards (subagent results, fetched pages). */
+.md.md-sm {
+  font-size: 13px;
+  line-height: 20px;
+}
+.md.md-sm h1,
+.md.md-sm h2,
+.md.md-sm h3,
+.md.md-sm h4 {
+  font-size: 13px;
+  line-height: 20px;
 }
 
 /* The streaming caret: a soft glowing bar after the last block while Claude writes. */

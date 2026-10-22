@@ -6,6 +6,7 @@ import {
   decodeChatMessage,
   emptyBoardState,
   type PatchOp,
+  parseToolCall,
   type ServerToUi,
   type SessionStatusKind,
   transcriptStreamId,
@@ -104,6 +105,29 @@ describe('DemoSimulator', () => {
       expect.arrayContaining(['user', 'assistant', 'thinking', 'tool_use', 'tool_result']),
     );
     expect(messages.some((m) => m?.kind === 'assistant' && m.text.includes('```'))).toBe(true);
+    // Every tool card variant has something to show (7.9).
+    const tools = new Set(messages.flatMap((m) => (m?.kind === 'tool_use' ? [m.name] : [])));
+    expect([...tools]).toEqual(
+      expect.arrayContaining([
+        'Bash',
+        'Edit',
+        'MultiEdit',
+        'Write',
+        'Read',
+        'Grep',
+        'Glob',
+        'TodoWrite',
+        'Task',
+        'WebFetch',
+        'WebSearch',
+        'mcp__tracker__create_ticket',
+      ]),
+    );
+    // Built-in tools parse into their cards; only the MCP tool takes the generic view.
+    for (const m of messages) {
+      if (m?.kind !== 'tool_use') continue;
+      expect(parseToolCall(m.name, m.input).kind === 'other').toBe(m.name.startsWith('mcp__'));
+    }
     // Every tool result answers a tool call earlier in the same transcript.
     for (const s of sessions) {
       const seen = new Set<string>();

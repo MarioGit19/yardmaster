@@ -136,60 +136,254 @@ function fileOf(tool: DemoTool): string {
   return tool.summary.replace(/^"|"$/g, '');
 }
 
+/** Before/after pairs for demo edits, with where they sit in the (imaginary) file. */
+const EDITS: Record<string, { line: number; before: string; after: string }[]> = {
+  ts: [
+    {
+      line: 41,
+      before: [
+        'export function applyAll(items: readonly Item[], rules: readonly Rule[]): number {',
+        '  return rules.reduce((total, rule) => rule.apply(total), subtotal(items));',
+        '}',
+      ].join('\n'),
+      after: [
+        'export function applyAll(items: readonly Item[], rules: readonly Rule[]): number {',
+        '  const ordered = [...rules].sort((a, b) => rank(a) - rank(b));',
+        '  // Percentages first, so fixed amounts are never scaled.',
+        '  return ordered.reduce((total, rule) => rule.apply(total), subtotal(items));',
+        '}',
+      ].join('\n'),
+    },
+    {
+      line: 12,
+      before: 'const MAX_RETRIES = 3;\nconst BASE_DELAY_MS = 200;',
+      after: 'const MAX_RETRIES = 5;\nconst BASE_DELAY_MS = 250;\nconst MAX_DELAY_MS = 8_000;',
+    },
+    {
+      line: 88,
+      before: "  it('rounds the total', () => {\n    expect(total(cart)).toBe(19.99);\n  });",
+      after:
+        "  it('rounds the total to whole cents', () => {\n    expect(total(cart)).toBe(1999);\n    expect(Number.isInteger(total(cart))).toBe(true);\n  });",
+    },
+  ],
+  tsx: [
+    {
+      line: 7,
+      before:
+        "export function SearchBox({ onQuery }: { onQuery: (q: string) => void }) {\n  const [value, setValue] = useState('');",
+      after:
+        "export function SearchBox({ onQuery }: { onQuery: (q: string) => void }) {\n  const [value, setValue] = useState('');\n  const deferred = useDeferredValue(value);\n  useEffect(() => onQuery(deferred), [deferred, onQuery]);",
+    },
+  ],
+  ruby: [
+    {
+      line: 14,
+      before: '  def index\n    orbits = Orbit.order(created_at: :desc)\n    render json: orbits',
+      after:
+        '  def index\n    orbits = Orbit.order(created_at: :desc).limit(per_page).offset(offset)\n    render json: OrbitSerializer.new(orbits).as_json',
+    },
+  ],
+  md: [
+    {
+      line: 3,
+      before: '## Pagination\n\nResults are not paginated.',
+      after: '## Pagination\n\nPass `page` and `per_page`. The default page size is 25.',
+    },
+  ],
+};
+
+const numbered = (text: string, first: number) =>
+  text
+    .split('\n')
+    .map((line, i) => `${String(first + i).padStart(6)}\t${line}`)
+    .join('\n');
+
+const editResult = (path: string, after: string, line: number) =>
+  `The file ${path} has been updated. Here's the result of running \`cat -n\` on a snippet of the edited file:\n${numbered(after, line)}`;
+
 /** A tool call and its result, shaped like the real tool's input and output. */
 export function demoToolCall(
   project: DemoProject,
   tool: DemoTool,
   rng: Rng,
-): { input: Record<string, unknown>; result: string } {
+): { name: string; input: Record<string, unknown>; result: string; error: string } {
   const root = project.path;
   const target = fileOf(tool);
+  const name = tool.tool;
   switch (tool.tool) {
     case 'Read': {
-      const count = rng.int(40, 220);
-      const body = (SNIPPETS[langFor(target)] ?? SNIPPETS.ts ?? '')
-        .split('\n')
-        .map((line, i) => `${String(i + 1).padStart(6)}\t${line}`)
-        .join('\n');
-      return { input: { file_path: `${root}/${target}` }, result: `${body}\n… ${count} lines` };
+      const snippet = SNIPPETS[langFor(target)] ?? SNIPPETS.ts ?? '';
+      const offset = rng.chance(0.3) ? rng.int(20, 120) : 1;
+      return {
+        name,
+        input:
+          offset > 1
+            ? { file_path: `${root}/${target}`, offset, limit: 80 }
+            : { file_path: `${root}/${target}` },
+        result: numbered(snippet, offset),
+        error: `File does not exist: ${root}/${target}`,
+      };
     }
     case 'Edit':
-    case 'Write':
+    case 'Write': {
+      const path = target.startsWith('/') ? target : `${root}/${target}`;
+      const edits = EDITS[langFor(path)] ?? EDITS.ts ?? [];
+      if (tool.tool === 'Write' || rng.chance(0.08)) {
+        const content = SNIPPETS[langFor(path)] ?? SNIPPETS.ts ?? '';
+        return {
+          name: 'Write',
+          input: { file_path: path, content: `${content}\n` },
+          result: `File created successfully at: ${path}`,
+          error: `EACCES: permission denied, open '${path}'`,
+        };
+      }
+      if (edits.length > 1 && rng.chance(0.25)) {
+        const [a, b] = [edits[0], edits[1]] as [(typeof edits)[number], (typeof edits)[number]];
+        return {
+          name: 'MultiEdit',
+          input: {
+            file_path: path,
+            edits: [
+              { old_string: a.before, new_string: a.after },
+              { old_string: b.before, new_string: b.after },
+            ],
+          },
+          result: `Applied 2 edits to ${path}:\n1. Replaced "${a.before.split('\n')[0]}…"\n2. Replaced "${b.before.split('\n')[0]}…"`,
+          error: 'String to replace not found in file.',
+        };
+      }
+      const edit = rng.pick(edits);
       return {
-        input: {
-          file_path: `${root}/${target}`,
-          old_string: 'return rules.reduce((total, rule) => rule.apply(total), subtotal(items));',
-          new_string: 'return ordered.reduce((total, rule) => rule.apply(total), subtotal(items));',
-        },
-        result: `The file ${root}/${target} has been updated.`,
+        name: 'Edit',
+        input: { file_path: path, old_string: edit.before, new_string: edit.after },
+        result: editResult(path, edit.after, edit.line),
+        error: `String to replace not found in file.\nString: ${edit.before.split('\n')[0] ?? ''}`,
       };
-    case 'Grep':
+    }
+    case 'Grep': {
+      const files = [
+        ...new Set([
+          ...project.testFiles,
+          ...project.scenarios.flatMap((s) => s.tools.filter((t) => t.tool === 'Edit').map(fileOf)),
+        ]),
+      ];
+      const hits = files.slice(0, rng.int(1, Math.min(5, files.length)));
       return {
-        input: { pattern: target, path: root, output_mode: 'content' },
-        result: `Found ${rng.int(2, 9)} matches in ${rng.int(1, 4)} files`,
+        name,
+        input: { pattern: target, path: root, output_mode: 'files_with_matches' },
+        result: hits.length
+          ? `Found ${hits.length} ${hits.length === 1 ? 'file' : 'files'}\n${hits.map((f) => `${root}/${f}`).join('\n')}`
+          : 'No files found',
+        error: 'Error: regex parse error',
       };
-    case 'Glob':
-      return { input: { pattern: target, path: root }, result: `${rng.int(1, 6)} files` };
-    case 'Bash':
+    }
+    case 'Glob': {
+      const files = project.testFiles.slice(0, rng.int(1, project.testFiles.length));
       return {
+        name,
+        input: { pattern: target, path: root },
+        result: files.map((f) => `${root}/${f}`).join('\n'),
+        error: 'Error: invalid glob',
+      };
+    }
+    case 'Bash': {
+      const passed = rng.int(4, 40);
+      const seconds = `${rng.int(1, 9)}.${rng.int(0, 9)}`;
+      return {
+        name,
         input: { command: tool.summary, description: `Run ${tool.summary}` },
-        result: `$ ${tool.summary}\n✓ ${rng.int(4, 40)} passed in ${rng.int(1, 9)}.${rng.int(0, 9)}s`,
+        result: `> ${tool.summary}\n\n Test Files  ${rng.int(1, 6)} passed\n      Tests  ${passed} passed\n   Duration  ${seconds}s`,
+        error: `Exit code 1\n> ${tool.summary}\n\n FAIL  ${project.testFiles[0] ?? 'test'}\n  ✕ applies codes in order (4 ms)\n\n    Expected: 1800\n    Received: 1799\n\n Tests  1 failed, ${passed - 1} passed`,
       };
+    }
     case 'Task':
       return {
-        input: { description: tool.summary, prompt: tool.summary, subagent_type: 'Explore' },
-        result: `Done. ${rng.int(2, 7)} places found, summarised above.`,
+        name,
+        input: {
+          description: tool.summary,
+          prompt: `${tool.summary}. Report file paths with line numbers and a one-line note for each, and say if anything looks unsafe to change.`,
+          subagent_type: 'Explore',
+        },
+        result: [
+          `Found ${rng.int(2, 5)} places worth a look:`,
+          '',
+          ...project.testFiles
+            .slice(0, 3)
+            .map(
+              (f, i) =>
+                `- \`${f}:${12 + i * 17}\`: ${rng.pick(['reads the value directly', 'wraps it in a helper', 'only used in tests'])}`,
+            ),
+          '',
+          'Nothing looks unsafe to change; the helper is the only shared entry point.',
+        ].join('\n'),
+        error: 'Subagent stopped: the request timed out.',
       };
     case 'WebFetch':
       return {
+        name,
         input: { url: `https://${tool.summary}`, prompt: 'Summarise the relevant section' },
-        result: 'The page documents the options; the relevant one is described in section 3.',
+        result:
+          'The page documents the options. The relevant one is described in **section 3**: it takes a block, and the default is `nil`.',
+        error: 'Request failed with status code 404',
       };
-    case 'WebSearch':
-      return { input: { query: tool.summary }, result: `${rng.int(5, 10)} results` };
+    case 'WebSearch': {
+      const slug = tool.summary.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const links = [
+        { title: 'Backoff strategies compared', url: `https://example.com/blog/${slug}` },
+        { title: 'Retry guide', url: `https://docs.example.org/guides/${slug}` },
+        { title: 'Notes on jitter', url: `https://example.net/notes/${slug}#jitter` },
+      ];
+      return {
+        name,
+        input: { query: tool.summary },
+        result: `Web search results for query: "${tool.summary}"\n\nLinks: ${JSON.stringify(links)}\n\nFull jitter spreads retries evenly across the window, which avoids synchronized retry storms.`,
+        error: 'Search failed: rate limited',
+      };
+    }
     default:
-      return { input: { summary: tool.summary }, result: 'Done.' };
+      return {
+        name,
+        input: { summary: tool.summary },
+        result: 'Done.',
+        error: `Error: ${tool.tool} failed`,
+      };
   }
+}
+
+/** A TodoWrite input for a scenario's todos, `done` of them finished. */
+export function demoTodos(scenario: DemoScenario, done: number): Record<string, unknown> {
+  return {
+    todos: scenario.todos.map((content, index) => ({
+      content,
+      status: index < done ? 'completed' : index === done ? 'in_progress' : 'pending',
+      activeForm: content,
+    })),
+  };
+}
+
+export const TODO_RESULT =
+  'Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress.';
+
+/** A call to a third-party (MCP) tool the UI doesn't know, for the generic card. */
+export function demoMcpCall(
+  scenario: DemoScenario,
+  rng: Rng,
+): {
+  name: string;
+  input: Record<string, unknown>;
+  result: string;
+} {
+  const id = rng.int(100, 999);
+  return {
+    name: 'mcp__tracker__create_ticket',
+    input: {
+      title: scenario.title,
+      labels: ['demo', rng.pick(['backend', 'frontend', 'tests'])],
+      priority: rng.pick(['low', 'medium', 'high']),
+      estimate: { points: rng.int(1, 5), confidence: 0.7 },
+    },
+    result: `Created ticket TRK-${id}: ${scenario.title}`,
+  };
 }
 
 /** Assistant text with some markdown: a list of touched files, sometimes a code block. */
@@ -234,30 +428,46 @@ export function demoHistory(
       ts: 0,
     });
     if (rng.chance(0.7)) out.push({ entry: { kind: 'thinking', text: rng.pick(THOUGHTS) }, ts: 0 });
+    const todo = (done: number) => {
+      const toolUseId = `toolu_demo_${seed.toString(16)}_${out.length}`;
+      out.push({
+        entry: { kind: 'tool_use', toolUseId, name: 'TodoWrite', input: demoTodos(scenario, done) },
+        ts: 0,
+      });
+      out.push({
+        entry: { kind: 'tool_result', toolUseId, text: TODO_RESULT, isError: false },
+        ts: 0,
+      });
+    };
+    const planned = scenario.todos.length > 0 && rng.chance(0.6);
+    if (planned) todo(0);
     const steps = rng.int(3, 8);
     for (let i = 0; i < steps; i++) {
+      if (planned && i === Math.floor(steps / 2)) todo(Math.floor(scenario.todos.length / 2));
       if (rng.chance(0.3)) {
         out.push({ entry: { kind: 'assistant', text: rng.pick(scenario.texts) }, ts: 0 });
         continue;
       }
-      const tool = rng.pick(scenario.tools);
       const toolUseId = `toolu_demo_${seed.toString(16)}_${out.length}`;
-      const call = demoToolCall(project, tool, rng);
+      const isError = rng.chance(0.05);
+      const call = rng.chance(0.04)
+        ? { ...demoMcpCall(scenario, rng), error: 'Error: tracker is unavailable' }
+        : demoToolCall(project, rng.pick(scenario.tools), rng);
       out.push({
-        entry: { kind: 'tool_use', toolUseId, name: tool.tool, input: call.input },
+        entry: { kind: 'tool_use', toolUseId, name: call.name, input: call.input },
         ts: 0,
       });
-      const isError = rng.chance(0.05);
       out.push({
         entry: {
           kind: 'tool_result',
           toolUseId,
-          text: isError ? 'Error: command exited with code 1' : call.result,
+          text: isError ? call.error : call.result,
           isError,
         },
         ts: 0,
       });
     }
+    if (planned) todo(scenario.todos.length);
     out.push({ entry: { kind: 'assistant', text: demoAssistantText(scenario, rng, true) }, ts: 0 });
     turn++;
   }

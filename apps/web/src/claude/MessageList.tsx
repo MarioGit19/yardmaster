@@ -1,34 +1,14 @@
-import { toolFamily } from '@c-board/protocol';
+import { parseToolCall, type TodoStatus } from '@c-board/protocol';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  ArrowDown,
-  Check,
-  ChevronRight,
-  FilePen,
-  FileText,
-  GitFork,
-  Globe,
-  ListChecks,
-  Search,
-  Terminal,
-  Wrench,
-  X,
-} from 'lucide-react';
+import { ArrowDown, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import {
-  memo,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { dur, ease, spring } from '../motion.js';
 import { cx } from '../ui/cx.js';
 import { Markdown } from './Markdown.js';
-import { type ToolRow, type TranscriptRow, toolSummary } from './transcript.js';
+import { ToolCard } from './tools/ToolCard.js';
+import { ToolViewState } from './tools/viewState.js';
+import type { ToolRow, TranscriptRow } from './transcript.js';
 
 /** Within this many px of the bottom the list counts as "at the latest" and follows new rows. */
 export const STICK_THRESHOLD_PX = 48;
@@ -44,22 +24,11 @@ const SETTLE_FRAMES = 30;
 
 type Item = TranscriptRow | { kind: 'tail'; id: typeof TAIL_ID; text: string };
 
-const FAMILY_ICON = {
-  bash: Terminal,
-  edit: FilePen,
-  read: FileText,
-  search: Search,
-  web: Globe,
-  task: GitFork,
-  todo: ListChecks,
-  other: Wrench,
-} as const;
-
 function estimate(item: Item | undefined): number {
   if (!item) return 40;
   switch (item.kind) {
     case 'tool':
-      return 36;
+      return estimateTool(item);
     case 'thinking':
       return 40;
     case 'user':
@@ -67,6 +36,43 @@ function estimate(item: Item | undefined): number {
     default:
       return 32 + Math.min(40, Math.ceil(item.text.length / 90)) * 22;
   }
+}
+
+const CHIP_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch']);
+
+function estimateTool(row: ToolRow): number {
+  if (CHIP_TOOLS.has(row.name)) return 28;
+  const o = (row.input && typeof row.input === 'object' ? row.input : {}) as Record<
+    string,
+    unknown
+  >;
+  switch (row.name) {
+    case 'Edit':
+    case 'MultiEdit':
+    case 'Write': {
+      const text = [o.old_string, o.new_string, o.content].filter((v) => typeof v === 'string');
+      const lines = text.join('\n').split('\n').length;
+      return 74 + Math.min(18, lines) * 20 + (lines > 18 ? 28 : 0);
+    }
+    case 'TodoWrite':
+      return 54 + (Array.isArray(o.todos) ? o.todos.length : 0) * 24;
+    default:
+      return 34;
+  }
+}
+
+/** The todos of the TodoWrite call before `index`, so a new list can tell what just finished. */
+function previousTodos(
+  items: readonly Item[],
+  index: number,
+): { content: string; status: TodoStatus }[] | null {
+  for (let i = index - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item?.kind !== 'tool' || item.name !== 'TodoWrite') continue;
+    const call = parseToolCall(item.name, item.input);
+    return call.kind === 'todo' ? call.todos : null;
+  }
+  return null;
 }
 
 const timeFormat = new Intl.DateTimeFormat(undefined, {
@@ -176,88 +182,102 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
 
   const virtualItems = virtualizer.getVirtualItems();
   return (
-    <div className="relative min-h-0 flex-1">
-      <div
-        ref={scrollRef}
-        data-message-list
-        data-count={items.length}
-        data-at-end={atEnd ? '' : undefined}
-        role="log"
-        aria-label="Conversation"
-        aria-live="off"
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be keyboard scrollable
-        tabIndex={0}
-        onWheel={stopSettling}
-        onPointerDown={stopSettling}
-        onKeyDown={stopSettling}
-        onTouchStart={stopSettling}
-        className="message-scroll h-full overflow-y-auto overscroll-contain"
-      >
-        <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-          {virtualItems.map((v) => {
-            const item = items[v.index];
-            if (!item) return null;
-            const prev = items[v.index - 1];
-            const turnStart = item.kind === 'user' && v.index > 0;
-            return (
-              <div
-                key={v.key}
-                ref={virtualizer.measureElement}
-                data-index={v.index}
-                data-row={item.kind}
-                className="absolute top-0 left-0 w-full px-5"
-                style={{ transform: `translateY(${v.start}px)` }}
-              >
+    <ToolViewState>
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          data-message-list
+          data-count={items.length}
+          data-at-end={atEnd ? '' : undefined}
+          role="log"
+          aria-label="Conversation"
+          aria-live="off"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be keyboard scrollable
+          tabIndex={0}
+          onWheel={stopSettling}
+          onPointerDown={stopSettling}
+          onKeyDown={stopSettling}
+          onTouchStart={stopSettling}
+          className="message-scroll h-full overflow-y-auto overscroll-contain"
+        >
+          <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualItems.map((v) => {
+              const item = items[v.index];
+              if (!item) return null;
+              const prev = items[v.index - 1];
+              const turnStart = item.kind === 'user' && v.index > 0;
+              const enter = item.kind !== 'tail' && entering(item.id);
+              return (
                 <div
-                  className={cx(
-                    'mx-auto max-w-3xl',
-                    turnStart
-                      ? 'pt-6'
-                      : prev
-                        ? item.kind === 'tool' && prev.kind === 'tool'
-                          ? 'pt-1'
-                          : 'pt-3'
-                        : '',
-                    item.kind !== 'tail' && entering(item.id) && 'msg-enter',
-                  )}
+                  key={v.key}
+                  ref={virtualizer.measureElement}
+                  data-index={v.index}
+                  data-row={item.kind}
+                  className="absolute top-0 left-0 w-full px-5"
+                  style={{ transform: `translateY(${v.start}px)` }}
                 >
-                  <Row item={item} cwd={cwd} expanded={expanded.has(item.id)} onToggle={toggle} />
+                  <div
+                    className={cx(
+                      'mx-auto max-w-3xl',
+                      turnStart
+                        ? 'pt-6'
+                        : prev
+                          ? item.kind === 'tool' && prev.kind === 'tool'
+                            ? 'pt-1'
+                            : 'pt-3'
+                          : '',
+                      enter && (item.kind === 'tool' ? 'tool-enter' : 'msg-enter'),
+                    )}
+                  >
+                    <Row
+                      item={item}
+                      cwd={cwd}
+                      expanded={expanded.has(item.id)}
+                      onToggle={toggle}
+                      entering={enter}
+                      previousTodos={
+                        enter && item.kind === 'tool' && item.name === 'TodoWrite'
+                          ? previousTodos(items, v.index)
+                          : undefined
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+          <AnimatePresence>
+            {!atEnd && (
+              <motion.button
+                key="jump"
+                type="button"
+                onClick={toEnd}
+                // Whole transform strings stay on the compositor while messages stream in.
+                initial={{ opacity: 0, transform: 'translateY(8px) scale(0.96)' }}
+                animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
+                exit={{
+                  opacity: 0,
+                  transform: 'translateY(4px) scale(0.98)',
+                  transition: { duration: dur.fast, ease: ease.out },
+                }}
+                transition={spring.snappy}
+                className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-3.5 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] hover:bg-bg-1"
+              >
+                <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
+                Jump to latest
+                {unseen > 0 && (
+                  <span className="tabular rounded-full bg-st-work/20 px-1.5 text-meta text-st-work">
+                    {unseen > 99 ? '99+' : unseen}
+                  </span>
+                )}
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-        <AnimatePresence>
-          {!atEnd && (
-            <motion.button
-              key="jump"
-              type="button"
-              onClick={toEnd}
-              // Whole transform strings stay on the compositor while messages stream in.
-              initial={{ opacity: 0, transform: 'translateY(8px) scale(0.96)' }}
-              animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
-              exit={{
-                opacity: 0,
-                transform: 'translateY(4px) scale(0.98)',
-                transition: { duration: dur.fast, ease: ease.out },
-              }}
-              transition={spring.snappy}
-              className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-3.5 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] hover:bg-bg-1"
-            >
-              <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
-              Jump to latest
-              {unseen > 0 && (
-                <span className="tabular rounded-full bg-st-work/20 px-1.5 text-meta text-st-work">
-                  {unseen > 99 ? '99+' : unseen}
-                </span>
-              )}
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+    </ToolViewState>
   );
 }
 
@@ -266,11 +286,15 @@ const Row = memo(function Row({
   cwd,
   expanded,
   onToggle,
+  entering,
+  previousTodos,
 }: {
   item: Item;
   cwd: string | undefined;
   expanded: boolean;
   onToggle: (id: string) => void;
+  entering: boolean;
+  previousTodos: { content: string; status: TodoStatus }[] | null | undefined;
 }) {
   switch (item.kind) {
     case 'user':
@@ -286,7 +310,7 @@ const Row = memo(function Row({
     case 'thinking':
       return <Thinking row={item} expanded={expanded} onToggle={onToggle} />;
     case 'tool':
-      return <ToolLine row={item} cwd={cwd} />;
+      return <ToolCard row={item} cwd={cwd} entering={entering} previousTodos={previousTodos} />;
   }
 });
 
@@ -366,44 +390,6 @@ function Thinking({
           {row.text}
         </div>
       )}
-    </div>
-  );
-}
-
-/** A one-line tool call; 7.9 turns these into full tool cards. */
-function ToolLine({ row, cwd }: { row: ToolRow; cwd: string | undefined }) {
-  const Icon = FAMILY_ICON[toolFamily(row.name)];
-  const summary = toolSummary(row.name, row.input, cwd);
-  const state: ReactNode =
-    row.result === null ? (
-      <span className="flex items-center gap-1.5 text-st-tool">
-        <span
-          aria-hidden
-          className="size-1.5 rounded-full bg-st-tool shadow-[0_0_0_3px_var(--st-tool-glow)]"
-        />
-        running
-      </span>
-    ) : row.result.isError ? (
-      <span className="flex items-center gap-1 text-st-err">
-        <X aria-hidden className="size-3.5" strokeWidth={2} />
-        failed
-      </span>
-    ) : (
-      <span className="flex items-center text-st-ok">
-        <Check aria-label="done" className="size-3.5" strokeWidth={2} />
-      </span>
-    );
-  return (
-    <div
-      title={row.result?.isError ? row.result.text : undefined}
-      className="flex h-8 min-w-0 items-center gap-2.5 rounded-control border border-line bg-bg-1 px-2.5 text-label"
-    >
-      <Icon aria-hidden className="size-3.5 shrink-0 text-text-3" strokeWidth={1.5} />
-      <span className="shrink-0 font-medium text-text-1">{row.name}</span>
-      <span className="min-w-0 flex-1 truncate font-mono text-text-3" title={summary}>
-        {summary}
-      </span>
-      <span className="shrink-0 text-meta">{state}</span>
     </div>
   );
 }
