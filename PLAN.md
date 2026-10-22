@@ -448,11 +448,12 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
 
 Comes from a motion audit of the built UI (screen recording plus code review, 2026-10-22). Goal: motion that reads as professional, rich and alive at a glance, is correct at every motion level, and is the base every layout in Phase 11 builds on. For every task: use `animate` + `apple-design` (and the `motion` skill and the Motion docs MCP for Motion APIs), run `pnpm motion:record` (from 10.1) and **Read the contact sheets** before ticking, then run `review-animations` (read its SKILL.md) on what you changed. DESIGN.md wins over skill advice.
 
-- [ ] **10.1 Motion recorder**
+- [x] **10.1 Motion recorder**
   - `pnpm motion:record [scenario]` (`e2e/motion/record.ts`, run with the repo's Playwright on full Chromium): boots `--demo` with a throwaway home (reuse `e2e/board.ts`), records a 1440×900 dark video at motion Full, and runs a scripted walkthrough. Scenarios: `overview` (entrance, 8 s of activity, pod hover, lane peek), `focus` (pod → focus → Esc), `chrome` (⌘K, Attention Center, toasts, Pulse expand), `crew` (`/#/_tokens` character sheet), `phone` (390 px, touch), `all`. With ffmpeg it writes contact sheets (`artifacts/motion/<scenario>-<moment>.png`: entrances and transitions at 10–15 fps tiled, activity at 2 fps) plus the `.webm`; without ffmpeg, a burst of screenshots. Prints which sheet covers which moment. Later phases add their scenarios (each layout, room enter, Grid dive).
   - Add to CLAUDE.md: animation tasks must run it and look at the sheets.
   - **Done when:** `pnpm motion:record all` produces the sheets, and the README of `e2e/motion/` says how to read them.
   - **Verify:** `pnpm motion:record overview && ls artifacts/motion`
+  - Note: `tsx` is now a root dev dependency (the script runs as `tsx e2e/motion/record.ts`). Each scenario boots its own demo board so `chrome` sees the first toast fresh; that toast is whichever the demo raises first (often a failed test run), not always an approval. `--no-ffmpeg` forces the screenshot-burst fallback. Sheets have no timestamp labels (the local ffmpeg has no `drawtext`); the run prints each sheet's window and frame rate instead.
 
 - [ ] **10.2 Motion correctness and accessibility**
   - **Reduced motion leaks:** Motion's `reducedMotion` only reduces `x`/`y`/`scale`-style keys, not a whole `transform` string. Add a helper (in `motion.ts`, next to `slide`) that returns a still transform at Reduced, use it at `claude/MessageList.tsx` (jump pill), `claude/Composer.tsx` (send icon), `onboarding/OnboardingWizard.tsx` and `lanes/TerminalLane.tsx` (peek), and add a unit test that fails on any `transform:` animate target in `apps/web/src` that bypasses the helper.

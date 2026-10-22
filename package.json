@@ -19,13 +19,15 @@
     "icons": "pnpm --filter @c-board/web icons",
     "check": "scripts/privacy-check.sh && pnpm lint && pnpm typecheck && pnpm test",
     "e2e": "pnpm --filter @c-board/web build && playwright test -c e2e --project=e2e",
-    "shots": "pnpm --filter @c-board/web build && playwright test -c e2e --project=shots"
+    "shots": "pnpm --filter @c-board/web build && playwright test -c e2e --project=shots",
+    "motion:record": "pnpm --filter @c-board/web build && tsx e2e/motion/record.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",
     "@playwright/test": "^1.64.1",
     "@types/node": "^22",
     "simple-git-hooks": "^2.14.0",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vitest": "^5.0.5"
   },

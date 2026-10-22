@@ -1,0 +1,403 @@
+/**
+ * `pnpm motion:record [scenario] [--no-ffmpeg]`: records a scripted walkthrough of the demo
+ * board at motion Full and turns each moment into a contact sheet in `artifacts/motion/`.
+ * See `README.md` next to this file for how to read the sheets.
+ */
+import { execFile } from 'node:child_process';
+import { mkdir, readdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { type Browser, type BrowserContextOptions, chromium, type Page } from '@playwright/test';
+import { startDemoBoard } from '../board.js';
+import { signedInState } from '../fixtures.js';
+
+const run = promisify(execFile);
+const OUT_DIR = fileURLToPath(new URL('../../artifacts/motion/', import.meta.url));
+const DESKTOP = { width: 1440, height: 900 };
+const PHONE = { width: 390, height: 844 };
+/** The video starts a beat before our clock does: open each window early, close it just late. */
+const LEAD_S = 0.3;
+const TAIL_S = 0.1;
+const MAX_TILES = 60;
+
+type Kind = 'transition' | 'activity';
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface Moment {
+  name: string;
+  kind: Kind;
+  note: string;
+  start: number;
+  end: number;
+  clip?: Box;
+}
+
+const FPS: Record<Kind, number> = { transition: 12, activity: 2 };
+
+class Recorder {
+  readonly moments: Moment[] = [];
+  private readonly t0 = performance.now();
+
+  constructor(
+    readonly page: Page,
+    private readonly scenario: string,
+    private readonly ffmpeg: boolean,
+  ) {}
+
+  private now(): number {
+    return (performance.now() - this.t0) / 1000;
+  }
+
+  /**
+   * Runs `action` and records its time window as one moment. Without ffmpeg, screenshots are
+   * taken in a burst while it runs (as fast as they come for transitions, every 500 ms for
+   * activity).
+   */
+  async moment(
+    name: string,
+    kind: Kind,
+    note: string,
+    action: () => Promise<void>,
+    clip?: Box,
+  ): Promise<void> {
+    const start = this.now();
+    let done = false;
+    const burst = this.ffmpeg ? Promise.resolve() : this.burst(name, kind, () => done, clip);
+    try {
+      await action();
+    } finally {
+      done = true;
+      await burst;
+    }
+    this.moments.push({ name, kind, note, start, end: this.now(), clip });
+  }
+
+  private async burst(name: string, kind: Kind, done: () => boolean, clip?: Box) {
+    const every = kind === 'transition' ? 0 : 500;
+    for (let i = 0; i < MAX_TILES && !done(); i++) {
+      const file = `${this.scenario}-${name}-${String(i).padStart(2, '0')}.png`;
+      await this.page.screenshot({ path: join(OUT_DIR, file), clip }).catch(() => {});
+      if (every) await this.page.waitForTimeout(every);
+    }
+  }
+}
+
+const hold = (page: Page, ms: number) => () => page.waitForTimeout(ms);
+
+/** Opens the overview and waits for the first pod, the way the e2e suite does. */
+async function openOverview(page: Page, route = '/') {
+  await page.goto(`/#${route}`);
+  await page.locator('a[href^="#/p/"], [data-pod]').first().waitFor();
+}
+
+const SCENARIOS = {
+  async overview(r: Recorder) {
+    const { page } = r;
+    await r.moment('entrance', 'transition', 'first paint and the board entrance', async () => {
+      await openOverview(page);
+      await page.waitForTimeout(2200);
+    });
+    await r.moment('activity', 'activity', '8 s of live activity', hold(page, 8000));
+    await r.moment('pod-hover', 'transition', 'pointer onto the first pod and off', async () => {
+      await page.locator('[data-pod]').first().hover();
+      await page.waitForTimeout(900);
+      await page.mouse.move(4, DESKTOP.height - 4);
+      await page.waitForTimeout(600);
+    });
+    const lane = page.locator('[data-lane][data-streaming], [data-lane]').first();
+    await lane.waitFor();
+    await r.moment(
+      'lane-peek',
+      'transition',
+      'hover a lane: the peek opens, then closes',
+      async () => {
+        await lane.locator('[aria-expanded]').first().hover();
+        await page.locator('[data-peek]').waitFor({ timeout: 5000 });
+        await page.waitForTimeout(900);
+        await page.mouse.move(4, 4);
+        await page.waitForTimeout(700);
+      },
+    );
+  },
+
+  async focus(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(1500);
+    const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+    if (!id) throw new Error('no pod on the overview');
+    await r.moment('open', 'transition', 'pod morphs into the focus view', async () => {
+      await page.locator(`[data-pod="${id}"] header a`).click();
+      await page.locator(`[data-focus="${id}"]`).waitFor();
+      await page.waitForTimeout(1200);
+    });
+    await r.moment('close', 'transition', 'Esc morphs it back into the pod', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(900);
+    });
+  },
+
+  async chrome(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(1200);
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await r.moment(
+      'palette-open',
+      'transition',
+      '⌘K opens the palette, typing filters',
+      async () => {
+        await page.keyboard.press('ControlOrMeta+K');
+        await palette.waitFor();
+        await page.waitForTimeout(500);
+        await page.keyboard.type('orb', { delay: 90 });
+        await page.waitForTimeout(600);
+      },
+    );
+    await r.moment('palette-close', 'transition', 'Esc closes the palette', async () => {
+      await page.keyboard.press('Escape');
+      await palette.waitFor({ state: 'hidden' });
+      await page.waitForTimeout(500);
+    });
+
+    // The demo raises its first toast (a failed run or a permission request) within seconds.
+    const toast = page.locator('[data-sonner-toast]').first();
+    const arrived = await toast.waitFor({ timeout: 30_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (arrived) {
+      const seen = r.moments.length;
+      await r.moment('toast', 'transition', 'the first toast arrives', hold(page, 1200));
+      // Reach back to the arrival: the toast was already entering when it was detected.
+      const m = r.moments[seen];
+      if (m) m.start = Math.max(0, m.start - 0.6);
+    } else {
+      console.warn('motion:record: no toast within 30 s; skipping chrome-toast');
+    }
+
+    const sheet = page.getByRole('complementary', { name: /Needs you/ });
+    await r.moment('attention-open', 'transition', 'the Attention Center slides in', async () => {
+      const review = toast.getByRole('button', { name: 'Review' });
+      if (arrived && (await review.isVisible())) await review.click();
+      else await page.locator('[data-hud="waiting"]').click();
+      await sheet.waitFor();
+      await page.waitForTimeout(900);
+    });
+    await r.moment('attention-close', 'transition', 'Esc closes the Attention Center', async () => {
+      await page.keyboard.press('Escape');
+      await sheet.waitFor({ state: 'hidden' });
+      await page.waitForTimeout(500);
+    });
+
+    const rail = page.locator('[data-pulse]');
+    const toggle = rail.getByRole('button', { name: /Pulse/ });
+    if ((await rail.getAttribute('data-pulse')) === 'expanded') {
+      await toggle.click();
+      await page.waitForTimeout(800);
+    }
+    await r.moment('pulse-expand', 'transition', 'the Pulse rail expands', async () => {
+      await toggle.click();
+      await page.locator('[data-pulse="expanded"]').waitFor();
+      await page.waitForTimeout(1000);
+    });
+    await r.moment('pulse-collapse', 'transition', 'the Pulse rail collapses', async () => {
+      await toggle.click();
+      await page.locator('[data-pulse="collapsed"]').waitFor();
+      await page.waitForTimeout(700);
+    });
+  },
+
+  async crew(r: Recorder) {
+    const { page } = r;
+    await page.goto('/#/_tokens');
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Crew mascot' }),
+    });
+    await section.scrollIntoViewIfNeeded();
+    await section.locator('[data-crew]').nth(35).waitFor();
+    await page.waitForTimeout(800);
+    const box = await section.boundingBox();
+    const clip = box ? visible(box, DESKTOP) : undefined;
+    await r.moment('loop', 'transition', 'every state, 2 s up close', hold(page, 2000), clip);
+    await r.moment('idle', 'activity', 'every state, 10 s of idle life', hold(page, 10_000), clip);
+  },
+
+  async phone(r: Recorder) {
+    const { page } = r;
+    await r.moment('entrance', 'transition', 'first paint and the entrance at 390 px', async () => {
+      await openOverview(page);
+      await page.waitForTimeout(2000);
+    });
+    await r.moment('scroll', 'transition', 'a flick down the overview and back', async () => {
+      await page.evaluate(() => window.scrollBy({ top: 600, behavior: 'smooth' }));
+      await page.waitForTimeout(900);
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      await page.waitForTimeout(900);
+    });
+    const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+    if (!id) throw new Error('no pod on the overview');
+    await r.moment('focus-open', 'transition', 'tap a pod: the focus view opens', async () => {
+      await page.locator(`[data-pod="${id}"] header a`).tap();
+      await page.locator(`[data-focus="${id}"]`).waitFor();
+      await page.waitForTimeout(1200);
+    });
+    await r.moment('focus-close', 'transition', 'back: the focus view closes', async () => {
+      await page.goBack();
+      await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(900);
+    });
+  },
+} satisfies Record<string, (r: Recorder) => Promise<void>>;
+
+type Scenario = keyof typeof SCENARIOS;
+const NAMES = Object.keys(SCENARIOS) as Scenario[];
+
+/** `box` cut to the viewport, rounded to even pixels for the video encoder. */
+function visible(box: Box, viewport: { width: number; height: number }): Box {
+  const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
+  const x = Math.max(0, Math.round(box.x));
+  const y = Math.max(0, Math.round(box.y));
+  return {
+    x,
+    y,
+    width: even(Math.min(box.width, viewport.width - x)),
+    height: even(Math.min(box.height, viewport.height - y)),
+  };
+}
+
+async function hasFfmpeg(): Promise<boolean> {
+  try {
+    await run('ffmpeg', ['-version']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Tiles the frames of one moment into a single PNG, in reading order. */
+async function contactSheet(video: string, out: string, m: Moment, phone: boolean) {
+  const start = Math.max(0, m.start - LEAD_S);
+  const duration = m.end - start + TAIL_S;
+  const fps = Math.min(FPS[m.kind], MAX_TILES / duration);
+  const frames = Math.max(1, Math.ceil(duration * fps));
+  const cols = Math.min(frames, phone ? 8 : 4);
+  const rows = Math.ceil(frames / cols);
+  const width = m.clip
+    ? Math.min(m.clip.width, 480)
+    : phone
+      ? 240
+      : m.kind === 'transition'
+        ? 480
+        : 360;
+  const filters = [
+    m.clip && `crop=${m.clip.width}:${m.clip.height}:${m.clip.x}:${m.clip.y}`,
+    `fps=${fps.toFixed(3)}`,
+    `scale=${width}:-2`,
+    `tile=${cols}x${rows}:padding=6:margin=6:color=0x202024`,
+  ].filter(Boolean);
+  await run('ffmpeg', [
+    '-y',
+    '-v',
+    'error',
+    '-ss',
+    start.toFixed(2),
+    '-t',
+    duration.toFixed(2),
+    '-i',
+    video,
+    '-vf',
+    filters.join(','),
+    '-frames:v',
+    '1',
+    out,
+  ]);
+  return { fps };
+}
+
+async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean) {
+  for (const file of await readdir(OUT_DIR)) {
+    if (file.startsWith(`${scenario}-`) || file === `${scenario}.webm`) {
+      await rm(join(OUT_DIR, file));
+    }
+  }
+  const phone = scenario === 'phone';
+  const viewport = phone ? PHONE : DESKTOP;
+  const board = await startDemoBoard();
+  const videoDir = join(board.home, 'video');
+  const options: BrowserContextOptions = {
+    baseURL: board.url,
+    storageState: signedInState(board.url, board.cookie),
+    viewport,
+    colorScheme: 'dark',
+    reducedMotion: 'no-preference',
+    ...(phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}),
+    ...(ffmpeg ? { recordVideo: { dir: videoDir, size: viewport } } : {}),
+  };
+  try {
+    const context = await browser.newContext(options);
+    await context.addInitScript(() => {
+      localStorage.setItem('cboard.theme', 'dark');
+      localStorage.setItem('cboard.motion', 'full');
+    });
+    const page = await context.newPage();
+    const recorder = new Recorder(page, scenario, ffmpeg);
+    try {
+      await SCENARIOS[scenario](recorder);
+    } finally {
+      await context.close();
+    }
+
+    console.log(`\n${scenario}`);
+    if (!ffmpeg) {
+      for (const m of recorder.moments) {
+        console.log(`  ${scenario}-${m.name}-NN.png  ${m.note}`);
+      }
+      return;
+    }
+    const webm = join(OUT_DIR, `${scenario}.webm`);
+    await page.video()?.saveAs(webm);
+    for (const m of recorder.moments) {
+      const file = `${scenario}-${m.name}.png`;
+      const { fps } = await contactSheet(webm, join(OUT_DIR, file), m, phone);
+      const span = `${m.start.toFixed(1)}–${m.end.toFixed(1)} s`;
+      console.log(`  ${file.padEnd(32)} ${span.padEnd(13)} ${fps.toFixed(1)} fps  ${m.note}`);
+    }
+    console.log(`  ${`${scenario}.webm`.padEnd(32)} the full recording`);
+  } finally {
+    await board.stop();
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const wanted = args.find((a) => !a.startsWith('--')) ?? 'all';
+  if (wanted !== 'all' && !NAMES.includes(wanted as Scenario)) {
+    console.error(`Unknown scenario "${wanted}". Use one of: ${[...NAMES, 'all'].join(', ')}`);
+    process.exit(2);
+  }
+  const scenarios = wanted === 'all' ? NAMES : [wanted as Scenario];
+  const ffmpeg = !args.includes('--no-ffmpeg') && (await hasFfmpeg());
+  if (!ffmpeg) console.warn('motion:record: ffmpeg not found; taking screenshot bursts instead');
+  await mkdir(OUT_DIR, { recursive: true });
+
+  // Full Chromium (new headless) renders with the GPU, like the perf-stress project.
+  const browser = await chromium.launch({ channel: 'chromium' });
+  try {
+    for (const scenario of scenarios) await record(browser, scenario, ffmpeg);
+  } finally {
+    await browser.close();
+  }
+  console.log(`\nSheets in artifacts/motion/ (see e2e/motion/README.md).`);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

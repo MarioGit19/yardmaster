@@ -28,7 +28,7 @@ Installed for this project: the plugins in `.claude/settings.json`, and the skil
 |---|---|
 | Any library API you aren't 100% sure of (Motion 14, Vite 8, Tailwind 4, xterm 6, zod 4, Fastify 5, Agent SDK, VS Code API) | **Context7** MCP: resolve the library, then fetch docs for the exact version in `package.json`. Our stack is newer than your training data. |
 | Building any UI component or view | `frontend-design` + `emil-design-eng` |
-| Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth. For Motion APIs use the `motion` skill and the **Motion docs MCP** (`search-motion-docs`, in `.mcp.json`) or Context7. Then run `pnpm motion:record <scenario>` (once 10.1 exists) and Read the contact sheets in `artifacts/motion/` |
+| Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth. For Motion APIs use the `motion` skill and the **Motion docs MCP** (`search-motion-docs`, in `.mcp.json`) or Context7. Then run `pnpm motion:record <scenario>` and Read the contact sheets in `artifacts/motion/` (see `e2e/motion/README.md`) |
 | A visual effect (text effect, background, shader, micro-interaction) | Check `.claude/references/react-bits/` first (React Bits, MIT + Commons Clause). Adapt into `apps/web/src/fx/` per DESIGN.md §3 "Third-party effects"; never import from the reference folder |
 | After finishing a UI task | `review-animations` on the motion you added, plus an `impeccable` critique of the screen. Fix what they flag, if it doesn't contradict DESIGN.md. |
 | Charts, sparklines, stat tiles, HUD counters | `dataviz` |
@@ -46,6 +46,7 @@ Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a dif
 - `pnpm dev`: server and web in watch mode. `pnpm dev:demo` does the same with synthetic data.
 - `pnpm check`: privacy check, lint, typecheck and tests. It must pass before a task is ticked.
 - `pnpm e2e` / `pnpm shots`: Playwright tests and screenshots (into `artifacts/shots/`, gitignored).
+- `pnpm motion:record [scenario]`: records the demo at motion Full and writes contact sheets to `artifacts/motion/`. Every animation task must run it and Read the sheets before it is ticked.
 - When you start the server yourself (`c-board start`, `src/cli.ts start`), always pass `--no-open`. Never open the maintainer's browser.
 
 ## Git
