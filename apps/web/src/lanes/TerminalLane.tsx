@@ -237,7 +237,7 @@ function LaneCaption({
           }}
           className={cx(
             'block min-w-0 truncate',
-            error ? 'text-st-err' : running ? 'text-text-2' : 'text-text-3',
+            error ? 'text-st-err-ink' : running ? 'text-text-2' : 'text-text-3',
           )}
         >
           {error ?? command ?? '—'}

@@ -29,10 +29,11 @@ export function Toasts() {
   return (
     <Toaster
       theme={theme}
+      // Above the Pulse rail (AppShell publishes its height), so its newest events stay visible.
       position="bottom-right"
       gap={8}
-      offset={16}
-      mobileOffset={16}
+      offset={{ right: 16, bottom: 'calc(var(--pulse-h, 0px) + 16px)' }}
+      mobileOffset={{ left: 16, right: 16, bottom: 'calc(var(--pulse-h, 0px) + 16px)' }}
       toastOptions={{
         unstyled: true,
         classNames: {
@@ -41,10 +42,10 @@ export function Toasts() {
           title: 'font-medium',
           description: 'mt-0.5 text-label text-text-2',
           icon: 'mt-0.5 flex shrink-0 [&_svg]:size-4',
-          info: '[&_[data-icon]]:text-st-work',
-          success: '[&_[data-icon]]:text-st-ok',
-          warning: '[&_[data-icon]]:text-st-wait',
-          error: '[&_[data-icon]]:text-st-err',
+          info: '[&_[data-icon]]:text-st-work-ink',
+          success: '[&_[data-icon]]:text-st-ok-ink',
+          warning: '[&_[data-icon]]:text-st-wait-ink',
+          error: '[&_[data-icon]]:text-st-err-ink',
         },
       }}
     />

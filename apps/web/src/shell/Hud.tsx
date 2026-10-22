@@ -213,7 +213,7 @@ function Connection() {
           <span className="hud-spin absolute inset-0 rounded-full border border-st-err border-r-transparent border-b-transparent" />
         )}
       </span>
-      <span className={cx('max-md:sr-only', reconnecting && 'text-st-err')}>{view.label}</span>
+      <span className={cx('max-md:sr-only', reconnecting && 'text-st-err-ink')}>{view.label}</span>
     </output>
   );
 }

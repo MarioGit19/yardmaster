@@ -39,9 +39,9 @@ export function ClaudePanel({
 
   return (
     <div className="claude-panel flex h-full min-h-0 flex-col" data-session-panel={session.id}>
-      <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 py-3">
+      <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
         <h2
-          className="min-w-0 flex-1 truncate font-medium text-body text-text-1"
+          className="min-w-0 flex-1 truncate font-medium text-body text-text-1 leading-7"
           title={session.title ?? undefined}
         >
           {session.title ?? 'Claude session'}

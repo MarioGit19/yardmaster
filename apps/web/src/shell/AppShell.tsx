@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { selectConnection, useBoard } from '../data/index.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { cx } from '../ui/cx.js';
@@ -23,6 +23,7 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
   const collapsed = narrow || rail === 'collapsed';
   const toggleRail = () => railPreference.set(rail === 'collapsed' ? 'expanded' : 'collapsed');
   const reconnecting = useBoard(selectConnection).status === 'reconnecting';
+  const pulseRef = usePulseHeight();
 
   useEffect(() => {
     if (narrow) return;
@@ -46,16 +47,23 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
         Skip to content
       </button>
       <Hud />
-      {reconnecting && (
+      <div className="relative flex min-h-0 flex-1">
+        {reconnecting && (
+          <div
+            role="status"
+            className="glass pointer-events-none absolute inset-x-0 top-0 z-30 flex h-8 items-center justify-center border-line border-b text-label text-st-err-ink"
+          >
+            Reconnecting…
+          </div>
+        )}
         <div
-          role="status"
-          className="flex h-8 shrink-0 items-center justify-center border-line border-b bg-bg-1 text-label text-st-err"
+          className={cx(
+            'flex shrink-0 transition-opacity duration-200',
+            reconnecting && 'opacity-60',
+          )}
         >
-          Reconnecting…
+          <ProjectRail collapsed={collapsed} onToggle={narrow ? undefined : toggleRail} />
         </div>
-      )}
-      <div className="flex min-h-0 flex-1">
-        <ProjectRail collapsed={collapsed} onToggle={narrow ? undefined : toggleRail} />
         <div data-reconnecting={reconnecting || undefined} className="relative flex min-w-0 flex-1">
           <main
             id="main"
@@ -71,7 +79,33 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
         </div>
         {sheet}
       </div>
-      {pulse}
+      {pulse && (
+        <div
+          ref={pulseRef}
+          className={cx('shrink-0 transition-opacity duration-200', reconnecting && 'opacity-60')}
+        >
+          {pulse}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Publishes the Pulse rail's height as `--pulse-h`, so toasts can sit above it. */
+function usePulseHeight() {
+  const observer = useRef<ResizeObserver | null>(null);
+  return useCallback((el: HTMLDivElement | null) => {
+    const root = document.documentElement.style;
+    observer.current?.disconnect();
+    observer.current = null;
+    if (!el) {
+      root.removeProperty('--pulse-h');
+      return;
+    }
+    if (typeof ResizeObserver === 'undefined') return;
+    observer.current = new ResizeObserver(() =>
+      root.setProperty('--pulse-h', `${el.offsetHeight}px`),
+    );
+    observer.current.observe(el);
+  }, []);
 }

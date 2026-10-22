@@ -31,6 +31,11 @@
   --color-st-ok-glow: var(--st-ok-glow);
   --color-st-err-glow: var(--st-err-glow);
   --color-st-idle-glow: var(--st-idle-glow);
+  --color-st-work-ink: var(--st-work-ink);
+  --color-st-tool-ink: var(--st-tool-ink);
+  --color-st-wait-ink: var(--st-wait-ink);
+  --color-st-ok-ink: var(--st-ok-ink);
+  --color-st-err-ink: var(--st-err-ink);
 
   --font-*: initial;
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
@@ -1107,11 +1112,11 @@
 }
 .diff-add .diff-sign,
 .diff-add .diff-no {
-  color: var(--st-ok);
+  color: var(--st-ok-ink);
 }
 .diff-del .diff-sign,
 .diff-del .diff-no {
-  color: var(--st-err);
+  color: var(--st-err-ink);
 }
 .diff-gap,
 .diff-more {

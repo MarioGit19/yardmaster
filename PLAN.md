@@ -349,8 +349,35 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: Rejected: the ⌘K palette animation is keyboard-triggered, but DESIGN §4.8 specifies it, so it stays (already 120 ms). Pod grid entrance and crew prop/mini-crew scales keep their shorthands: one shares its element with `layout` projection, the others are SVG groups using `transform-box`. Backdrop dim (420 ms) and ambient fades (0.6–1.2 s) stay over 300 ms because they are large-surface or ambient state, not responses to input. Opportunity sweep of overview and focus found nothing that passed the gate: the remaining instant swaps (git counts, elapsed time, history rows) are data the user reads.
   - Note: Follow-ups seen in shots, not caused by this pass: at 390 a Sonner toast covers the Attention bottom sheet. `focus.spec` "pod morphs" sometimes counts only 4 distinct widths under load; it also fails on the unchanged code. Other AnimatePresence entrances may still show one frame of their `initial` state at Off.
 
-- [ ] **7.16 Impeccable design critique**
+- [x] **7.16 Impeccable design critique**
   - Run an `impeccable` critique and audit of the overview, focus view, Attention Center and settings, using the screenshots plus the code. Fix the top issues (hierarchy, spacing, typography, contrast, states) without leaving DESIGN.md's direction. If more than about 10 issues remain, add follow-up task `7.16b`.
+  - **Verify:** `pnpm shots && pnpm check`
+  - Note: The critique ran as two isolated passes: a design review of the screenshots and code, and the `impeccable detect` scan. The review scored 29/40 and found 19 issues. The detector found nothing, but it only matches source text and can't check contrast or rendered sizes.
+  - Note: Fixed:
+    - Light-theme status text was 2.2–2.7:1. New `--st-*-ink` tokens (the status colour in dark, darker in light, ≥4.7:1 on every light surface) are now used for every `text-st-*`; dots, borders and glows keep the status colour. Light `--text-3` is now `#5f6573` (5.1:1 on `--bg-2`).
+    - The reconnect banner pushed the layout down 32px. It is now a glass overlay, and the rail and Pulse grey out along with main (§6 "nothing jumps").
+    - Settings ignored its max width: `cx` doesn't merge classes, so `max-w-[1600px]` won. Fixed with `Page width="narrow"`, plus clearer descriptions in text-2.
+    - Lanes no longer sit at the bottom of the pod (`mt-auto` removed), which left large gaps in equal-height rows.
+    - Session rows hide "0 tok".
+    - All three focus-column titles share a 28px `ColumnHeading` row (with an `actions` slot), so they line up.
+    - Toasts sit above the Pulse rail: AppShell publishes `--pulse-h`.
+  - Note: Tried a 340px default for the terminal column to give the Claude panel more room. Reverted: the 2×2 terminal grid broke at that width (the interactive placeholder overlapped its tile header).
+  - Note: e2e on a heavily loaded machine (load ~30): each full run failed 1–3 different timing-sensitive tests (pod morph widths, pulse oldest-dot hover, grid lefts mid-reorder), and each passed when re-run alone or with `--repeat-each`. One full run passed clean. The pulse test hovers the oldest dot, which can age out of the 15-min window before the hover lands.
+
+- [ ] **7.16b Design critique follow-ups**
+  - Remaining issues from the 7.16 critique, all within DESIGN.md's direction:
+    - (a) Dark `--text-3` `#6B7183` is 4.0:1 on `--bg-1` and 3.8:1 on `--bg-2`, below AA for 11–12px meta. Either change the DESIGN-specified hex (e.g. `#7A8093`, needs maintainer sign-off) or move information-bearing meta to text-2.
+    - (b) Dimmed pods (opacity 0.7) put meta text at ~2.5:1: dim only the non-text layers.
+    - (c) The Pulse rail defaults to expanded and takes ~22% of a 900px-tall or phone viewport: collapse it by default on short or narrow screens.
+    - (d) At 1440 the Claude panel is ~430px, so titles and code clip: give the terminal column a width-relative default, and fix the 2×2 grid's narrow tiles first.
+    - (e) The terminal stack opens on a terminal it can't mirror ("Interactive app" placeholder): prefer an xterm-mirrorable terminal when there's no explicit choice.
+    - (f) Rail status dots and the HUD below `lg` are colour-only (§8): add a shape or icon.
+    - (g) Crash toast copy ("Tests failed / tests") lacks the project and exit code: fix server-side.
+    - (h) Interim Attention Center rows show no tool payload, and the sheet covers the third pod column without a scrim (full cards are 8.4).
+    - (i) Identical idle rows ("Idle / No reply yet"): show the start time or a short id.
+    - (j) The pod skeleton doesn't match the real pod (56px crew, lane rows).
+    - (k) Off-scale radius and spacing leftovers (`rounded-[4px]` in ToolCard and PulseRail, 10/14px steps).
+    - (l) The pulse e2e test's oldest-dot hover is timing-sensitive.
   - **Verify:** `pnpm shots && pnpm check`
 
 ## Phase 8 — Act: headless sessions and approvals

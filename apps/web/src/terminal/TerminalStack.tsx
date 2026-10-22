@@ -18,6 +18,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { selectWindow, useBoard, useBoardClient, useBoardShallow } from '../data/index.js';
+import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
 import { spring } from '../motion.js';
@@ -122,30 +123,32 @@ export function TerminalStack({
 
   return (
     <div data-terminal-stack={projectId} className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <h2 className="flex min-w-0 flex-1 items-baseline gap-2 font-medium text-body text-text-1">
-          <span className="truncate">Terminals</span>
-          {ordered.length > 0 && (
-            <span className="tabular text-meta text-text-3">{ordered.length}</span>
-          )}
-        </h2>
-        {ordered.length > 1 && <LayoutToggle layout={layout} />}
-        {onMaximizedChange && (
-          <IconButton
-            size="sm"
-            label={maximized ? 'Restore terminals' : 'Maximize terminals'}
-            aria-pressed={maximized}
-            icon={
-              maximized ? (
-                <Minimize2 className="size-4" strokeWidth={1.5} />
-              ) : (
-                <Maximize2 className="size-4" strokeWidth={1.5} />
-              )
-            }
-            onClick={() => onMaximizedChange(!maximized)}
-          />
-        )}
-      </div>
+      <ColumnHeading
+        className=""
+        meta={ordered.length > 0 ? ordered.length : undefined}
+        actions={
+          <>
+            {ordered.length > 1 && <LayoutToggle layout={layout} />}
+            {onMaximizedChange && (
+              <IconButton
+                size="sm"
+                label={maximized ? 'Restore terminals' : 'Maximize terminals'}
+                aria-pressed={maximized}
+                icon={
+                  maximized ? (
+                    <Minimize2 className="size-4" strokeWidth={1.5} />
+                  ) : (
+                    <Maximize2 className="size-4" strokeWidth={1.5} />
+                  )
+                }
+                onClick={() => onMaximizedChange(!maximized)}
+              />
+            )}
+          </>
+        }
+      >
+        Terminals
+      </ColumnHeading>
 
       {ordered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-control border border-line border-dashed px-6 text-center">

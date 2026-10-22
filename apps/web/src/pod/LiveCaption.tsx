@@ -6,8 +6,8 @@ import type { Caption, CaptionTone } from './model.js';
 
 export const CAPTION_COLOR: Record<CaptionTone, string> = {
   active: 'text-text-1',
-  wait: 'text-st-wait',
-  err: 'text-st-err',
+  wait: 'text-st-wait-ink',
+  err: 'text-st-err-ink',
   rest: 'text-text-3',
 };
 

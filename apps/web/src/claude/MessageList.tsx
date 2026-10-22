@@ -268,7 +268,7 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
                 <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
                 Jump to latest
                 {unseen > 0 && (
-                  <span className="tabular rounded-full bg-st-work/20 px-1.5 text-meta text-st-work">
+                  <span className="tabular rounded-full bg-st-work/20 px-1.5 text-meta text-st-work-ink">
                     {unseen > 99 ? '99+' : unseen}
                   </span>
                 )}

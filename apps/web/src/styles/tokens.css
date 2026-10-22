@@ -26,6 +26,12 @@
   --st-ok-glow: color-mix(in srgb, var(--st-ok) 35%, transparent);
   --st-err-glow: color-mix(in srgb, var(--st-err) 35%, transparent);
   --st-idle-glow: color-mix(in srgb, var(--st-idle) 35%, transparent);
+  /* Status as text. Same as the status color in dark; darker in light so small text clears 4.5:1. */
+  --st-work-ink: var(--st-work);
+  --st-tool-ink: var(--st-tool);
+  --st-wait-ink: var(--st-wait);
+  --st-ok-ink: var(--st-ok);
+  --st-err-ink: var(--st-err);
 
   /* Project accents: OKLCH L=0.72 C=0.14, hues kept ≥15° away from every status hue (accents.ts). */
   --accent-0: oklch(0.72 0.14 35);
@@ -91,7 +97,7 @@
   --line-strong: rgb(0 0 0 / 0.16);
   --text-1: #0e1116;
   --text-2: #4a505e;
-  --text-3: #686e7b;
+  --text-3: #5f6573;
 
   /* Status colors with OKLCH lightness lowered by 0.12 for contrast on light surfaces. */
   --st-work: #5a77d6;
@@ -100,6 +106,11 @@
   --st-ok: #00b573;
   --st-err: #d43157;
   --st-idle: #4a4f60;
+  --st-work-ink: #4a64c0;
+  --st-tool-ink: #0a6f7e;
+  --st-wait-ink: #8a5a00;
+  --st-ok-ink: #00754a;
+  --st-err-ink: #c02a4d;
 
   --highlight-inset: inset 0 1px 0 rgb(255 255 255 / 0.8);
   --glass-shimmer: rgb(255 255 255 / 0.7);

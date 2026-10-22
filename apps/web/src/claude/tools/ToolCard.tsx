@@ -113,7 +113,7 @@ type CallOf<K extends ToolCall['kind']> = Extract<ToolCall, { kind: K }>;
 function ToolState({ row }: { row: ToolRow }) {
   if (row.result === null) {
     return (
-      <span className="flex items-center gap-1.5 text-meta text-st-tool">
+      <span className="flex items-center gap-1.5 text-meta text-st-tool-ink">
         <span
           aria-hidden
           className="tool-running size-1.5 rounded-full bg-st-tool shadow-[0_0_0_3px_var(--st-tool-glow)]"
@@ -124,13 +124,13 @@ function ToolState({ row }: { row: ToolRow }) {
   }
   if (row.result.isError) {
     return (
-      <span className="flex items-center gap-1 text-meta text-st-err">
+      <span className="flex items-center gap-1 text-meta text-st-err-ink">
         <X aria-hidden className="size-3.5" strokeWidth={2} />
         failed
       </span>
     );
   }
-  return <Check aria-label="done" className="size-3.5 text-st-ok" strokeWidth={2} />;
+  return <Check aria-label="done" className="size-3.5 text-st-ok-ink" strokeWidth={2} />;
 }
 
 function Chevron({ open }: { open: boolean }) {
@@ -232,7 +232,7 @@ function ResultText({ text, tone }: { text: string; tone?: 'error' }) {
     <pre
       className={cx(
         'max-h-72 overflow-auto px-3 py-2 font-mono text-label leading-5 whitespace-pre-wrap break-words',
-        tone === 'error' ? 'bg-st-err/[0.06] text-st-err' : 'text-text-2',
+        tone === 'error' ? 'bg-st-err/[0.06] text-st-err-ink' : 'text-text-2',
       )}
     >
       {clipped || <span className="font-sans text-text-3 italic">No output</span>}
@@ -386,12 +386,12 @@ function EditCard({ row, cwd, call }: CardProps & { call: CallOf<'edit'> | CallO
             {added} added, {removed} removed
           </span>
           {added > 0 && (
-            <span aria-hidden className="text-st-ok">
+            <span aria-hidden className="text-st-ok-ink">
               +{added}
             </span>
           )}
           {removed > 0 && (
-            <span aria-hidden className="text-st-err">
+            <span aria-hidden className="text-st-err-ink">
               −{removed}
             </span>
           )}

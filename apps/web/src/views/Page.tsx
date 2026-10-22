@@ -1,10 +1,26 @@
 import type { ReactNode } from 'react';
 import { cx } from '../ui/cx.js';
 
-/** Main-area page frame: 16px gutters on phones, 24px from tablet up. */
-export function Page({ children, className }: { children: ReactNode; className?: string }) {
+/** Main-area page frame: 16px gutters on phones, 24px from tablet up. `narrow` is for forms. */
+export function Page({
+  children,
+  width = 'wide',
+  className,
+}: {
+  children: ReactNode;
+  width?: 'wide' | 'narrow';
+  className?: string;
+}) {
   return (
-    <div className={cx('mx-auto w-full max-w-[1600px] p-4 md:p-6', className)}>{children}</div>
+    <div
+      className={cx(
+        'mx-auto w-full p-4 md:p-6',
+        width === 'narrow' ? 'max-w-2xl' : 'max-w-[1600px]',
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 

@@ -133,7 +133,12 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
             </span>
           )}
         </span>
-        <StatusDot tone="wait" label={caption.text} showLabel className="text-label text-st-wait" />
+        <StatusDot
+          tone="wait"
+          label={caption.text}
+          showLabel
+          className="text-label text-st-wait-ink"
+        />
       </span>
     </>
   );

@@ -198,7 +198,7 @@ export function ProjectPod({ project }: { project: Project }) {
       )}
 
       {openTerminals.length > 0 ? (
-        <div className="lanes relative z-[1] mt-auto">
+        <div className="lanes relative z-[1]">
           <ul aria-label="Terminals" className="flex flex-col">
             {openTerminals.slice(0, MAX_LANES).map((terminal) => (
               <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
@@ -211,7 +211,7 @@ export function ProjectPod({ project }: { project: Project }) {
           )}
         </div>
       ) : (
-        <p className="mt-auto text-meta text-text-3">No open terminals</p>
+        <p className="text-meta text-text-3">No open terminals</p>
       )}
     </motion.article>
   );

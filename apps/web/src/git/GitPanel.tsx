@@ -7,14 +7,14 @@ import { cx } from '../ui/cx.js';
 import { groupFiles, splitPath, syncState, unlistedCount } from './model.js';
 
 const FILE_MARK: Record<GitFileStatus, { mark: string; className: string }> = {
-  modified: { mark: 'M', className: 'text-st-work' },
-  added: { mark: 'A', className: 'text-st-ok' },
-  deleted: { mark: 'D', className: 'text-st-err' },
-  renamed: { mark: 'R', className: 'text-st-work' },
-  copied: { mark: 'C', className: 'text-st-work' },
-  typechange: { mark: 'T', className: 'text-st-work' },
+  modified: { mark: 'M', className: 'text-st-work-ink' },
+  added: { mark: 'A', className: 'text-st-ok-ink' },
+  deleted: { mark: 'D', className: 'text-st-err-ink' },
+  renamed: { mark: 'R', className: 'text-st-work-ink' },
+  copied: { mark: 'C', className: 'text-st-work-ink' },
+  typechange: { mark: 'T', className: 'text-st-work-ink' },
   untracked: { mark: 'U', className: 'text-text-3' },
-  conflicted: { mark: '!', className: 'text-st-err' },
+  conflicted: { mark: '!', className: 'text-st-err-ink' },
 };
 
 /** Files shown before "Show more"; the groups share this budget in display order. */
@@ -44,7 +44,7 @@ export function GitPanel({ git, now }: GitPanelProps) {
       </div>
       {git.dirty === 0 ? (
         <p className="flex items-center gap-1.5 text-body-sm text-text-3">
-          <Check aria-hidden className="size-3.5 text-st-ok" strokeWidth={1.75} />
+          <Check aria-hidden className="size-3.5 text-st-ok-ink" strokeWidth={1.75} />
           Working tree clean
         </p>
       ) : (
@@ -159,7 +159,7 @@ function FileRow({ file }: { file: GitFileChange }) {
       </span>
       {file.staged && (
         <span
-          className={cx('shrink-0 text-meta', staged ? 'text-st-ok' : 'text-text-3')}
+          className={cx('shrink-0 text-meta', staged ? 'text-st-ok-ink' : 'text-text-3')}
           title={staged ? 'Staged' : 'Partly staged'}
         >
           <span aria-hidden>●</span>

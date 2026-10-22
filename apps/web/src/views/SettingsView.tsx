@@ -21,10 +21,10 @@ export function SettingsView() {
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
   return (
-    <Page className="max-w-2xl">
+    <Page width="narrow">
       <PageHeader title="Settings" />
       <section className="flex flex-col divide-y divide-line rounded-panel border border-line bg-bg-1 shadow-raised">
-        <SettingRow title="Theme" description="System follows your OS appearance.">
+        <SettingRow title="Theme" description="Dark, light, or follow your OS.">
           <Segmented
             label="Theme"
             options={THEME_SETTINGS}
@@ -35,7 +35,7 @@ export function SettingsView() {
         </SettingRow>
         <SettingRow
           title="Motion"
-          description="Reduced keeps cross-fades only. Off stops every animation."
+          description="Reduced keeps cross-fades only. Off stops every animation. System follows your OS."
         >
           <Segmented
             label="Motion"
@@ -63,7 +63,7 @@ function SettingRow({
     <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
         <h2 className="font-medium text-body text-text-1">{title}</h2>
-        <p className="text-label text-text-3">{description}</p>
+        <p className="text-label text-text-2">{description}</p>
       </div>
       {children}
     </div>

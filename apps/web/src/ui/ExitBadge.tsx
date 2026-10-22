@@ -23,7 +23,7 @@ export function ExitBadge({ code, className }: { code: number; className?: strin
       transition={spring.snappy}
       className={cx(
         'inline-flex h-5 shrink-0 items-center gap-0.5 rounded-chip px-1 font-mono text-meta tabular',
-        code === 0 ? 'text-st-ok' : 'bg-st-err-glow text-st-err',
+        code === 0 ? 'text-st-ok-ink' : 'bg-st-err-glow text-st-err-ink',
         className,
       )}
     >

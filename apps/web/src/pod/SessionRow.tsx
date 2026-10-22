@@ -21,6 +21,7 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
   const line = lastLine(session.lastAssistantText);
   const title = session.title?.trim() || null;
   const fallback = title && title !== caption.text ? title : 'No reply yet';
+  const tokens = totalTokens(session);
   const streaming = isStreaming(session);
   const tool = session.status.kind === 'tool' ? session.status.tool : null;
   const subagents = session.subagents.filter((a) => a.status === 'running').length;
@@ -50,12 +51,14 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
           <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
-          <span
-            title={`${totalTokens(session).toLocaleString('en-US')} tokens`}
-            className="tabular shrink-0 font-mono text-meta text-text-3"
-          >
-            {formatCount(totalTokens(session))} tok
-          </span>
+          {tokens > 0 && (
+            <span
+              title={`${tokens.toLocaleString('en-US')} tokens`}
+              className="tabular shrink-0 font-mono text-meta text-text-3"
+            >
+              {formatCount(tokens)} tok
+            </span>
+          )}
         </div>
         <p
           dir="auto"
