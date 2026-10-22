@@ -307,7 +307,7 @@ function StackTab({
       // detail 0: Enter or Space, not a pointer.
       onClick={(e) => onSelect(e.detail === 0)}
       className={cx(
-        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-150',
+        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-fast',
         selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
         closed && 'opacity-70',
       )}
@@ -359,7 +359,7 @@ function Pane({
       onPointerDown={inGrid ? onActivate : undefined}
       onFocusCapture={inGrid ? onActivate : undefined}
       className={cx(
-        'flex min-h-0 min-w-0 flex-col overflow-hidden rounded-control border bg-bg-0 transition-[border-color,box-shadow] duration-150',
+        'flex min-h-0 min-w-0 flex-col overflow-hidden rounded-control border bg-bg-0 transition-[border-color,box-shadow] duration-fast',
         inGrid && active ? 'border-line-strong shadow-raised' : 'border-line',
         wide && 'col-span-2',
       )}
@@ -696,7 +696,7 @@ function CommandLine({
         void submit();
       }}
       className={cx(
-        'flex min-w-0 items-center gap-2 rounded-control border border-line bg-bg-0 pr-1.5 pl-3 transition-colors duration-150 focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]',
+        'flex min-w-0 items-center gap-2 rounded-control border border-line bg-bg-0 pr-1.5 pl-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]',
         !open && 'opacity-60',
       )}
     >

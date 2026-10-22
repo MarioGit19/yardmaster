@@ -11,8 +11,15 @@ export const spring = {
   gentle: { type: 'spring', stiffness: 120, damping: 20 },
 } as const satisfies Record<string, Transition>;
 
-/** Seconds. */
+/** Seconds. Mirrored in CSS as `--dur-fast/base/slow` (tokens.css); `motion.test.ts` keeps them equal. */
 export const dur = { fast: 0.12, base: 0.22, slow: 0.42 } as const;
+
+/**
+ * Seconds. The named exceptions to `dur` (DESIGN.md §3 rule 9), mirrored as `--dur-<name>`:
+ * the attention ripple, the turn-finished sweep, a quiet pod stepping back, an event's spark along
+ * the pod's hairline (it shares the ripple's length) and the ambient field's energy cross-fade.
+ */
+export const moment = { ripple: 0.9, sweep: 0.6, dim: 0.8, spark: 0.9, ambient: 1.2 } as const;
 
 export const ease = {
   out: [0.16, 1, 0.3, 1],

@@ -75,7 +75,7 @@ export function ApprovalCard({
       data-resolved={resolved ?? undefined}
       onClick={onSelect}
       className={cx(
-        'relative flex flex-col gap-2.5 overflow-hidden rounded-panel border p-3 transition-[border-color,background-color] duration-150',
+        'relative flex flex-col gap-2.5 overflow-hidden rounded-panel border p-3 transition-[border-color,background-color] duration-fast',
         selected && !resolved ? 'border-line-strong bg-bg-2' : 'border-line bg-bg-1',
       )}
     >
@@ -244,7 +244,7 @@ function MaskedPayload({ approval, projectPath }: { approval: Approval; projectP
         type="button"
         aria-pressed={!masked}
         onClick={() => reveal.toggle(key)}
-        className="self-start rounded-chip px-1 text-meta text-text-3 transition-colors duration-150 hover:text-text-1"
+        className="self-start rounded-chip px-1 text-meta text-text-3 transition-colors duration-fast hover:text-text-1"
       >
         {masked ? 'Secrets hidden · Reveal' : 'Hide secrets'}
       </button>

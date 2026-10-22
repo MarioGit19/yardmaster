@@ -92,7 +92,7 @@ function Segmented<T extends string>({
           type="button"
           aria-pressed={option === value}
           onClick={() => onChange(option)}
-          className="relative rounded-chip px-3 py-1 text-label capitalize text-text-2 transition-colors duration-150 hover:text-text-1 aria-pressed:text-text-1"
+          className="relative rounded-chip px-3 py-1 text-label capitalize text-text-2 transition-colors duration-fast hover:text-text-1 aria-pressed:text-text-1"
         >
           {option === value && (
             <motion.span

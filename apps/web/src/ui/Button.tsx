@@ -25,7 +25,7 @@ export function buttonClass(
 ) {
   return cx(
     'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap rounded-control font-medium',
-    'transition-[background-color,border-color,color,transform] duration-150 ease-out active:scale-[0.97]',
+    'transition-[background-color,border-color,color,transform] duration-fast ease-out active:scale-[0.97]',
     'disabled:pointer-events-none disabled:opacity-50',
     VARIANT[variant],
     square ? SQUARE[size] : SIZE[size],

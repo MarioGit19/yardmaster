@@ -7,7 +7,7 @@ import {
   useDoneAt,
   useEventCount,
 } from '../data/index.js';
-import { useMotionLevel } from '../motion.js';
+import { moment, useMotionLevel } from '../motion.js';
 import { approach, borderOpacity, borderSpeed, isFreshDone, SWEEP_MS } from './activity.js';
 
 // The pod's activity layers, DESIGN.md §4.10: a light travelling around the border while the
@@ -15,7 +15,7 @@ import { approach, borderOpacity, borderSpeed, isFreshDone, SWEEP_MS } from './a
 
 /** Sparks on screen at once; a burst of events doesn't turn into a shower. */
 const MAX_SPARKS = 5;
-const SPARK_MS = 900;
+const SPARK_MS = moment.spark * 1000;
 /** Where the border light starts, so a fresh pod's light isn't always at the same spot. */
 const START_ANGLE = 210;
 

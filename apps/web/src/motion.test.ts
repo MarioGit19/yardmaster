@@ -6,6 +6,7 @@ import {
   applyInitialMotion,
   dur,
   ease,
+  moment,
   motionConfigFor,
   motionPreference,
   move,
@@ -129,5 +130,76 @@ describe('reduced motion', () => {
     const second =
       "initial={{ transform: move(still, 'scale(0.9)') }} exit={{ transform: 'scale(0.9)' }}";
     expect(transformLeaks('sample.tsx', second)).toHaveLength(1);
+  });
+});
+
+const STYLES = join(SRC, 'styles');
+const tokensCss = readFileSync(join(STYLES, 'tokens.css'), 'utf8');
+const indexCss = readFileSync(join(STYLES, 'index.css'), 'utf8');
+
+function cssVar(css: string, name: string): string | undefined {
+  return new RegExp(`--${name}:\\s*([^;]+);`).exec(css)?.[1]?.trim();
+}
+
+const toSeconds = (value: string) =>
+  value.endsWith('ms') ? Number.parseFloat(value) / 1000 : Number.parseFloat(value);
+
+/**
+ * Raw times in CSS transitions and animations. One-shot motion takes a `--dur-*` token; an
+ * `infinite` loop keeps its own period, and a duration override on a loop says so with `loop:`.
+ */
+function rawTimes(css: string): string[] {
+  const leaks: string[] = [];
+  for (const match of css.matchAll(
+    /\b(transition|animation)(-duration|-delay)?:([^;]+);([^\n]*)/g,
+  )) {
+    const [line, , longhand, value = '', rest = ''] = match;
+    if (!/(?<![\w-])-?\d*\.?\d+m?s\b/.test(value.replace(/var\([^)]*\)/g, ''))) continue;
+    if (/\binfinite\b/.test(value) || /loop:/.test(rest)) continue;
+    if (longhand === '-delay' && /^\s*-/.test(value)) continue;
+    leaks.push(line.trim());
+  }
+  return leaks;
+}
+
+describe('CSS motion tokens', () => {
+  it('mirror dur, moment and ease from motion.ts', () => {
+    for (const [name, seconds] of Object.entries({ ...dur, ...moment })) {
+      const value = cssVar(tokensCss, `dur-${name}`);
+      expect(value, `--dur-${name}`).toBeDefined();
+      expect(toSeconds(value ?? ''), `--dur-${name}`).toBeCloseTo(seconds, 6);
+    }
+    expect(cssVar(indexCss, 'ease-out')).toBe(`cubic-bezier(${ease.out.join(', ')})`);
+    expect(cssVar(indexCss, 'ease-in-out')).toBe(`cubic-bezier(${ease.inOut.join(', ')})`);
+  });
+
+  it("back Tailwind's default transition", () => {
+    expect(cssVar(indexCss, 'default-transition-duration')).toBe('var(--dur-fast)');
+    expect(cssVar(indexCss, 'default-transition-timing-function')).toBe('var(--ease-out)');
+  });
+
+  it('leave no raw one-shot durations in the stylesheet', () => {
+    expect(rawTimes(indexCss)).toEqual([]);
+  });
+
+  it('flags a raw duration', () => {
+    expect(rawTimes('a { transition: opacity 150ms ease; }')).toHaveLength(1);
+    expect(rawTimes('a { animation: x 0.8s var(--ease-out) both; }')).toHaveLength(1);
+    expect(rawTimes('a { transition: opacity var(--dur-fast) var(--ease-out); }')).toEqual([]);
+    expect(rawTimes('a { animation: x 1.6s linear infinite; }')).toEqual([]);
+    expect(rawTimes('a { animation-delay: -0.4s; }')).toEqual([]);
+  });
+
+  it('use no raw Tailwind durations or string easings in components', () => {
+    const hits = sources(SRC).flatMap((path) =>
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .flatMap((line, i) =>
+          /\bduration-\d|'ease(Out|In|InOut)'/.test(line)
+            ? [`${relative(SRC, path)}:${i + 1}`]
+            : [],
+        ),
+    );
+    expect(hits).toEqual([]);
   });
 });

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, type ReactNode, useId, useMemo, useRef } from 'react';
-import { ease, useMotionLevel } from '../../motion.js';
+import { dur, ease, useMotionLevel } from '../../motion.js';
 import { usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
 import { ExitBadge } from '../../ui/ExitBadge.js';
@@ -138,7 +138,7 @@ function Chevron({ open }: { open: boolean }) {
     <ChevronRight
       aria-hidden
       className={cx(
-        'size-3.5 shrink-0 text-text-3 transition-transform duration-200 ease-out',
+        'size-3.5 shrink-0 text-text-3 transition-transform duration-base ease-out',
         open && 'rotate-90',
       )}
       strokeWidth={1.75}
@@ -428,7 +428,7 @@ function LayoutToggle() {
           aria-checked={layout === option}
           onClick={() => diffLayoutPreference.set(option)}
           className={cx(
-            'h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-150',
+            'h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-fast',
             layout === option
               ? 'bg-bg-1 text-text-1 shadow-raised'
               : 'text-text-3 hover:text-text-1',
@@ -532,7 +532,7 @@ function ChipCard({
             target="_blank"
             rel="noreferrer noopener"
             aria-label={`Open ${urlParts(href)?.host ?? 'link'}`}
-            className="flex h-full shrink-0 items-center border-line border-l px-1.5 text-text-3 transition-colors duration-150 hover:bg-bg-2 hover:text-text-1"
+            className="flex h-full shrink-0 items-center border-line border-l px-1.5 text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1"
           >
             <ExternalLink aria-hidden className="size-3" strokeWidth={1.75} />
           </a>
@@ -628,7 +628,7 @@ function UrlChip({ url }: { url: string }) {
       target="_blank"
       rel="noreferrer noopener"
       title={url}
-      className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2 font-mono text-meta transition-colors duration-150 hover:border-line-strong"
+      className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2 font-mono text-meta transition-colors duration-fast hover:border-line-strong"
     >
       <Globe aria-hidden className="size-3 shrink-0 text-text-3" strokeWidth={1.5} />
       <span className="shrink-0 text-text-1">{parts.host}</span>
@@ -733,7 +733,7 @@ function TodoMark({ status, draw }: { status: TodoStatus; draw: boolean }) {
             strokeLinejoin="round"
             initial={initial}
             animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 0.32, delay: 0.14, ease: ease.out }}
+            transition={{ duration: dur.base, delay: dur.fast, ease: ease.out }}
           />
         </>
       ) : status === 'in_progress' ? (

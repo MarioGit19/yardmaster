@@ -78,7 +78,7 @@ export function SessionHistory({ projectId, knownIds, refreshKey, branch }: Sess
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="mt-1.5 rounded-control text-meta text-text-2 tabular transition-colors duration-150 hover:text-text-1"
+              className="mt-1.5 rounded-control text-meta text-text-2 tabular transition-colors duration-fast hover:text-text-1"
             >
               {expanded ? 'Show fewer' : `Show ${hidden} more`}
             </button>
@@ -114,7 +114,7 @@ function HistoryRow({
   return (
     <div
       data-history={entry.id}
-      className="group relative flex min-w-0 items-center gap-2 rounded-control px-2 py-1.5 transition-colors duration-150 focus-within:bg-bg-2 hover:bg-bg-2"
+      className="group relative flex min-w-0 items-center gap-2 rounded-control px-2 py-1.5 transition-colors duration-fast focus-within:bg-bg-2 hover:bg-bg-2"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span

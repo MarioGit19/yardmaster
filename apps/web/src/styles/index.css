@@ -78,6 +78,10 @@
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Bare `transition-*` utilities use the motion tokens (tokens.css). */
+  --default-transition-duration: var(--dur-fast);
+  --default-transition-timing-function: var(--ease-out);
 }
 
 /* Emphasis glow, DESIGN.md §2: `glow-st-wait`, `glow-st-err`, … */
@@ -94,6 +98,25 @@
 
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Motion durations, DESIGN.md §3: `duration-fast/base/slow` (Tailwind has no duration namespace).
+   Like Tailwind's own `duration-*` they set `--tw-duration`, which `transition-*` reads. */
+@property --tw-duration {
+  syntax: "*";
+  inherits: false;
+}
+@utility duration-fast {
+  --tw-duration: var(--dur-fast);
+  transition-duration: var(--dur-fast);
+}
+@utility duration-base {
+  --tw-duration: var(--dur-base);
+  transition-duration: var(--dur-base);
+}
+@utility duration-slow {
+  --tw-duration: var(--dur-slow);
+  transition-duration: var(--dur-slow);
 }
 
 @layer base {
@@ -149,7 +172,7 @@
 
 .tooltip {
   transform-origin: var(--radix-tooltip-content-transform-origin);
-  animation: tooltip-in 120ms var(--ease-out);
+  animation: tooltip-in var(--dur-fast) var(--ease-out);
 }
 .tooltip[data-side="bottom"] {
   --tooltip-dy: -2px;
@@ -181,7 +204,7 @@
   inset: 0;
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, var(--glass-shimmer), transparent);
-  animation: skeleton-sweep 1.6s var(--ease-in-out) infinite;
+  animation: skeleton-sweep 1.6s linear infinite;
 }
 
 /* Reduced motion keeps cross-fades only: skeletons and tooltips hold still. */
@@ -237,7 +260,7 @@
     radial-gradient(60% 50% at 82% 6%, var(--field-deep), transparent 72%),
     radial-gradient(90% 60% at 50% 115%, var(--field-floor), transparent 70%);
   opacity: calc(0.55 + 0.45 * var(--ambient-energy, 0));
-  transition: opacity 1.2s var(--ease-in-out);
+  transition: opacity var(--dur-ambient) var(--ease-in-out);
 }
 .ambient-attention {
   background: radial-gradient(
@@ -246,11 +269,11 @@
     transparent 70%
   );
   opacity: var(--ambient-attention, 0);
-  transition: opacity 0.9s var(--ease-in-out);
+  transition: opacity var(--dur-ripple) var(--ease-in-out);
 }
 .ambient-canvas {
   opacity: 0;
-  transition: opacity 0.6s var(--ease-out);
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
 .ambient-canvas[data-ready] {
   opacity: 1;
@@ -434,7 +457,7 @@
   animation: crew-scroll 1.6s linear infinite;
 }
 [data-crew-detail="detailed"] .crew-scroll {
-  animation-duration: 3.2s;
+  animation-duration: 3.2s; /* loop: a longer page scrolls at the same speed */
 }
 
 @keyframes crew-dot {
@@ -511,7 +534,7 @@
 .crew-spark {
   transform-origin: center;
   opacity: 0;
-  animation: crew-spark 0.8s var(--ease-out) both;
+  animation: crew-spark var(--dur-spark) var(--ease-out) both;
 }
 .crew[data-crew-hold] .crew-spark {
   animation: crew-spark-hold 1.6s var(--ease-out) infinite;
@@ -563,7 +586,7 @@
   opacity: 0;
   transform: translateX(-100%);
   pointer-events: none;
-  transition: opacity 400ms var(--ease-out);
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
 [data-streaming] > .lane-row::after {
   opacity: 0.85;
@@ -628,11 +651,11 @@
 /* A quiet pod steps back (§4.10) on its non-text layers only, so its text keeps AA contrast.
    Stepping back is slow; coming forward is quick. */
 .pod-dim {
-  transition: opacity 120ms var(--ease-out);
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 .pod[data-faded] .pod-dim {
   opacity: 0.7;
-  transition-duration: 800ms;
+  transition-duration: var(--dur-dim);
 }
 .pod::before {
   content: "";
@@ -681,7 +704,7 @@
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 600ms var(--ease-out);
+  transition: opacity var(--dur-slow) var(--ease-out);
   mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -745,7 +768,7 @@
   border-radius: 9999px;
   background: color-mix(in srgb, var(--accent) 60%, white);
   box-shadow: 0 0 6px var(--accent);
-  animation: pod-spark 900ms var(--ease-out) forwards;
+  animation: pod-spark var(--dur-spark) var(--ease-out) forwards;
 }
 
 /* Turn finished: one green band sweeps left to right, 600 ms, never loops (§3 rule 5). */
@@ -776,7 +799,7 @@
     transparent
   );
   transform: translateX(-100%);
-  animation: pod-sweep 600ms var(--ease-in-out) forwards;
+  animation: pod-sweep var(--dur-sweep) var(--ease-in-out) forwards;
 }
 @keyframes pod-sweep-wash {
   0%,
@@ -791,7 +814,7 @@
   width: 100%;
   transform: none;
   background: color-mix(in srgb, var(--st-ok) 8%, transparent);
-  animation: pod-sweep-wash 600ms var(--ease-out) forwards;
+  animation: pod-sweep-wash var(--dur-sweep) var(--ease-out) forwards;
 }
 
 .pod-spotlight {
@@ -801,7 +824,7 @@
   border-radius: 9999px;
   background: radial-gradient(closest-side, var(--spotlight), transparent);
   opacity: 0;
-  transition: opacity 200ms var(--ease-out);
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
   .pod:hover .pod-spotlight {
@@ -826,7 +849,7 @@
   width: 40%;
   background: linear-gradient(90deg, transparent, var(--text-shimmer), transparent);
   transform: translateX(-100%);
-  animation: caption-sweep 700ms var(--ease-in-out) 80ms forwards;
+  animation: caption-sweep var(--dur-slow) var(--ease-in-out) forwards;
   pointer-events: none;
 }
 [data-motion="reduced"] .caption-sweep::after {
@@ -857,7 +880,7 @@
   left: 0;
   width: 25%;
   background: linear-gradient(90deg, transparent, var(--st-work), transparent);
-  animation: progress-sweep 1.4s var(--ease-in-out) infinite;
+  animation: progress-sweep 1.4s linear infinite;
 }
 [data-motion="reduced"] .progress-shimmer::after {
   animation: none;
@@ -918,7 +941,7 @@
   inset: 0;
   z-index: 5;
   background: var(--bg-1);
-  animation: focus-col-max-in 160ms var(--ease-out);
+  animation: focus-col-max-in var(--dur-fast) var(--ease-out);
 }
 @keyframes focus-col-max-in {
   from {
@@ -955,7 +978,7 @@
   width: 1px;
   height: 100%;
   background: var(--line);
-  transition: background-color 150ms var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .focus-handle-grip {
   position: absolute;
@@ -968,8 +991,8 @@
   opacity: 0;
   transform: scaleY(0.6);
   transition:
-    opacity 150ms var(--ease-out),
-    transform 200ms var(--ease-out);
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
   .focus-handle:hover .focus-handle-line {
@@ -1021,10 +1044,10 @@
   }
 }
 .msg-enter {
-  animation: msg-enter 220ms var(--ease-out) both;
+  animation: msg-enter var(--dur-base) var(--ease-out) both;
 }
 .msg-fade {
-  animation: msg-fade 160ms var(--ease-out) both;
+  animation: msg-fade var(--dur-fast) var(--ease-out) both;
 }
 [data-motion="reduced"] .msg-enter {
   animation-name: msg-fade;
@@ -1039,13 +1062,13 @@
 }
 .tool-enter {
   transform-origin: 0 0;
-  animation: tool-enter 220ms var(--ease-out) both;
+  animation: tool-enter var(--dur-base) var(--ease-out) both;
 }
 [data-motion="reduced"] .tool-enter {
   animation-name: msg-fade;
 }
 .tool-head {
-  transition: background-color 150ms var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .tool-head:not(:disabled):hover {
   background: var(--bg-2);
@@ -1055,7 +1078,7 @@
   box-shadow: inset 0 0 0 2px var(--line-strong);
 }
 .todo-progress {
-  transition: transform 420ms var(--ease-out);
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 .task-thread {
   border-color: color-mix(in srgb, var(--orb-task) 45%, transparent);
@@ -1170,7 +1193,7 @@
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
   text-underline-offset: 2px;
-  transition: text-decoration-color 150ms var(--ease-out);
+  transition: text-decoration-color var(--dur-fast) var(--ease-out);
 }
 .md a:hover {
   text-decoration-color: currentColor;
@@ -1330,10 +1353,10 @@
   }
 }
 .pulse-body {
-  animation: pulse-in 200ms var(--ease-out);
+  animation: pulse-in var(--dur-base) var(--ease-out);
 }
 [data-motion="reduced"] .pulse-body {
-  animation: fade-in 200ms var(--ease-out);
+  animation: fade-in var(--dur-base) var(--ease-out);
 }
 
 /* Session history: where hover exists, row actions float over the row's end on hover or
@@ -1347,7 +1370,7 @@
     border-radius: inherit;
     background: linear-gradient(to right, transparent, var(--bg-2) 1.5rem);
     opacity: 0;
-    transition: opacity 150ms var(--ease-out);
+    transition: opacity var(--dur-fast) var(--ease-out);
   }
   .group:hover .history-actions,
   .group:focus-within .history-actions {
@@ -1392,9 +1415,9 @@
 .copy-swap > * {
   grid-area: 1 / 1;
   transition:
-    opacity 150ms var(--ease-out),
-    transform 150ms var(--ease-out),
-    filter 150ms var(--ease-out);
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
 }
 .copy-swap[data-state="idle"] .copy-swap-done,
 .copy-swap[data-state="done"] .copy-swap-idle {
@@ -1405,4 +1428,48 @@
 [data-motion="reduced"] .copy-swap > * {
   transform: none;
   filter: none;
+}
+
+/* Toasts: Sonner keeps its interruptible CSS transitions, on our tokens instead of its 400 ms
+   `ease`: in at `dur.base`, out at `dur.fast`. Its injected stylesheet can load after ours, so
+   each override is one attribute more specific than the rule it replaces. */
+[data-sonner-toaster][data-sonner-toaster] {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+[data-sonner-toaster] [data-sonner-toast] {
+  transition-duration: var(--dur-base);
+  transition-timing-function: var(--ease-out);
+}
+[data-sonner-toaster] [data-sonner-toast] > * {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"],
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="false"] {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    height var(--dur-fast) var(--ease-out);
+}
+[data-sonner-toaster] [data-sonner-toast][data-swiping="true"] {
+  transition: none;
+}
+/* Reduced keeps the cross-fade and drops the slide; Off swaps. `:is()` takes its most specific
+   argument, so these beat every rule above. */
+[data-motion="reduced"]
+  [data-sonner-toaster]
+  :is(
+    [data-sonner-toast],
+    [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="false"]
+  ) {
+  transition-property: opacity;
+}
+[data-motion="off"]
+  [data-sonner-toaster]
+  :is(
+    [data-sonner-toast],
+    [data-sonner-toast] > *,
+    [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="false"]
+  ) {
+  transition: none;
 }

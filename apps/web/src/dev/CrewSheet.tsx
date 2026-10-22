@@ -90,7 +90,7 @@ export function CrewSheet() {
                 type="button"
                 aria-pressed={state === live}
                 onClick={() => setLive(state)}
-                className="rounded-chip border border-line px-2.5 py-1 font-mono text-label text-text-2 transition-colors duration-150 hover:border-line-strong hover:text-text-1 aria-pressed:border-line-strong aria-pressed:bg-bg-2 aria-pressed:text-text-1"
+                className="rounded-chip border border-line px-2.5 py-1 font-mono text-label text-text-2 transition-colors duration-fast hover:border-line-strong hover:text-text-1 aria-pressed:border-line-strong aria-pressed:bg-bg-2 aria-pressed:text-text-1"
               >
                 {state}
               </button>

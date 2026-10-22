@@ -41,7 +41,7 @@ export function CopyCommand({ command, className }: { command: string; className
         onClick={() => void copy()}
         aria-label={copied ? 'Copied' : `Copy: ${command}`}
         data-copied={copied || undefined}
-        className="grid size-7 shrink-0 place-items-center rounded-chip text-text-3 transition-[color,background-color,transform] duration-150 ease-out hover:bg-bg-2 hover:text-text-1 active:scale-[0.97]"
+        className="grid size-7 shrink-0 place-items-center rounded-chip text-text-3 transition-[color,background-color,transform] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 active:scale-[0.97]"
       >
         <span className="copy-swap grid place-items-center" data-state={copied ? 'done' : 'idle'}>
           <Copy aria-hidden className="copy-swap-idle size-3.5" strokeWidth={1.5} />

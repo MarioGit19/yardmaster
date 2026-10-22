@@ -83,7 +83,7 @@ export function Hud() {
       <ul
         aria-label="Activity"
         className={cx(
-          'flex min-w-0 items-center gap-0.5 transition-opacity duration-200 md:ml-3',
+          'flex min-w-0 items-center gap-0.5 transition-opacity duration-base md:ml-3',
           stale && 'opacity-60',
         )}
       >
@@ -98,7 +98,7 @@ export function Hud() {
               aria-expanded={sheetOpen}
               onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
               className={cx(
-                'rounded-control transition-[background-color,box-shadow] duration-150 hover:bg-bg-2',
+                'rounded-control transition-[background-color,box-shadow] duration-fast hover:bg-bg-2',
                 counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
               )}
             >
@@ -125,7 +125,7 @@ export function Hud() {
           aria-label="Open the command palette"
           aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
           onClick={() => paletteOpen.set('open')}
-          className="flex items-center gap-0.5 rounded-control p-1 transition-colors duration-150 hover:bg-bg-2 max-md:hidden"
+          className="flex items-center gap-0.5 rounded-control p-1 transition-colors duration-fast hover:bg-bg-2 max-md:hidden"
           data-hud="palette-hint"
         >
           <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd>
@@ -173,7 +173,7 @@ function Counter({ tone, label, value, format }: CounterProps) {
         <span aria-hidden data-mark={tone} className="grid size-2 shrink-0 place-items-center">
           <span
             className={cx(
-              'block shrink-0 transition-opacity duration-200',
+              'block shrink-0 transition-opacity duration-base',
               TONE_MARK[tone],
               !active && 'opacity-40 grayscale',
             )}
@@ -183,7 +183,7 @@ function Counter({ tone, label, value, format }: CounterProps) {
       <NumberTicker
         value={value}
         format={format}
-        className={cx('transition-colors duration-200', active ? 'text-text-1' : 'text-text-2')}
+        className={cx('transition-colors duration-base', active ? 'text-text-1' : 'text-text-2')}
       />
       <span className="text-label text-text-2 max-lg:sr-only">{label}</span>
     </span>

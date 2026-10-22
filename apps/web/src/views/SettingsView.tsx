@@ -474,7 +474,7 @@ function Segmented<T extends string>({
           aria-pressed={option === value}
           onClick={() => onChange(option)}
           className={cx(
-            'h-7 rounded-chip px-3 text-label transition-colors duration-150',
+            'h-7 rounded-chip px-3 text-label transition-colors duration-fast',
             option === value
               ? 'bg-bg-2 text-text-1 shadow-raised'
               : 'text-text-2 hover:text-text-1',

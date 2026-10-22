@@ -190,7 +190,7 @@ function Composer({
       }}
       className="shrink-0 px-5 pt-2 pb-4"
     >
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 pt-2.5 pb-2 shadow-raised transition-[border-color] duration-150 focus-within:border-line-strong">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 pt-2.5 pb-2 shadow-raised transition-[border-color] duration-fast focus-within:border-line-strong">
         <textarea
           ref={inputRef}
           aria-label={label}
@@ -267,7 +267,7 @@ function Pill<V extends string>({
     <label
       title={disabled ? `${name}: the session isn't running` : name}
       className={cx(
-        'relative inline-flex h-6 min-w-0 items-center gap-1.5 rounded-chip border border-line bg-bg-1 px-2 text-label text-text-2 transition-[border-color,color] duration-150',
+        'relative inline-flex h-6 min-w-0 items-center gap-1.5 rounded-chip border border-line bg-bg-1 px-2 text-label text-text-2 transition-[border-color,color] duration-fast',
         'has-[select:focus-visible]:shadow-focus',
         disabled ? 'opacity-50' : 'hover:border-line-strong hover:text-text-1',
       )}

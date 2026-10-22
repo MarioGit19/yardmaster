@@ -51,7 +51,7 @@ export function PortChip({
         data-port={port.port}
         className={cx(
           'inline-flex h-5 min-w-0 max-w-full items-center rounded-chip border border-line bg-bg-2 px-1.5 font-mono text-meta tabular text-text-2',
-          'transition-colors duration-150 ease-out hover:border-line-strong hover:text-text-1',
+          'transition-colors duration-fast ease-out hover:border-line-strong hover:text-text-1',
           className,
         )}
       >

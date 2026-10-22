@@ -23,7 +23,6 @@ import { useErrorLine } from './useErrorLine.js';
 
 /** Hovering across lanes shouldn't flash a peek for every lane the pointer crosses. */
 const PEEK_DELAY_MS = 140;
-const PEEK_IN_S = 0.18;
 
 // The flow-light comet along the lane's bottom edge and the running dot's pulse, both faster the
 // more the lane writes (§4.10). Rates are per activity step, relative to step 1.
@@ -143,7 +142,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
               aria-hidden
               strokeWidth={1.75}
               className={cx(
-                'size-3.5 shrink-0 text-text-3 transition-transform duration-200 ease-out',
+                'size-3.5 shrink-0 text-text-3 transition-transform duration-base ease-out',
                 open && 'rotate-90',
               )}
             />
@@ -212,7 +211,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
               transform: move(still, 'translateY(-2px) scaleY(0.98)'),
               transition: { duration: dur.fast, ease: ease.out },
             }}
-            transition={{ duration: PEEK_IN_S, ease: ease.out }}
+            transition={{ duration: dur.fast, ease: ease.out }}
             className="pointer-events-none absolute inset-x-0 top-full z-20 mt-1 origin-top"
           >
             <TerminalPeek

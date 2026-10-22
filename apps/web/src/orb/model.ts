@@ -1,4 +1,5 @@
 import type { SessionStatus, ToolFamily } from '@c-board/protocol';
+import { moment } from '../motion.js';
 
 /** The orb's visual states, DESIGN.md §4.2. */
 export const ORB_STATES = [
@@ -42,9 +43,9 @@ export type OrbEffect = 'ripple' | 'glitch' | 'sweep' | 'expand';
 
 /** Seconds. */
 export const EFFECT_DURATION: Record<OrbEffect, number> = {
-  ripple: 0.9,
+  ripple: moment.ripple,
   glitch: 0.12,
-  sweep: 0.6,
+  sweep: moment.sweep,
   expand: 0.3,
 };
 

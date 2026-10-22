@@ -127,7 +127,7 @@ export function ProjectPod({ project }: { project: Project }) {
       style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
       className={cx(
         'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
-        'transition-[border-color] duration-150 ease-out hover:border-line-strong',
+        'transition-[border-color] duration-fast ease-out hover:border-line-strong',
         crashed && tone !== 'wait' ? BORDER.err : BORDER[tone],
       )}
     >

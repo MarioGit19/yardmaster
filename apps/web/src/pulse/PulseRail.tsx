@@ -132,7 +132,7 @@ export function PulseRail() {
           type="button"
           onClick={togglePulse}
           aria-expanded={!collapsed}
-          className="flex h-7 items-center gap-2 rounded-control px-1.5 text-label text-text-2 transition-colors duration-150 hover:text-text-1"
+          className="flex h-7 items-center gap-2 rounded-control px-1.5 text-label text-text-2 transition-colors duration-fast hover:text-text-1"
         >
           {collapsed ? (
             <ChevronUp className="size-4" strokeWidth={1.5} />
@@ -169,7 +169,7 @@ function FilterToggle() {
           data-filter={option}
           onClick={() => pulseFilterPreference.set(option)}
           className={cx(
-            'h-6 rounded-chip px-2 text-meta transition-colors duration-150',
+            'h-6 rounded-chip px-2 text-meta transition-colors duration-fast',
             filter === option
               ? 'bg-bg-1 text-text-1 shadow-raised'
               : 'text-text-3 hover:text-text-1',

@@ -84,6 +84,19 @@
 
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
+
+  /* Motion, DESIGN.md §3: the CSS mirror of `dur` and `moment` in motion.ts (`--ease-*` sit in
+     index.css's @theme). motion.test.ts fails if the two drift. */
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+  /* Named exceptions: attention ripple, turn-finished sweep, quiet-pod dim, event spark, and the
+     ambient field's energy cross-fade. */
+  --dur-ripple: 900ms;
+  --dur-sweep: 600ms;
+  --dur-dim: 800ms;
+  --dur-spark: 900ms;
+  --dur-ambient: 1200ms;
 }
 
 [data-theme="light"] {

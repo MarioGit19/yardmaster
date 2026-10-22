@@ -186,7 +186,7 @@ function RailLink({
       data-rail-item=""
       className={cx(
         'relative flex h-9 items-center gap-2 rounded-control px-2 text-body-sm outline-none',
-        'transition-colors duration-150 ease-out',
+        'transition-colors duration-fast ease-out',
         collapsed && 'justify-center px-0',
         active
           ? 'bg-bg-2 text-text-1 shadow-raised'

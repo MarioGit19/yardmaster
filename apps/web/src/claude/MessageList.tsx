@@ -335,7 +335,7 @@ const Row = memo(function Row(props: RowProps) {
         onClick={() => reveal.toggle(key)}
         data-reveal={masked ? 'hidden' : 'shown'}
         className={cx(
-          'mt-1 flex h-6 items-center gap-1.5 rounded-chip px-1 text-meta text-text-3 transition-colors duration-150 hover:text-text-1',
+          'mt-1 flex h-6 items-center gap-1.5 rounded-chip px-1 text-meta text-text-3 transition-colors duration-fast hover:text-text-1',
           item.kind === 'user' ? 'self-end' : 'self-start',
         )}
       >
@@ -422,12 +422,12 @@ function Thinking({
         aria-expanded={expanded}
         aria-controls={id}
         onClick={() => onToggle(row.id)}
-        className="group -ml-1 flex h-7 min-w-0 max-w-full items-center gap-1.5 self-start rounded-chip px-1 text-label text-text-3 transition-colors duration-150 hover:text-text-2"
+        className="group -ml-1 flex h-7 min-w-0 max-w-full items-center gap-1.5 self-start rounded-chip px-1 text-label text-text-3 transition-colors duration-fast hover:text-text-2"
       >
         <ChevronRight
           aria-hidden
           className={cx(
-            'size-3.5 shrink-0 transition-transform duration-200 ease-out',
+            'size-3.5 shrink-0 transition-transform duration-base ease-out',
             expanded && 'rotate-90',
           )}
           strokeWidth={1.75}

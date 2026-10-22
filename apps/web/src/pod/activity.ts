@@ -1,4 +1,5 @@
 import { SLEEP_AFTER_MS } from '../crew/model.js';
+import { moment } from '../motion.js';
 import type { Tone } from '../status.js';
 
 // Pod-level activity signals, DESIGN.md §4.10.
@@ -7,7 +8,7 @@ import type { Tone } from '../status.js';
 export const DIM_AFTER_MS = SLEEP_AFTER_MS;
 /** A finished turn older than this when it reaches the pod is history, not news: no sweep. */
 export const SWEEP_FRESH_MS = 3_000;
-export const SWEEP_MS = 600;
+export const SWEEP_MS = moment.sweep * 1000;
 
 /** Degrees per second of the activity border's light: faster the more is going on. */
 export function borderSpeed(level: number, working: number): number {

@@ -104,7 +104,7 @@ export function CrewMascot({
             animate(
               blinkRef.current,
               { scaleY: [1, 0.1, 1] },
-              { duration: 0.18, ease: 'easeInOut' },
+              { duration: dur.fast, ease: ease.inOut },
             );
           next();
         },
@@ -587,12 +587,12 @@ function MiniCrew({ index, size, color }: { index: number; size: number; color: 
           shown: {
             opacity: [0.7, 0],
             scale: [0.6, 1.5],
-            transition: { duration: 0.42, ease: ease.out },
+            transition: { duration: dur.slow, ease: ease.out },
           },
           gone: {
             opacity: [0.7, 0],
             scale: [0.6, 1.5],
-            transition: { duration: 0.32, ease: ease.out },
+            transition: { duration: dur.base, ease: ease.out },
           },
         }}
       >

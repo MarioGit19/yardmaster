@@ -221,7 +221,7 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
         <button
           type="button"
           onClick={toggleAll}
-          className="diff-more flex h-7 w-full items-center justify-center font-sans text-label text-text-3 transition-colors duration-150 hover:text-text-1"
+          className="diff-more flex h-7 w-full items-center justify-center font-sans text-label text-text-3 transition-colors duration-fast hover:text-text-1"
         >
           {all
             ? `Show less${hidden > 0 ? ` · ${hidden} lines too many to show` : ''}`

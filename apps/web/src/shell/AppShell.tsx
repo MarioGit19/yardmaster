@@ -58,7 +58,7 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
         )}
         <div
           className={cx(
-            'flex shrink-0 transition-opacity duration-200',
+            'flex shrink-0 transition-opacity duration-base',
             reconnecting && 'opacity-60',
           )}
         >
@@ -69,7 +69,7 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
             id="main"
             tabIndex={-1}
             className={cx(
-              'min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-200',
+              'min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-base',
               reconnecting && 'opacity-60',
             )}
           >
@@ -82,7 +82,7 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
       {pulse && (
         <div
           ref={pulseRef}
-          className={cx('shrink-0 transition-opacity duration-200', reconnecting && 'opacity-60')}
+          className={cx('shrink-0 transition-opacity duration-base', reconnecting && 'opacity-60')}
         >
           {pulse}
         </div>

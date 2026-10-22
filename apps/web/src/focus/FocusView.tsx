@@ -80,7 +80,7 @@ export function FocusView({ projectId, sessionId, shared }: FocusViewProps) {
 /** The body fades in once the card has mostly grown, and out first on the way back. */
 const body = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: dur.base, ease: ease.out, delay: 0.1 } },
+  animate: { opacity: 1, transition: { duration: dur.base, ease: ease.out, delay: dur.fast } },
   exit: { opacity: 0, transition: { duration: dur.fast, ease: ease.out } },
 };
 
@@ -276,7 +276,7 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
                 setActive(panel.id);
               }}
               className={cx(
-                'relative h-10 rounded-control px-3 text-body-sm transition-colors duration-150',
+                'relative h-10 rounded-control px-3 text-body-sm transition-colors duration-fast',
                 selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
               )}
             >
@@ -405,7 +405,7 @@ function SessionLink({
       aria-current={active ? 'page' : undefined}
       data-session={session.id}
       className={cx(
-        'flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-150',
+        'flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
         active ? 'bg-bg-2 shadow-raised' : 'hover:bg-bg-2/60',
       )}
     >

@@ -67,7 +67,7 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
           type="button"
           onClick={copy}
           aria-label={copied ? 'Copied' : 'Copy code'}
-          className="flex size-6 items-center justify-center rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color] duration-150 hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100"
+          className="flex size-6 items-center justify-center rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color] duration-fast hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100"
         >
           {copied ? (
             <Check className="size-3.5 text-st-ok-ink" strokeWidth={1.75} />

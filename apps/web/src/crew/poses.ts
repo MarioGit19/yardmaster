@@ -1,5 +1,5 @@
 import type { Transition, Variants } from 'motion/react';
-import { spring } from '../motion.js';
+import { dur, ease, spring } from '../motion.js';
 import type { MascotState } from './model.js';
 
 // Poses in viewBox units (0–100); the body layer converts them to CSS px for its size.
@@ -39,8 +39,8 @@ export const POSES: Record<MascotState, Pose> = {
   done: { body: { y: -4, rotate: 0, scale: 1 }, armL: 155, armR: -155, eyes: { x: 0, y: -3 } },
 };
 
-const SHAKE: Transition = { duration: 0.3, ease: 'easeOut' };
-const PRESS: Transition = { duration: 0.6, times: [0, 0.35, 1], ease: 'easeOut' };
+const SHAKE: Transition = { duration: dur.base, ease: ease.out };
+const PRESS: Transition = { duration: dur.slow, times: [0, 0.35, 1], ease: ease.out };
 
 function variants<T>(pick: (pose: Pose, state: MascotState) => T): Variants {
   const out: Variants = {};
