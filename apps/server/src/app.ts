@@ -8,11 +8,13 @@ import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { DemoSimulator } from './demo/simulator.js';
+import { createEditorActions } from './editor-actions.js';
 import {
   EditorGateway,
   type EditorGatewayOptions,
   registerEditorGateway,
 } from './editor-gateway.js';
+import { EditorRouter } from './editor-router.js';
 import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
 import { registerStatic } from './static.js';
@@ -40,7 +42,7 @@ export interface BuildOptions {
   demo?: boolean | { seed?: number };
   /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`, or `:memory:` in demo mode. */
   dbPath?: string;
-  /** UI action handlers. Defaults to stubs. */
+  /** UI action handlers. Defaults to the editor bridge for terminal actions and stubs for the rest. */
   actions?: ActionHandlers;
   /** Gateway tuning, for tests. */
   gateway?: Pick<UiGatewayOptions, 'patchIntervalMs' | 'maxBufferedBytes'>;
@@ -51,7 +53,7 @@ export interface BuildOptions {
   /** Session registry discovery tuning, for tests. Not started in demo mode. */
   discovery?: Omit<SessionDiscoveryOptions, 'store' | 'logger'>;
   /** Editor link tuning, for tests. */
-  editor?: Pick<EditorGatewayOptions, 'graceMs' | 'idleMs' | 'resolvePath'>;
+  editor?: Pick<EditorGatewayOptions, 'graceMs' | 'idleMs' | 'resolvePath' | 'commandTimeoutMs'>;
 }
 
 declare module 'fastify' {
@@ -140,18 +142,6 @@ export async function buildServer(
         ...options.discovery,
       });
   app.decorate('sessionDiscovery', discovery);
-  const gateway: UiGateway = new UiGateway({
-    store,
-    ...(transcripts ? { transcripts } : {}),
-    dispatch: createActionDispatcher(options.actions ?? stubActionHandlers()),
-    ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
-    logger: logger.child({ component: 'ui-ws' }),
-    ...options.gateway,
-  });
-  app.decorate('uiGateway', gateway);
-  registerUiGateway(app, gateway);
-  app.decorate('demo', demo);
-
   const editorGateway = new EditorGateway({
     store,
     logger: logger.child({ component: 'editor-ws' }),
@@ -161,6 +151,29 @@ export async function buildServer(
   });
   app.decorate('editorGateway', editorGateway);
   registerEditorGateway(app, editorGateway, token);
+  const editorRouter = new EditorRouter({
+    state: () => store.state,
+    isConnected: (windowId) => editorGateway.isConnected(windowId),
+  });
+  const actions = options.actions ?? {
+    ...stubActionHandlers(),
+    ...createEditorActions({
+      router: editorRouter,
+      send: editorGateway.sendCommand.bind(editorGateway),
+    }),
+  };
+
+  const gateway: UiGateway = new UiGateway({
+    store,
+    ...(transcripts ? { transcripts } : {}),
+    dispatch: createActionDispatcher(actions),
+    ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
+    logger: logger.child({ component: 'ui-ws' }),
+    ...options.gateway,
+  });
+  app.decorate('uiGateway', gateway);
+  registerUiGateway(app, gateway);
+  app.decorate('demo', demo);
 
   const startedAt = Date.now();
   const hookStats: HookStats = { received: 0, lastAt: null };

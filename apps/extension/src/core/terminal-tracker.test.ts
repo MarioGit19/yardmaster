@@ -220,4 +220,17 @@ describe('TerminalTracker', () => {
     const ids = take().map((m) => m.type === 'sync' && m.terminals.map((t) => t.terminalId));
     expect(ids).toEqual([['term-1'], ['term-1']]);
   });
+
+  it('finds open terminals by id', () => {
+    const { tracker } = setup();
+    const zsh = fakeTerminal('zsh');
+    const bash = fakeTerminal('bash');
+    tracker.opened(zsh);
+    tracker.opened(bash);
+    expect(tracker.find('term-1')).toBe(zsh);
+    expect(tracker.find('term-2')).toBe(bash);
+    expect(tracker.find('term-9')).toBeUndefined();
+    tracker.closed(zsh);
+    expect(tracker.find('term-1')).toBeUndefined();
+  });
 });

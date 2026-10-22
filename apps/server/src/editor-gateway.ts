@@ -5,9 +5,13 @@ import {
   EDITOR_CLOSE_REPLACED,
   type EditorTerminal,
   type EditorToServer,
+  encodeServerToEditor,
+  makeMessage,
+  type ServerToEditor,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
+import type { ActionResult } from './actions.js';
 import { ensureProject, type PathResolver, resolveDir } from './claude/project-lookup.js';
 import { applyExecEvent, type ExecEvent, endRunning } from './exec-reducer.js';
 import { TOKEN_HEADER } from './security.js';
@@ -22,6 +26,17 @@ export const WINDOW_GRACE_MS = 15_000;
 export const EDITOR_IDLE_MS = 35_000;
 /** Largest editor → server message (characters). */
 export const MAX_EDITOR_MESSAGE = 1024 * 1024;
+/** How long an editor has to acknowledge a command with `cmd.result`. */
+export const COMMAND_TIMEOUT_MS = 5_000;
+
+export const COMMAND_ERRORS = {
+  timeout: 'editor_timeout',
+  offline: 'editor_offline',
+  disconnected: 'editor_disconnected',
+  invalid: 'invalid_command',
+  failed: 'command_failed',
+  shuttingDown: 'server_shutting_down',
+} as const;
 
 export interface EditorGatewayOptions {
   store: BoardStore;
@@ -34,6 +49,16 @@ export interface EditorGatewayOptions {
   apply?: boolean;
   /** Receives `exec.start` / `exec.end` for the Pulse timeline. */
   onActivity?: (event: ActivityEvent) => void;
+  commandTimeoutMs?: number;
+}
+
+type Command<T extends ServerToEditor['type']> = Extract<ServerToEditor, { type: T }>;
+export type CommandPayloads = { [K in ServerToEditor['type']]: Command<K>['payload'] };
+
+interface PendingCommand {
+  connection: Connection;
+  timer: NodeJS.Timeout;
+  resolve: (result: ActionResult) => void;
 }
 
 interface Connection {
@@ -52,8 +77,9 @@ interface WindowEntry {
 
 /**
  * Accepts extension connections on `/ws/editor`: registers each window and its workspace
- * folders as projects, keeps its terminal inventory and execution output, and removes the window (with its terminals) once it has been gone
- * for the grace period.
+ * folders as projects, keeps its terminal inventory and execution output, sends it commands
+ * (acknowledged with `cmd.result`), and removes the window (with its terminals) once it has
+ * been gone for the grace period.
  */
 export class EditorGateway {
   private readonly store: BoardStore;
@@ -66,6 +92,8 @@ export class EditorGateway {
   private readonly onActivity: ((event: ActivityEvent) => void) | undefined;
   private readonly connections = new Set<Connection>();
   private readonly windows = new Map<string, WindowEntry>();
+  private readonly pending = new Map<string, PendingCommand>();
+  private readonly commandTimeoutMs: number;
 
   constructor(options: EditorGatewayOptions) {
     this.store = options.store;
@@ -76,6 +104,79 @@ export class EditorGateway {
     this.now = options.now ?? Date.now;
     this.apply = options.apply ?? true;
     this.onActivity = options.onActivity;
+    this.commandTimeoutMs = options.commandTimeoutMs ?? COMMAND_TIMEOUT_MS;
+  }
+
+  /** True while the window has a live connection that has sent `editor.hello`. */
+  isConnected(windowId: string): boolean {
+    const connection = this.windows.get(windowId)?.connection;
+    return !!connection && !connection.closed && connection.windowId === windowId;
+  }
+
+  /**
+   * Sends a command to a window and resolves with its `cmd.result`, or with an error once the
+   * editor disconnects or the timeout passes. Never rejects.
+   */
+  sendCommand<T extends ServerToEditor['type']>(
+    windowId: string,
+    type: T,
+    payload: CommandPayloads[T],
+  ): Promise<ActionResult> {
+    const connection = this.windows.get(windowId)?.connection;
+    if (!connection || !this.isConnected(windowId)) {
+      return Promise.resolve({ ok: false, error: COMMAND_ERRORS.offline });
+    }
+    const id = randomUUID();
+    const encoded = encodeServerToEditor(
+      makeMessage<ServerToEditor>(type, payload as ServerToEditor['payload'], {
+        id,
+        ts: this.now(),
+      }),
+    );
+    if (!encoded.ok) {
+      this.log.warn({ type, reason: encoded.reason }, 'refused an invalid editor command');
+      return Promise.resolve({ ok: false, error: COMMAND_ERRORS.invalid });
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        this.log.warn({ type }, 'editor command timed out');
+        resolve({ ok: false, error: COMMAND_ERRORS.timeout });
+      }, this.commandTimeoutMs);
+      this.pending.set(id, { connection, timer, resolve });
+      connection.socket.send(encoded.data, (error) => {
+        if (error) this.settle(id, { ok: false, error: COMMAND_ERRORS.disconnected });
+      });
+    });
+  }
+
+  private settle(id: string, result: ActionResult): void {
+    const pending = this.pending.get(id);
+    if (!pending) return;
+    this.pending.delete(id);
+    clearTimeout(pending.timer);
+    pending.resolve(result);
+  }
+
+  private settleConnection(connection: Connection, error: string): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.connection === connection) this.settle(id, { ok: false, error });
+    }
+  }
+
+  private onCommandResult(
+    connection: Connection,
+    result: Extract<EditorToServer, { type: 'cmd.result' }>['payload'],
+  ): void {
+    const pending = this.pending.get(result.id);
+    if (!pending || pending.connection !== connection) {
+      this.log.debug('ignored a cmd.result for an unknown command');
+      return;
+    }
+    this.settle(
+      result.id,
+      result.ok ? { ok: true } : { ok: false, error: result.error ?? COMMAND_ERRORS.failed },
+    );
   }
 
   get connectionCount(): number {
@@ -125,6 +226,7 @@ export class EditorGateway {
     for (const connection of this.connections) {
       connection.closed = true;
       clearTimeout(connection.idleTimer);
+      this.settleConnection(connection, COMMAND_ERRORS.shuttingDown);
       connection.socket.close(1001, 'server shutting down');
     }
     this.connections.clear();
@@ -162,9 +264,8 @@ export class EditorGateway {
         return this.applyExec(connection.windowId, { type: 'interactive', ...message.payload });
       case 'exec.end':
         return this.applyExec(connection.windowId, { type: 'end', ...message.payload });
-      default:
-        // Command results are handled by 5.5.
-        this.log.debug({ type: message.type }, 'editor message not handled yet');
+      case 'cmd.result':
+        return this.onCommandResult(connection, message.payload);
     }
   }
 
@@ -210,6 +311,7 @@ export class EditorGateway {
     if (previous && previous !== connection) {
       // The same window reconnected before its old socket noticed it was gone.
       previous.windowId = null;
+      this.settleConnection(previous, COMMAND_ERRORS.disconnected);
       previous.socket.close(EDITOR_CLOSE_REPLACED, 'replaced by a newer connection');
     }
     entry.connection = connection;
@@ -289,6 +391,7 @@ export class EditorGateway {
     connection.closed = true;
     clearTimeout(connection.idleTimer);
     this.connections.delete(connection);
+    this.settleConnection(connection, COMMAND_ERRORS.disconnected);
     const windowId = connection.windowId;
     if (windowId === null) return;
     const entry = this.windows.get(windowId);

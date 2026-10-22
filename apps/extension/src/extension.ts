@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import * as vscode from 'vscode';
+import { CommandHandler } from './core/command-handler.js';
 import {
   authUrl,
   COMMANDS,
@@ -69,6 +70,17 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     onError: (message) => log.warn(message),
   });
+  const commands = new CommandHandler<vscode.Terminal>({
+    editor: {
+      findTerminal: (terminalId) => terminals.find(terminalId),
+      createTerminal: ({ name, cwd }) => vscode.window.createTerminal({ name, cwd }),
+      onShellIntegration: (listener) =>
+        vscode.window.onDidChangeTerminalShellIntegration(({ terminal }) => listener(terminal)),
+      execution: (execId) => executions.lookup(execId),
+    },
+    reply: (id, ok, error) =>
+      link?.send('cmd.result', error === undefined ? { id, ok } : { id, ok, error }),
+  });
   const showStatus = (status: LinkStatus) => {
     statusItem.tooltip = statusTooltip(status, config.port);
     // Every (re)connect gets the full list, so the server drops anything stale.
@@ -100,6 +112,10 @@ export function activate(context: vscode.ExtensionContext): void {
       readToken: () => readToken(home),
       hello,
       onStatus: showStatus,
+      onCommand: (command) => {
+        log.debug(`command ${command.type}`);
+        void commands.handle(command);
+      },
       logger: log,
     });
     link.start();
@@ -111,6 +127,7 @@ export function activate(context: vscode.ExtensionContext): void {
     statusItem,
     {
       dispose: () => {
+        commands.dispose();
         executions.dispose();
         link?.stop();
       },

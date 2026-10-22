@@ -7,6 +7,8 @@ import { localPath, type UriLike } from './terminal-tracker.js';
 const MAX_COMMAND_LINE = 100_000;
 /** How long to wait for the output stream to drain after the end event. */
 export const END_GRACE_MS = 1_000;
+/** Recent executions remembered for `cmd.rerun`. */
+export const MAX_REMEMBERED = 500;
 
 /** The parts of `vscode.TerminalShellExecution` the streamer reads. */
 export interface ExecutionLike {
@@ -29,6 +31,11 @@ export interface ExecSink {
   data(execId: string, seq: number, chunk: string): void;
   interactive(execId: string): void;
   end(execId: string, exitCode: number | null): void;
+}
+
+export interface RememberedExecution {
+  terminalId: string;
+  commandLine: string;
 }
 
 export interface ExecStreamerOptions {
@@ -64,6 +71,7 @@ export class ExecStreamer<E extends ExecutionLike> {
   private readonly batch: ExecStreamerOptions['batch'];
   private readonly onError: (message: string) => void;
   private readonly running = new Map<E, Running>();
+  private readonly remembered = new Map<string, RememberedExecution>();
 
   constructor(options: ExecStreamerOptions) {
     this.sink = options.sink;
@@ -75,6 +83,11 @@ export class ExecStreamer<E extends ExecutionLike> {
 
   get runningCount(): number {
     return this.running.size;
+  }
+
+  /** A recent execution started in this activation, by its id. */
+  lookup(execId: string): RememberedExecution | undefined {
+    return this.remembered.get(execId);
   }
 
   /** Call from the start event handler: output is only complete if `read()` starts right away. */
@@ -102,10 +115,12 @@ export class ExecStreamer<E extends ExecutionLike> {
     };
     this.running.set(execution, state);
     const confidence = CONFIDENCE[execution.commandLine.confidence] ?? 'low';
+    const commandLine = execution.commandLine.value.slice(0, MAX_COMMAND_LINE);
+    this.remember(execId, { terminalId, commandLine });
     this.sink.start({
       execId,
       terminalId,
-      commandLine: execution.commandLine.value.slice(0, MAX_COMMAND_LINE),
+      commandLine,
       confidence,
       cwd: localPath(execution.cwd),
     });
@@ -135,6 +150,13 @@ export class ExecStreamer<E extends ExecutionLike> {
       state.exitCode ??= null;
       this.finish(execution, state);
     }
+  }
+
+  private remember(execId: string, execution: RememberedExecution): void {
+    this.remembered.set(execId, execution);
+    if (this.remembered.size <= MAX_REMEMBERED) return;
+    const oldest = this.remembered.keys().next().value;
+    if (oldest !== undefined) this.remembered.delete(oldest);
   }
 
   private async pump(execution: E, state: Running, stream: AsyncIterable<string>): Promise<void> {

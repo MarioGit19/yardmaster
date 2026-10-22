@@ -68,6 +68,12 @@ export class TerminalTracker<T extends TerminalLike> {
     return id;
   }
 
+  /** The open terminal with this id, if any. */
+  find(terminalId: string): T | undefined {
+    for (const terminal of this.open) if (this.ids.get(terminal) === terminalId) return terminal;
+    return undefined;
+  }
+
   /** A terminal opened (or was found already open). */
   opened(terminal: T): void {
     if (terminal.exitStatus !== undefined) return;

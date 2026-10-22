@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FLUSH_MS } from './chunk-batcher.js';
-import { END_GRACE_MS, type ExecSink, ExecStreamer, type ExecutionLike } from './exec-streamer.js';
+import {
+  END_GRACE_MS,
+  type ExecSink,
+  ExecStreamer,
+  type ExecutionLike,
+  MAX_REMEMBERED,
+} from './exec-streamer.js';
 
 /** A fake execution whose output is pushed by the test. */
 class FakeExecution implements ExecutionLike {
@@ -169,5 +175,20 @@ describe('ExecStreamer', () => {
     );
     expect(events).toEqual([]);
     expect(errors).toHaveLength(1);
+  });
+
+  it('remembers recent executions for reruns, dropping the oldest', async () => {
+    const { streamer } = make();
+    streamer.started(new FakeExecution('pnpm test'), 'term-1');
+    expect(streamer.lookup('exec-1')).toEqual({ terminalId: 'term-1', commandLine: 'pnpm test' });
+    for (let i = 0; i < MAX_REMEMBERED; i++)
+      streamer.started(new FakeExecution(`echo ${i}`), 'term-2');
+    expect(streamer.lookup('exec-1')).toBeUndefined();
+    expect(streamer.lookup(`exec-${MAX_REMEMBERED + 1}`)).toEqual({
+      terminalId: 'term-2',
+      commandLine: `echo ${MAX_REMEMBERED - 1}`,
+    });
+    expect(streamer.lookup('missing')).toBeUndefined();
+    streamer.dispose();
   });
 });
