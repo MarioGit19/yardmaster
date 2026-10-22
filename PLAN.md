@@ -15,7 +15,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 0 — Foundation
 
-- [ ] **0.1 Monorepo scaffold**
+- [x] **0.1 Monorepo scaffold**
   - pnpm workspace with `apps/server`, `apps/web`, `apps/extension`, `packages/protocol`, `packages/hook`. Root `package.json` (`private`, `packageManager: pnpm@9`, `engines.node >=22`), `pnpm-workspace.yaml`, `tsconfig.base.json` (strict, `moduleResolution: bundler`, `verbatimModuleSyntax`), and `.nvmrc` (22).
   - TypeScript pinned to `~6.0.3`. Every package gets `typecheck` and `build` scripts, plus placeholder `src/index.ts`.
   - **Done when:** `pnpm install` and `pnpm -r typecheck` succeed.
