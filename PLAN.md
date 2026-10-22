@@ -63,10 +63,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 2 — Server core (`apps/server`)
 
-- [ ] **2.1 Server skeleton and config**
+- [x] **2.1 Server skeleton and config**
   - Fastify 5 with pino. Config from env and defaults: `CBOARD_PORT=4317`, `CBOARD_HOME=~/.c-board`, `CBOARD_HOST=127.0.0.1` (refuse any non-loopback value). Add `GET /api/health`. Run in dev with `tsx watch`.
   - **Done when:** the server starts, `/api/health` returns `{ok:true, version}`, and a test uses `fastify.inject`.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `buildServer(config)` / `startServer(config)` in `app.ts`, env parsing in `config.ts` (`loadConfig(env, home)`), entry `main.ts` (`pnpm --filter @c-board/server dev`). Loopback means `127.0.0.0/8`, `::1` or `localhost`. `CBOARD_PORT=0` is allowed for ephemeral ports. Added `CBOARD_LOG_LEVEL` (default `info`). Request logging is off and pino omits the hostname.
 
 - [ ] **2.2 Security layer**
   - Token bootstrap: create `~/.c-board/token` (0600, 32 random bytes, base64url) if it's missing. Add `GET /auth?t=` to set an `HttpOnly; SameSite=Strict` cookie (signed) and redirect to `/`. Host-header allowlist and Origin check per PRD §8. Add an auth guard for `/api/*` (except health) that accepts the cookie or the `X-CBoard-Token` header.
