@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { PACKAGE_NAME } from './index.js';
+import * as protocol from './index.js';
 
 describe('@c-board/protocol', () => {
-  it('exports its package name', () => {
-    expect(PACKAGE_NAME).toBe('@c-board/protocol');
+  it('re-exports the domain model and helpers', () => {
+    expect(protocol.PACKAGE_NAME).toBe('@c-board/protocol');
+    expect(typeof protocol.BoardState.safeParse).toBe('function');
+    expect(typeof protocol.projectIdFromPath).toBe('function');
+    expect(typeof protocol.accentForProject).toBe('function');
   });
 });

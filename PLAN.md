@@ -35,11 +35,12 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
 
 ## Phase 1 — Protocol (`packages/protocol`)
 
-- [ ] **1.1 Domain model**
+- [x] **1.1 Domain model**
   - zod 4 schemas and inferred types for `Project`, `EditorWindow`, `Terminal`, `Execution`, `ClaudeSession` (status union per PRD §4.2), `ToolActivity`, `Approval`, `ActivityEvent`, `PortBinding`, `ProcessStats`, `GitInfo` and `BoardState` (normalized maps by id).
   - Helpers: `projectIdFromPath(realpath)` (stable short hash) and `accentForProject(id)` (returns one of the 10 hues from DESIGN.md §2).
   - **Done when:** the types export cleanly and unit tests cover the schemas (valid and invalid samples) and helper stability.
   - **Verify:** `pnpm --filter @c-board/protocol test`
+  - Note: `SessionStatus` is a discriminated union on `kind`; `compacting` carries the `previous` status to restore. `BoardState` rejects map keys that differ from item ids. Activity events are not kept in `BoardState` (unbounded); they stream separately. `Project.accent` stores the index from `accentForProject`. The hash is a hand-rolled FNV-1a 64 so it runs in Node and the browser without `node:crypto`.
 
 - [ ] **1.2 Wire messages**
   - Envelope `{ v: 1, type, id?, ts, payload }` and discriminated unions for editor↔server, server↔UI and UI→server messages exactly as in PRD §7. Add `encode/decode` helpers that validate with zod and return typed results (never throw on bad input).
