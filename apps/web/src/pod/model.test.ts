@@ -8,6 +8,7 @@ import {
   lastLine,
   orderPods,
   podSessions,
+  risingPods,
   selectPodOrder,
   sessionCaption,
 } from './model.js';
@@ -140,5 +141,18 @@ describe('isStreaming', () => {
     expect(isStreaming(session({ kind: 'working' }))).toBe(true);
     expect(isStreaming(session({ kind: 'tool', tool: 'Read', toolUseId: null }))).toBe(true);
     expect(isStreaming(session({ kind: 'idle' }))).toBe(false);
+  });
+});
+
+describe('risingPods', () => {
+  it('marks the pods that overtook a neighbour', () => {
+    expect(risingPods(['a', 'b', 'c', 'd'], ['c', 'a', 'b', 'd'])).toEqual(new Set(['c']));
+    expect(risingPods(['a', 'b'], ['b', 'a'])).toEqual(new Set(['b']));
+  });
+
+  it('ignores pods that only close a gap or make room', () => {
+    expect(risingPods(['a', 'b', 'c'], ['b', 'c'])).toEqual(new Set());
+    expect(risingPods(['a', 'b'], ['x', 'a', 'b'])).toEqual(new Set());
+    expect(risingPods(['a', 'b', 'c'], ['a', 'b', 'c'])).toEqual(new Set());
   });
 });

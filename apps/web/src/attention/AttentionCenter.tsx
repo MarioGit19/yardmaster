@@ -12,7 +12,7 @@ import {
   useBoardList,
   useBoardStore,
 } from '../data/index.js';
-import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, type MotionLevel, move, spring, useMotionLevel } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { sessionHref } from '../routes.js';
@@ -29,6 +29,7 @@ import {
   attentionKey,
   attentionOpen,
   canAlwaysAllow,
+  lingerFor,
   selectWaitingWithoutApproval,
 } from './attention.js';
 
@@ -94,7 +95,7 @@ function SheetBody() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [denyingId, setDenyingId] = useState<string | null>(null);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
-  const lingering = useLingering(pending, level === 'off' ? 0 : LINGER_MS);
+  const lingering = useLingering(pending, level);
 
   const cards = [...pending, ...lingering.values()].sort(
     (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
@@ -201,11 +202,8 @@ function SheetBody() {
                       // y and scale (not a transform string) compose with the layout slide.
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.98,
-                        transition: { duration: dur.fast, ease: ease.out },
-                      }}
+                      // A decided card has already said how it ended: it just fades.
+                      exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
                       transition={spring.smooth}
                     >
                       <ApprovalCard
@@ -251,14 +249,14 @@ function SheetBody() {
   );
 }
 
-/** How long a decided card shows its outcome (and the check sweep) before it collapses. */
-const LINGER_MS = 700;
-
 /**
- * Approvals that just left the pending list, kept for `ms` with their final state, so a decided
- * card can show the outcome before it collapses. Removed approvals count as expired.
+ * Approvals that just left the pending list, kept with their final state for as long as their
+ * outcome plays (`lingerFor`). Removed approvals count as expired.
  */
-function useLingering(pending: readonly Approval[], ms: number): ReadonlyMap<string, Approval> {
+function useLingering(
+  pending: readonly Approval[],
+  level: MotionLevel,
+): ReadonlyMap<string, Approval> {
   const store = useBoardStore();
   const [lingering, setLingering] = useState<ReadonlyMap<string, Approval>>(new Map());
   const previous = useRef<readonly Approval[]>(pending);
@@ -268,20 +266,27 @@ function useLingering(pending: readonly Approval[], ms: number): ReadonlyMap<str
     const ids = new Set(pending.map((a) => a.id));
     const left = previous.current.filter((a) => !ids.has(a.id));
     previous.current = pending;
-    if (left.length === 0 || ms === 0) return;
     const approvals = store.getState().board.approvals;
-    const done = left.map((a) => approvals[a.id] ?? { ...a, state: 'expired' as const });
+    const done = left
+      .map((a) => approvals[a.id] ?? { ...a, state: 'expired' as const })
+      .filter((a) => lingerFor(a.state, level) > 0);
+    if (done.length === 0) return;
     setLingering((prev) => new Map([...prev, ...done.map((a) => [a.id, a] as const)]));
-    const timer = setTimeout(() => {
-      timers.current.delete(timer);
-      setLingering((prev) => {
-        const next = new Map(prev);
-        for (const a of done) next.delete(a.id);
-        return next;
-      });
-    }, ms);
-    timers.current.add(timer);
-  }, [pending, ms, store]);
+    for (const approval of done) {
+      const timer = setTimeout(
+        () => {
+          timers.current.delete(timer);
+          setLingering((prev) => {
+            const next = new Map(prev);
+            next.delete(approval.id);
+            return next;
+          });
+        },
+        lingerFor(approval.state, level),
+      );
+      timers.current.add(timer);
+    }
+  }, [pending, level, store]);
 
   useEffect(() => {
     const all = timers.current;

@@ -7,10 +7,11 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 
 | Scenario   | Moments                                                                      |
 | ---------- | ---------------------------------------------------------------------------- |
-| `overview` | `entrance`, `activity` (8 s), `pod-hover`, `lane-peek`                       |
+| `overview` | `entrance`, `activity` (8 s), `pod-hover`, `lane-peek`, `route` (overview ↔ settings) |
+| `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
-| `focus`    | `open` (pod → focus), `close` (Esc)                                          |
-| `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `attention-close`, `pulse-expand`, `pulse-collapse` |
+| `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `close` (Esc) |
+| `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
 | `phone`    | `entrance`, `scroll`, `focus-open` (tap), `focus-close` (back)               |
 | `all`      | every scenario above, each on a fresh demo board                             |
@@ -43,4 +44,6 @@ they come for transitions and every 500 ms for activity.
 
 Add a function to `SCENARIOS` in `record.ts` and wrap each thing worth watching in
 `recorder.moment(name, 'transition' | 'activity', note, action, clip?)`. Keep actions
-deterministic: wait on selectors, not on the demo's timing.
+deterministic: wait on selectors, not on the demo's timing. For something the demo does on its own
+clock (a reorder, a turn finishing), `catchMoment` waits for its selector and records around it,
+or warns and skips it.

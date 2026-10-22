@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, type Variants } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { selectProject, useBoard, useBoardList } from '../data/index.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
-import { selectPodOrder } from './model.js';
+import { risingPods, selectPodOrder } from './model.js';
 import { ProjectPod, ProjectPodSkeleton } from './ProjectPod.js';
 
 /** Columns follow the space the grid gets (the rail takes some), not the viewport. */
@@ -46,6 +46,13 @@ export function PodGrid() {
   useEffect(() => {
     entered = true;
   }, []);
+  // The order the slots last animated from: pods that overtook a neighbour fly above the rest.
+  const previous = useRef(order);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: recomputed per reorder (`orderKey`)
+  const rising = useMemo(() => risingPods(previous.current, order), [orderKey]);
+  useEffect(() => {
+    previous.current = order;
+  });
 
   return (
     <div className="@container">
@@ -54,25 +61,66 @@ export function PodGrid() {
           {order.map((id, index) => {
             const first = stagger && initial.has(id);
             return (
-              <motion.div
+              <PodSlot
                 key={id}
-                layout="position"
-                layoutDependency={orderKey}
-                custom={index}
-                variants={variants}
-                initial={first ? 'stagger' : 'plain'}
-                animate={first ? 'shown' : 'settled'}
-                exit="exit"
-                transition={{ layout: spring.smooth }}
-                className="relative h-full min-w-0 has-[[data-open]]:z-10"
+                orderKey={orderKey}
+                index={index}
+                first={first}
+                rising={rising.has(id)}
               >
                 <PodById id={id} />
-              </motion.div>
+              </PodSlot>
             );
           })}
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+/**
+ * One grid cell. A reorder glides every slot on `smooth`; a pod that overtakes a neighbour is
+ * lifted above the others with a soft shadow for the flight, so cards never cross visibly.
+ */
+function PodSlot({
+  orderKey,
+  index,
+  first,
+  rising,
+  children,
+}: {
+  orderKey: string;
+  index: number;
+  first: boolean;
+  rising: boolean;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const lift = (on: boolean) => {
+    const slot = ref.current;
+    if (!slot) return;
+    if (on && rising) slot.dataset.rising = '';
+    else delete slot.dataset.rising;
+  };
+  return (
+    <motion.div
+      ref={ref}
+      layout="position"
+      layoutDependency={orderKey}
+      custom={index}
+      variants={variants}
+      initial={first ? 'stagger' : 'plain'}
+      animate={first ? 'shown' : 'settled'}
+      exit="exit"
+      transition={{ layout: spring.smooth }}
+      onLayoutAnimationStart={() => lift(true)}
+      onLayoutAnimationComplete={() => lift(false)}
+      data-pod-slot
+      className="pod-slot relative h-full min-w-0 has-[[data-open]]:z-10"
+    >
+      <span aria-hidden className="pod-lift" />
+      {children}
+    </motion.div>
   );
 }
 

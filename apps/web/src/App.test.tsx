@@ -86,7 +86,7 @@ function render(path: string, { hydrated = true } = {}) {
 
 const heading = () =>
   (container.querySelector('[data-focus] h1') ?? container.querySelector('main h1'))?.textContent;
-const backdrop = () => container.querySelector('main > div');
+const backdrop = () => container.querySelector('main > [data-screen] > div');
 const railItems = () =>
   Array.from(
     container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Projects"] [data-rail-item]'),

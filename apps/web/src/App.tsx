@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react';
+import { AnimatePresence, motion, useIsPresent } from 'motion/react';
+import { lazy, type ReactNode, type Ref, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch, useLocation, useRoute } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
@@ -7,6 +8,7 @@ import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { MotionRoot } from './MotionRoot.js';
+import { dur, ease } from './motion.js';
 import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
 import { CommandPalette } from './palette/CommandPalette.js';
 import { PulseRail } from './pulse/PulseRail.js';
@@ -40,6 +42,7 @@ export function AppRoutes() {
 /** The overview and focus routes share one stage: the focus view opens over the overview. */
 function Screens() {
   const [onOverview] = useRoute(routes.overview);
+  const [location] = useLocation();
   const focus = useFocusRoute();
   const board = onOverview || focus !== null;
   return (
@@ -48,26 +51,58 @@ function Screens() {
       stage={board ? <FocusStage focus={focus} /> : undefined}
       pulse={<PulseRail />}
     >
-      {board ? (
-        <FocusBackdrop dimmed={focus !== null}>
-          <Overview />
-        </FocusBackdrop>
-      ) : (
-        <Switch>
-          <Route path={routes.settings}>
-            <SettingsView />
-          </Route>
-          <Route path={routes.welcome}>
-            <WelcomeView />
-          </Route>
-          <Route>
-            <Page>
-              <EmptyState title="Nothing here">This page doesn't exist.</EmptyState>
-            </Page>
-          </Route>
-        </Switch>
-      )}
+      <AnimatePresence initial={false} mode="popLayout">
+        <ScreenFade key={board ? 'board' : location}>
+          {board ? (
+            <FocusBackdrop dimmed={focus !== null}>
+              <Overview />
+            </FocusBackdrop>
+          ) : (
+            <OtherScreens />
+          )}
+        </ScreenFade>
+      </AnimatePresence>
     </AppShell>
+  );
+}
+
+/**
+ * Screens cross-fade (`dur.base`): the old one fades out over the new one as it fades in. The
+ * leaving screen is inert and hidden from assistive tech while it goes.
+ */
+function ScreenFade({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivElement> }) {
+  const present = useIsPresent();
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: dur.base, ease: ease.out }}
+      inert={!present}
+      aria-hidden={!present || undefined}
+      data-screen={present ? '' : 'leaving'}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function OtherScreens() {
+  return (
+    <Switch>
+      <Route path={routes.settings}>
+        <SettingsView />
+      </Route>
+      <Route path={routes.welcome}>
+        <WelcomeView />
+      </Route>
+      <Route>
+        <Page>
+          <EmptyState title="Nothing here">This page doesn't exist.</EmptyState>
+        </Page>
+      </Route>
+    </Switch>
   );
 }
 

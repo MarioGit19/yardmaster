@@ -69,7 +69,7 @@ export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
             id="main"
             tabIndex={-1}
             className={cx(
-              'min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-base',
+              'relative min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-base',
               reconnecting && 'opacity-60',
             )}
           >

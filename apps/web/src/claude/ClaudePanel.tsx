@@ -1,6 +1,8 @@
 import type { ClaudeSession } from '@c-board/protocol';
+import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
+import { dur, ease } from '../motion.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { Chip } from '../ui/Chip.js';
 import { Skeleton } from '../ui/Skeleton.js';
@@ -73,21 +75,35 @@ export function ClaudePanel({
           {formatCount(totalTokens(session))} tok
         </span>
       </header>
-      {!loaded ? (
-        <TranscriptSkeleton />
-      ) : rows.length === 0 && tail === null ? (
-        <div className="min-h-0 flex-1 px-5">
-          <EmptyState title="No messages yet">
-            {session.origin === 'board'
-              ? 'Your first message and Claude’s reply show up here.'
-              : 'The conversation shows up here as soon as Claude writes to its transcript.'}
-          </EmptyState>
-        </div>
-      ) : (
-        <Suspense fallback={<TranscriptSkeleton />}>
-          <MessageList key={session.id} rows={rows} tail={tail} cwd={session.cwd ?? undefined} />
-        </Suspense>
-      )}
+      {/* The skeleton cross-fades into the transcript, and one session's into the next's. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.div
+            key={loaded ? session.id : 'skeleton'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: dur.base, ease: ease.out }}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            {!loaded ? (
+              <TranscriptSkeleton />
+            ) : rows.length === 0 && tail === null ? (
+              <div className="min-h-0 flex-1 px-5">
+                <EmptyState title="No messages yet">
+                  {session.origin === 'board'
+                    ? 'Your first message and Claude’s reply show up here.'
+                    : 'The conversation shows up here as soon as Claude writes to its transcript.'}
+                </EmptyState>
+              </div>
+            ) : (
+              <Suspense fallback={<TranscriptSkeleton />}>
+                <MessageList rows={rows} tail={tail} cwd={session.cwd ?? undefined} />
+              </Suspense>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
       <SessionComposer session={session} />
     </div>
   );

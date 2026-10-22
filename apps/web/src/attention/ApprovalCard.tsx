@@ -4,24 +4,29 @@ import {
   parseToolCall,
   toolInputDetail,
 } from '@c-board/protocol';
-import { Check, X } from 'lucide-react';
-import { type KeyboardEvent, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { langFor, type TokenLine, useHighlight } from '../claude/highlight.js';
 import { DiffView } from '../claude/tools/DiffView.js';
 import { buildHunk } from '../claude/tools/diff.js';
 import { extensionOf, prettyJson } from '../claude/tools/results.js';
 import { selectProject, selectSession, useBoard } from '../data/index.js';
+import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
-import { orbStateFor } from '../orb/model.js';
+import { finishCountdown, orbStateFor } from '../orb/model.js';
 import { redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { Button } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
+import { DrawnCheck } from '../ui/DrawnCheck.js';
 import { Kbd } from '../ui/Kbd.js';
 import {
   type AttentionDecision,
+  COLLAPSE_AT_MS,
   canAlwaysAllow,
+  EXPIRE_FINISH_MS,
   RESOLVED_LABEL,
   relativeToProject,
 } from './attention.js';
@@ -64,10 +69,32 @@ export function ApprovalCard({
   const always = canAlwaysAllow(approval);
   const accent = project ? `var(--accent-${project.accent})` : undefined;
   const headingId = `approval-${approval.id}`;
+  const level = useMotionLevel();
+  const still = level !== 'full';
+
+  // Allowed: once the check has drawn, the card collapses to its header and outcome (by
+  // `layout`), then leaves. Reduced skips the collapse, which is movement.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (resolved !== 'allowed' || still) return;
+    const timer = setTimeout(() => setCollapsed(true), COLLAPSE_AT_MS);
+    return () => clearTimeout(timer);
+  }, [resolved, still]);
+
+  // The ring counts down while pending; an approval that expires early lets it run out.
+  const countdown = useMemo(() => {
+    if (approval.expiresAt === null) return null;
+    const ring = { startedAt: approval.createdAt, endsAt: approval.expiresAt };
+    if (resolved === 'expired') return finishCountdown(ring, Date.now(), EXPIRE_FINISH_MS);
+    return resolved ? null : ring;
+  }, [approval.createdAt, approval.expiresAt, resolved]);
+  const layout = resolved === 'allowed' && !still;
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: selection follows the sheet's keyboard (↑↓)
-    <article
+    <motion.article
+      layout={layout}
+      transition={spring.smooth}
+      style={{ borderRadius: 16 }}
       aria-labelledby={headingId}
       aria-current={selected || undefined}
       data-approval={approval.id}
@@ -84,7 +111,11 @@ export function ApprovalCard({
           <div className="pod-sweep-band" />
         </div>
       )}
-      <header className="flex min-w-0 items-center gap-2.5">
+      <motion.header
+        layout={layout && 'position'}
+        transition={spring.smooth}
+        className="flex min-w-0 items-center gap-2.5"
+      >
         {project && <ProjectAvatar project={project} />}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 text-body-sm">
@@ -104,38 +135,59 @@ export function ApprovalCard({
         </span>
         {session && (
           <ClaudeOrb
-            state={orbStateFor(session.status)}
+            state={resolved === 'expired' ? 'waiting' : orbStateFor(session.status)}
             size={24}
             accent={accent}
+            countdown={countdown}
             showToolLabel={false}
           />
         )}
-      </header>
+      </motion.header>
 
-      <MaskedPayload approval={approval} projectPath={project?.path} />
-
-      {approval.blockedPath && (
-        <p className="text-meta text-text-2">
-          Outside the allowed folders:{' '}
-          <span className="break-all font-mono text-text-1">{approval.blockedPath}</span>
-        </p>
-      )}
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            key="body"
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+            className="flex flex-col gap-2.5"
+          >
+            <MaskedPayload approval={approval} projectPath={project?.path} />
+            {approval.blockedPath && (
+              <p className="text-meta text-text-2">
+                Outside the allowed folders:{' '}
+                <span className="break-all font-mono text-text-1">{approval.blockedPath}</span>
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {resolved ? (
-        <p
-          data-outcome={resolved}
-          className={cx(
-            'flex h-7 items-center gap-1.5 text-label',
-            resolved === 'allowed' ? 'text-st-ok-ink' : 'text-text-2',
-          )}
+        // The outcome slides in like a session caption.
+        <motion.div
+          layout={layout && 'position'}
+          transition={spring.smooth}
+          className="flex h-7 overflow-hidden"
         >
-          {resolved === 'allowed' ? (
-            <Check aria-hidden className="size-3.5" strokeWidth={2} />
-          ) : (
-            <X aria-hidden className="size-3.5" strokeWidth={2} />
-          )}
-          {RESOLVED_LABEL[resolved]}
-        </p>
+          <motion.p
+            data-outcome={resolved}
+            initial={{ opacity: 0, transform: slide(still, '80%') }}
+            animate={{ opacity: 1, transform: slide(still, '0%'), transition: spring.snappy }}
+            className={cx(
+              'flex items-center gap-1.5 text-label',
+              resolved === 'allowed' ? 'text-st-ok-ink' : 'text-text-2',
+            )}
+          >
+            {resolved === 'allowed' ? (
+              <svg aria-hidden viewBox="0 0 16 16" className="size-4" fill="none" strokeWidth={1.5}>
+                <DrawnCheck draw />
+              </svg>
+            ) : (
+              <X aria-hidden className="size-3.5" strokeWidth={2} />
+            )}
+            {RESOLVED_LABEL[resolved]}
+          </motion.p>
+        </motion.div>
       ) : denying ? (
         <DenyForm
           busy={busy}
@@ -163,7 +215,7 @@ export function ApprovalCard({
           </Button>
         </div>
       )}
-    </article>
+    </motion.article>
   );
 }
 

@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNow } from '../anim/clock.js';
+import { DOT_PULSE } from '../anim/dotPulse.js';
 import { useInView } from '../anim/useFrame.js';
 import { type RateLoopSpec, useRateLoop } from '../anim/useRateLoop.js';
 import {
@@ -35,17 +36,6 @@ const COMET: RateLoopSpec = {
   pseudoElement: '::after',
 };
 const COMET_RATE = [1, 1, 1.5, 2.4] as const;
-const PULSE: RateLoopSpec = {
-  keyframes: [
-    // motion-still: only runs at Full; Reduced hides the pulse.
-    { transform: 'scale(1)', opacity: 0.55 },
-    // motion-still: as above.
-    { transform: 'scale(2.8)', opacity: 0 },
-  ],
-  durationMs: 1600,
-  easing: `cubic-bezier(${ease.out.join(', ')})`,
-  pseudoElement: '::after',
-};
 const PULSE_RATE = [1, 1, 1.45, 2.15] as const;
 
 export interface TerminalLaneProps {
@@ -229,17 +219,13 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   );
 }
 
-/**
- * The lane's command column. After a crash the error line slides up into its place (§4.10),
- * in rose; the command stays in the tooltip.
- */
 /** The uptime dot; while the lane streams, a ring pulses out of it. */
 function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const full = useMotionLevel() === 'full';
   const pulsing = running && level > 0;
   const onScreen = useInView(ref);
-  useRateLoop(ref, PULSE, PULSE_RATE[level], pulsing && full && onScreen);
+  useRateLoop(ref, DOT_PULSE, PULSE_RATE[level], pulsing && full && onScreen);
   return (
     <span
       ref={ref}
@@ -253,6 +239,10 @@ function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 })
   );
 }
 
+/**
+ * The lane's command column. A new command slides in like a session caption; after a crash the
+ * error line slides up into its place (§4.10), in rose, and the command stays in the tooltip.
+ */
 function LaneCaption({
   command,
   running,
@@ -273,7 +263,7 @@ function LaneCaption({
     >
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span
-          key={error ? `error:${error}` : 'command'}
+          key={error ? `error:${error}` : `command:${command ?? ''}`}
           data-error-line={error ? '' : undefined}
           initial={{ opacity: 0, transform: slide(still, '100%') }}
           animate={{ opacity: 1, transform: slide(still, '0%'), transition: spring.snappy }}

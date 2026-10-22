@@ -15,10 +15,13 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, type ReactNode, useId, useMemo, useRef } from 'react';
+import { DOT_PULSE } from '../../anim/dotPulse.js';
 import { useInView } from '../../anim/useFrame.js';
-import { dur, ease, useMotionLevel } from '../../motion.js';
+import { useRateLoop } from '../../anim/useRateLoop.js';
+import { dur, ease, move, spring, useMotionLevel } from '../../motion.js';
 import { usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
+import { DrawnCheck } from '../../ui/DrawnCheck.js';
 import { ExitBadge } from '../../ui/ExitBadge.js';
 import { langFor, type TokenLine, useHighlight } from '../highlight.js';
 import { Markdown } from '../Markdown.js';
@@ -111,14 +114,43 @@ type CallOf<K extends ToolCall['kind']> = Extract<ToolCall, { kind: K }>;
 
 // Shared pieces
 
+/**
+ * Whether this card was running when it mounted, so its result arrives on screen: the check pops
+ * and a failure glitches then, but not when the list scrolls a finished card back into view.
+ */
+function useLiveResult(row: ToolRow): boolean {
+  const wasRunning = useRef(row.result === null);
+  return wasRunning.current && row.result !== null;
+}
+
+/** The rose glitch for a failure that just happened (DESIGN.md §3 rule 6). */
+function useGlitch(row: ToolRow): string | false {
+  const live = useLiveResult(row);
+  return live && row.result?.isError === true && 'tool-glitch';
+}
+
+/** A running tool's dot, with a ring pulsing out of it like a streaming lane's. */
+function RunningDot() {
+  const ref = useRef<HTMLSpanElement>(null);
+  const full = useMotionLevel() === 'full';
+  const onScreen = useInView(ref);
+  useRateLoop(ref, DOT_PULSE, 1, full && onScreen);
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      className="tool-running size-1.5 rounded-full bg-st-tool text-st-tool shadow-[0_0_0_3px_var(--st-tool-glow)]"
+    />
+  );
+}
+
 function ToolState({ row }: { row: ToolRow }) {
+  const live = useLiveResult(row);
+  const still = useMotionLevel() !== 'full';
   if (row.result === null) {
     return (
       <span className="flex items-center gap-1.5 text-meta text-st-tool-ink">
-        <span
-          aria-hidden
-          className="tool-running size-1.5 rounded-full bg-st-tool shadow-[0_0_0_3px_var(--st-tool-glow)]"
-        />
+        <RunningDot />
         running
       </span>
     );
@@ -131,7 +163,19 @@ function ToolState({ row }: { row: ToolRow }) {
       </span>
     );
   }
-  return <Check aria-label="done" className="size-3.5 text-st-ok-ink" strokeWidth={2} />;
+  // Success pops the check in (scale .6 → 1 on `snappy`), as a transform string so it stays on
+  // the compositor while the transcript streams.
+  return (
+    <motion.span
+      data-done
+      initial={live ? { opacity: 0, transform: move(still, 'scale(0.6)') } : false}
+      animate={{ opacity: 1, transform: move(still, 'scale(1)') }}
+      transition={{ default: spring.snappy, opacity: { duration: dur.fast, ease: ease.out } }}
+      className="flex"
+    >
+      <Check aria-label="done" className="size-3.5 text-st-ok-ink" strokeWidth={2} />
+    </motion.span>
+  );
 }
 
 function Chevron({ open }: { open: boolean }) {
@@ -184,6 +228,7 @@ function Card({
 }) {
   const [open, toggle] = useStickyFlag(row.id, defaultOpen);
   const bodyId = useId();
+  const glitch = useGlitch(row);
   const Icon = FAMILY_ICON[toolFamily(row.name)];
   const head = (
     <>
@@ -201,7 +246,7 @@ function Card({
       data-tool-kind={kind}
       data-state={row.result === null ? 'running' : row.result.isError ? 'error' : 'done'}
       data-open={children && open ? '' : undefined}
-      className="tool-card overflow-hidden rounded-control border border-line bg-bg-1"
+      className={cx('tool-card overflow-hidden rounded-control border border-line bg-bg-1', glitch)}
     >
       {children ? (
         <button
@@ -453,6 +498,7 @@ function ChipCard({
 }) {
   const result = row.result;
   const failed = result?.isError ?? false;
+  const glitch = useGlitch(row);
   const [open, toggle] = useStickyFlag(row.id, false);
   const bodyId = useId();
   const Icon = FAMILY_ICON[toolFamily(row.name)];
@@ -510,7 +556,12 @@ function ChipCard({
       data-open={open ? '' : undefined}
       className="flex min-w-0 flex-col items-start"
     >
-      <div className="tool-chip flex h-7 max-w-full min-w-0 items-center overflow-hidden rounded-chip border border-line bg-bg-1 text-label">
+      <div
+        className={cx(
+          'tool-chip flex h-7 max-w-full min-w-0 items-center overflow-hidden rounded-chip border border-line bg-bg-1 text-label',
+          glitch,
+        )}
+      >
         <button
           type="button"
           aria-expanded={open}
@@ -709,12 +760,9 @@ function TodoCard({
 }
 
 function TodoMark({ status, draw }: { status: TodoStatus; draw: boolean }) {
-  const level = useMotionLevel();
   const label =
     status === 'completed' ? 'done' : status === 'in_progress' ? 'in progress' : 'to do';
-  // The check draws in on a newly finished item (DESIGN.md §4.6); at Reduced it fades.
-  const initial =
-    !draw || level === 'off' ? false : level === 'full' ? { pathLength: 0 } : { opacity: 0 };
+  // The check draws in on a newly finished item.
   return (
     <svg
       role="img"
@@ -725,18 +773,7 @@ function TodoMark({ status, draw }: { status: TodoStatus; draw: boolean }) {
       strokeWidth={1.5}
     >
       {status === 'completed' ? (
-        <>
-          <circle cx="8" cy="8" r="6.5" className="fill-st-ok/15 stroke-st-ok" />
-          <motion.path
-            d="M5.2 8.2l1.9 1.9 3.7-4"
-            className="stroke-st-ok"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={initial}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: dur.base, delay: dur.fast, ease: ease.out }}
-          />
-        </>
+        <DrawnCheck draw={draw} />
       ) : status === 'in_progress' ? (
         <>
           <circle cx="8" cy="8" r="6.5" className="stroke-st-work" />

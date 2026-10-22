@@ -1,4 +1,11 @@
-import { animate, type MotionValue, motion, useMotionTemplate, useMotionValue } from 'motion/react';
+import {
+  animate,
+  type HTMLMotionProps,
+  type MotionValue,
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+} from 'motion/react';
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -33,6 +40,8 @@ export interface ResizableColumnsProps {
   labels: Record<SideColumn | 'center', string>;
   /** The right column covers the others (the maximized terminal stack). */
   rightMaximized?: boolean;
+  /** How each column enters (the focus view's settle after the morph). */
+  settle?: HTMLMotionProps<'section'>;
 }
 
 /**
@@ -46,6 +55,7 @@ export function ResizableColumns({
   right,
   labels,
   rightMaximized = false,
+  settle,
 }: ResizableColumnsProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -87,9 +97,15 @@ export function ResizableColumns({
       style={{ gridTemplateColumns: columns }}
       className="relative grid min-h-0 flex-1"
     >
-      <section id={ids.left} aria-label={labels.left} className="focus-col" inert={rightMaximized}>
+      <motion.section
+        {...settle}
+        id={ids.left}
+        aria-label={labels.left}
+        className="focus-col"
+        inert={rightMaximized}
+      >
         {left}
-      </section>
+      </motion.section>
       <Handle
         column="left"
         controls={ids.left}
@@ -99,9 +115,14 @@ export function ResizableColumns({
         width={width}
         onCommit={commit}
       />
-      <section aria-label={labels.center} className="focus-col" inert={rightMaximized}>
+      <motion.section
+        {...settle}
+        aria-label={labels.center}
+        className="focus-col"
+        inert={rightMaximized}
+      >
         {center}
-      </section>
+      </motion.section>
       <Handle
         column="right"
         controls={ids.right}
@@ -111,13 +132,14 @@ export function ResizableColumns({
         width={width}
         onCommit={commit}
       />
-      <section
+      <motion.section
+        {...settle}
         id={ids.right}
         aria-label={labels.right}
         className={cx('focus-col', rightMaximized && 'focus-col-max')}
       >
         {right}
-      </section>
+      </motion.section>
     </motion.div>
   );
 }

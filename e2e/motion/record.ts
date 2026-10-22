@@ -89,6 +89,49 @@ class Recorder {
 
 const hold = (page: Page, ms: number) => () => page.waitForTimeout(ms);
 
+/**
+ * Waits up to `timeout` for `selector` (something the demo does on its own timing), then records
+ * `ms` around it, reaching back `leadMs` to the start of what was detected. Warns and skips when
+ * the demo doesn't get there in time.
+ */
+async function catchMoment(
+  r: Recorder,
+  name: string,
+  note: string,
+  selector: string,
+  {
+    timeout = 45_000,
+    ms = 1200,
+    leadMs = 500,
+    clip,
+  }: {
+    timeout?: number;
+    ms?: number;
+    leadMs?: number;
+    clip?: Box;
+  } = {},
+): Promise<boolean> {
+  const seen = await r.page
+    .locator(selector)
+    .first()
+    .waitFor({ state: 'attached', timeout })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!seen) {
+    console.warn(
+      `motion:record: ${selector} did not show within ${timeout / 1000} s; skipping ${name}`,
+    );
+    return false;
+  }
+  const index = r.moments.length;
+  await r.moment(name, 'transition', note, hold(r.page, ms), clip);
+  const m = r.moments[index];
+  if (m) m.start = Math.max(0, m.start - leadMs / 1000);
+  return true;
+}
+
 /** Opens the overview and waits for the first pod, the way the e2e suite does. */
 async function openOverview(page: Page, route = '/') {
   await page.goto(`/#${route}`);
@@ -123,6 +166,26 @@ const SCENARIOS = {
         await page.waitForTimeout(700);
       },
     );
+    await r.moment('route', 'transition', 'overview → settings → overview cross-fade', async () => {
+      await page.goto('/#/settings');
+      await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
+      await page.waitForTimeout(600);
+      await page.goto('/#/');
+      await page.locator('[data-pod]').first().waitFor();
+      await page.waitForTimeout(600);
+    });
+  },
+
+  /** A fresh board's first attention change reorders the pods within seconds. */
+  async reorder(r: Recorder) {
+    await openOverview(r.page);
+    await catchMoment(
+      r,
+      'pods',
+      'attention reorders the pods: the riser flies over the others',
+      '[data-pod-slot][data-rising]',
+      { ms: 900, leadMs: 300 },
+    );
   },
 
   /** The stress board: compare with `overview-activity` for how much louder a busy board reads. */
@@ -142,13 +205,49 @@ const SCENARIOS = {
     const { page } = r;
     await openOverview(page);
     await page.waitForTimeout(1500);
-    const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+    // A pod with two sessions, so the switch between them can be recorded.
+    const pods = page.locator('[data-pod]');
+    const pair = pods.filter({ has: page.locator('li[data-session] + li[data-session]') });
+    const id = await ((await pair.count()) > 0 ? pair : pods).first().getAttribute('data-pod');
     if (!id) throw new Error('no pod on the overview');
     await r.moment('open', 'transition', 'pod morphs into the focus view', async () => {
       await page.locator(`[data-pod="${id}"] header a`).click();
       await page.locator(`[data-focus="${id}"]`).waitFor();
       await page.waitForTimeout(1200);
     });
+    const rows = page.locator(`[data-focus="${id}"] a[data-session]`);
+    if ((await rows.count()) > 1) {
+      await r.moment(
+        'session-switch',
+        'transition',
+        'pick another session: the pill slides, the transcript cross-fades',
+        async () => {
+          await rows.nth(1).click();
+          await page.waitForTimeout(1000);
+          await rows.nth(0).click();
+          await page.waitForTimeout(1000);
+        },
+      );
+    } else {
+      console.warn('motion:record: one session in the focused pod; skipping focus-session-switch');
+    }
+    const center = await page
+      .locator(`[data-focus="${id}"] section[aria-label="Claude"]`)
+      .boundingBox();
+    await catchMoment(
+      r,
+      'tool-finish',
+      'a running tool card finishes (check pop or glitch)',
+      `[data-focus="${id}"] [data-tool][data-state="running"]`,
+      { ms: 4000, leadMs: 200, ...(center ? { clip: visible(center, DESKTOP) } : {}) },
+    );
+    await catchMoment(
+      r,
+      'done',
+      'the focused session finishes its turn: header sweep and the crew’s done',
+      `[data-focus="${id}"] header [data-done-sweep]`,
+      { ms: 1200, leadMs: 300 },
+    );
     await r.moment('close', 'transition', 'Esc morphs it back into the pod', async () => {
       await page.keyboard.press('Escape');
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
@@ -195,6 +294,11 @@ const SCENARIOS = {
       console.warn('motion:record: no toast within 30 s; skipping chrome-toast');
     }
 
+    // Wait for a permission request, so the sheet has a card to allow and deny.
+    await page
+      .locator('[data-attention-live]', { hasText: 'Approval needed' })
+      .waitFor({ state: 'attached', timeout: 30_000 })
+      .catch(() => {});
     const sheet = page.getByRole('complementary', { name: /Needs you/ });
     await r.moment('attention-open', 'transition', 'the Attention Center slides in', async () => {
       const review = toast.getByRole('button', { name: 'Review' });
@@ -203,6 +307,37 @@ const SCENARIOS = {
       await sheet.waitFor();
       await page.waitForTimeout(900);
     });
+    const card = sheet.locator('article[data-approval]:not([data-resolved])').first();
+    if (await card.isVisible()) {
+      const box = await sheet.boundingBox();
+      const clip = box ? visible(box, DESKTOP) : undefined;
+      await r.moment(
+        'approval-allow',
+        'transition',
+        'Allow: outcome slides in, check draws, the card collapses and leaves',
+        async () => {
+          await card.getByRole('button', { name: /^Allow/ }).click();
+          await page.waitForTimeout(1600);
+        },
+        clip,
+      );
+      const next = sheet.locator('article[data-approval]:not([data-resolved])').first();
+      if (await next.isVisible()) {
+        await r.moment(
+          'approval-deny',
+          'transition',
+          'Deny: the outcome slides in, then a short fade',
+          async () => {
+            await next.getByRole('button', { name: /^Deny/ }).click();
+            await next.getByRole('button', { name: 'Deny', exact: true }).click();
+            await page.waitForTimeout(1100);
+          },
+          clip,
+        );
+      }
+    } else {
+      console.warn('motion:record: no approval in the Attention Center; skipping approvals');
+    }
     await r.moment('attention-close', 'transition', 'Esc closes the Attention Center', async () => {
       await page.keyboard.press('Escape');
       await sheet.waitFor({ state: 'hidden' });

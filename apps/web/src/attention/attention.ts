@@ -1,5 +1,6 @@
 import type { Approval, ApprovalState, ClaudeSession, Project } from '@c-board/protocol';
 import type { BoardStoreState } from '../data/store.js';
+import type { MotionLevel } from '../motion.js';
 import { createPreference, type KeyValueStorage } from '../prefs.js';
 
 // Whether the sheet is open lives only in memory: a reload starts with it closed.
@@ -93,6 +94,30 @@ export const RESOLVED_LABEL: Record<ApprovalState, string> = {
   denied: 'Denied',
   expired: 'Expired',
 };
+
+/** An expired card's countdown ring runs out over this long before the card fades. */
+export const EXPIRE_FINISH_MS = 450;
+/** An allowed card shows its outcome and drawn check this long, then collapses. */
+export const COLLAPSE_AT_MS = 520;
+
+/**
+ * How long a decided card stays in the list showing its outcome. Allow draws its check and
+ * collapses the card (Reduced only shows the check); Deny fades out after a short beat; Expire lets
+ * the countdown ring finish. Off removes it at once.
+ */
+export function lingerFor(state: ApprovalState, level: MotionLevel): number {
+  if (level === 'off') return 0;
+  switch (state) {
+    case 'allowed':
+      return level === 'full' ? 1000 : 700;
+    case 'denied':
+      return 450;
+    case 'expired':
+      return EXPIRE_FINISH_MS + 200;
+    case 'pending':
+      return 0;
+  }
+}
 
 /** A payload path inside the project, shown relative to it. */
 export function relativeToProject(path: string, projectPath: string | undefined): string {

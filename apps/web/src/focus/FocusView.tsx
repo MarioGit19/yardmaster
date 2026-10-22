@@ -1,6 +1,6 @@
 import type { ClaudeSession, Project } from '@c-board/protocol';
 import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, type HTMLMotionProps, motion } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
@@ -11,6 +11,7 @@ import { CrewMascot } from '../crew/CrewMascot.js';
 import { miniCrewCount } from '../crew/model.js';
 import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
+  activityKey,
   selectApproval,
   selectHydrated,
   selectProject,
@@ -22,8 +23,9 @@ import {
 } from '../data/index.js';
 import { GitPanel } from '../git/GitPanel.js';
 import { SessionHistory } from '../history/SessionHistory.js';
-import { dur, ease, spring, tabGlide } from '../motion.js';
+import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
 import { podSessions } from '../pod/model.js';
+import { DoneSweep } from '../pod/PodActivity.js';
 import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
 import { useMascotState } from '../pod/useMascotState.js';
 import { useMediaQuery } from '../prefs.js';
@@ -85,12 +87,28 @@ export function FocusView({ projectId, sessionId, shared }: FocusViewProps) {
   return <ProjectFocus project={project} sessionId={sessionId} shared={shared} />;
 }
 
-/** The body fades in once the card has mostly grown, and out first on the way back. */
-const body = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: dur.base, ease: ease.out, delay: dur.fast } },
-  exit: { opacity: 0, transition: { duration: dur.fast, ease: ease.out } },
-};
+/** The body fades out first on the way back; its columns settle in on their own. */
+const body = { exit: { opacity: 0, transition: { duration: dur.fast, ease: ease.out } } };
+
+/**
+ * Each column settles once the card has mostly grown: opacity and a 4 px rise on `smooth`, all
+ * together (no stagger). Reduced only fades. The transform is dropped at rest so a column never
+ * keeps a containing block for its fixed and maximized layers.
+ */
+export function columnSettle(still: boolean, delay: number): HTMLMotionProps<'div'> {
+  return {
+    initial: { opacity: 0, transform: slide(still, '4px') },
+    animate: {
+      opacity: 1,
+      transform: slide(still, '0px'),
+      transition: {
+        default: { ...spring.smooth, delay },
+        opacity: { duration: dur.base, ease: ease.out, delay },
+      },
+      transitionEnd: { transform: 'none' },
+    },
+  };
+}
 
 function ProjectFocus({
   project,
@@ -117,6 +135,8 @@ function ProjectFocus({
   }, [sessionId]);
   const now = useNow(IDLE_CLOCK_MS);
   const crew = useCrewTerminals(terminals);
+  const still = useMotionLevel() !== 'full';
+  const settle = columnSettle(still, shared ? dur.base : 0);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -166,8 +186,9 @@ function ProjectFocus({
       <motion.header
         layoutId={shared ? sharedId.header(project.id) : undefined}
         transition={spring.smooth}
-        className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-4 py-3 md:px-5"
+        className="relative flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-4 py-3 md:px-5"
       >
+        {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
         <Tooltip content="Back to the overview" shortcut="Esc">
           <Link
             href={routes.overview}
@@ -215,6 +236,7 @@ function ProjectFocus({
       <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
         {tabs ? (
           <FocusTabs
+            settle={settle}
             show={composing ? 'claude' : terminalRequested ? 'terminals' : null}
             panels={[
               { id: 'sessions', label: 'Sessions', content: sessionsColumn },
@@ -230,6 +252,7 @@ function ProjectFocus({
             center={claudeColumn}
             right={terminalsColumn}
             rightMaximized={maximized}
+            settle={settle}
           />
         )}
       </motion.div>
@@ -244,7 +267,15 @@ interface TabPanel {
 }
 
 /** Narrow screens: one column at a time, Claude first. */
-function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }) {
+function FocusTabs({
+  panels,
+  show,
+  settle,
+}: {
+  panels: TabPanel[];
+  show: string | null;
+  settle: HTMLMotionProps<'div'>;
+}) {
   const [active, setActive] = useState(show ?? 'claude');
   const [byKeyboard, setByKeyboard] = useState(false);
   // A panel asked for from outside (a terminal picked in ⌘K).
@@ -313,7 +344,8 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
         })}
       </div>
       {panels.map((panel) => (
-        <div
+        <motion.div
+          {...settle}
           key={panel.id}
           role="tabpanel"
           id={`focus-panel-${panel.id}`}
@@ -322,7 +354,7 @@ function FocusTabs({ panels, show }: { panels: TabPanel[]; show: string | null }
           className="focus-col min-h-0 flex-1"
         >
           {panel.content}
-        </div>
+        </motion.div>
       ))}
     </>
   );
@@ -354,6 +386,8 @@ function SessionsColumn({
   const ended = sessions.filter((s) => s.status.kind === 'ended');
   const ordered = [...live, ...ended];
   const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
+  // Rows only measure when the list itself changes, not on every status tick.
+  const orderKey = ordered.map((s) => s.id).join('|');
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -376,19 +410,30 @@ function SessionsColumn({
           <p className="text-body-sm text-text-2">No Claude sessions</p>
         ) : (
           <ul className="-mx-2 flex flex-col gap-0.5">
-            {ordered.map((s) => (
-              <li key={s.id}>
-                <SessionLink
-                  session={s}
-                  projectId={project.id}
-                  active={s.id === activeId}
-                  accent={accent}
-                  crew={crew}
-                  now={now}
-                  shared={sharedOrbs}
-                />
-              </li>
-            ))}
+            <AnimatePresence initial={false}>
+              {ordered.map((s) => (
+                <motion.li
+                  key={s.id}
+                  layout="position"
+                  layoutDependency={orderKey}
+                  // y (not a transform string) composes with the layout glide.
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+                  transition={spring.smooth}
+                >
+                  <SessionLink
+                    session={s}
+                    projectId={project.id}
+                    active={s.id === activeId}
+                    accent={accent}
+                    crew={crew}
+                    now={now}
+                    shared={sharedOrbs}
+                  />
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
@@ -434,10 +479,20 @@ function SessionLink({
       aria-current={active ? 'page' : undefined}
       data-session={session.id}
       className={cx(
-        'flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
-        active ? 'bg-bg-2 shadow-raised' : 'hover:bg-bg-2/60',
+        'relative isolate flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
+        !active && 'hover:bg-bg-2/60',
       )}
     >
+      {active && (
+        // One highlight that slides from row to row as the session changes.
+        <motion.span
+          layoutId={`focus-session-pill:${projectId}`}
+          transition={spring.smooth}
+          aria-hidden
+          data-session-pill
+          className="absolute inset-0 -z-10 rounded-control bg-bg-2 shadow-raised"
+        />
+      )}
       <motion.span
         layoutId={shared ? sharedId.orb(session.id) : undefined}
         transition={spring.smooth}

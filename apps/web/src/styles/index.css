@@ -663,10 +663,12 @@
 }
 
 /* The running dot's pulse ring, driven the same way (`PULSE`). */
-.lane-dot {
+.lane-dot,
+.tool-running {
   position: relative;
 }
-.lane-dot[data-level]::after {
+.lane-dot[data-level]::after,
+.tool-running::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -887,6 +889,24 @@
   animation: pod-sweep-wash var(--dur-sweep) var(--ease-out) forwards;
 }
 
+/* A reorder lifts the pod that overtakes its neighbours above them, with a soft shadow that fades
+   in for the flight and out as it lands. The rest glide underneath. */
+.pod-slot[data-rising] {
+  z-index: 5;
+}
+.pod-lift {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -14px rgb(0 0 0 / 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.pod-slot[data-rising] > .pod-lift {
+  opacity: 1;
+}
+
 .pod-spotlight {
   position: absolute;
   top: 0;
@@ -1026,6 +1046,15 @@
   }
 }
 
+/* A pane fades in once its renderer has mounted, instead of popping in (motion Off: at once). */
+.xterm-host {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.xterm-host[data-renderer] {
+  opacity: 1;
+}
+
 /* xterm's scrollbar, slimmed to match the custom ones elsewhere. */
 .xterm-host .xterm .scrollbar.vertical {
   width: 6px !important;
@@ -1143,6 +1172,30 @@
 }
 [data-motion="reduced"] .tool-enter {
   animation-name: msg-fade;
+}
+
+/* A failure that happens on screen: a 2-frame horizontal glitch (±2px, 120 ms), then rose stays
+   on the card (DESIGN.md §3 rule 6). Reduced keeps only the rose. */
+@keyframes glitch {
+  0% {
+    transform: translateX(2px);
+  }
+  50% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.tool-glitch {
+  animation: glitch var(--dur-fast) steps(1, end) both;
+}
+[data-motion="reduced"] .tool-glitch {
+  animation: none;
+}
+.tool-card[data-state="error"],
+[data-state="error"] > .tool-chip {
+  border-color: color-mix(in srgb, var(--st-err) 45%, var(--line));
 }
 .tool-head {
   transition: background-color var(--dur-fast) var(--ease-out);

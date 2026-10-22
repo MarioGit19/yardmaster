@@ -6,6 +6,8 @@ import {
   approvalHeadline,
   attentionKey,
   canAlwaysAllow,
+  EXPIRE_FINISH_MS,
+  lingerFor,
   relativeToProject,
   selectWaitingWithoutApproval,
 } from './attention.js';
@@ -104,5 +106,22 @@ describe('helpers', () => {
       '/home/dev/acme-shopper/a.ts',
     );
     expect(relativeToProject('/etc/hosts', undefined)).toBe('/etc/hosts');
+  });
+});
+
+describe('lingerFor', () => {
+  it('holds an allowed card long enough to draw its check and collapse', () => {
+    expect(lingerFor('allowed', 'full')).toBeGreaterThan(lingerFor('allowed', 'reduced'));
+    expect(lingerFor('denied', 'full')).toBeLessThan(lingerFor('allowed', 'full'));
+  });
+
+  it('lets an expired ring finish first', () => {
+    expect(lingerFor('expired', 'full')).toBeGreaterThan(EXPIRE_FINISH_MS);
+  });
+
+  it('removes decided cards at once with motion off', () => {
+    for (const state of ['allowed', 'denied', 'expired'] as const) {
+      expect(lingerFor(state, 'off')).toBe(0);
+    }
   });
 });

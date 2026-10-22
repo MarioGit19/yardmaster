@@ -101,6 +101,21 @@ export function countdownProgress(
   return Math.min(1, Math.max(0, (now - countdown.startedAt) / span));
 }
 
+/**
+ * The countdown re-timed to run out `ms` from `now`, continuing from where it is: an approval that
+ * expires early lets its ring finish instead of vanishing mid-way.
+ */
+export function finishCountdown(
+  countdown: { startedAt: number; endsAt: number },
+  now: number,
+  ms: number,
+): { startedAt: number; endsAt: number } {
+  const done = countdownProgress(countdown, now) ?? 1;
+  if (done >= 1) return countdown;
+  const span = ms / (1 - done);
+  return { startedAt: now - done * span, endsAt: now + ms };
+}
+
 const STATE_LABEL: Record<OrbState, string> = {
   idle: 'Idle',
   working: 'Thinking',

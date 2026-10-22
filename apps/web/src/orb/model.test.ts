@@ -4,6 +4,7 @@ import {
   countdownProgress,
   enterEffect,
   FAMILY_TOKEN,
+  finishCountdown,
   orbAnimates,
   orbLabel,
   orbStateFor,
@@ -104,5 +105,20 @@ describe('orbLabel', () => {
     expect(orbLabel('waiting', null, 0)).toBe('Waiting for you');
     expect(orbLabel('working', null, 1)).toBe('Thinking, 1 subagent');
     expect(orbLabel('working', null, 3)).toBe('Thinking, 3 subagents');
+  });
+});
+
+describe('finishCountdown', () => {
+  it('runs the rest of the ring out in the given time, from where it is', () => {
+    const finish = finishCountdown({ startedAt: 0, endsAt: 10_000 }, 4000, 600);
+    expect(finish.endsAt).toBe(4600);
+    expect(countdownProgress(finish, 4000)).toBeCloseTo(0.4);
+    expect(countdownProgress(finish, 4300)).toBeCloseTo(0.7);
+    expect(countdownProgress(finish, 4600)).toBe(1);
+  });
+
+  it('leaves a finished countdown alone', () => {
+    const over = { startedAt: 0, endsAt: 1000 };
+    expect(finishCountdown(over, 2000, 600)).toBe(over);
   });
 });

@@ -25,6 +25,22 @@ export function orderPods(entries: readonly PodEntry[]): string[] {
     .map((e) => e.id);
 }
 
+/**
+ * Pods that moved ahead of a pod they used to follow between two orders: during the reorder they
+ * fly over their neighbours. Pods that only close a gap left by a removed one don't count.
+ */
+export function risingPods(prev: readonly string[], next: readonly string[]): Set<string> {
+  const kept = new Set(prev);
+  const common = next.filter((id) => kept.has(id));
+  const stayed = new Set(common);
+  const before = new Map(prev.filter((id) => stayed.has(id)).map((id, i) => [id, i]));
+  const rising = new Set<string>();
+  common.forEach((id, i) => {
+    if (i < (before.get(id) ?? i)) rising.add(id);
+  });
+  return rising;
+}
+
 /** Project ids in overview order, from one pass over the board. */
 export function selectPodOrder(s: BoardStoreState): string[] {
   const sessions = new Map<string, ClaudeSession[]>();

@@ -156,6 +156,33 @@ describe('ToolCard', () => {
     expect(container.textContent).toContain('TRK-142');
   });
 
+  it('glitches a failure that happens on screen, not one scrolled back into view', () => {
+    const task = sample('Task');
+    const running = { ...task, result: null };
+    const failed = { ...task, result: { text: 'Agent crashed', isError: true } };
+    render(running);
+    expect($('.tool-running')).not.toBeNull();
+    render(failed);
+    expect($('[data-tool-kind]')?.classList.contains('tool-glitch')).toBe(true);
+    act(() =>
+      root.render(
+        <ToolViewState key="remount">
+          <ToolCard row={failed} />
+        </ToolViewState>,
+      ),
+    );
+    expect($('[data-tool-kind]')?.classList.contains('tool-glitch')).toBe(false);
+  });
+
+  it('pops the check when a running chip finishes', () => {
+    const read = sample('Read');
+    render({ ...read, result: null });
+    expect($('[data-done]')).toBeNull();
+    render(read);
+    expect($('[data-done]')).not.toBeNull();
+    expect($('.tool-glitch')).toBeNull();
+  });
+
   it('keeps a card open across remounts', () => {
     const row = sample('Task');
     const view = (show: boolean) =>

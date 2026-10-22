@@ -11,6 +11,16 @@ async function openFirstPod(page: Page) {
   await page.locator(`[data-pod="${id}"] header a`).click();
   const card = page.locator(`[data-focus="${id}"]`);
   await expect(card).toBeVisible();
+  // Measure the view, not the morph: wait until the card and its columns have settled.
+  await expect
+    .poll(() =>
+      card.evaluate((el) =>
+        [el, ...el.querySelectorAll('section')].every(
+          (node) => getComputedStyle(node).transform === 'none',
+        ),
+      ),
+    )
+    .toBe(true);
   return { id, card };
 }
 
@@ -72,7 +82,7 @@ test.describe('at 1440', () => {
     expect(final?.width ?? 0).toBeGreaterThan(podBox.width * 2);
 
     // The overview stays behind it, dimmed, blurred and inert.
-    const backdrop = page.locator('main > div').first();
+    const backdrop = page.locator('main > [data-screen] > div').first();
     await expect(backdrop).toHaveAttribute('inert', '');
     await expect
       .poll(() => backdrop.evaluate((el) => getComputedStyle(el).filter))

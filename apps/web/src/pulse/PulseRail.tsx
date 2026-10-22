@@ -1,6 +1,7 @@
 import { type ActivityEvent, PULSE_WINDOW_MS } from '@c-board/protocol';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cubicBezier } from 'motion';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   type KeyboardEvent,
   type MouseEvent,
@@ -13,7 +14,7 @@ import {
 import { useLocation } from 'wouter';
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
-import { ease, moment, move, useMotionLevel } from '../motion.js';
+import { dur, ease, moment, move, useMotionLevel } from '../motion.js';
 import { resolveColor } from '../orb/colors.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
@@ -166,7 +167,17 @@ export function PulseRail() {
         </button>
         {!collapsed && <FilterToggle />}
       </div>
-      {!collapsed && <PulsePlot />}
+      {/* Collapsing fades the plot out before it goes, rather than snapping it away. */}
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            key="plot"
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+          >
+            <PulsePlot />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
