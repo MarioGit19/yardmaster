@@ -28,7 +28,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm check`
   - Note: Vitest 5 uses root `test.projects` (the old workspace file is gone); each package has its own `vitest.config.ts` and `test` script. Builds use `tsconfig.build.json` to keep tests out of `dist`. Biome skips Markdown so the docs stay hand-formatted.
 
-- [ ] **0.3 CI**
+- [x] **0.3 CI**
   - `.github/workflows/ci.yml`: on push/PR, runs on ubuntu-latest and macos-latest, sets up Node 22 and pnpm, then runs `pnpm install --frozen-lockfile`, `pnpm check` and `pnpm build`. Uploads the extension `.vsix` as an artifact once that exists (guard with `if: hashFiles(...)`).
   - **Done when:** the workflow file is valid YAML and references only existing scripts.
   - **Verify:** `pnpm dlx @action-validator/cli .github/workflows/ci.yml` (or a YAML parse via node if unavailable).
