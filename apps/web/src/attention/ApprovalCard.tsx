@@ -13,6 +13,8 @@ import { extensionOf, prettyJson } from '../claude/tools/results.js';
 import { selectProject, selectSession, useBoard } from '../data/index.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
+import { redactDeep } from '../redact/redact.js';
+import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { Button } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
@@ -110,7 +112,7 @@ export function ApprovalCard({
         )}
       </header>
 
-      <Payload approval={approval} projectPath={project?.path} />
+      <MaskedPayload approval={approval} projectPath={project?.path} />
 
       {approval.blockedPath && (
         <p className="text-meta text-text-2">
@@ -219,6 +221,34 @@ function DenyForm({
         Cancel
       </Button>
     </form>
+  );
+}
+
+/** The payload with its secrets masked while the setting is on, and a reveal to check them. */
+function MaskedPayload({ approval, projectPath }: { approval: Approval; projectPath?: string }) {
+  const key = `approval:${approval.id}`;
+  const on = useRedactOn();
+  const masked = useMasked(key);
+  const redacted = useMemo(
+    () => (on ? redactDeep(approval.input) : approval.input),
+    [on, approval.input],
+  );
+  if (redacted === approval.input) return <Payload approval={approval} projectPath={projectPath} />;
+  return (
+    <div className="flex flex-col gap-1">
+      <Payload
+        approval={masked ? { ...approval, input: redacted } : approval}
+        projectPath={projectPath}
+      />
+      <button
+        type="button"
+        aria-pressed={!masked}
+        onClick={() => reveal.toggle(key)}
+        className="self-start rounded-chip px-1 text-meta text-text-3 transition-colors duration-150 hover:text-text-1"
+      >
+        {masked ? 'Secrets hidden · Reveal' : 'Hide secrets'}
+      </button>
+    </div>
   );
 }
 

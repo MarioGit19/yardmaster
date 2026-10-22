@@ -1,10 +1,19 @@
 import type { StreamId } from '@c-board/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { useStream } from '../data/index.js';
+import { redact } from '../redact/redact.js';
+import { useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
 import { type Line, segmentCss, TerminalTail } from './ansi.js';
 
 export const PEEK_LINES = 6;
+
+/** A line with its secrets masked. A masked line loses its colors, which only it can show. */
+export function maskLine(line: Line): Line {
+  const text = line.map((s) => s.text).join('');
+  const masked = redact(text);
+  return masked === text || !line[0] ? line : [{ text: masked, style: line[0].style }];
+}
 /** At most 10 renders a second, however fast the terminal writes. */
 const FLUSH_MS = 100;
 
@@ -22,7 +31,9 @@ export interface TerminalPeekProps {
 export function TerminalPeek({ terminalId, id, label, className }: TerminalPeekProps) {
   const tail = useRef<TerminalTail | null>(null);
   tail.current ??= new TerminalTail(PEEK_LINES);
-  const [lines, setLines] = useState<Line[]>([]);
+  const [raw, setLines] = useState<Line[]>([]);
+  const redactOn = useRedactOn();
+  const lines = redactOn ? raw.map(maskLine) : raw;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useStream(`term:${terminalId}` as StreamId, (chunk) => {

@@ -1,9 +1,20 @@
 import { parseToolCall, type TodoStatus } from '@c-board/protocol';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { dur, ease, spring } from '../motion.js';
+import { redact, redactDeep } from '../redact/redact.js';
+import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
 import { Markdown } from './Markdown.js';
 import { ToolCard } from './tools/ToolCard.js';
@@ -281,21 +292,64 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
   );
 }
 
-const Row = memo(function Row({
-  item,
-  cwd,
-  expanded,
-  onToggle,
-  entering,
-  previousTodos,
-}: {
+/** The row with its secrets masked; the same object when it has none. */
+export function redactItem(item: Item): Item {
+  if (item.kind !== 'tool') {
+    const text = redact(item.text);
+    return text === item.text ? item : { ...item, text };
+  }
+  const input = redactDeep(item.input);
+  const resultText = item.result ? redact(item.result.text) : null;
+  if (input === item.input && resultText === (item.result?.text ?? null)) return item;
+  return {
+    ...item,
+    input,
+    result: item.result && resultText !== null ? { ...item.result, text: resultText } : null,
+  };
+}
+
+interface RowProps {
   item: Item;
   cwd: string | undefined;
   expanded: boolean;
   onToggle: (id: string) => void;
   entering: boolean;
   previousTodos: { content: string; status: TodoStatus }[] | null | undefined;
-}) {
+}
+
+/** A row, masked while the redact setting is on (PRD §8.7), with a per-row reveal. */
+const Row = memo(function Row(props: RowProps) {
+  const { item } = props;
+  const key = `row:${item.id}`;
+  const on = useRedactOn();
+  const masked = useMasked(key);
+  const redacted = useMemo(() => (on ? redactItem(item) : item), [on, item]);
+  if (redacted === item) return <RowBody {...props} />;
+  return (
+    <div className="flex flex-col">
+      <RowBody {...props} item={masked ? redacted : item} />
+      <button
+        type="button"
+        aria-pressed={!masked}
+        onClick={() => reveal.toggle(key)}
+        data-reveal={masked ? 'hidden' : 'shown'}
+        className={cx(
+          'mt-1 flex h-6 items-center gap-1.5 rounded-chip px-1 text-meta text-text-3 transition-colors duration-150 hover:text-text-1',
+          item.kind === 'user' ? 'self-end' : 'self-start',
+        )}
+      >
+        {masked ? (
+          <EyeOff aria-hidden className="size-3.5" strokeWidth={1.5} />
+        ) : (
+          <Eye aria-hidden className="size-3.5" strokeWidth={1.5} />
+        )}
+        {masked ? 'Secrets hidden · Reveal' : 'Hide secrets'}
+      </button>
+    </div>
+  );
+});
+
+function RowBody({ item, cwd, expanded, onToggle, entering, previousTodos }: RowProps) {
   switch (item.kind) {
     case 'user':
       return <UserBubble row={item} expanded={expanded} onToggle={onToggle} />;
@@ -312,7 +366,7 @@ const Row = memo(function Row({
     case 'tool':
       return <ToolCard row={item} cwd={cwd} entering={entering} previousTodos={previousTodos} />;
   }
-});
+}
 
 function UserBubble({
   row,

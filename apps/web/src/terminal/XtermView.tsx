@@ -6,6 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { useBoardClient } from '../data/index.js';
+import { StreamRedactor } from '../redact/redact.js';
 import { domColorResolver, xtermTheme } from './theme.js';
 
 /** What the stack's toolbar can do to a mounted terminal. */
@@ -22,12 +23,16 @@ export interface XtermController {
 export interface XtermViewProps {
   terminalId: string;
   label: string;
+  /** Mask secrets in the output (PRD §8.7). Changing it remounts the view and replays. */
+  redact?: boolean;
   onController?: (controller: XtermController | null) => void;
 }
 
 const FONT_FAMILY = '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace';
 const FONT_SIZE = 12;
 const SCROLLBACK = 10_000;
+/** Longest an unfinished line is held back while it's checked for secrets. */
+const REDACT_HOLD_MS = 40;
 const GAP_NOTE = '\r\n\x1b[2m… earlier output was dropped …\x1b[22m\r\n';
 
 /**
@@ -35,7 +40,12 @@ const GAP_NOTE = '\r\n\x1b[2m… earlier output was dropped …\x1b[22m\r\n';
  * search, themed from the tokens. Output comes from `term:<id>`, replayed from the client's
  * stream history, so a pane can be disposed and remounted without losing what it showed.
  */
-export default function XtermView({ terminalId, label, onController }: XtermViewProps) {
+export default function XtermView({
+  terminalId,
+  label,
+  redact = false,
+  onController,
+}: XtermViewProps) {
   const client = useBoardClient();
   const hostRef = useRef<HTMLDivElement>(null);
   const [renderer, setRenderer] = useState<'webgl' | 'dom' | null>(null);
@@ -106,14 +116,37 @@ export default function XtermView({ terminalId, label, onController }: XtermView
       }
       refit();
 
+      // The write filter: masked output goes in, the raw text never reaches the terminal.
+      const redactor = redact ? new StreamRedactor() : null;
+      let hold: ReturnType<typeof setTimeout> | null = null;
+      const write = (chunk: string) => {
+        if (!redactor) {
+          term.write(chunk);
+          return;
+        }
+        const ready = redactor.push(chunk);
+        if (ready) term.write(ready);
+        if (redactor.pending) {
+          hold ??= setTimeout(() => {
+            hold = null;
+            term.write(redactor.flush());
+          }, REDACT_HOLD_MS);
+        }
+      };
       const unsubscribe = client.subscribeStream(
         `term:${terminalId}` as StreamId,
         (chunk, info) => {
-          if (info.gap) term.write(GAP_NOTE);
-          term.write(chunk);
+          if (info.gap) {
+            if (redactor) term.write(redactor.flush());
+            term.write(GAP_NOTE);
+          }
+          write(chunk);
         },
       );
-      cleanups.push(unsubscribe);
+      cleanups.push(() => {
+        unsubscribe();
+        if (hold) clearTimeout(hold);
+      });
 
       let frame = 0;
       const ro = new ResizeObserver(() => {
@@ -160,7 +193,7 @@ export default function XtermView({ terminalId, label, onController }: XtermView
       onControllerRef.current?.(null);
       for (const cleanup of cleanups.reverse()) cleanup();
     };
-  }, [client, terminalId]);
+  }, [client, terminalId, redact]);
 
   return (
     <div

@@ -1,6 +1,8 @@
 import type { StreamId } from '@c-board/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { useStream } from '../data/index.js';
+import { redact } from '../redact/redact.js';
+import { useRedactOn } from '../redact/reveal.js';
 import { TerminalTail } from './ansi.js';
 import { errorLine } from './lane.js';
 
@@ -35,5 +37,6 @@ export function useErrorLine(execId: string | null): string | null {
     }, FLUSH_MS);
   });
 
-  return line;
+  const redactOn = useRedactOn();
+  return redactOn && line !== null ? redact(line) : line;
 }

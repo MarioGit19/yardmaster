@@ -5,6 +5,8 @@ import {
   ChevronUp,
   Eraser,
   ExternalLink,
+  Eye,
+  EyeOff,
   LayoutGrid,
   Maximize2,
   Minimize2,
@@ -24,6 +26,7 @@ import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
 import { spring } from '../motion.js';
 import { usePreference } from '../prefs.js';
+import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
@@ -337,6 +340,7 @@ function Pane({
 }) {
   const { execution, view } = useTerminalView(terminal);
   const kind = paneKind(execution.id === null ? null : execution, terminal);
+  const masked = useMasked(`term:${terminal.id}`);
   return (
     <section
       aria-label={terminalName(terminal)}
@@ -380,6 +384,7 @@ function Pane({
               <XtermView
                 terminalId={terminal.id}
                 label={`Output of ${terminalName(terminal)}`}
+                redact={masked}
                 onController={onController}
               />
             </Suspense>
@@ -466,6 +471,8 @@ function ActiveControls({
   const act = useTerminalAction();
   const open = terminal.state === 'open';
   const [searching, setSearching] = useState(false);
+  const redactOn = useRedactOn();
+  const masked = useMasked(`term:${terminal.id}`);
   const interactive =
     paneKind(execution.id === null ? null : execution, terminal) === 'interactive';
 
@@ -516,6 +523,22 @@ function ActiveControls({
           icon={<Eraser className="size-4" strokeWidth={1.5} />}
           onClick={() => controller()?.clear()}
         />
+        {redactOn && (
+          <IconButton
+            size="sm"
+            label={masked ? 'Reveal secrets' : 'Hide secrets'}
+            aria-pressed={!masked}
+            disabled={interactive}
+            icon={
+              masked ? (
+                <EyeOff className="size-4" strokeWidth={1.5} />
+              ) : (
+                <Eye className="size-4" strokeWidth={1.5} />
+              )
+            }
+            onClick={() => reveal.toggle(`term:${terminal.id}`)}
+          />
+        )}
         <span className="ml-auto min-w-0 truncate pl-2 font-mono text-meta text-text-2">
           {view.running ? 'running' : view.exit ? `exit ${view.exit.code}` : null}
         </span>
