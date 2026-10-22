@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { notificationsPreference } from '../attention/attention.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { usePreference } from '../prefs.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
@@ -45,8 +47,54 @@ export function SettingsView() {
             onChange={motionPreference.set}
           />
         </SettingRow>
+        <NotificationsRow />
       </section>
     </Page>
+  );
+}
+
+const NOTIFICATION_OPTIONS = ['off', 'on'] as const;
+const NOTIFICATION_LABEL = { off: 'Off', on: 'On' } as const;
+
+/** Browser notifications for new approvals; turning them on asks the browser for permission. */
+function NotificationsRow() {
+  const supported = typeof Notification !== 'undefined';
+  const setting = usePreference(notificationsPreference);
+  const [permission, setPermission] = useState(() =>
+    supported ? Notification.permission : 'denied',
+  );
+  const enabled = setting === 'on' && permission === 'granted';
+
+  const change = async (next: 'on' | 'off') => {
+    if (next === 'off' || !supported) {
+      notificationsPreference.set('off');
+      return;
+    }
+    const result =
+      Notification.permission === 'default'
+        ? await Notification.requestPermission()
+        : Notification.permission;
+    setPermission(result);
+    notificationsPreference.set(result === 'granted' ? 'on' : 'off');
+  };
+
+  const description = !supported
+    ? 'This browser does not support notifications.'
+    : permission === 'denied'
+      ? 'Blocked by the browser. Allow notifications for this site in its settings to turn them on.'
+      : 'Notify me about new approvals while c-board is in the background.';
+
+  return (
+    <SettingRow title="Notifications" description={description}>
+      <Segmented
+        label="Notifications"
+        options={NOTIFICATION_OPTIONS}
+        labels={NOTIFICATION_LABEL}
+        value={enabled ? 'on' : 'off'}
+        onChange={(next) => void change(next)}
+        disabled={!supported || permission === 'denied'}
+      />
+    </SettingRow>
   );
 }
 
@@ -76,15 +124,20 @@ function Segmented<T extends string>({
   labels,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   options: readonly T[];
   labels: Record<T, string>;
   value: T;
   onChange(value: T): void;
+  disabled?: boolean;
 }) {
   return (
-    <fieldset className="flex shrink-0 self-start rounded-control border border-line bg-bg-0 p-0.5 sm:self-auto">
+    <fieldset
+      disabled={disabled}
+      className="flex shrink-0 self-start rounded-control border border-line bg-bg-0 p-0.5 disabled:opacity-50 sm:self-auto"
+    >
       <legend className="sr-only">{label}</legend>
       {options.map((option) => (
         <button

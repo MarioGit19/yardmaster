@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch, useRoute } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
+import { AttentionAlerts } from './attention/AttentionAlerts.js';
 import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
@@ -77,6 +78,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <CommandPalette />
         </Router>
         <Toasts />
+        <AttentionAlerts />
         <LiveFavicon />
       </TooltipProvider>
     </MotionRoot>

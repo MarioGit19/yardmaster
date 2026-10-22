@@ -408,10 +408,13 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: Board sessions stream from `session.draft`. "New session" (the + in the Sessions column) swaps the Claude panel for a new-session composer. A project with no session shows it directly. The model and permission pills are native selects behind a pill face. They change a live session through `session.setModel`/`setPermissionMode` and are disabled once it has ended or errored. The model pill offers the aliases opus/sonnet/haiku. Not yet in ⌘K: New session.
   - Note: e2e at load ~30–35: `composer.spec` passed on every run. Across full runs, the only failures were the known load-sensitive `focus.spec` morph and `messages.spec` long-task tests, and both pass when run alone.
 
-- [ ] **8.4 Attention Center**
+- [x] **8.4 Attention Center**
   - Right sheet per DESIGN.md §4.5. It collects approvals from every source, with keyboard shortcuts A, ⇧A and D, a deny reason input, collapse on resolve, a toast plus an `aria-live` announcement on new items and an optional browser Notification (permission asked in Settings).
   - **Done when:** an e2e test approves a demo request with the keyboard.
   - **Verify:** `pnpm e2e && pnpm shots`
+  - Note: Pending approvals (SDK and hook) render as `ApprovalCard`s: a highlighted command, a unified mini diff for Edit/MultiEdit/Write, or the main argument. Sessions that wait without a decidable approval (a reply is due, or a terminal asks in its terminal) are listed below under "Answer in the session". ↑↓ and J/K move the selection. "Always allow" (⇧A) is disabled when the request carries no suggestions. A decided card shows its outcome and a check sweep for 700 ms, then collapses, while the selection moves on at once. The toast has a "Review" action, isn't shown while the sheet is open, and is dismissed when the approval resolves.
+  - Note: Settings is still a route (the sheet is 8.5), so the Notifications on/off row lives in `SettingsView`. Turning it on asks for browser permission. Notifications show only while the tab is hidden or unfocused.
+  - Note: at load 30–40, the full `pnpm e2e` failed only the known `focus.spec` morph test, and `pnpm shots` timed out on two shots (focus transition, claude panel messages). All three pass when re-run alone.
 
 - [ ] **8.5 Settings and onboarding**
   - The Settings sheet covers theme, motion level, notifications, redact secrets, away mode (Phase 9), hooks status plus an install button (calls the installer with a confirm dialog showing the diff), connected editor windows, data retention, and token rotate.

@@ -157,14 +157,17 @@ export interface DiffViewProps {
   lang: Lang | null;
   /** Labels the gaps between hunks (MultiEdit), e.g. "Edit 2". */
   gapLabel?: (index: number) => string;
+  /** Overrides the global layout, e.g. unified in a narrow sheet. */
+  layout?: DiffLayout;
 }
 
 /**
  * A syntax-highlighted line diff, unified or side by side (a global preference). Long diffs show
  * their first lines and a "Show all" button.
  */
-export function DiffView({ id, hunks, lang, gapLabel }: DiffViewProps) {
-  const layout = usePreference(diffLayoutPreference);
+export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffViewProps) {
+  const preferred = usePreference(diffLayoutPreference);
+  const layout = forced ?? preferred;
   const [all, toggleAll] = useStickyFlag(`${id}:all`, false);
   const total = hunks.reduce((n, h) => n + h.lines.length, 0);
   const numbers = hunks.some((h) => h.lines.some((l) => l.oldNo !== null || l.newNo !== null));

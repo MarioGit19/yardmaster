@@ -46,9 +46,10 @@ test('the Waiting count opens the Attention Center', async ({ page }) => {
   await waiting.click();
   const sheet = page.getByRole('complementary', { name: /Needs you/ });
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('[data-waiting]').first()).toBeVisible();
+  const card = sheet.locator('article[data-approval]').first();
+  await expect(card).toBeVisible();
   // Each request shows its payload (the command or the file).
-  await expect(sheet.locator('[data-waiting] code').first()).not.toBeEmpty();
+  await expect(card.locator('[data-command], code, .diff').first()).not.toBeEmpty();
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
 

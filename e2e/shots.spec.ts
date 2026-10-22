@@ -201,6 +201,15 @@ test.describe('hud', () => {
             path: new URL(`attention-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
             animations: 'disabled',
           });
+          // D opens the deny reason on the selected card.
+          await page.keyboard.press('d');
+          await page.keyboard.type('Run it on staging first');
+          await page.waitForTimeout(300);
+          await page.screenshot({
+            path: new URL(`attention-deny-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+          await page.keyboard.press('Escape');
         });
       });
     }

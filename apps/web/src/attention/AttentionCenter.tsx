@@ -1,9 +1,17 @@
-import { type ClaudeSession, toolInputDetail } from '@c-board/protocol';
+import type { Approval, ClaudeSession } from '@c-board/protocol';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Link } from 'wouter';
-import { selectApproval, selectProject, useBoard, useBoardList } from '../data/index.js';
+import {
+  selectPendingApprovals,
+  selectProject,
+  useBoard,
+  useBoardClient,
+  useBoardList,
+  useBoardStore,
+} from '../data/index.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
@@ -11,15 +19,23 @@ import { sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
+import { actionErrorText } from '../terminal/stack.js';
 import { IconButton } from '../ui/IconButton.js';
 import { StatusDot } from '../ui/StatusDot.js';
-import { attentionOpen, selectWaitingSessions } from './attention.js';
+import { ApprovalCard } from './ApprovalCard.js';
+import {
+  type AttentionDecision,
+  attentionKey,
+  attentionOpen,
+  canAlwaysAllow,
+  selectWaitingWithoutApproval,
+} from './attention.js';
 
 const close = () => attentionOpen.set('closed');
 
 /**
  * The right sheet (a bottom sheet on narrow screens) listing everything that waits for the user,
- * DESIGN.md §4.5. 8.4 adds the approval cards and their keyboard actions.
+ * DESIGN.md §4.5: approval cards (keyboard first: A, ⇧A, D, ↑↓), then sessions to answer elsewhere.
  */
 export function AttentionCenter() {
   const open = usePreference(attentionOpen) === 'open';
@@ -68,16 +84,74 @@ export function AttentionCenter() {
 }
 
 function SheetBody() {
-  const waiting = useBoardList(selectWaitingSessions);
+  const pending = useBoardList(selectPendingApprovals);
+  const others = useBoardList(selectWaitingWithoutApproval);
+  const client = useBoardClient();
+  const level = useMotionLevel();
   const heading = useRef<HTMLHeadingElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [denyingId, setDenyingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const lingering = useLingering(pending, level === 'off' ? 0 : LINGER_MS);
+
+  const cards = [...pending, ...lingering.values()].sort(
+    (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+  );
+  const selected = pending.find((a) => a.id === selectedId) ?? pending[0] ?? null;
+
+  const decide = async (approval: Approval, decision: AttentionDecision, reason?: string) => {
+    if (busy.has(approval.id)) return;
+    if (decision === 'allowAlways' && !canAlwaysAllow(approval)) return;
+    setBusy((prev) => new Set(prev).add(approval.id));
+    const result = await client.request(
+      'approval.decide',
+      decision === 'deny'
+        ? { approvalId: approval.id, decision, ...(reason ? { reason } : {}) }
+        : { approvalId: approval.id, decision },
+    );
+    setBusy((prev) => {
+      const next = new Set(prev);
+      next.delete(approval.id);
+      return next;
+    });
+    if (!result.ok) toast.error(actionErrorText(result.error, 'The decision did not go through'));
+    else setDenyingId((id) => (id === approval.id ? null : id));
+  };
+
+  // The newest handlers for the window listener, which subscribes once.
+  const keys = useRef<(event: KeyboardEvent) => void>(() => {});
+  keys.current = (event) => {
+    const key = attentionKey(event);
+    if (!key || !selected) return;
+    event.preventDefault();
+    if (key.kind === 'move') {
+      const index = pending.indexOf(selected);
+      const next = pending[Math.max(0, Math.min(pending.length - 1, index + key.by))];
+      if (!next) return;
+      setSelectedId(next.id);
+      setDenyingId(null);
+      list.current
+        ?.querySelector(`[data-approval="${CSS.escape(next.id)}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    } else if (key.decision === 'deny') {
+      setDenyingId(selected.id);
+    } else {
+      void decide(selected, key.decision);
+    }
+  };
 
   useEffect(() => {
     const opener = document.activeElement;
     heading.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || isTypingTarget(event.target)) return;
-      event.preventDefault();
-      close();
+      if (event.defaultPrevented || isTypingTarget(event.target)) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      keys.current(event);
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -86,6 +160,7 @@ function SheetBody() {
     };
   }, []);
 
+  const count = pending.length + others.length;
   return (
     <>
       <header className="flex h-12 shrink-0 items-center gap-2 border-line border-b pr-2 pl-5">
@@ -96,7 +171,7 @@ function SheetBody() {
           className="flex-1 text-body text-text-1 outline-none"
         >
           Needs you
-          <span className="ml-2 text-text-2 tabular-nums">{waiting.length}</span>
+          <span className="ml-2 text-text-2 tabular-nums">{count}</span>
         </h2>
         <IconButton
           label="Close"
@@ -107,31 +182,119 @@ function SheetBody() {
           icon={<X className="size-4" strokeWidth={1.5} />}
         />
       </header>
-      {waiting.length === 0 ? (
+      {count === 0 && cards.length === 0 ? (
         <p className="px-5 py-8 text-center text-body-sm text-text-2">
           Nothing is waiting for you.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1 overflow-y-auto p-2">
-          {waiting.map((session) => (
-            <WaitingItem key={session.id} session={session} />
-          ))}
-        </ul>
+        <div className="flex min-h-0 flex-col overflow-y-auto">
+          {cards.length > 0 && (
+            <ul ref={list} aria-label="Approvals" className="relative flex flex-col gap-2 p-2">
+              <AnimatePresence initial={false} mode="popLayout">
+                {cards.map((approval) => {
+                  const resolved = lingering.has(approval.id);
+                  return (
+                    <motion.li
+                      key={approval.id}
+                      layout="position"
+                      // y and scale (not a transform string) compose with the layout slide.
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{
+                        opacity: 0,
+                        scale: 0.98,
+                        transition: { duration: dur.fast, ease: ease.out },
+                      }}
+                      transition={spring.smooth}
+                    >
+                      <ApprovalCard
+                        approval={approval}
+                        resolved={
+                          resolved ? (lingering.get(approval.id)?.state ?? 'expired') : null
+                        }
+                        selected={!resolved && approval.id === selected?.id}
+                        denying={!resolved && approval.id === denyingId}
+                        busy={busy.has(approval.id)}
+                        onSelect={() => !resolved && setSelectedId(approval.id)}
+                        onDecide={(decision, reason) => void decide(approval, decision, reason)}
+                        onDenyStart={() => {
+                          setSelectedId(approval.id);
+                          setDenyingId(approval.id);
+                        }}
+                        onDenyCancel={() => {
+                          setDenyingId(null);
+                          heading.current?.focus();
+                        }}
+                      />
+                    </motion.li>
+                  );
+                })}
+              </AnimatePresence>
+            </ul>
+          )}
+          {others.length > 0 && (
+            <section aria-labelledby="attention-others" className="flex flex-col p-2 pt-1">
+              <h3 id="attention-others" className="px-3 pt-2 pb-1 text-meta text-text-2">
+                Answer in the session
+              </h3>
+              <ul className="flex flex-col gap-1">
+                {others.map((session) => (
+                  <WaitingItem key={session.id} session={session} />
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </>
   );
 }
 
+/** How long a decided card shows its outcome (and the check sweep) before it collapses. */
+const LINGER_MS = 700;
+
+/**
+ * Approvals that just left the pending list, kept for `ms` with their final state, so a decided
+ * card can show the outcome before it collapses. Removed approvals count as expired.
+ */
+function useLingering(pending: readonly Approval[], ms: number): ReadonlyMap<string, Approval> {
+  const store = useBoardStore();
+  const [lingering, setLingering] = useState<ReadonlyMap<string, Approval>>(new Map());
+  const previous = useRef<readonly Approval[]>(pending);
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+
+  useEffect(() => {
+    const ids = new Set(pending.map((a) => a.id));
+    const left = previous.current.filter((a) => !ids.has(a.id));
+    previous.current = pending;
+    if (left.length === 0 || ms === 0) return;
+    const approvals = store.getState().board.approvals;
+    const done = left.map((a) => approvals[a.id] ?? { ...a, state: 'expired' as const });
+    setLingering((prev) => new Map([...prev, ...done.map((a) => [a.id, a] as const)]));
+    const timer = setTimeout(() => {
+      timers.current.delete(timer);
+      setLingering((prev) => {
+        const next = new Map(prev);
+        for (const a of done) next.delete(a.id);
+        return next;
+      });
+    }, ms);
+    timers.current.add(timer);
+  }, [pending, ms, store]);
+
+  useEffect(() => {
+    const all = timers.current;
+    return () => {
+      for (const timer of all) clearTimeout(timer);
+    };
+  }, []);
+
+  return lingering;
+}
+
 function WaitingItem({ session }: { session: ClaudeSession }) {
   const project = useBoard(selectProject(session.projectId ?? ''));
-  const approvalId =
-    session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
-  const approval = useBoard(selectApproval(approvalId ?? ''));
-  const caption = sessionCaption(session, approval);
-  // The exact payload (the command, the file) until 8.4's full approval cards.
-  const raw = approval ? toolInputDetail(approval.input)?.trim() || null : null;
-  const detail =
-    raw && project && raw.startsWith(`${project.path}/`) ? raw.slice(project.path.length + 1) : raw;
+  const caption = sessionCaption(session, null);
   const title = session.title?.trim() || null;
   const href = project ? sessionHref(project.id, session.id) : null;
   const body = (
@@ -152,18 +315,10 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
         </span>
         <StatusDot
           tone="wait"
-          label={approval ? `Wants to run ${approval.tool}` : caption.text}
+          label={caption.text}
           showLabel
           className="text-label text-st-wait-ink"
         />
-        {detail && (
-          <code
-            title={detail}
-            className="mt-1.5 line-clamp-2 break-all rounded-chip bg-bg-2 px-2 py-1 font-mono text-label text-text-1"
-          >
-            {detail}
-          </code>
-        )}
       </span>
     </>
   );

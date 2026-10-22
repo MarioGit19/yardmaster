@@ -179,7 +179,8 @@ describe('routes', () => {
   it('renders settings and unknown routes', () => {
     render('/settings');
     expect(heading()).toBe('Settings');
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(7);
+    // Theme (3), motion (4) and notifications (2).
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(9);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');
