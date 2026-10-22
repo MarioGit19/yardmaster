@@ -28,7 +28,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 ### Non-goals (v1)
 
 - Replacing Cursor or being a code editor.
-- Remote or multi-user access. Bound to 127.0.0.1 only; reaching it from a phone through Tailscale is documented, not built in.
+- Public remote or multi-user access. The server binds 127.0.0.1 only; the one supported way in from another device is the user's own Tailscale network (F27).
 - Windows support. macOS and Linux first; Windows is a stretch.
 - Managing remote, CI or cloud Claude sessions.
 
@@ -100,10 +100,13 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - F16 Pulse timeline: a cross-project activity stream with filters.
 - F17 Session history browser per project (SDK `listSessions`), with "resume in board" or "resume in Cursor terminal".
 - F18 Daily stats: sessions, tokens and tool calls per project (from transcripts).
+- F19 Board-owned terminals (node-pty) for projects with no editor window open: fully interactive, started from the board or the phone.
+- F25 **Project library and launch:** the user picks root folders (for example `~/Desktop`). The overview shows only **active** projects; the "Open project" picker lists the roots' folders, and launching one can open it in Cursor, start a Claude session and start terminals, in one step.
+- F26 Active-only overview: projects leave the overview when nothing has happened in them for a while (unless pinned) and come back the moment something starts.
+- F27 **Phone access** over the user's own Tailscale network: opt-in allowed hosts, QR pairing, and phone-ready screens.
 - F24 **Layouts** (DESIGN.md §10): the overview can be shown as **Minimal** (default, the pod grid), **Office** (each project is an office room and every session and terminal is a character at a station, working or idling with its state) **Grid** (a neon network of projects fed by pipelines; entering a project dives into it and its screens phase in), **Transit** (a metro map where each project is a line and every session and terminal a train) or **Retro** (a dense green-phosphor text console). Same data, statuses and actions in every layout; click any character, node or screen to see where it is and act on it.
 
 **Could**
-- F19 Board-owned terminals (node-pty) for projects with no editor window open.
 - F21 Saved "launch profiles" per project (for example "backend + storefront + claude").
 - F22 Light theme ("Daylight") polish beyond baseline.
 
@@ -241,6 +244,9 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 7. **Secrets in output:** terminal and transcript data stays in memory and local sqlite under `~/.c-board`. A "redact" setting masks common secret patterns in the UI (`sk-ant-…`, `ghp_…`, `AKIA…`, `-----BEGIN … KEY-----`, `.env`-style `KEY=value` for names containing SECRET|TOKEN|KEY|PASSWORD).
 8. **Shell safety:** the server never builds shell strings from user input. Use `execFile` with argument arrays. The hook installer writes JSON with a JSON serializer.
 9. **Repository hygiene (public repo):** nothing machine-specific or personal is ever committed. That covers real home paths, usernames, emails other than GitHub noreply, real project names, real transcripts and tokens. Fixtures are synthetic (`/home/dev/acme-shop`). `scripts/privacy-check.sh` runs in pre-commit, in the build loop, and in CI.
+10. **Project library:** the server lists only the top-level directory names of the configured roots and checks `.git` existence. It reads nothing else under a root until a project is opened, and every path from the UI is `realpath`-checked to be inside a root (no `..`, no symlink escape). Editor launches go through `execFile` with the folder as a single argument.
+11. **Remote hosts:** off by default. Allowed hosts are an explicit list (Tailscale `*.ts.net` names), HTTPS only, and the server still binds `127.0.0.1`. Public tunnels (ngrok, Cloudflare and the like) are unsupported, and the docs say why: the board can type into terminals.
+12. **Pairing:** a phone signs in with a one-time code (5 min, single use) shown as a QR code, never the raw token. Paired devices are listed and can be revoked.
 
 ## 9. Non-functional requirements
 
@@ -275,6 +281,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 - **M2 Act:** terminal actions, headless SDK sessions, approvals, ⌘K, Attention Center.
 - **M3 Wow plus polish:** ambient shader, orbs, Pulse timeline, git panel, stats, onboarding, docs and GIFs, performance and accessibility pass.
 - **M3.5 Layouts:** Office and Grid layouts with the shared Actor inspector.
+- **M3.6 Workspaces:** project library and launch, board terminals, phone access.
 - **M4 Stretch:** away mode, terminal reply, board-owned PTYs, launch profiles.
 
 ## 13. Open questions

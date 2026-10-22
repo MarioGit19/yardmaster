@@ -31,8 +31,8 @@ Installed for this project: the plugins in `.claude/settings.json`, and the skil
 | Adding or changing an animation | `animate` (decide purpose, properties, curve and duration first), then `apple-design` for springs, gestures and depth |
 | After finishing a UI task | `review-animations` on the motion you added, plus an `impeccable` critique of the screen. Fix what they flag, if it doesn't contradict DESIGN.md. |
 | Charts, sparklines, stat tiles, HUD counters | `dataviz` |
-| Performance work (11.1, 10.10) or a janky animation | `animation-performance` + `react-best-practices` |
-| Polish, a11y and audit tasks (11.2, 11.4) | `web-design-guidelines` + `impeccable` audit/polish |
+| Performance work (12.1, 10.10) or a janky animation | `animation-performance` + `react-best-practices` |
+| Polish, a11y and audit tasks (12.2, 12.4) | `web-design-guidelines` + `impeccable` audit/polish |
 | Edge-case hardening of data-heavy components | `break-ui` |
 | Looking for places that should animate but don't | `find-animation-opportunities` (proposes only; you implement what fits DESIGN.md) |
 

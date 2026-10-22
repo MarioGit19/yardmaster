@@ -502,9 +502,42 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
 - [ ] **[HUMAN] 10.11 Try the layouts**
   - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts, and write any feedback as new tasks below this one before ticking it.
 
-## Phase 11 — Quality, docs, release
+## Phase 11 — Workspaces: open projects from the board, board terminals, phone access
 
-- [x] **11.1 Performance pass** (committed as 10.1)
+Goal: start work from the board (or a phone) on a project that isn't open anywhere yet. Spec: PRD F25–F27 and §8 items 10–12. The overview stays focused: only **active** projects appear on it; the library is reached through the picker.
+
+- [ ] **11.1 Project library and active-only overview**
+  - Server setting `library.roots` (a list of folders, empty by default; onboarding and Settings suggest `~/Desktop`). `ProjectLibrary`: lists only the **top-level directories** of each root (no recursion, no file contents, no hidden folders, no files), marks git repos (`.git` exists), and merges recents from persisted projects (last active time). Every path is `realpath`-checked to be inside a root, so symlinks can't escape. `GET /api/library` behind the auth guard. A macOS permission error (`EPERM` on Desktop) returns a clear message: allow access under System Settings → Privacy & Security → Files and Folders.
+  - Active-only overview: a project is **active** while it has a connected editor window, a live terminal, a live Claude session, or activity in the last `library.idleHideMin` minutes (default 30), or the user opened it from the board. Inactive projects leave the overview (exit animation in every layout) but stay in the picker's recents and ⌘K. Pinned projects (a pin toggle on the pod menu) always stay.
+  - **Done when:** tests with temp dirs cover files ignored, hidden ignored, symlink escape refused, a path outside the roots refused, EPERM handled, and the active/inactive rule; nothing under a root is read except directory names and `.git` existence.
+  - **Verify:** `pnpm --filter @c-board/server test && pnpm --filter @c-board/web test`
+
+- [ ] **11.2 Open-project picker and launch sheet**
+  - An "Open project" button in the HUD and project rail, ⌘K "Open project…" (`⌘O`): a searchable list of library folders (git badge, branch for repos, recents first, fuzzy search), designed for phone widths too. Choosing one opens a **launch sheet**: *Open in Cursor*, *New Claude session* (prompt field, model and permission mode), and *New terminal* (with a command field, and the project's recent commands as one-tap chips, such as `pnpm dev`). Several can be ticked at once ("Cursor + pnpm dev + Claude"), and the sheet remembers the last choice per project. The project joins the overview with the normal enter animation and lands in the focus view.
+  - **Done when:** e2e (demo mode with a synthetic library) opens a project from the picker, starts a Claude session and a terminal in it, and sees both in the focus view; screenshots at 390 and 1440.
+  - **Verify:** `pnpm e2e && pnpm shots`
+
+- [ ] **11.3 Launch actions on the server**
+  - `project.openInEditor {path}`: `execFile` the editor CLI (`cursor`, falling back to `code`; configurable path in Settings; `doctor` reports which was found) with the folder as one argument, after the library path check. The pod shows "Opening in Cursor…" until the window's extension connects (timeout with a hint). `session.start` accepts any library project (reuses `SessionRunner`). `terminal.create` routes to the editor when its window is connected, otherwise to board terminals (11.4). Every launch is refused for paths outside `library.roots`.
+  - **Done when:** routing and path-guard tests pass (the CLI is mocked; tests never launch an editor).
+  - **Verify:** `pnpm --filter @c-board/server test`
+
+- [ ] **11.4 Board-owned terminals (node-pty)**
+  - PRD F19. `node-pty` as an **optional** dependency (prebuilt binaries; if it fails to load, `doctor` says so and *New terminal* without an editor is disabled with an explanation). `PtyManager`: spawns the user's `$SHELL -l` in the project folder, optional initial command, resize, input, kill, exit codes, ring buffers like editor terminals, process and port scanning attached, max 16 terminals. Board terminals are fully interactive in xterm (keystrokes go straight to the pty, so TUIs work), marked with a "board" origin icon, and they survive UI reconnects but not a server stop (the UI says so before stopping).
+  - **Done when:** tests spawn a real pty running `/bin/sh` with synthetic commands (echo, exit codes, Ctrl+C, resize) and an e2e test types into a board terminal in demo mode.
+  - **Verify:** `pnpm --filter @c-board/server test && pnpm e2e`
+
+- [ ] **11.5 Phone access over Tailscale**
+  - Opt-in setting `remote.allowedHosts` (exact host names such as `my-mac.tailnet-name.ts.net`; only `*.ts.net` names are accepted from the UI). The server still binds `127.0.0.1`; `tailscale serve` forwards to it. Host and Origin checks accept the listed hosts over HTTPS only. **Pairing:** Settings → Phone shows a QR code with a one-time pairing code (valid 5 min, single use) instead of the raw token; scanning it on the phone sets the session cookie. A list of paired devices with *revoke*. A phone pass over the overview (every layout), picker, launch sheet, focus view (tabs), Attention Center and composer at 390 px. Docs: a short "Use it from your phone" guide (install Tailscale on both devices, `tailscale serve`, add the host, scan the QR).
+  - **Done when:** security tests cover an unlisted host refused, plain HTTP refused for remote hosts, pairing code expiry and single use, and revoke; phone screenshots of every screen look right.
+  - **Verify:** `pnpm --filter @c-board/server test && pnpm shots`
+
+- [ ] **[HUMAN] 11.6 Try workspaces and phone access**
+  - Add your projects folder in Settings, open a project that isn't open anywhere (Cursor, Claude, and a terminal), then set up Tailscale and pair your phone. Write any feedback as tasks below, then tick this.
+
+## Phase 12 — Quality, docs, release
+
+- [x] **12.1 Performance pass** (committed as 10.1)
   - Add a `--demo-stress` mode (10 projects × 6 terminals, 2 terminals at about 200 lines/s each, and 4 Claude sessions doing roughly 5 tool calls per second), with every activity animation running. Write a Playwright perf test that measures FPS (rAF sampling over 10 s) and long tasks on the overview and focus views. Optimize until it reaches ≥ 55 fps and has no long tasks over 50 ms (PRD §9). Record the numbers under this task.
   - **Verify:** `pnpm e2e --grep @perf`
   - Note: Ran before the layouts phase existed. 10.10 re-checks every layout under `--demo-stress`.
@@ -513,25 +546,25 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
   - Note: The stress tests run in their own `perf-stress` project on full Chromium (`channel: 'chromium'`), which renders with the GPU. The default headless shell uses SwiftShader (software WebGL), where the WebGL terminal and the shaders stall compositor commits; that says nothing about the PRD §9 machine. Server CPU (PRD §9) is not measured by this test.
   - Note: Flaky under parallel load on main before this task, too: `onboarding.spec` (extension step), `attention.spec` (keyboard approval) and the `composer` shots. They pass when run alone.
 
-- [ ] **11.2 Accessibility pass**
-  - Add `@axe-core/playwright` checks on every route and every layout (Minimal, Office, Grid, Transit, Retro) (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
+- [ ] **12.2 Accessibility pass**
+  - Add `@axe-core/playwright` checks on every route and every layout (Minimal, Office, Grid, Transit, Retro), the picker and the phone screens (0 serious or critical issues). Run keyboard-only e2e tests through the main flows, and verify reduced motion.
   - **Verify:** `pnpm e2e --grep @a11y`
 
-- [ ] **11.3 Security review**
-  - Audit against PRD §8: Host and Origin checks, the token on every route, `execFile`-only usage (`grep -rn "exec(" apps` returns nothing unsafe), no raw HTML rendering, no credential-file reads (`grep -rn "credentials" apps packages`), the hook script being silent, and the installer's backups. Fix the findings and list them under this task.
+- [ ] **12.3 Security review**
+  - Audit against PRD §8: Host and Origin checks, the token on every route, the library path guard, remote hosts and pairing (PRD §8 items 10–12), `execFile`-only usage (`grep -rn "exec(" apps` returns nothing unsafe), no raw HTML rendering, no credential-file reads (`grep -rn "credentials" apps packages`), the hook script being silent, and the installer's backups. Fix the findings and list them under this task.
   - **Verify:** `pnpm check`
 
-- [ ] **11.4 Visual polish sweep**
-  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `11.4b` below this one.
+- [ ] **12.4 Visual polish sweep**
+  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `12.4b` below this one.
   - **Verify:** `pnpm shots`
 
-- [ ] **11.5 README and docs**
-  - Write a public README: hero screenshot or GIF (captured from demo mode only), one shot per layout, features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `c-board hooks install`, install the vsix), privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`c-board hooks uninstall`, remove the extension, `rm -rf ~/.c-board`), troubleshooting (`c-board doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
+- [ ] **12.5 README and docs**
+  - Write a public README: hero screenshot or GIF (captured from demo mode only), one shot per layout, features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `c-board hooks install`, install the vsix), adding a projects folder, phone access, privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`c-board hooks uninstall`, remove the extension, `rm -rf ~/.c-board`), troubleshooting (`c-board doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
   - **Verify:** `scripts/privacy-check.sh && pnpm check`
 
-- [ ] **11.6 Release packaging**
+- [ ] **12.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry, so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Add a CHANGELOG.
   - **Verify:** `pnpm build && node apps/server/dist/cli.js doctor`
 
-- [ ] **[HUMAN] 11.7 Real-world acceptance**
+- [ ] **[HUMAN] 12.7 Real-world acceptance**
   - Use c-board for a day with your real projects. File issues or add tasks below for anything off. Decide on a license and the open questions in PRD §13.
