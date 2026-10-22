@@ -3,6 +3,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } 
 import { pino } from 'pino';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import type { ServerConfig } from './config.js';
+import { DemoSimulator } from './demo/simulator.js';
 import { Persistence } from './persistence.js';
 import { registerSecurity } from './security.js';
 import { BoardStore } from './store.js';
@@ -23,7 +24,9 @@ export interface HealthResponse {
 export interface BuildOptions {
   /** Install token. Defaults to reading (or creating) `<config.home>/token`. */
   token?: string;
-  /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`. */
+  /** Run the synthetic demo board (F12). Its data never touches `board.db`. */
+  demo?: boolean | { seed?: number };
+  /** Database file, or `:memory:`. Defaults to `<config.home>/board.db`, or `:memory:` in demo mode. */
   dbPath?: string;
   /** UI action handlers. Defaults to stubs. */
   actions?: ActionHandlers;
@@ -37,6 +40,7 @@ declare module 'fastify' {
     persistence: Persistence;
     /** Settings loaded from the database at boot. */
     settings: Record<string, unknown>;
+    demo: DemoSimulator | null;
   }
 }
 
@@ -58,10 +62,11 @@ export async function buildServer(
 
   const persistence = new Persistence({
     home: config.home,
-    path: options.dbPath,
+    path: options.dbPath ?? (options.demo ? ':memory:' : undefined),
     logger: logger.child({ component: 'db' }),
   });
   const store = new BoardStore();
+  let demo: DemoSimulator | null = null;
   for (const project of persistence.loadProjects()) store.upsertProject(project);
   // Boot state is already on disk; only later changes need writing back.
   store.flush();
@@ -70,6 +75,7 @@ export async function buildServer(
   app.decorate('persistence', persistence);
   app.decorate('settings', persistence.loadSettings());
   app.addHook('onClose', async () => {
+    demo?.stop();
     // Emit any changes made since the last microtask so they reach the database.
     store.flush();
     persistence.close();
@@ -80,18 +86,30 @@ export async function buildServer(
   await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
   registerSecurity(app, { config, token });
 
-  const gateway = new UiGateway({
+  // Constructed first so the gateway can route approvals to it; it starts once the app is ready.
+  demo = options.demo
+    ? new DemoSimulator({
+        store,
+        ...(typeof options.demo === 'object' ? { seed: options.demo.seed } : {}),
+        onActivity: (event) => persistence.recordActivity(event),
+        onMessage: (message) => gateway.broadcast(message),
+      })
+    : null;
+  const gateway: UiGateway = new UiGateway({
     store,
     dispatch: createActionDispatcher(options.actions ?? stubActionHandlers()),
+    ...(demo ? { decideApproval: demo.decideApproval.bind(demo) } : {}),
     logger: logger.child({ component: 'ui-ws' }),
     ...options.gateway,
   });
   app.decorate('uiGateway', gateway);
   registerUiGateway(app, gateway);
+  app.decorate('demo', demo);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
 
   await app.ready();
+  demo?.start();
   return app;
 }
 

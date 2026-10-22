@@ -18,6 +18,12 @@ export {
   loadConfig,
   type ServerConfig,
 } from './config.js';
+export {
+  DEMO_APPROVAL_TIMEOUT_MS,
+  DEMO_PERMISSION_INTERVAL_MS,
+  DemoSimulator,
+  type DemoSimulatorOptions,
+} from './demo/simulator.js';
 export { createOscStripper, type OscStripper, stripOsc633 } from './osc.js';
 export {
   type AppendResult,

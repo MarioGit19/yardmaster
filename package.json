@@ -8,6 +8,8 @@
   },
   "scripts": {
     "prepare": "simple-git-hooks",
+    "dev": "pnpm --filter @c-board/server dev",
+    "dev:demo": "pnpm --filter @c-board/server dev:demo",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

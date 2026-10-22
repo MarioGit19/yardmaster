@@ -1,4 +1,5 @@
 import {
+  type ApprovalDecision,
   decodeUiToServer,
   encodeServerToUi,
   makeMessage,
@@ -8,7 +9,7 @@ import {
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
-import { type ActionDispatcher, NOT_IMPLEMENTED } from './actions.js';
+import { type ActionDispatcher, type ActionResult, NOT_IMPLEMENTED } from './actions.js';
 import type { OutputStreamId } from './output-buffers.js';
 import type { BoardStore } from './store.js';
 
@@ -23,6 +24,8 @@ export const MAX_UI_MESSAGE = 1024 * 1024;
 export interface UiGatewayOptions {
   store: BoardStore;
   dispatch: ActionDispatcher;
+  /** Handles `approval.decide`. Defaults to `not_implemented`. */
+  decideApproval?: (decision: ApprovalDecision) => ActionResult | Promise<ActionResult>;
   logger: FastifyBaseLogger;
   patchIntervalMs?: number;
   maxBufferedBytes?: number;
@@ -45,6 +48,7 @@ interface Client {
 export class UiGateway {
   private readonly store: BoardStore;
   private readonly dispatch: ActionDispatcher;
+  private readonly decideApproval: NonNullable<UiGatewayOptions['decideApproval']>;
   private readonly log: FastifyBaseLogger;
   private readonly patchIntervalMs: number;
   private readonly maxBufferedBytes: number;
@@ -57,6 +61,8 @@ export class UiGateway {
   constructor(options: UiGatewayOptions) {
     this.store = options.store;
     this.dispatch = options.dispatch;
+    this.decideApproval =
+      options.decideApproval ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
     this.log = options.logger;
     this.patchIntervalMs = options.patchIntervalMs ?? PATCH_INTERVAL_MS;
     this.maxBufferedBytes = options.maxBufferedBytes ?? MAX_BUFFERED_BYTES;
@@ -125,9 +131,18 @@ export class UiGateway {
         this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
         return;
       }
+      case 'approval.decide': {
+        let result: ActionResult;
+        try {
+          result = await this.decideApproval(message.payload);
+        } catch (error) {
+          result = { ok: false, error: error instanceof Error ? error.message : 'action_failed' };
+        }
+        this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
+        return;
+      }
       case 'session.send':
-      case 'approval.decide':
-        // Wired up with the session manager and approvals (phase 4+).
+        // Wired up with the session manager (phase 4+).
         this.reply(client, message.id, false, NOT_IMPLEMENTED);
         return;
     }

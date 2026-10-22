@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "dev:demo": "tsx watch src/main.ts --demo",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",

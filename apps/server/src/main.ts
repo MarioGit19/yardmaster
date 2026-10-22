@@ -1,7 +1,19 @@
+import { parseArgs } from 'node:util';
 import { startServer } from './app.js';
 import { ConfigError, loadConfig } from './config.js';
 
+function parseFlags(): { demo: boolean } {
+  try {
+    const { values } = parseArgs({ options: { demo: { type: 'boolean', default: false } } });
+    return { demo: values.demo };
+  } catch (err) {
+    process.stderr.write(`c-board: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  const flags = parseFlags();
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
@@ -13,7 +25,8 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const app = await startServer(config);
+  const app = await startServer(config, { demo: flags.demo });
+  if (flags.demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
 
   let closing = false;
   const shutdown = (signal: NodeJS.Signals) => {
