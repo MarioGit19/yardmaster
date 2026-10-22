@@ -236,7 +236,7 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `terminalForPid` (in `processes.ts`) walks the ppid chain to the nearest open terminal's shell (loop-guarded). `session-linker.ts` (`SessionLinker`, `app.sessionLinker`) runs after every ps sample (new `ProcessScanner` option `onSample`) and on the microtask after any terminal or session patch (except stats). Registry pids are covered because discovery already writes them to `claudePid`. A pid not in the latest sample keeps its last link (so a short-lived hook `sh` that is gone by the next sample doesn't unlink); ended sessions are never relinked (pid reuse); a link to a removed terminal is cleared. Linking never moves `updatedAt`. Off in demo mode and with `processes: false`.
 
-- [ ] **6.3 Git info**
+- [x] **6.3 Git info**
   - Per project, every 5 s while connected UI clients exist (and on hook `PostToolUse` for Edit/Write/Bash), run `git status --porcelain=v2 --branch` and `git log -5 --format=…` through `execFile`. Fill `GitInfo` (branch, upstream ahead/behind, changed files with status, last commits). Skip non-git folders.
   - **Done when:** parser tests on synthetic porcelain output pass.
   - **Verify:** `pnpm --filter @c-board/server test`
