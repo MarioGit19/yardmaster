@@ -122,10 +122,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: RSS jitter is floored at half the base size rather than 0, so idle shells never report 0 bytes. Checked 40 sequential connects to a live demo server; each received `snapshot` first.
 
-- [ ] **3.2 Data layer**
+- [x] **3.2 Data layer**
   - A WS client with reconnect (exponential backoff up to 10 s), snapshot and patch application into a zustand store (using `applyPatch` from protocol), selectors per entity, connection state, and a `useStream(streamId)` hook that delivers chunks to a callback (outside React state).
   - **Done when:** unit tests with a mock WS cover reconnect, resync and patch application.
   - **Verify:** `pnpm --filter @c-board/web test`
+  - Note: `src/data/`: `store.ts` (vanilla zustand: `board`, `hydrated`, `connection` {status connecting|syncing|live|reconnecting|stopped, attempt, retryAt, syncedAt}), `client.ts` (`BoardClient` with an injectable socket; backoff 500 ms doubling to 10 s with ≤ 20% jitter, reset only once a snapshot arrives; patches before a snapshot are ignored; every message is zod-decoded and bad ones logged and skipped; refcounted `subscribeStream` that resumes with `fromSeq` after reconnect or `stream.resync`, drops replayed duplicates and flags buffer gaps; `action`/`request` resolve with `action.result`, or `offline`/`disconnected`/`timeout`), `selectors.ts`, `react.tsx` (`BoardProvider`, `useBoard`, `useBoardList` via `useShallow`, `useStream`). `main.tsx` starts the client and reconnects on `online`. Limitation: if the server restarts, stream seqs restart at 0 and a resumed subscription drops them (follow-up: a server boot id in `snapshot` would let the client reset its seqs); zod now ships in the main chunk.
 
 - [ ] **3.3 App shell and routing**
   - `wouter` hash routes: `/` overview, `/p/:projectId` focus, `/p/:projectId/s/:sessionId`, `/settings`. AppShell layout: HUD top bar, left project rail (collapsible), main area, and slots for the right sheet and bottom Pulse rail. Base primitives: Button, IconButton, Kbd, Tooltip (Radix), Chip, StatusDot, Skeleton and Toasts (sonner, themed).
