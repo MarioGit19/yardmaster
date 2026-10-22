@@ -1,3 +1,4 @@
+import type { WebSocketRoute } from '@playwright/test';
 import { expect, firstProjectRoute, openRoute, type Theme, test } from './fixtures.js';
 
 const VIEWPORTS = [
@@ -169,4 +170,66 @@ test.describe('waiting pod', () => {
       });
     });
   }
+});
+
+// HUD close-ups, the Attention Center opened from the Waiting count, and the reconnect state.
+test.describe('hud', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ] as const) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('attention', async ({ page }) => {
+          test.slow();
+          await openRoute(page, '/');
+          const waiting = page.locator('[data-hud="waiting"]');
+          await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
+            timeout: 30_000,
+          });
+          await page.waitForTimeout(800);
+          const name = `hud-${viewport.width}-${theme}.png`;
+          await page
+            .locator('header')
+            .first()
+            .screenshot({ path: new URL(name, OUT_DIR).pathname, animations: 'disabled' });
+          await waiting.click();
+          await page.waitForTimeout(800);
+          await page.screenshot({
+            path: new URL(`attention-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        });
+      });
+    }
+  }
+
+  test.describe('reconnecting', () => {
+    test.use({ viewport: { width: 1440, height: 900 } });
+    test('dark', async ({ page }) => {
+      // Proxy the board socket so the test can drop it after the first snapshot, then refuse
+      // every reconnect: the board stays on screen, greyed, while the client retries.
+      let refuse = false;
+      const sockets: WebSocketRoute[] = [];
+      await page.routeWebSocket(/\/ws\/ui/, (ws) => {
+        if (refuse) return ws.close();
+        ws.connectToServer();
+        sockets.push(ws);
+      });
+      await openRoute(page, '/');
+      await expect(page.locator('[data-pod]').first()).toBeVisible();
+      await page.waitForTimeout(800);
+      refuse = true;
+      for (const ws of sockets) await ws.close();
+      await expect(page.locator('header [data-connection="reconnecting"]')).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: new URL('hud-reconnecting-1440-dark.png', OUT_DIR).pathname,
+        animations: 'disabled',
+      });
+    });
+  });
 });

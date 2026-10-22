@@ -14,25 +14,7 @@ export const test = base.extend<{ theme: Theme }>({
   theme: ['dark', { option: true }],
   baseURL: async ({}, use) => use(required(E2E_URL)),
   colorScheme: async ({ theme }, use) => use(theme),
-  storageState: async ({}, use) => {
-    const url = new URL(required(E2E_URL));
-    const [name = '', value = ''] = required(E2E_COOKIE).split(/=(.*)/s);
-    await use({
-      cookies: [
-        {
-          name,
-          value,
-          domain: url.hostname,
-          path: '/',
-          expires: -1,
-          httpOnly: true,
-          secure: false,
-          sameSite: 'Strict',
-        },
-      ],
-      origins: [],
-    });
-  },
+  storageState: async ({}, use) => use(signedInState(required(E2E_URL), required(E2E_COOKIE))),
   page: async ({ page, theme }, use) => {
     await page.addInitScript((value) => localStorage.setItem('cboard.theme', value), theme);
     await use(page);
@@ -40,6 +22,27 @@ export const test = base.extend<{ theme: Theme }>({
 });
 
 export { expect };
+
+/** Browser storage holding the board's session cookie (`name=value`) for `origin`. */
+export function signedInState(origin: string, cookie: string) {
+  const url = new URL(origin);
+  const [name = '', value = ''] = cookie.split(/=(.*)/s);
+  return {
+    cookies: [
+      {
+        name,
+        value,
+        domain: url.hostname,
+        path: '/',
+        expires: -1,
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Strict' as const,
+      },
+    ],
+    origins: [],
+  };
+}
 
 /** Opens a hash route and waits until the demo snapshot has rendered the project rail. */
 export async function openRoute(page: Page, route: string): Promise<void> {

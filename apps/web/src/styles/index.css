@@ -207,6 +207,19 @@
   }
 }
 
+/* HUD reconnect ring around the connection dot. Reduced keeps the ring, still. */
+@keyframes hud-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.hud-spin {
+  animation: hud-spin 0.9s linear infinite;
+}
+[data-motion="reduced"] .hud-spin {
+  animation: none;
+}
+
 /* Ambient field, DESIGN.md §4.1. The CSS layers are the fallback and the Reduced/Off field;
    energy and attention only cross-fade them. The canvas fades in over them on its first frame. */
 .ambient-css {

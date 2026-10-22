@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
+import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { MotionRoot } from './MotionRoot.js';
 import { routes } from './routes.js';
@@ -26,7 +27,7 @@ export function AppRoutes() {
         </Suspense>
       </Route>
       <Route>
-        <AppShell>
+        <AppShell sheet={<AttentionCenter />}>
           <Switch>
             <Route path={routes.overview}>
               <Overview />

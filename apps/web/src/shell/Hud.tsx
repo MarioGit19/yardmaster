@@ -1,12 +1,24 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { CirclePause, Monitor, MonitorCog, Moon, Sparkle, Sparkles, Sun } from 'lucide-react';
 import { Link } from 'wouter';
+import { attentionOpen } from '../attention/attention.js';
 import { Wordmark } from '../brand/Logo.js';
-import { type ConnectionState, selectConnection, useBoard } from '../data/index.js';
+import {
+  type ConnectionState,
+  selectConnection,
+  useBoard,
+  useBoardShallow,
+} from '../data/index.js';
+import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
+import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
-import type { Tone } from '../status.js';
+import { formatCount, type Tone } from '../status.js';
 import { type ThemeSetting, useTheme } from '../theme/theme.js';
+import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
-import { StatusDot } from '../ui/StatusDot.js';
+import { Kbd } from '../ui/Kbd.js';
+import { NumberTicker } from '../ui/NumberTicker.js';
+import { Tooltip } from '../ui/Tooltip.js';
+import { selectHudCounts } from './counts.js';
 
 const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = {
   dark: 'light',
@@ -19,6 +31,23 @@ const THEME_NAME: Record<ThemeSetting, string> = {
   light: 'Light',
   system: 'System',
 };
+
+const MOTION_ICON = {
+  system: MonitorCog,
+  full: Sparkles,
+  reduced: Sparkle,
+  off: CirclePause,
+} as const;
+const MOTION_NAME: Record<MotionSetting, string> = {
+  system: 'System',
+  full: 'Full',
+  reduced: 'Reduced',
+  off: 'Off',
+};
+const nextMotion = (setting: MotionSetting): MotionSetting =>
+  MOTION_SETTINGS[(MOTION_SETTINGS.indexOf(setting) + 1) % MOTION_SETTINGS.length] ?? 'system';
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 export function connectionView(connection: ConnectionState): { tone: Tone; label: string } {
   switch (connection.status) {
@@ -34,29 +63,155 @@ export function connectionView(connection: ConnectionState): { tone: Tone; label
   }
 }
 
-/** Top bar. The HUD counters, ⌘K hint and motion toggle land with 7.5. */
+const selectCounts = selectHudCounts();
+
+/** Top bar, DESIGN.md §4.4: live counters, connection, ⌘K hint, motion and theme. */
 export function Hud() {
-  const connection = useBoard(selectConnection);
-  const { setting, setTheme } = useTheme();
-  const status = connectionView(connection);
-  const nextTheme = NEXT_THEME[setting];
-  const ThemeIcon = THEME_ICON[setting];
+  const counts = useBoardShallow(selectCounts);
+  const sheetOpen = usePreference(attentionOpen) === 'open';
+  const { setting: theme, setTheme } = useTheme();
+  const motion = usePreference(motionPreference);
+  const stale = useBoard(selectConnection).status === 'reconnecting';
+  const ThemeIcon = THEME_ICON[theme];
+  const MotionIcon = MOTION_ICON[motion];
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-line border-b bg-bg-1 px-4">
-      <Link href={routes.overview} className="rounded-chip text-body text-text-1">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-line border-b bg-bg-1 px-4 md:gap-3">
+      <Link
+        href={routes.overview}
+        aria-label="c-board overview"
+        className="rounded-chip text-body text-text-1"
+      >
         <Wordmark />
       </Link>
+      <ul
+        aria-label="Activity"
+        className={cx(
+          'flex min-w-0 items-center gap-0.5 transition-opacity duration-200 md:ml-3',
+          stale && 'opacity-60',
+        )}
+      >
+        <li>
+          <Counter tone="work" label="Working" value={counts.working} />
+        </li>
+        <li>
+          <Tooltip content="Open the Attention Center">
+            <button
+              type="button"
+              data-hud="waiting"
+              aria-expanded={sheetOpen}
+              onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
+              className={cx(
+                'rounded-control transition-[background-color,box-shadow] duration-150 hover:bg-bg-2',
+                counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
+              )}
+            >
+              <Counter tone="wait" label="Waiting" value={counts.waiting} />
+            </button>
+          </Tooltip>
+        </li>
+        <li className="max-sm:hidden">
+          <Counter tone="ok" label="Running" value={counts.running} />
+        </li>
+        <li>
+          <Counter tone="err" label="Errors" value={counts.errors} />
+        </li>
+        <li aria-hidden className="mx-1.5 h-4 w-px bg-line max-md:hidden" />
+        <li className="max-md:hidden">
+          <Counter label="tokens today" value={counts.tokensToday} format={formatCount} />
+        </li>
+      </ul>
       <div className="flex-1" />
-      <output aria-live="polite" className="flex items-center text-label text-text-2">
-        <StatusDot tone={status.tone} label={status.label} showLabel />
-      </output>
-      <IconButton
-        label={`Theme: ${THEME_NAME[setting]} (switch to ${THEME_NAME[nextTheme]})`}
-        size="sm"
-        onClick={() => setTheme(nextTheme)}
-        icon={<ThemeIcon className="size-4" strokeWidth={1.5} />}
-      />
+      <Connection />
+      <Tooltip content="Command palette">
+        <span className="flex items-center gap-0.5 max-md:hidden" data-hud="palette-hint">
+          <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd>
+          <Kbd>K</Kbd>
+        </span>
+      </Tooltip>
+      <div className="flex items-center gap-1">
+        <IconButton
+          label={`Motion: ${MOTION_NAME[motion]} (switch to ${MOTION_NAME[nextMotion(motion)]})`}
+          size="sm"
+          data-hud="motion"
+          onClick={() => motionPreference.set(nextMotion(motion))}
+          icon={<MotionIcon className="size-4" strokeWidth={1.5} />}
+        />
+        <IconButton
+          label={`Theme: ${THEME_NAME[theme]} (switch to ${THEME_NAME[NEXT_THEME[theme]]})`}
+          size="sm"
+          onClick={() => setTheme(NEXT_THEME[theme])}
+          icon={<ThemeIcon className="size-4" strokeWidth={1.5} />}
+        />
+      </div>
     </header>
+  );
+}
+
+interface CounterProps {
+  /** Without a tone the counter has no dot (tokens). */
+  tone?: Tone;
+  label: string;
+  value: number;
+  format?: (value: number) => string;
+}
+
+function Counter({ tone, label, value, format }: CounterProps) {
+  const active = value > 0;
+  return (
+    <span
+      data-counter={label}
+      className="flex h-7 items-center gap-1.5 px-2 text-body-sm"
+      title={`${format ? format(value) : value} ${label}`}
+    >
+      {tone && (
+        <span
+          aria-hidden
+          className={cx(
+            'size-1.5 shrink-0 rounded-full transition-colors duration-200',
+            active ? DOT[tone] : 'bg-st-idle opacity-60',
+          )}
+        />
+      )}
+      <NumberTicker
+        value={value}
+        format={format}
+        className={cx('transition-colors duration-200', active ? 'text-text-1' : 'text-text-3')}
+      />
+      <span className="text-label text-text-3 max-lg:sr-only">{label}</span>
+    </span>
+  );
+}
+
+const DOT: Record<Tone, string> = {
+  work: 'bg-st-work',
+  tool: 'bg-st-tool',
+  wait: 'bg-st-wait',
+  ok: 'bg-st-ok',
+  err: 'bg-st-err',
+  idle: 'bg-st-idle',
+};
+
+function Connection() {
+  const connection = useBoard(selectConnection);
+  const view = connectionView(connection);
+  const reconnecting = connection.status === 'reconnecting';
+  return (
+    <output
+      aria-live="polite"
+      data-connection={connection.status}
+      className="flex items-center gap-2 text-label text-text-2"
+      title={view.label}
+    >
+      <span aria-hidden className="relative grid size-3.5 place-items-center">
+        <span
+          className={cx('size-2 rounded-full transition-colors duration-200', DOT[view.tone])}
+        />
+        {reconnecting && (
+          <span className="hud-spin absolute inset-0 rounded-full border border-st-err border-r-transparent border-b-transparent" />
+        )}
+      </span>
+      <span className={cx('max-md:sr-only', reconnecting && 'text-st-err')}>{view.label}</span>
+    </output>
   );
 }
