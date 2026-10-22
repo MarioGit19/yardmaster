@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { spring } from '../motion.js';
+import { spring, useMotionLevel } from '../motion.js';
 import { cx } from './cx.js';
 
 const DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
@@ -14,10 +14,12 @@ export interface NumberTickerProps {
 /**
  * A rolling-digit counter (DESIGN.md §3.7). Each digit is a 0–9 strip moved by transform with a
  * spring, keyed from the right so units stay put as the number grows. Mounts without rolling.
+ * Reduced swaps digits in place: a roll is movement.
  */
 export function NumberTicker({ value, format = String, className }: NumberTickerProps) {
   const text = format(value);
   const chars = [...text];
+  const still = useMotionLevel() !== 'full';
   return (
     <span className={cx('inline-flex tabular-nums', className)} data-value={value}>
       <span className="sr-only">{text}</span>
@@ -25,7 +27,7 @@ export function NumberTicker({ value, format = String, className }: NumberTicker
         {chars.map((char, i) => {
           const place = chars.length - i;
           return /\d/.test(char) ? (
-            <Digit key={place} digit={Number(char)} />
+            <Digit key={place} digit={Number(char)} still={still} />
           ) : (
             <span key={`${place}${char}`}>{char}</span>
           );
@@ -35,7 +37,7 @@ export function NumberTicker({ value, format = String, className }: NumberTicker
   );
 }
 
-function Digit({ digit }: { digit: number }) {
+function Digit({ digit, still }: { digit: number; still: boolean }) {
   return (
     <span className="relative inline-block overflow-hidden">
       {/* Sizes the column: tabular digits all share this width. */}
@@ -43,8 +45,9 @@ function Digit({ digit }: { digit: number }) {
       <motion.span
         className="absolute inset-x-0 top-0 flex flex-col"
         initial={false}
-        animate={{ y: `${-digit * 10}%` }}
-        transition={spring.smooth}
+        // A full transform string stays on the compositor while the HUD ticks during streaming.
+        animate={{ transform: `translateY(${-digit * 10}%)` }}
+        transition={still ? { duration: 0 } : spring.smooth}
       >
         {DIGITS.map((d) => (
           <span key={d}>{d}</span>

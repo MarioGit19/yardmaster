@@ -51,6 +51,44 @@ test('the Waiting count opens the Attention Center', async ({ page }) => {
   await expect(sheet).toBeHidden();
 });
 
+// Full slides the sheet in, Reduced only fades it, Off shows it at once.
+for (const level of ['full', 'reduced', 'off'] as const) {
+  test(`the Attention Center at ${level} motion`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cboard.motion', value), level);
+    await openRoute(page, '/');
+    const button = page.locator('[data-hud="waiting"]');
+    await expect(button).toBeVisible();
+    // Samples the sheet's computed transform and opacity every frame once it appears.
+    const sampling = page.evaluate(
+      () =>
+        new Promise<{ transform: string; opacity: number }[]>((resolve) => {
+          const frames: { transform: string; opacity: number }[] = [];
+          let start: number | null = null;
+          const tick = (now: number) => {
+            const sheet = document.querySelector('aside[aria-labelledby="attention-title"]');
+            if (sheet) {
+              start ??= now;
+              const style = getComputedStyle(sheet);
+              frames.push({ transform: style.transform, opacity: Number(style.opacity) });
+            }
+            if (start === null || now - start < 400) requestAnimationFrame(tick);
+            else resolve(frames);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    await button.click();
+    const frames = await sampling;
+    expect(frames.length).toBeGreaterThan(2);
+    const moved = frames.some((f) => f.transform !== 'none');
+    const faded = frames.some((f) => f.opacity < 1);
+    expect(moved).toBe(level === 'full');
+    if (level === 'off') expect(faded).toBe(false);
+    else expect(faded).toBe(true);
+    await expect(page.getByRole('complementary', { name: /Needs you/ })).toBeVisible();
+  });
+}
+
 test('killing the server shows the disconnected state', async ({ browser }) => {
   test.slow();
   const board = await startDemoBoard();

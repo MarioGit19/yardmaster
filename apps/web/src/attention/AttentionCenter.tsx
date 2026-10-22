@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { Link } from 'wouter';
 import { selectApproval, selectProject, useBoard, useBoardList } from '../data/index.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { sessionHref } from '../routes.js';
@@ -24,16 +24,23 @@ const close = () => attentionOpen.set('closed');
 export function AttentionCenter() {
   const open = usePreference(attentionOpen) === 'open';
   const narrow = useMediaQuery(NARROW_QUERY);
-  const offscreen = narrow ? { y: '100%' } : { x: '100%' };
+  // Reduced cross-fades in place; Off mounts the sheet already at rest.
+  const level = useMotionLevel();
+  const still = level !== 'full';
+  const offscreen = still ? 'none' : narrow ? 'translateY(100%)' : 'translateX(100%)';
   return (
     <AnimatePresence>
       {open && (
         <motion.aside
           key="attention"
           aria-labelledby="attention-title"
-          initial={{ ...offscreen, opacity: 0 }}
-          animate={{ x: 0, y: 0, opacity: 1, transition: spring.smooth }}
-          exit={{ ...offscreen, opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+          initial={level === 'off' ? false : { transform: offscreen, opacity: 0 }}
+          animate={{ transform: 'none', opacity: 1, transition: spring.smooth }}
+          exit={{
+            transform: offscreen,
+            opacity: 0,
+            transition: { duration: dur.fast, ease: ease.out },
+          }}
           className={
             narrow
               ? 'fixed inset-x-0 bottom-0 z-40 flex max-h-[70dvh] flex-col rounded-t-modal border-line border-t bg-bg-1 shadow-raised'

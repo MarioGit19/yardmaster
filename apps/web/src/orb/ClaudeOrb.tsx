@@ -30,6 +30,9 @@ const STATUS_TOKEN: Record<OrbState, string> = {
   ended: '--st-idle',
 };
 
+/** The tool chip's slide as a transform string (compositor-only); Reduced fades it in place. */
+const chipShift = (moving: boolean, px: number) => `translateX(${moving ? px : 0}px)`;
+
 export interface ClaudeOrbProps {
   state: OrbState;
   /** CSS px, 28–64 in session rows and headers. */
@@ -199,9 +202,13 @@ export function ClaudeOrb({
           <motion.span
             key={chip}
             aria-hidden
-            initial={{ opacity: 0, x: -4 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -2, transition: { duration: dur.fast, ease: ease.out } }}
+            initial={{ opacity: 0, transform: chipShift(moving, -4) }}
+            animate={{ opacity: 1, transform: chipShift(moving, 0) }}
+            exit={{
+              opacity: 0,
+              transform: chipShift(moving, -2),
+              transition: { duration: dur.fast, ease: ease.out },
+            }}
             transition={spring.snappy}
             className="pointer-events-none absolute top-1/2 left-full ml-1.5 -translate-y-1/2 whitespace-nowrap rounded-chip border border-line bg-bg-2 px-1.5 py-px font-mono text-meta text-text-2"
             style={{ borderColor: `rgb(${palette?.family.join(' ') ?? '128 128 128'} / 0.35)` }}
