@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { type Browser, type BrowserContextOptions, chromium, type Page } from '@playwright/test';
-import { startDemoBoard } from '../board.js';
+import { startBoard } from '../board.js';
 import { signedInState } from '../fixtures.js';
 
 const run = promisify(execFile);
@@ -122,6 +122,19 @@ const SCENARIOS = {
         await page.mouse.move(4, 4);
         await page.waitForTimeout(700);
       },
+    );
+  },
+
+  /** The stress board: compare with `overview-activity` for how much louder a busy board reads. */
+  async busy(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(2500);
+    await r.moment(
+      'activity',
+      'activity',
+      '8 s of the stress board at full tilt',
+      hold(page, 8000),
     );
   },
 
@@ -258,6 +271,8 @@ const SCENARIOS = {
 
 type Scenario = keyof typeof SCENARIOS;
 const NAMES = Object.keys(SCENARIOS) as Scenario[];
+/** Scenarios that run on `--demo-stress` instead of `--demo`. */
+const STRESS = new Set<Scenario>(['busy']);
 
 /** `box` cut to the viewport, rounded to even pixels for the video encoder. */
 function visible(box: Box, viewport: { width: number; height: number }): Box {
@@ -332,7 +347,7 @@ async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean, red
   }
   const phone = scenario === 'phone';
   const viewport = phone ? PHONE : DESKTOP;
-  const board = await startDemoBoard();
+  const board = await startBoard({ demo: true, stress: STRESS.has(scenario) });
   const videoDir = join(board.home, 'video');
   const options: BrowserContextOptions = {
     baseURL: board.url,

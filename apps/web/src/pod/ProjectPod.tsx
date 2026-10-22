@@ -1,4 +1,4 @@
-import type { ClaudeSession, Project, Terminal } from '@c-board/protocol';
+import type { ClaudeSession, Project } from '@c-board/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type PointerEvent, useEffect, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import { useNow } from '../anim/clock.js';
 import { useInView } from '../anim/useFrame.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { type CrewTerminal, miniCrewCount } from '../crew/model.js';
+import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
   activityKey,
   selectCrashedCount,
@@ -14,9 +15,7 @@ import {
   selectTerminalsByProject,
   useBoard,
   useBoardList,
-  useBusyFlags,
   useLastActivity,
-  useLatestActivity,
 } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
@@ -74,6 +73,8 @@ export function ProjectPod({ project }: { project: Project }) {
   const crashed = useBoard(selectCrashedCount(project.id)) > 0;
   const working = sessions.filter((s) => WORKING.has(s.status.kind)).length;
   const now = useNow(IDLE_CLOCK_MS);
+  // The crew watches streaming terminals and falls asleep after five quiet minutes (§4.11).
+  const crew = useCrewTerminals(terminals);
   const lastPulse = useLastActivity(pulseKey);
   const lastActivity = Math.max(lastPulse ?? 0, project.lastActivityAt ?? 0) || null;
   // Nothing for five minutes: the pod steps back. Only its non-text layers (`.pod-dim`: avatar,
@@ -202,7 +203,8 @@ export function ProjectPod({ project }: { project: Project }) {
         </div>
         <PodCrew
           sessions={live.slice(0, MAX_CREW)}
-          terminals={terminals}
+          terminals={crew.terminals}
+          activity={crew.activity}
           accent={accent}
           now={now}
         />
@@ -211,7 +213,7 @@ export function ProjectPod({ project }: { project: Project }) {
       {live.length > 0 ? (
         <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
           {live.slice(0, MAX_SESSION_ROWS).map((session) => (
-            <SessionRow key={session.id} session={session} accent={accent} />
+            <SessionRow key={session.id} session={session} accent={accent} crew={crew} now={now} />
           ))}
           {hiddenSessions > 0 && (
             <li className="pl-10 text-meta text-text-2 tabular">
@@ -289,28 +291,17 @@ function GitLine({ git }: { git: Project['git'] }) {
 /** The project's crew in the header: one per live session, or one for the project itself. */
 function PodCrew({
   sessions,
-  terminals: raw,
+  terminals,
+  activity,
   accent,
   now,
 }: {
   sessions: readonly ClaudeSession[];
-  terminals: readonly Terminal[];
+  terminals: readonly CrewTerminal[];
+  activity: number;
   accent: string;
   now: number;
 }) {
-  // The crew watches streaming terminals and falls asleep after five quiet minutes (§4.11).
-  const keys = raw.map((t) => activityKey.terminal(t.id));
-  const busy = useBusyFlags(keys);
-  const lastOutputAt = useLatestActivity(keys);
-  const terminals = raw.map(
-    (t, i): CrewTerminal => ({
-      state: t.state,
-      createdAt: t.createdAt,
-      closedAt: t.closedAt,
-      streaming: busy[i] === '1',
-      lastOutputAt,
-    }),
-  );
   const crew = sessions.length > 0 ? sessions : [null];
   return (
     <div className="pod-crew pod-dim -my-2 flex shrink-0 items-end">
@@ -319,6 +310,7 @@ function PodCrew({
           key={session?.id ?? 'project'}
           session={session}
           terminals={terminals}
+          activity={activity}
           accent={accent}
           now={now}
           overlap={i > 0}
@@ -331,12 +323,14 @@ function PodCrew({
 function CrewMember({
   session,
   terminals,
+  activity,
   accent,
   now,
   overlap,
 }: {
   session: ClaudeSession | null;
   terminals: readonly CrewTerminal[];
+  activity: number;
   accent: string;
   now: number;
   overlap: boolean;
@@ -354,6 +348,7 @@ function CrewMember({
         color={accent}
         tool={session?.status.kind === 'tool' ? session.status.tool : null}
         subagents={subagents}
+        activity={activity}
       />
     </span>
   );

@@ -7,6 +7,7 @@ import {
   activeSessionCount,
   approach,
   attentionProjectId,
+  boardActivity,
   DEFAULT_ATTENTION_POINT,
   energyFrom,
   frameDue,
@@ -104,6 +105,21 @@ describe('board signals', () => {
   });
 });
 
+describe('boardActivity', () => {
+  it("adds up the projects' activity levels, ignoring other entities", () => {
+    const board = sampleBoard();
+    const now = T0;
+    const pulse = (energy: number) => ({ energy, at: now, lastAt: now, events: 1, doneAt: null });
+    expect(boardActivity(board, {}, now)).toBe(0);
+    const busy = boardActivity(board, { 'p:p-acme': pulse(10), 'p:p-zen': pulse(10) }, now);
+    expect(busy).toBeCloseTo(2, 3);
+    // Sessions and terminals have their own pulses; only projects count.
+    expect(boardActivity(board, { 's:s-1': pulse(10), 't:t-1': pulse(10) }, now)).toBe(0);
+    // Levels decay with time.
+    expect(boardActivity(board, { 'p:p-acme': pulse(10) }, now + 20_000)).toBeLessThan(0.1);
+  });
+});
+
 describe('energyFrom', () => {
   it('is zero for a quiet board and stays below one', () => {
     expect(energyFrom(0, 0, 0)).toBe(0);
@@ -111,13 +127,24 @@ describe('energyFrom', () => {
     expect(energyFrom(50, 50, 1e9)).toBeGreaterThan(0.99);
   });
 
-  it('rises with sessions, commands and throughput', () => {
+  it('rises with sessions, project activity and throughput', () => {
     const one = energyFrom(1, 0, 0);
     expect(energyFrom(2, 0, 0)).toBeGreaterThan(one);
     expect(energyFrom(1, 1, 0)).toBeGreaterThan(one);
     expect(energyFrom(1, 0, 64 * 1024)).toBeGreaterThan(one);
-    // A session matters more than a command.
-    expect(energyFrom(1, 0, 0)).toBeGreaterThan(energyFrom(0, 1, 0));
+  });
+
+  it('keeps a calm board low and a busy one clearly brighter', () => {
+    // One working session; the demo board (5 working, ~4 busy projects, a trickle of output);
+    // the stress board (two log firehoses, rapid tool calls everywhere).
+    const calm = energyFrom(1, 0.5, 0);
+    const demo = energyFrom(5, 3.8, 400);
+    const stress = energyFrom(4, 8, 25 * 1024);
+    expect(calm).toBeLessThan(0.15);
+    expect(demo).toBeGreaterThan(0.4);
+    expect(demo).toBeLessThan(0.65);
+    expect(stress).toBeGreaterThan(0.85);
+    expect(stress - demo).toBeGreaterThan(0.25);
   });
 
   it('treats negative input as zero', () => {

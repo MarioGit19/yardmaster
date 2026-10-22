@@ -4,8 +4,8 @@ import { useMotionLevel } from '../motion.js';
 import { resolveColor } from '../orb/colors.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
-import { sparkPoints, sparkStep } from './spark.js';
-import { SAMPLE_MS, type SampleRing } from './throughput.js';
+import { HEAD_ROOM, sparkPoints, sparkStep } from './spark.js';
+import { SAMPLE_MS, SAMPLES, type SampleRing } from './throughput.js';
 import { useThroughput } from './useThroughput.js';
 
 function trace(ctx: CanvasRenderingContext2D, points: ReadonlyArray<[number, number]>) {
@@ -26,8 +26,9 @@ export interface SparklineProps {
 }
 
 /**
- * The lane's 60-sample output-rate line, DESIGN.md §4.3. It redraws once per sample, and a
- * linear one-step slide on the compositor brings each new sample in from the right.
+ * The lane's 60-sample output-rate line, DESIGN.md §4.3: a soft fill in the lane's color under
+ * the line, and a bright head on the newest sample while the terminal writes. It redraws once per
+ * sample, and a linear one-step slide on the compositor brings each new sample in from the right.
  */
 export function Sparkline({ terminalId, color, error = false, className }: SparklineProps) {
   const { theme } = useTheme();
@@ -70,20 +71,22 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     if (!ctx) return;
     const [r, g, b] = resolveColor(tint);
     const { width, height } = size;
-    const step = sparkStep(width);
+    // The plot stops short of the right edge, so the head dot isn't clipped once it slides in.
+    const plot = Math.max(1, width - HEAD_ROOM);
+    const step = sparkStep(plot);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width + step, height);
 
-    const points = sparkPoints(ring, width, height);
+    const points = sparkPoints(ring, plot, height, HEAD_ROOM / 2);
     const quiet = ring.max() === 0;
     trace(ctx, points);
     if (!quiet) {
       ctx.save();
-      ctx.lineTo(width + step, height);
+      ctx.lineTo(plot + step, height);
       ctx.lineTo(0, height);
       ctx.closePath();
       const fill = ctx.createLinearGradient(0, 0, 0, height);
-      fill.addColorStop(0, `rgb(${r} ${g} ${b} / 0.24)`);
+      fill.addColorStop(0, `rgb(${r} ${g} ${b} / 0.38)`);
       fill.addColorStop(1, `rgb(${r} ${g} ${b} / 0)`);
       ctx.fillStyle = fill;
       ctx.fill();
@@ -95,6 +98,21 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
     ctx.lineCap = 'round';
     ctx.strokeStyle = `rgb(${r} ${g} ${b} / ${quiet ? 0.35 : 0.95})`;
     ctx.stroke();
+
+    // Streaming: a bright head with a soft halo on the newest sample.
+    const head = points[SAMPLES - 1];
+    if (head && ring.at(SAMPLES - 1) > 0) {
+      const [x, y] = head;
+      const halo = ctx.createRadialGradient(x, y, 0, x, y, HEAD_ROOM);
+      halo.addColorStop(0, `rgb(${r} ${g} ${b} / 0.55)`);
+      halo.addColorStop(1, `rgb(${r} ${g} ${b} / 0)`);
+      ctx.fillStyle = halo;
+      ctx.fillRect(x - HEAD_ROOM, y - HEAD_ROOM, HEAD_ROOM * 2, HEAD_ROOM * 2);
+      ctx.beginPath();
+      ctx.arc(x, y, 1.75, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${Math.round((r + 255) / 2)} ${Math.round((g + 255) / 2)} ${Math.round((b + 255) / 2)})`;
+      ctx.fill();
+    }
 
     slide.current?.cancel();
     slide.current = null;
@@ -129,7 +147,7 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !size) return;
-    const step = sparkStep(size.width);
+    const step = sparkStep(Math.max(1, size.width - HEAD_ROOM));
     canvas.width = Math.round((size.width + step) * dpr);
     canvas.height = Math.round(size.height * dpr);
     canvas.style.width = `${size.width + step}px`;
@@ -144,7 +162,7 @@ export function Sparkline({ terminalId, color, error = false, className }: Spark
       ref={rootRef}
       aria-hidden
       data-sparkline
-      className={cx('relative block h-5 min-w-0 overflow-hidden', className)}
+      className={cx('relative block h-6 min-w-0 overflow-hidden', className)}
     >
       <canvas ref={canvasRef} className="absolute top-0 left-0" />
     </span>

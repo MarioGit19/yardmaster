@@ -106,3 +106,15 @@ export function useLatestActivity(keys: readonly string[]): number | null {
     return coarse(latest);
   });
 }
+
+/** The busiest step among `keys` (0 = all quiet). Re-renders only when it changes. */
+export function useMaxActivityStep(keys: readonly string[]): 0 | 1 | 2 | 3 {
+  return useDecaying((s, now) => {
+    let max: 0 | 1 | 2 | 3 = 0;
+    for (const key of keys) {
+      const step = levelStep(levelAt(s.pulses[key], now));
+      if (step > max) max = step;
+    }
+    return max;
+  }, isBusyStep);
+}

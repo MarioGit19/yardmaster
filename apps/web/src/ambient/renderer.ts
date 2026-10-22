@@ -57,10 +57,11 @@ void main() {
   vec2 q = vec2(fbm(p + vec2(0.0, t * 0.6)), fbm(p + vec2(5.2, 1.3) - t * 0.4));
   float f = fbm(p + 1.9 * q + vec2(t * 0.3, -t * 0.2));
 
-  float band = smoothstep(0.28, 0.9, f);
+  // Energy widens the lit bands and lifts them: a calm room is mostly floor, a busy one glows.
+  float band = smoothstep(0.3 - 0.1 * uEnergy, 0.92 - 0.2 * uEnergy, f);
   // Light pools toward the top of the room, so content below stays on a calm, dark floor.
   float sky = mix(0.45, 1.0, smoothstep(0.0, 1.0, vUv.y));
-  float lift = (0.45 + 0.55 * uEnergy) * sky;
+  float lift = (0.3 + 0.7 * uEnergy) * sky;
   vec3 tint = mix(uDeep, uViolet, smoothstep(0.35, 0.85, q.x));
   vec3 color = mix(uBase, tint, clamp(band * lift * uGain, 0.0, 1.0));
 

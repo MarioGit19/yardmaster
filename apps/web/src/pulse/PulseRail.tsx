@@ -13,7 +13,7 @@ import {
 import { useLocation } from 'wouter';
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
-import { ease, useMotionLevel } from '../motion.js';
+import { ease, moment, move, useMotionLevel } from '../motion.js';
 import { resolveColor } from '../orb/colors.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
@@ -24,6 +24,7 @@ import { NumberTicker } from '../ui/NumberTicker.js';
 import {
   buildLanes,
   eventLabel,
+  eventTone,
   FILTER_LABEL,
   formatAgo,
   hitTest,
@@ -54,6 +55,11 @@ const FLY_MAX_AGE_MS = 10_000;
 const HALO_MS = 20_000;
 /** The window slides about 1 px/s, so a redraw per second keeps it current. */
 const DRIFT_MS = 1_000;
+/** Runners on the collapsed rail at once; a burst beyond this drops the extras. */
+const MAX_RUNNERS = 6;
+/** How far a runner travels in from the right edge, px (at most this share of the rail). */
+const RUN_PX = 520;
+const RUN_SHARE = 0.4;
 /** Lanes visible before the rail scrolls. */
 const MAX_VISIBLE_LANES = 6;
 const LABEL_FONT = '500 11px "Geist Mono Variable", ui-monospace, monospace';
@@ -138,8 +144,9 @@ export function PulseRail() {
     <section
       aria-label="Pulse"
       data-pulse={collapsed ? 'collapsed' : 'expanded'}
-      className="shrink-0 border-line border-t bg-bg-1"
+      className="relative shrink-0 border-line border-t bg-bg-1"
     >
+      {collapsed && <PulseTicker />}
       <div className="flex h-9 items-center gap-3 px-3">
         <button
           type="button"
@@ -162,6 +169,73 @@ export function PulseRail() {
       {!collapsed && <PulsePlot />}
     </section>
   );
+}
+
+/**
+ * The collapsed rail keeps talking: each new event sends a small dot in its tone along the top
+ * hairline, in from the right like the plot's dots. Reduced fades it in place; Off shows nothing.
+ */
+function PulseTicker() {
+  const store = useBoardStore();
+  const level = useMotionLevel();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const track = ref.current;
+    if (!track || level === 'off') return;
+    const known = new Set(store.getState().activity.map((e) => e.id));
+    const running = new Set<Animation>();
+    let runs = 0;
+
+    const launch = (event: ActivityEvent) => {
+      if (running.size >= MAX_RUNNERS || document.hidden) return;
+      const width = track.clientWidth;
+      if (width === 0) return;
+      const dot = document.createElement('span');
+      dot.className = 'pulse-runner';
+      dot.dataset.pulseRunner = eventTone(event);
+      dot.style.setProperty('--runner', TONE_VAR[eventTone(event)]);
+      track.append(dot);
+      dot.style.left = `${width - 6}px`;
+      const still = level !== 'full';
+      const travel = Math.min(RUN_PX, width * RUN_SHARE);
+      const run = dot.animate(
+        [
+          { transform: move(still, 'translateX(0)'), opacity: 0 },
+          { opacity: 1, offset: 0.12 },
+          { opacity: 1, offset: 0.55 },
+          { transform: move(still, `translateX(${-travel}px)`), opacity: 0 },
+        ],
+        { duration: moment.spark * 1000, easing: `cubic-bezier(${ease.out.join(',')})` },
+      );
+      running.add(run);
+      track.dataset.runs = String(++runs);
+      const done = () => {
+        running.delete(run);
+        dot.remove();
+      };
+      run.onfinish = done;
+      run.oncancel = done;
+    };
+
+    const off = store.subscribe((state, prev) => {
+      if (state.activity === prev.activity) return;
+      const now = Date.now();
+      const fresh: ActivityEvent[] = [];
+      for (const event of state.activity as ActivityEvent[]) {
+        if (!known.has(event.id) && now - event.ts < FLY_MAX_AGE_MS) fresh.push(event);
+      }
+      known.clear();
+      for (const event of state.activity) known.add(event.id);
+      for (const event of fresh.sort((a, b) => a.ts - b.ts)) launch(event);
+    });
+    return () => {
+      off();
+      for (const run of running) run.cancel();
+    };
+  }, [store, level]);
+
+  return <div ref={ref} aria-hidden data-pulse-ticker className="pulse-ticker" />;
 }
 
 function FilterToggle() {

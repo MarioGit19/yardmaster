@@ -9,7 +9,8 @@ interface Pose {
   body: { y: number; rotate: number; scale: number; x?: number[] };
   armL: number;
   armR: number | number[];
-  eyes: { x: number; y: number };
+  /** `scale` above 1 opens the eyes wide, facing the viewer. */
+  eyes: { x: number; y: number; scale?: number };
 }
 
 export const POSES: Record<MascotState, Pose> = {
@@ -28,7 +29,13 @@ export const POSES: Record<MascotState, Pose> = {
     eyes: { x: 4, y: 2 },
   },
   delegating: { body: { y: 0, rotate: 5, scale: 1 }, armL: 10, armR: -95, eyes: { x: 4, y: 0 } },
-  waiting: { body: { y: -1, rotate: 0, scale: 1.03 }, armL: 12, armR: -165, eyes: { x: 0, y: -1 } },
+  // Turns to face the viewer: square on, eyes centred and wide.
+  waiting: {
+    body: { y: -1, rotate: 0, scale: 1.04 },
+    armL: 12,
+    armR: -165,
+    eyes: { x: 0, y: 0, scale: 1.18 },
+  },
   // A quick shake on entry.
   error: {
     body: { y: 0, rotate: 0, scale: 1, x: [0, -3, 3, -2, 2, 0] },
@@ -70,4 +77,9 @@ export const armRVariants = variants(({ armR }) =>
     : { rotate: armR, transition: spring.smooth },
 );
 
-export const eyeVariants = variants(({ eyes }) => ({ ...eyes, transition: spring.smooth }));
+export const eyeVariants = variants(({ eyes }) => ({
+  x: eyes.x,
+  y: eyes.y,
+  scale: eyes.scale ?? 1,
+  transition: spring.smooth,
+}));

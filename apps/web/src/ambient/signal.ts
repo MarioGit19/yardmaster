@@ -1,9 +1,10 @@
 import type { BoardState, Project } from '@c-board/protocol';
+import { activityKey, levelAt, type Pulses } from '../data/activity.js';
 
 type ProjectId = Project['id'];
 
-// Pure inputs for the ambient field, DESIGN.md §4.1: `uEnergy` from working sessions and
-// output throughput, `uAttention` toward the project that is waiting for the user.
+// Pure inputs for the ambient field, DESIGN.md §4.1: `uEnergy` from working sessions, how busy
+// the projects are and output throughput, `uAttention` toward the project waiting for the user.
 
 const ACTIVE_KINDS = new Set(['working', 'tool', 'compacting']);
 const WAITING_KINDS = new Set(['waiting_permission', 'waiting_input']);
@@ -63,14 +64,28 @@ export function attentionProjectId(board: BoardState): ProjectId | null {
 }
 
 /**
- * 0..1. Each active session adds a lot, running commands a little, and throughput adds on a
- * log scale, so a chatty build brightens the room without blowing it out.
+ * The projects' activity levels (§4.10) added up: 0 for a quiet board, about one per project
+ * that is busy right now. It follows the event rate, so a board firing tool calls reads busier
+ * than one whose sessions merely count as working.
  */
-export function energyFrom(active: number, running: number, bytesPerSecond: number): number {
+export function boardActivity(board: BoardState, pulses: Pulses, now: number): number {
+  let total = 0;
+  for (const id of Object.keys(board.projects))
+    total += levelAt(pulses[activityKey.project(id)], now);
+  return total;
+}
+
+/**
+ * 0..1 from working sessions, the summed project activity (`boardActivity`) and output
+ * throughput (log scale). Long-running commands that sit quiet (dev servers) add nothing. The
+ * curve is gentle: a demo-like board with a few busy projects sits mid-range, and only a board
+ * busy everywhere (firehose logs, rapid tool calls) nears the top.
+ */
+export function energyFrom(active: number, activity: number, bytesPerSecond: number): number {
   const drive =
-    0.45 * Math.max(0, active) +
-    0.12 * Math.max(0, running) +
-    0.25 * Math.log1p(Math.max(0, bytesPerSecond) / 1024);
+    0.08 * Math.max(0, active) +
+    0.07 * Math.max(0, activity) +
+    0.4 * Math.log1p(Math.max(0, bytesPerSecond) / 1024);
   return 1 - Math.exp(-drive);
 }
 

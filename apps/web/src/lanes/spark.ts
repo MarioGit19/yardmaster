@@ -12,6 +12,9 @@ export function sparkLevel(value: number, peak: number): number {
   return Math.min(1, Math.log1p(value / KNEE) / Math.log1p(top / KNEE));
 }
 
+/** Room right of the plot and above it for the streaming head dot and its halo, px. */
+export const HEAD_ROOM = 5;
+
 /** The horizontal distance between two samples, for a sparkline `width` px wide. */
 export const sparkStep = (width: number) => width / (SAMPLES - 2);
 

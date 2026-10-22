@@ -1,8 +1,7 @@
 import { type ToolFamily, toolFamily } from '@c-board/protocol';
-import { AnimatePresence, motion } from 'motion/react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useInView } from '../anim/useFrame.js';
-import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { useMotionLevel } from '../motion.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
 import { resolveColor } from './colors.js';
@@ -19,6 +18,7 @@ import {
   particleCount,
 } from './model.js';
 import { CANVAS_SCALE, drawOrb, type OrbFrame, type OrbPalette } from './render.js';
+import { ToolChip } from './ToolChip.js';
 
 const STATUS_TOKEN: Record<OrbState, string> = {
   idle: '--st-idle',
@@ -29,9 +29,6 @@ const STATUS_TOKEN: Record<OrbState, string> = {
   compacting: '--st-work',
   ended: '--st-idle',
 };
-
-/** The tool chip's slide as a transform string (compositor-only); Reduced fades it in place. */
-const chipShift = (moving: boolean, px: number) => move(!moving, `translateX(${px}px)`);
 
 export interface ClaudeOrbProps {
   state: OrbState;
@@ -198,26 +195,11 @@ export function ClaudeOrb({
           animationDelay: `${-offset}s`,
         }}
       />
-      <AnimatePresence initial={false}>
-        {chip && (
-          <motion.span
-            key={chip}
-            aria-hidden
-            initial={{ opacity: 0, transform: chipShift(moving, -4) }}
-            animate={{ opacity: 1, transform: chipShift(moving, 0) }}
-            exit={{
-              opacity: 0,
-              transform: chipShift(moving, -2),
-              transition: { duration: dur.fast, ease: ease.out },
-            }}
-            transition={spring.snappy}
-            className="pointer-events-none absolute top-1/2 left-full ml-1.5 -translate-y-1/2 whitespace-nowrap rounded-chip border border-line bg-bg-2 px-1.5 py-px font-mono text-meta text-text-2"
-            style={{ borderColor: `rgb(${palette?.family.join(' ') ?? '128 128 128'} / 0.35)` }}
-          >
-            {chip}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <ToolChip
+        tool={chip}
+        family={toolFamilyName}
+        className="absolute top-1/2 left-full ml-1.5 -translate-y-1/2"
+      />
     </span>
   );
 }

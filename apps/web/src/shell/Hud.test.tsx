@@ -81,6 +81,40 @@ describe('Hud', () => {
     expect(counter('Waiting')).toBe('2');
   });
 
+  it('flares Waiting and Errors once when their counts go up', () => {
+    motionPreference.set('full');
+    const { store } = render();
+    const flare = (kind: string) => container.querySelector(`[data-hud-flare="${kind}"]`);
+    // Counts that arrive with the first snapshot don't flare.
+    expect(flare('ripple')).toBeNull();
+    expect(flare('flash')).toBeNull();
+    act(() => {
+      const board = structuredClone(store.getState().board);
+      board.sessions['s-3'] = makeSession('s-3', 'p-zen', { kind: 'waiting_input' });
+      board.sessions['s-4'] = makeSession('s-4', 'p-zen', { kind: 'error', message: 'boom' });
+      store.getState().replaceBoard(board);
+    });
+    expect(flare('ripple')).not.toBeNull();
+    expect(flare('flash')).not.toBeNull();
+    act(() => flare('ripple')?.dispatchEvent(new Event('animationend', { bubbles: true })));
+    expect(flare('ripple')).toBeNull();
+
+    // Going down plays nothing; Off plays nothing either.
+    act(() => {
+      const board = structuredClone(store.getState().board);
+      delete board.sessions['s-3'];
+      store.getState().replaceBoard(board);
+    });
+    expect(flare('ripple')).toBeNull();
+    act(() => motionPreference.set('off'));
+    act(() => {
+      const board = structuredClone(store.getState().board);
+      board.sessions['s-5'] = makeSession('s-5', 'p-zen', { kind: 'waiting_input' });
+      store.getState().replaceBoard(board);
+    });
+    expect(flare('ripple')).toBeNull();
+  });
+
   it('opens the Attention Center from the Waiting count and closes it with Escape', async () => {
     const { location } = render();
     expect(sheet()).toBeNull();

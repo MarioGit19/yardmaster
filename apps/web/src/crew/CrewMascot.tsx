@@ -33,6 +33,8 @@ export interface CrewMascotProps {
   subagents?: number;
   /** 0..1 terminal output rate; the "watching" monitor flickers faster with it. */
   activity?: number;
+  /** Epoch ms; the antenna orb fills a countdown ring while an approval waits. */
+  countdown?: { startedAt: number; endsAt: number } | null;
   /**
    * False holds one-shot states (done's sparkle, error's ×-eyes) instead of settling into
    * idle or a worried look. For the character sheet.
@@ -61,6 +63,7 @@ export function CrewMascot({
   tool = null,
   subagents = 0,
   activity = 0,
+  countdown = null,
   settle = true,
   className,
 }: CrewMascotProps) {
@@ -164,7 +167,14 @@ export function CrewMascot({
       data-crew-paused={live ? undefined : ''}
       data-crew-hold={settle ? undefined : ''}
       className={cx('crew relative inline-block shrink-0 align-middle', className)}
-      style={{ width: size, height: size, '--crew-delay': loopDelay } as CSSProperties}
+      style={
+        {
+          width: size,
+          height: size,
+          '--crew-delay': loopDelay,
+          '--crew-color': color,
+        } as CSSProperties
+      }
     >
       <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
         <ellipse cx="50" cy="95" rx="22" ry="3" fill="var(--text-1)" opacity="0.08" />
@@ -210,7 +220,10 @@ export function CrewMascot({
               />
               <rect x="33" y="44" width="34" height="22" rx="11" fill="var(--crew-visor)" />
               <rect x="33" y="44" width="34" height="22" rx="11" fill={`url(#${id}v)`} />
-              <motion.g variants={eyeVariants}>
+              <motion.g
+                variants={eyeVariants}
+                style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+              >
                 <g ref={eyeLookRef}>
                   <g className={cx('crew-anim', `crew-eyes-${shown}`)}>
                     <g
@@ -266,6 +279,7 @@ export function CrewMascot({
                 accent={color}
                 tool={tool ?? STATE_TOOL[shown] ?? null}
                 subagents={detail === 'posture' ? miniCrewCount(shown, subagents) : 0}
+                countdown={shown === 'waiting' ? countdown : null}
                 showToolLabel={false}
               />
             </span>

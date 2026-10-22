@@ -1,14 +1,16 @@
 import { CirclePause, Monitor, MonitorCog, Moon, Sparkle, Sparkles, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
 import { Wordmark } from '../brand/Logo.js';
 import {
   type ConnectionState,
   selectConnection,
+  selectHydrated,
   useBoard,
   useBoardShallow,
 } from '../data/index.js';
-import { type MotionSetting, motionPreference, nextMotion } from '../motion.js';
+import { type MotionSetting, motionPreference, nextMotion, useMotionLevel } from '../motion.js';
 import { paletteOpen } from '../palette/palette.js';
 import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
@@ -67,6 +69,8 @@ export function Hud() {
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
   const stale = useBoard(selectConnection).status === 'reconnecting';
+  // Counts arriving with the first snapshot aren't news; only later rises flare.
+  const armed = useBoard(selectHydrated);
   const ThemeIcon = THEME_ICON[theme];
   const MotionIcon = MOTION_ICON[motion];
 
@@ -102,7 +106,13 @@ export function Hud() {
                 counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
               )}
             >
-              <Counter tone="wait" label="Waiting" value={counts.waiting} />
+              <Counter
+                tone="wait"
+                label="Waiting"
+                value={counts.waiting}
+                flare="ripple"
+                armed={armed}
+              />
             </button>
           </Tooltip>
         </li>
@@ -110,7 +120,7 @@ export function Hud() {
           <Counter tone="ok" label="Running" value={counts.running} />
         </li>
         <li>
-          <Counter tone="err" label="Errors" value={counts.errors} />
+          <Counter tone="err" label="Errors" value={counts.errors} flare="flash" armed={armed} />
         </li>
         <li aria-hidden className="mx-1.5 h-4 w-px bg-line max-md:hidden" />
         <li className="max-md:hidden">
@@ -157,10 +167,24 @@ interface CounterProps {
   label: string;
   value: number;
   format?: (value: number) => string;
+  /**
+   * Played once each time the value rises: the amber attention ripple (DESIGN.md §3 rule 4) or
+   * a short rose flash ring.
+   */
+  flare?: 'ripple' | 'flash';
+  armed?: boolean;
 }
 
-function Counter({ tone, label, value, format }: CounterProps) {
+function Counter({ tone, label, value, format, flare, armed = false }: CounterProps) {
   const active = value > 0;
+  const level = useMotionLevel();
+  const [flares, setFlares] = useState(0);
+  const previous = useRef(value);
+  useEffect(() => {
+    const rose = value > previous.current;
+    previous.current = value;
+    if (rose && flare && armed && level !== 'off') setFlares((n) => n + 1);
+  }, [value, flare, armed, level]);
   return (
     <span
       data-counter={label}
@@ -170,7 +194,19 @@ function Counter({ tone, label, value, format }: CounterProps) {
       {tone && (
         // Shaped like the board's status marks, so the counters read without color or labels
         // (labels hide below lg). Zero keeps the shape, greyed out.
-        <span aria-hidden data-mark={tone} className="grid size-2 shrink-0 place-items-center">
+        <span
+          aria-hidden
+          data-mark={tone}
+          className="relative grid size-2 shrink-0 place-items-center"
+        >
+          {flares > 0 && (
+            <span
+              key={flares}
+              data-hud-flare={flare}
+              className={cx('hud-flare', `hud-flare-${flare}`)}
+              onAnimationEnd={() => setFlares(0)}
+            />
+          )}
           <span
             className={cx(
               'block shrink-0 transition-opacity duration-base',

@@ -8,6 +8,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | Scenario   | Moments                                                                      |
 | ---------- | ---------------------------------------------------------------------------- |
 | `overview` | `entrance`, `activity` (8 s), `pod-hover`, `lane-peek`                       |
+| `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `close` (Esc)                                          |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `attention-close`, `pulse-expand`, `pulse-collapse` |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |

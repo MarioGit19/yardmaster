@@ -96,6 +96,9 @@ describe('ProjectPod', () => {
     expect(row?.textContent).toContain('Waiting for approval');
     expect(row?.textContent).toContain('12.4k tok');
     expect(row?.textContent).toContain('Refactoring the cart totals.');
+    // The row's own crew member (24 px, the orb as its antenna) raises its hand too.
+    expect(row?.querySelector('[data-crew]')?.getAttribute('data-crew')).toBe('waiting');
+    expect(row?.querySelector('[data-crew] [data-orb]')?.getAttribute('data-orb')).toBe('waiting');
 
     expect(pod('p-zen')?.dataset.tone).toBe('err');
     expect(pod('p-orbit')?.dataset.tone).toBe('work');
@@ -142,6 +145,20 @@ describe('ProjectPod', () => {
     expect(p1?.querySelectorAll('header [data-crew]')).toHaveLength(3);
     expect(p1?.querySelectorAll('[data-session]')).toHaveLength(3);
     expect(p1?.textContent).toContain('2 more sessions');
+  });
+
+  it("shows the running tool's chip in the session row", () => {
+    const store = createBoardStore();
+    store.getState().replaceBoard({
+      ...store.getState().board,
+      projects: { p1: makeProject('p1', 'acme-shop') },
+      sessions: { s1: makeSession('s1', 'p1', { kind: 'tool', tool: 'Grep', toolUseId: 't1' }) },
+    });
+    render(store);
+    const row = pod('p1')?.querySelector('[data-session="s1"]');
+    expect(row?.querySelector('[data-crew]')?.getAttribute('data-crew')).toBe('reading');
+    // Hidden below a 360 px row by a container query; present in the DOM either way.
+    expect(row?.querySelector('[data-tool-chip]')?.textContent).toBe('Grep');
   });
 
   it('plays "done" once a turn finishes', () => {

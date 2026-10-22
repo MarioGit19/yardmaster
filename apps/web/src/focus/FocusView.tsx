@@ -3,9 +3,13 @@ import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
+import { useNow } from '../anim/clock.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { NewSessionComposer } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
+import { CrewMascot } from '../crew/CrewMascot.js';
+import { miniCrewCount } from '../crew/model.js';
+import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
   selectApproval,
   selectHydrated,
@@ -19,9 +23,9 @@ import {
 import { GitPanel } from '../git/GitPanel.js';
 import { SessionHistory } from '../history/SessionHistory.js';
 import { dur, ease, spring, tabGlide } from '../motion.js';
-import { ClaudeOrb } from '../orb/ClaudeOrb.js';
-import { orbStateFor } from '../orb/model.js';
 import { podSessions } from '../pod/model.js';
+import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
+import { useMascotState } from '../pod/useMascotState.js';
 import { useMediaQuery } from '../prefs.js';
 import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
@@ -45,6 +49,10 @@ import { sharedId } from './shared.js';
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
 
 const LABELS = { left: 'Sessions, history and git', center: 'Claude', right: 'Terminals' } as const;
+/** The header's crew member: full acting with props in detail (DESIGN.md §4.11). */
+const HEADER_CREW_PX = 120;
+/** Sleeping crews only need to notice five quiet minutes. */
+const IDLE_CLOCK_MS = 15_000;
 
 export interface FocusViewProps {
   projectId: string;
@@ -107,6 +115,8 @@ function ProjectFocus({
   useEffect(() => {
     if (sessionId) setComposing(false);
   }, [sessionId]);
+  const now = useNow(IDLE_CLOCK_MS);
+  const crew = useCrewTerminals(terminals);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -120,6 +130,8 @@ function ProjectFocus({
       sessions={sessions}
       activeId={composing ? undefined : session?.id}
       accent={accent}
+      crew={crew}
+      now={now}
       sharedOrbs={shared && !tabs}
       composing={composing}
       onNewSession={() => setComposing(true)}
@@ -179,6 +191,13 @@ function ProjectFocus({
             {project.path}
           </p>
         </div>
+        <HeaderCrew
+          key={composing ? 'new' : (session?.id ?? 'project')}
+          session={composing ? null : (session ?? null)}
+          accent={accent}
+          crew={crew}
+          now={now}
+        />
         {session && session.status.kind !== 'ended' && (
           <div className="hidden min-w-0 max-w-[32rem] flex-[1.4] md:block">
             <FocusCaption session={session} />
@@ -314,6 +333,8 @@ function SessionsColumn({
   sessions,
   activeId,
   accent,
+  crew,
+  now,
   sharedOrbs,
   composing,
   onNewSession,
@@ -322,6 +343,8 @@ function SessionsColumn({
   sessions: readonly ClaudeSession[];
   activeId: string | undefined;
   accent: string;
+  crew: CrewView;
+  now: number;
   /** Orbs take part in the hand-off only where the session list is on screen (not in tabs). */
   sharedOrbs: boolean;
   composing: boolean;
@@ -360,6 +383,8 @@ function SessionsColumn({
                   projectId={project.id}
                   active={s.id === activeId}
                   accent={accent}
+                  crew={crew}
+                  now={now}
                   shared={sharedOrbs}
                 />
               </li>
@@ -383,12 +408,16 @@ function SessionLink({
   projectId,
   active,
   accent,
+  crew,
+  now,
   shared,
 }: {
   session: ClaudeSession;
   projectId: string;
   active: boolean;
   accent: string;
+  crew: CrewView;
+  now: number;
   shared: boolean;
 }) {
   const status = sessionStatusView(session.status);
@@ -412,16 +441,14 @@ function SessionLink({
       <motion.span
         layoutId={shared ? sharedId.orb(session.id) : undefined}
         transition={spring.smooth}
-        className="flex shrink-0"
+        className="flex w-7 shrink-0 justify-center"
       >
-        <ClaudeOrb
-          state={orbStateFor(session.status)}
-          size={28}
+        <SessionCrew
+          session={session}
           accent={accent}
-          tool={session.status.kind === 'tool' ? session.status.tool : null}
-          subagents={session.subagents.filter((a) => a.status === 'running').length}
+          crew={crew}
+          now={now}
           countdown={countdown}
-          showToolLabel={false}
         />
       </motion.span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -447,6 +474,41 @@ function SessionLink({
         </span>
       </span>
     </Link>
+  );
+}
+
+/**
+ * The focused session's crew member at full size (DESIGN.md §4.11), acting out the turn with its
+ * props and playing the done sparkle when it finishes. The project's own crew while composing.
+ */
+function HeaderCrew({
+  session,
+  accent,
+  crew,
+  now,
+}: {
+  session: ClaudeSession | null;
+  accent: string;
+  crew: CrewView;
+  now: number;
+}) {
+  const state = useMascotState(session, crew.terminals, now);
+  const subagents = session?.subagents.filter((a) => a.status === 'running').length ?? 0;
+  // Mini crew members stand to the right at 46% size; keep room for them.
+  const minis = miniCrewCount(state, subagents);
+  const mini = HEADER_CREW_PX * 0.46;
+  const room = minis > 0 ? mini + (minis - 1) * mini * 0.62 : 0;
+  return (
+    <span data-focus-crew className="-my-2 hidden shrink-0 md:flex" style={{ marginRight: room }}>
+      <CrewMascot
+        state={state}
+        size={HEADER_CREW_PX}
+        color={accent}
+        tool={session?.status.kind === 'tool' ? session.status.tool : null}
+        subagents={subagents}
+        activity={crew.activity}
+      />
+    </span>
   );
 }
 

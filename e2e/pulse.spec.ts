@@ -66,3 +66,19 @@ test('the Pulse rail collapses and remembers it', async ({ page }) => {
   await page.reload();
   await expect(page.locator('[data-pulse]')).toHaveAttribute('data-pulse', 'collapsed');
 });
+
+test('the collapsed Pulse rail sends a runner along its hairline per new event', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('cboard.pulse', 'collapsed');
+    localStorage.setItem('cboard.motion', 'full');
+  });
+  await openRoute(page, '/');
+  const ticker = page.locator('[data-pulse="collapsed"] [data-pulse-ticker]');
+  await expect(ticker).toBeAttached();
+  // The demo raises events every few seconds; each one launches a runner.
+  await expect
+    .poll(async () => Number((await ticker.getAttribute('data-runs')) ?? 0), { timeout: 20_000 })
+    .toBeGreaterThan(0);
+});

@@ -5,18 +5,26 @@ import { useInView } from '../anim/useFrame.js';
 import { selectApproval, useBoard } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { spring } from '../motion.js';
-import { ClaudeOrb } from '../orb/ClaudeOrb.js';
-import { orbStateFor } from '../orb/model.js';
+import { ToolChip } from '../orb/ToolChip.js';
 import { formatCount, totalTokens } from '../status.js';
 import { formatStarted } from '../time.js';
 import { LiveCaption } from './LiveCaption.js';
 import { isStreaming, lastLine, sessionCaption } from './model.js';
+import { type CrewView, SessionCrew } from './SessionCrew.js';
+
+export interface SessionRowProps {
+  session: ClaudeSession;
+  accent: string;
+  crew: CrewView;
+  now: number;
+}
 
 /**
- * One Claude session in a pod, DESIGN.md §4.3: orb · live caption (slides in on change) ·
- * tokens, over the last assistant line, which shimmers while the session streams.
+ * One Claude session in a pod, DESIGN.md §4.3: crew member · live caption (slides in on change) ·
+ * tool chip (rows ≥ 360 px) · tokens, over the last assistant line, which shimmers while the
+ * session streams.
  */
-export function SessionRow({ session, accent }: { session: ClaudeSession; accent: string }) {
+export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
@@ -34,35 +42,33 @@ export function SessionRow({ session, accent }: { session: ClaudeSession; accent
   const tokens = totalTokens(session);
   const streaming = isStreaming(session);
   const tool = session.status.kind === 'tool' ? session.status.tool : null;
-  const subagents = session.subagents.filter((a) => a.status === 'running').length;
   const countdown =
     approval?.state === 'pending' && approval.expiresAt !== null
       ? { startedAt: approval.createdAt, endsAt: approval.expiresAt }
       : null;
 
   return (
-    <li data-session={session.id} className="flex min-w-0 items-center gap-3">
+    <li data-session={session.id} className="@container flex min-w-0 items-center gap-3">
       <motion.span
         layoutId={sharedId.orb(session.id)}
         layoutDependency={POD_LAYOUT_DEPENDENCY}
         transition={spring.smooth}
-        className="flex shrink-0"
+        className="flex w-7 shrink-0 justify-center"
       >
         <span className="pod-dim flex">
-          <ClaudeOrb
-            state={orbStateFor(session.status)}
-            size={28}
+          <SessionCrew
+            session={session}
             accent={accent}
-            tool={tool}
-            subagents={subagents}
+            crew={crew}
+            now={now}
             countdown={countdown}
-            showToolLabel={false}
           />
         </span>
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
           <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
+          <ToolChip tool={tool} className="hidden self-center @min-[360px]:inline-block" />
           {tokens > 0 && (
             <span
               title={`${tokens.toLocaleString('en-US')} tokens`}

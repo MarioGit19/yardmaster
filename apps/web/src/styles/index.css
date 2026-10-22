@@ -252,6 +252,67 @@
   animation: none;
 }
 
+/* A HUD count went up: Waiting plays the attention ripple (§3 rule 4), Errors a short rose flash
+   ring, once per rise, around the counter's mark. Reduced fades a still ring instead. */
+.hud-flare {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+}
+@keyframes hud-ripple {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+.hud-flare-ripple {
+  box-shadow:
+    0 0 0 1.5px var(--st-wait),
+    0 0 12px var(--st-wait-glow);
+  animation: hud-ripple var(--dur-ripple) var(--ease-out) forwards;
+}
+@keyframes hud-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+.hud-flare-flash {
+  box-shadow:
+    0 0 0 1.5px var(--st-err),
+    0 0 12px var(--st-err-glow);
+  animation: hud-flash var(--dur-slow) var(--ease-out) forwards;
+}
+@keyframes hud-flare-fade {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 0;
+  }
+}
+[data-motion="reduced"] .hud-flare {
+  transform: scale(1.3);
+  animation-name: hud-flare-fade;
+}
+
 /* Ambient field, DESIGN.md §4.1. The CSS layers are the fallback and the Reduced/Off field;
    energy and attention only cross-fade them. The canvas fades in over them on its first frame. */
 .ambient-css {
@@ -259,7 +320,7 @@
     radial-gradient(70% 55% at 18% 0%, var(--field-violet), transparent 70%),
     radial-gradient(60% 50% at 82% 6%, var(--field-deep), transparent 72%),
     radial-gradient(90% 60% at 50% 115%, var(--field-floor), transparent 70%);
-  opacity: calc(0.55 + 0.45 * var(--ambient-energy, 0));
+  opacity: calc(0.4 + 0.6 * var(--ambient-energy, 0));
   transition: opacity var(--dur-ambient) var(--ease-in-out);
 }
 .ambient-attention {
@@ -303,6 +364,12 @@
   stroke: var(--line-strong);
   stroke-width: 1px;
   vector-effect: non-scaling-stroke;
+}
+/* At 24 px (session rows) the dark shell would vanish into the pod: a lighter body and an
+   outline in the session color keep the posture readable. */
+[data-crew-detail="posture"] :is(.crew-shell, .crew-limb) {
+  fill: color-mix(in srgb, var(--bg-2) 86%, var(--text-1));
+  stroke: color-mix(in srgb, var(--crew-color) 55%, var(--line-strong));
 }
 .crew-prop {
   fill: var(--bg-1);
@@ -1356,6 +1423,40 @@
 }
 
 /* Pulse rail (DESIGN.md §4.7): the plot rises in when the rail expands. Reduced only fades. */
+/* Collapsed Pulse rail: event dots run along the top hairline (WAAPI, transform and opacity). */
+.pulse-ticker {
+  position: absolute;
+  inset-inline: 0;
+  top: -1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.pulse-runner {
+  position: absolute;
+  top: -1.5px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--runner);
+  box-shadow: 0 0 6px var(--runner);
+  opacity: 0;
+}
+.pulse-runner::after {
+  content: "";
+  position: absolute;
+  top: 1.5px;
+  left: 4px;
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--runner), transparent);
+  opacity: 0.6;
+}
+[data-motion="reduced"] .pulse-runner::after {
+  display: none;
+}
+
 @keyframes pulse-in {
   from {
     opacity: 0;

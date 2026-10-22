@@ -12,10 +12,10 @@ import {
   activeSessionCount,
   approach,
   attentionProjectId,
+  boardActivity,
   DEFAULT_ATTENTION_POINT,
   energyFrom,
   frameDue,
-  runningExecutionCount,
   ThroughputMeter,
   totalOutputBytes,
   viewportPoint,
@@ -77,12 +77,12 @@ export function AmbientField() {
     const attentionPoint = new AttentionPoint<Element>();
     const moved = () => attentionPoint.invalidate();
     const sample = () => {
-      const { board } = store.getState();
+      const { board, pulses } = store.getState();
       const override = ambientOverride.get();
       const rate = meter.sample(totalOutputBytes(board), performance.now());
       const energy =
         override.energy ??
-        energyFrom(activeSessionCount(board), runningExecutionCount(board), rate);
+        energyFrom(activeSessionCount(board), boardActivity(board, pulses, Date.now()), rate);
       const projectId = attentionProjectId(board);
       const element = projectId === null ? null : attentionElement(projectId);
       const order = projectId === null ? '' : selectPodOrder(store.getState()).join(' ');
@@ -151,7 +151,7 @@ export function AmbientField() {
       current.x = approach(current.x, goal.x, dt, TAU.position);
       current.y = approach(current.y, goal.y, dt, TAU.position);
       // Integrating speed (not scaling time) keeps the flow continuous as energy changes.
-      time += (dt / 1000) * (0.018 + 0.07 * current.energy);
+      time += (dt / 1000) * (0.012 + 0.11 * current.energy);
       const scale = (window.devicePixelRatio || 1) * RESOLUTION;
       renderer.draw({
         width: Math.max(1, Math.round(window.innerWidth * scale)),
