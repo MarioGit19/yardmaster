@@ -35,6 +35,9 @@ case "$mode" in
         *) echo "✗ commit identity uses a non-noreply email: $email"; fail=1 ;;
       esac
     done < <(git log --format='%ae%n%ce' "$range" | sort -u)
+    if git log --format='%B' "$range" | grep -qiE '^co-authored-by:'; then
+      echo "✗ commit message contains a Co-Authored-By trailer (maintainer must be sole author)"; fail=1
+    fi
     ;;
   all|*)
     { git ls-files -z; git ls-files -z --others --exclude-standard; } | while IFS= read -r -d '' f; do

@@ -49,5 +49,6 @@ Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a dif
 ## Git
 
 - Small, focused commits. One commit per PLAN task, with the message `<task id>: <title>` and a short body.
+- The maintainer is the **sole author**. Never add `Co-Authored-By` trailers or any AI or tool attribution to commits or PRs.
 - Commits are signed through the repo's local git config. Don't change the git config, the identity or the remote.
 - Never commit `loop/logs/`, `artifacts/`, `.c-board/` or `.privacy-denylist`.

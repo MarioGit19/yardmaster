@@ -1,7 +1,14 @@
 {
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "extraKnownMarketplaces": {
     "impeccable": {
-      "source": { "source": "github", "repo": "pbakaus/impeccable" }
+      "source": {
+        "source": "github",
+        "repo": "pbakaus/impeccable"
+      }
     }
   },
   "enabledPlugins": {
