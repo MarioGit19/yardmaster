@@ -69,10 +69,11 @@ Task format: `- [ ] **ID Title**`, then indented details, **Done when** and **Ve
   - **Verify:** `pnpm --filter @c-board/server test`
   - Note: `buildServer(config)` / `startServer(config)` in `app.ts`, env parsing in `config.ts` (`loadConfig(env, home)`), entry `main.ts` (`pnpm --filter @c-board/server dev`). Loopback means `127.0.0.0/8`, `::1` or `localhost`. `CBOARD_PORT=0` is allowed for ephemeral ports. Added `CBOARD_LOG_LEVEL` (default `info`). Request logging is off and pino omits the hostname.
 
-- [ ] **2.2 Security layer**
+- [x] **2.2 Security layer**
   - Token bootstrap: create `~/.c-board/token` (0600, 32 random bytes, base64url) if it's missing. Add `GET /auth?t=` to set an `HttpOnly; SameSite=Strict` cookie (signed) and redirect to `/`. Host-header allowlist and Origin check per PRD §8. Add an auth guard for `/api/*` (except health) that accepts the cookie or the `X-CBoard-Token` header.
   - **Done when:** tests cover a wrong Host (403), a cross-origin request (403), a missing token (401), the cookie flow, and the token header.
   - **Verify:** `pnpm --filter @c-board/server test`
+  - Note: `token.ts` (`ensureToken` creates/reuses `<home>/token`, dir 0700, tightens loose perms, replaces invalid content) and `security.ts` (`registerSecurity`, `request.isAuthorized()`). The cookie is hand-signed (HMAC-SHA256 keyed by the token, so rotating the token invalidates sessions) with no `@fastify/cookie` dependency, and it is a browser-session cookie (no Max-Age), per PRD §8. Absent `Origin` is allowed (curl, hook, extension), and those requests still need the token. Added `CBOARD_DEV_ORIGINS` (comma-separated loopback http origins) to allow the Vite dev server's Host and Origin. `buildServer(config, { token })` skips the token file in tests.
 
 - [ ] **2.3 State store**
   - An in-memory `BoardStore` holding `BoardState` with typed mutators (`upsertProject`, `upsertTerminal`, `appendExec`, `setSessionStatus`, …), a change emitter carrying patch ops (from 1.4), and `OutputBuffers` (ring buffer per execution, 2 MB, and per terminal, 8 MB, with seq numbers and a truncated flag). Strip OSC 633 sequences and keep ANSI.

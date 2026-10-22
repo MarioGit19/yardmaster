@@ -13,6 +13,8 @@ export interface ServerConfig {
   host: string;
   home: string;
   logLevel: LogLevel;
+  /** Extra browser origins allowed besides the board's own, e.g. the Vite dev server. */
+  devOrigins: string[];
 }
 
 export class ConfigError extends Error {
@@ -59,6 +61,25 @@ function parseLogLevel(raw: string | undefined): LogLevel {
   throw new ConfigError(`CBOARD_LOG_LEVEL must be one of ${LOG_LEVELS.join(', ')}, got "${raw}"`);
 }
 
+function parseDevOrigins(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw.split(',').map((entry) => {
+    const value = entry.trim();
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new ConfigError(`CBOARD_DEV_ORIGINS entry is not a URL: "${value}"`);
+    }
+    if (url.protocol !== 'http:' || !isLoopbackHost(url.hostname) || url.origin !== value) {
+      throw new ConfigError(
+        `CBOARD_DEV_ORIGINS entries must be loopback http origins like http://localhost:5173, got "${value}"`,
+      );
+    }
+    return url.origin;
+  });
+}
+
 export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
   home: string = homedir(),
@@ -68,5 +89,6 @@ export function loadConfig(
     host: parseHost(env.CBOARD_HOST),
     home: parseHome(env.CBOARD_HOME, home),
     logLevel: parseLogLevel(env.CBOARD_LOG_LEVEL),
+    devOrigins: parseDevOrigins(env.CBOARD_DEV_ORIGINS),
   };
 }

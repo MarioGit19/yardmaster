@@ -11,6 +11,7 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       home: '/home/dev/.c-board',
       logLevel: 'info',
+      devOrigins: [],
     });
   });
 
@@ -29,6 +30,7 @@ describe('loadConfig', () => {
       host: 'localhost',
       home: '/tmp/cb-test',
       logLevel: 'debug',
+      devOrigins: [],
     });
   });
 
@@ -60,6 +62,22 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ CBOARD_HOST: host }, HOME)).toThrow(/loopback/);
     },
   );
+
+  it('parses CBOARD_DEV_ORIGINS as a comma-separated list of loopback origins', () => {
+    expect(
+      loadConfig({ CBOARD_DEV_ORIGINS: 'http://localhost:5173, http://127.0.0.1:5173' }, HOME)
+        .devOrigins,
+    ).toEqual(['http://localhost:5173', 'http://127.0.0.1:5173']);
+  });
+
+  it.each([
+    'http://evil.example.test:5173',
+    'https://localhost:5173',
+    'http://localhost:5173/app',
+    'nope',
+  ])('rejects dev origin %s', (origin) => {
+    expect(() => loadConfig({ CBOARD_DEV_ORIGINS: origin }, HOME)).toThrow(ConfigError);
+  });
 
   it('rejects an unknown log level', () => {
     expect(() => loadConfig({ CBOARD_LOG_LEVEL: 'loud' }, HOME)).toThrow(ConfigError);

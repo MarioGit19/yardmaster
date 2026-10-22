@@ -1,40 +1,55 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
 import { buildServer, startServer } from './app.js';
 import type { ServerConfig } from './config.js';
+import { generateToken } from './token.js';
 
 const config: ServerConfig = {
-  port: 0,
+  port: 4317,
   host: '127.0.0.1',
   home: '/home/dev/.c-board',
   logLevel: 'silent',
+  devOrigins: [],
 };
+const token = generateToken();
+const host = '127.0.0.1:4317';
 
 let app: FastifyInstance | undefined;
+let tmpHome: string | undefined;
 
 afterEach(async () => {
   await app?.close();
   app = undefined;
+  if (tmpHome) await rm(tmpHome, { recursive: true, force: true });
+  tmpHome = undefined;
 });
 
 describe('server', () => {
   it('GET /api/health returns ok and the package version', async () => {
-    app = await buildServer(config);
-    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    app = await buildServer(config, { token });
+    const res = await app.inject({ method: 'GET', url: '/api/health', headers: { host } });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.json()).toEqual({ ok: true, version: pkg.version });
   });
 
   it('returns 404 for unknown routes', async () => {
-    app = await buildServer(config);
-    const res = await app.inject({ method: 'GET', url: '/api/nope' });
+    app = await buildServer(config, { token });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/nope',
+      headers: { host, 'x-cboard-token': token },
+    });
     expect(res.statusCode).toBe(404);
   });
 
   it('listens on loopback and serves health over HTTP', async () => {
-    app = await startServer(config);
+    tmpHome = await mkdtemp(join(tmpdir(), 'cboard-app-'));
+    app = await startServer({ ...config, port: 0, home: tmpHome });
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('expected a TCP address');
     expect(address.address).toBe('127.0.0.1');
