@@ -89,6 +89,7 @@ const runningBoard = (status: object = {}): FakeWorld['http'] => ({
       uptimeMs: 1000,
       editors: 2,
       hooks: { received: 14, lastAt: NOW - 90_000 },
+      setup: { hookSeen: true, editorSeen: true },
       ...status,
     },
   },

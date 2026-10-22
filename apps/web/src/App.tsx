@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { type BaseLocationHook, Route, Router, Switch, useRoute } from 'wouter';
+import { type BaseLocationHook, Route, Router, Switch, useLocation, useRoute } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
 import { AttentionAlerts } from './attention/AttentionAlerts.js';
@@ -7,6 +7,7 @@ import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { MotionRoot } from './MotionRoot.js';
+import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
 import { CommandPalette } from './palette/CommandPalette.js';
 import { PulseRail } from './pulse/PulseRail.js';
 import { routes } from './routes.js';
@@ -56,6 +57,9 @@ function Screens() {
           <Route path={routes.settings}>
             <SettingsView />
           </Route>
+          <Route path={routes.welcome}>
+            <WelcomeView />
+          </Route>
           <Route>
             <Page>
               <EmptyState title="Nothing here">This page doesn't exist.</EmptyState>
@@ -64,6 +68,16 @@ function Screens() {
         </Switch>
       )}
     </AppShell>
+  );
+}
+
+/** The setup guide on demand (Settings, ⌘K), whatever the board's state. */
+function WelcomeView() {
+  const [, navigate] = useLocation();
+  return (
+    <Page width="narrow">
+      <OnboardingWizard onDone={() => navigate(routes.overview)} />
+    </Page>
   );
 }
 

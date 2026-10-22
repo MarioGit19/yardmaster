@@ -12,6 +12,16 @@ import { TooltipProvider } from './ui/Tooltip.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Settings and onboarding talk to the server over HTTP; here those requests never settle.
+vi.mock('./settings/api.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./settings/api.js')>();
+  const pending = () => new Promise<never>(() => {});
+  return {
+    ...actual,
+    api: Object.fromEntries(Object.keys(actual.api).map((key) => [key, pending])),
+  };
+});
+
 // The focus view's history list loads over HTTP; tests get a fixed listing instead.
 vi.mock('./history/api.js', () => ({
   useSessionHistory: (projectId: string) => ({
@@ -179,8 +189,8 @@ describe('routes', () => {
   it('renders settings and unknown routes', () => {
     render('/settings');
     expect(heading()).toBe('Settings');
-    // Theme (3), motion (4) and notifications (2).
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(9);
+    // Theme (3), motion (4), notifications (2), redact (2), away mode (2) and retention (4).
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(17);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');

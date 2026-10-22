@@ -4,6 +4,7 @@ export const routes = {
   project: '/p/:projectId',
   session: '/p/:projectId/s/:sessionId',
   settings: '/settings',
+  welcome: '/welcome',
   tokens: '/_tokens',
 } as const;
 

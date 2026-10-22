@@ -8,7 +8,7 @@ const VIEWPORTS = [
   { width: 390, height: 844 },
 ] as const;
 const THEMES: readonly Theme[] = ['dark', 'light'];
-const SCREENS = ['overview', 'focus', 'settings'] as const;
+const SCREENS = ['overview', 'focus', 'settings', 'welcome'] as const;
 const OUT_DIR = new URL('../artifacts/shots/', import.meta.url);
 
 for (const theme of THEMES) {
@@ -21,6 +21,7 @@ for (const theme of THEMES) {
           await openRoute(page, '/');
           if (screen === 'focus') await openRoute(page, await firstProjectRoute(page));
           if (screen === 'settings') await openRoute(page, '/settings');
+          if (screen === 'welcome') await openRoute(page, '/welcome');
           // Let entrance motion settle; the capture then freezes whatever still runs.
           await page.waitForTimeout(800);
           const file = `${screen}-${viewport.width}x${viewport.height}-${theme}.png`;
@@ -701,6 +702,31 @@ test.describe('composer', () => {
           await expect(tail).toBeVisible({ timeout: 15_000 });
           await page.waitForTimeout(1_200);
           await shot('composer-streaming');
+        });
+      });
+    }
+  }
+});
+
+// The hooks install confirm dialog with its settings.json diff (the demo's synthetic file).
+test.describe('hooks install dialog', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [VIEWPORTS[0], VIEWPORTS[2]]) {
+      test.describe(`${theme} ${viewport.width}x${viewport.height}`, () => {
+        test.use({ theme, viewport });
+        test('dialog', async ({ page }) => {
+          await openRoute(page, '/welcome');
+          await page
+            .locator('[data-step="hooks"]')
+            .getByRole('button', { name: 'Install hooks' })
+            .click();
+          await expect(page.locator('[data-hooks-dialog]')).toBeVisible();
+          await page.waitForTimeout(500);
+          await page.screenshot({
+            path: new URL(`hooks-dialog-${viewport.width}x${viewport.height}-${theme}.png`, OUT_DIR)
+              .pathname,
+            animations: 'disabled',
+          });
         });
       });
     }

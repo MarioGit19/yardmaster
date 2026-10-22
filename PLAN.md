@@ -416,11 +416,12 @@ For every task in this phase: follow DESIGN.md exactly, run `pnpm shots` after i
   - Note: Settings is still a route (the sheet is 8.5), so the Notifications on/off row lives in `SettingsView`. Turning it on asks for browser permission. Notifications show only while the tab is hidden or unfocused.
   - Note: at load 30–40, the full `pnpm e2e` failed only the known `focus.spec` morph test, and `pnpm shots` timed out on two shots (focus transition, claude panel messages). All three pass when re-run alone.
 
-- [ ] **8.5 Settings and onboarding**
+- [x] **8.5 Settings and onboarding**
   - The Settings sheet covers theme, motion level, notifications, redact secrets, away mode (Phase 9), hooks status plus an install button (calls the installer with a confirm dialog showing the diff), connected editor windows, data retention, and token rotate.
   - The onboarding wizard (shown when there are no hook events and no editors connected) follows DESIGN.md §6, with live auto-ticking steps and copyable commands.
   - **Done when:** the e2e onboarding flow ticks steps from simulated events.
   - **Verify:** `pnpm e2e && pnpm shots`
+  - Note: Settings stays a routed page (`#/settings`), now grouped into sections. New authenticated routes: `GET/PUT /api/settings` (activity retention 1/7/30/90 days, applied live), `GET /api/hooks`, `POST /api/hooks/plan` (diff plus a fingerprint) and `POST /api/hooks/install` (409 if settings.json changed since the plan), and `POST /api/token/rotate` (swaps the token live and re-issues this browser's cookie; refused in demo mode). Demo mode uses a synthetic in-memory settings.json. `/api/status` gains `setup.{hookSeen,editorSeen}`, persisted, so the guide only shows on a truly empty board; `#/welcome` (Settings, ⌘K) opens it on demand. The redact toggle only stores the preference until 8.6; away mode is shown disabled until 9.1. The e2e onboarding test runs a non-demo board with a throwaway `CLAUDE_CONFIG_DIR`. The composer shots flake on a clean `main` too (shared demo board state).
 
 - [ ] **8.6 Secret redaction**
   - A shared `redact()` (patterns per PRD §8.7) applied in the UI to terminal lines (an xterm write filter), tool cards and messages when the setting is on, with a "reveal" per block on click.

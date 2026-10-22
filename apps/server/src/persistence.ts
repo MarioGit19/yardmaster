@@ -83,7 +83,7 @@ export class Persistence {
   private readonly db: DatabaseSync;
   private readonly now: () => number;
   private readonly log: PersistenceLogger;
-  private readonly retentionMs: number;
+  private retentionMs: number;
   private readonly writeDelayMs: number;
   private readonly maxBatch: number;
   private readonly stmt: Record<
@@ -228,6 +228,7 @@ export class Persistence {
     if (key.length === 0 || key.length > MAX_SETTING_KEY) {
       throw new RangeError(`setting key must be 1-${MAX_SETTING_KEY} characters`);
     }
+    if (this.closed) return;
     if (value === undefined) {
       this.stmt.deleteSetting.run(key);
       return;
@@ -308,6 +309,18 @@ export class Persistence {
   }
 
   // Activity
+
+  get retention(): number {
+    return this.retentionMs;
+  }
+
+  /** Changes the retention window and prunes right away, so a shorter one applies at once. */
+  setRetention(ms: number): void {
+    if (!Number.isFinite(ms) || ms <= 0)
+      throw new RangeError('retention must be a positive duration');
+    this.retentionMs = ms;
+    this.prune();
+  }
 
   /** Deletes activity older than the retention window. Returns the number of rows removed. */
   prune(now = this.now()): number {

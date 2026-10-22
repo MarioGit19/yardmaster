@@ -219,6 +219,16 @@ describe('Persistence', () => {
     expect(db.listActivity().map((e) => e.id)).toEqual(['new']);
   });
 
+  it('applies a shorter retention right away', () => {
+    const db = openDb();
+    db.recordActivity(event('old', T0 - 3 * DAY));
+    db.recordActivity(event('new', T0 - DAY / 2));
+    db.setRetention(DAY);
+    expect(db.retention).toBe(DAY);
+    expect(db.listActivity().map((e) => e.id)).toEqual(['new']);
+    expect(() => db.setRetention(0)).toThrow(RangeError);
+  });
+
   it('prunes on the hourly timer', () => {
     vi.useFakeTimers();
     const db = openDb({ pruneIntervalMs: 60 * 60 * 1000 });

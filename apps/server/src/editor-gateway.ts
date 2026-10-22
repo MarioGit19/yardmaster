@@ -417,15 +417,16 @@ export class EditorGateway {
 export function registerEditorGateway(
   app: FastifyInstance,
   gateway: EditorGateway,
-  token: string,
+  token: string | (() => string),
 ): void {
+  const currentToken = typeof token === 'function' ? token : () => token;
   app.get(
     EDITOR_WS_PATH,
     {
       websocket: true,
       preValidation: async (request, reply) => {
         const header = request.headers[TOKEN_HEADER];
-        if (typeof header !== 'string' || !tokensEqual(header, token)) {
+        if (typeof header !== 'string' || !tokensEqual(header, currentToken())) {
           return reply.code(401).send({ error: 'unauthorized' });
         }
       },

@@ -50,14 +50,29 @@ function hostWithPort(host: string, port: number): string {
 
 export interface SecurityOptions {
   config: ServerConfig;
-  token: string;
+  /** The install token, or a getter for one that can be rotated while the server runs. */
+  token: string | (() => string);
+}
+
+/** Sets the session cookie for the current token on a reply. */
+export function setSessionCookie(reply: FastifyReply, token: string): FastifyReply {
+  const cookie = [
+    `${SESSION_COOKIE}=${createSessionValue(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+  ].join('; ');
+  return reply.header('set-cookie', cookie);
 }
 
 /**
  * PRD §8: Host allowlist (DNS-rebinding defence), Origin check, `/auth?t=` cookie bootstrap
  * and the token guard for `/api/*`. Register before any route.
  */
-export function registerSecurity(app: FastifyInstance, { config, token }: SecurityOptions): void {
+export function registerSecurity(app: FastifyInstance, options: SecurityOptions): void {
+  const { config } = options;
+  const currentToken =
+    typeof options.token === 'function' ? options.token : () => options.token as string;
   // With CBOARD_PORT=0 the port is only known once the server listens.
   const boardPort = (): number => {
     if (config.port !== 0) return config.port;
@@ -78,6 +93,7 @@ export function registerSecurity(app: FastifyInstance, { config, token }: Securi
 
   const isAuthorized = (request: FastifyRequest): boolean => {
     const header = request.headers[TOKEN_HEADER];
+    const token = currentToken();
     if (typeof header === 'string' && tokensEqual(header, token)) return true;
     const cookie = readCookie(request.headers.cookie, SESSION_COOKIE);
     return cookie !== undefined && verifySessionValue(token, cookie);
@@ -118,14 +134,9 @@ export function registerSecurity(app: FastifyInstance, { config, token }: Securi
     const query = authQuery.safeParse(request.query);
     const t = query.success ? query.data.t : undefined;
 
+    const token = currentToken();
     if (t !== undefined && tokensEqual(t, token)) {
-      const cookie = [
-        `${SESSION_COOKIE}=${createSessionValue(token)}`,
-        'Path=/',
-        'HttpOnly',
-        'SameSite=Strict',
-      ].join('; ');
-      return reply.header('set-cookie', cookie).redirect('/', 302);
+      return setSessionCookie(reply, token).redirect('/', 302);
     }
     if (t === undefined && isAuthorized(request)) return reply.redirect('/', 302);
     return deny(reply, 401, 'unauthorized');

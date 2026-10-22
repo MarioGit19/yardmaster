@@ -31,6 +31,18 @@ import { Persistence } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
+import {
+  diskHookSettings,
+  EDITOR_SEEN_KEY,
+  HOOK_SEEN_KEY,
+  type HookSettingsFile,
+  memoryHookSettings,
+  RETENTION_KEY,
+  registerSettingsRoutes,
+  retentionDays,
+  retentionMs,
+  rotateTokenFile,
+} from './settings-routes.js';
 import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
 import { ensureToken } from './token.js';
@@ -75,6 +87,8 @@ export interface BuildOptions {
   processes?: Omit<ProcessScannerOptions, 'store' | 'logger'> | false;
   /** Git info tuning, or false to turn it off. Not started in demo mode. */
   git?: Omit<GitScannerOptions, 'store' | 'logger' | 'active'> | false;
+  /** Claude's settings.json for the hooks routes. Defaults to the real one, or a synthetic one in demo mode. */
+  hookSettings?: HookSettingsFile;
 }
 
 /** Tools whose completion can change a repository's state. */
@@ -105,7 +119,9 @@ export async function buildServer(
   config: ServerConfig,
   options: BuildOptions = {},
 ): Promise<FastifyInstance> {
-  const token = options.token ?? (await ensureToken(config.home));
+  // Mutable: Settings can rotate it while the server runs.
+  let token = options.token ?? (await ensureToken(config.home));
+  const currentToken = () => token;
   const logger: FastifyBaseLogger = pino({
     name: 'c-board',
     level: config.logLevel,
@@ -130,7 +146,18 @@ export async function buildServer(
   persistence.attach(store);
   app.decorate('store', store);
   app.decorate('persistence', persistence);
-  app.decorate('settings', persistence.loadSettings());
+  const settings = persistence.loadSettings();
+  app.decorate('settings', settings);
+  if (settings[RETENTION_KEY] !== undefined) {
+    persistence.setRetention(retentionMs(retentionDays(settings[RETENTION_KEY])));
+  }
+  // First-run detection survives restarts, so the onboarding never reappears once set up.
+  const seen = (key: string) => settings[key] === true;
+  const markSeen = (key: string) => {
+    if (seen(key)) return;
+    settings[key] = true;
+    persistence.setSetting(key, true);
+  };
   app.addHook('onClose', async () => {
     demo?.stop();
     worst?.stop();
@@ -150,7 +177,7 @@ export async function buildServer(
   // Before the security layer and any route: it claims upgrade requests, and its onRequest
   // hook must run first so sockets rejected by security are cleaned up.
   await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
-  registerSecurity(app, { config, token });
+  registerSecurity(app, { config, token: currentToken });
 
   // Stored for history and pushed live to the Pulse rail. Nothing emits before the app is ready.
   const recordActivity = (event: ActivityEvent) => {
@@ -223,7 +250,7 @@ export async function buildServer(
     ...options.editor,
   });
   app.decorate('editorGateway', editorGateway);
-  registerEditorGateway(app, editorGateway, token);
+  registerEditorGateway(app, editorGateway, currentToken);
   const editorRouter = new EditorRouter({
     state: () => store.state,
     isConnected: (windowId) => editorGateway.isConnected(windowId),
@@ -289,6 +316,7 @@ export async function buildServer(
     onReceived: (ts) => {
       hookStats.received += 1;
       hookStats.lastAt = ts;
+      markSeen(HOOK_SEEN_KEY);
     },
     onActivity: recordActivity,
     onToolDone: (tool, projectId) => {
@@ -299,17 +327,32 @@ export async function buildServer(
   registerHookRoute(app, hookIngest);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
-  app.get(
-    '/api/status',
-    async (): Promise<ServerStatus> => ({
+  app.get('/api/status', async (): Promise<ServerStatus> => {
+    const editors = Object.keys(store.state.windows).length;
+    if (editors > 0) markSeen(EDITOR_SEEN_KEY);
+    return {
       ok: true,
       version: VERSION,
       demo: demo !== null,
       uptimeMs: Date.now() - startedAt,
-      editors: Object.keys(store.state.windows).length,
+      editors,
       hooks: { ...app.hookStats },
-    }),
-  );
+      setup: { hookSeen: seen(HOOK_SEEN_KEY), editorSeen: seen(EDITOR_SEEN_KEY) },
+    };
+  });
+  registerSettingsRoutes(app, {
+    persistence,
+    settings,
+    hookSettings:
+      options.hookSettings ?? (options.demo ? memoryHookSettings() : diskHookSettings()),
+    // The demo board may run on a real home: never touch its token.
+    rotateToken: options.demo
+      ? null
+      : async () => {
+          token = await rotateTokenFile(config.home);
+          return token;
+        },
+  });
 
   app.get('/api/projects/:projectId/sessions', async (request, reply) => {
     const params = ProjectParams.safeParse(request.params);

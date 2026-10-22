@@ -334,6 +334,15 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       icon: 'settings',
       run: { kind: 'navigate', href: routes.settings },
     },
+    {
+      id: 'setup',
+      group: 'Actions',
+      label: 'Open the setup guide',
+      hint: 'hooks and extension',
+      icon: 'settings',
+      searchOnly: true,
+      run: { kind: 'navigate', href: routes.welcome },
+    },
   );
   commands.push({
     id: 'pulse',

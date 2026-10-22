@@ -35,6 +35,10 @@ const newestFirst = <T extends { startedAt: number; id: string }>(a: T, b: T) =>
   b.startedAt - a.startedAt || a.id.localeCompare(b.id);
 
 export const selectProjects = (s: S): Project[] => Object.values(s.board.projects).sort(byName);
+export const selectWindowCount = (s: S) => Object.keys(s.board.windows).length;
+/** Connected editor windows, oldest connection first. */
+export const selectWindows = (s: S): EditorWindow[] =>
+  Object.values(s.board.windows).sort((a, b) => a.connectedAt - b.connectedAt);
 
 export const selectTerminalsByProject =
   (projectId: string | null) =>

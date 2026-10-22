@@ -13,6 +13,10 @@ export interface DemoBoard {
   url: string;
   /** `name=value` of the session cookie. */
   cookie: string;
+  /** The throwaway `CBOARD_HOME`. */
+  home: string;
+  /** The throwaway `CLAUDE_CONFIG_DIR` (inside `home`). */
+  claudeDir: string;
   /** Kills the server (SIGTERM) and removes its throwaway home. Safe to call twice. */
   stop(): Promise<void>;
 }
@@ -44,11 +48,27 @@ function waitForAuthUrl(child: ChildProcess): Promise<string> {
  * Boots `c-board start --demo --no-open` on a random port with a throwaway home, then signs in
  * through `/auth?t=` and returns the origin and session cookie.
  */
-export async function startDemoBoard(): Promise<DemoBoard> {
+export function startDemoBoard(): Promise<DemoBoard> {
+  return startBoard({ demo: true });
+}
+
+/**
+ * Like `startDemoBoard`, optionally without `--demo`: a fresh, empty board whose Claude config
+ * dir is a throwaway one too, so it never reads or writes the real `~/.claude`.
+ */
+export async function startBoard({ demo }: { demo: boolean }): Promise<DemoBoard> {
   const home = await mkdtemp(join(tmpdir(), 'c-board-e2e-'));
-  const child = spawn(TSX, ['src/cli.ts', 'start', '--demo', '--no-open'], {
+  const claudeDir = join(home, 'claude');
+  const args = ['src/cli.ts', 'start', ...(demo ? ['--demo'] : []), '--no-open'];
+  const child = spawn(TSX, args, {
     cwd: SERVER_DIR,
-    env: { ...process.env, CBOARD_PORT: '0', CBOARD_HOME: home, CBOARD_LOG_LEVEL: 'warn' },
+    env: {
+      ...process.env,
+      CBOARD_PORT: '0',
+      CBOARD_HOME: home,
+      CBOARD_LOG_LEVEL: 'warn',
+      CLAUDE_CONFIG_DIR: claudeDir,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const stop = async () => {
@@ -67,7 +87,7 @@ export async function startDemoBoard(): Promise<DemoBoard> {
     if (response.status !== 302 || !cookie) {
       throw new Error(`sign-in through /auth failed with HTTP ${response.status}`);
     }
-    return { url: new URL(authUrl).origin, cookie, stop };
+    return { url: new URL(authUrl).origin, cookie, home, claudeDir, stop };
   } catch (err) {
     await stop();
     throw err;
