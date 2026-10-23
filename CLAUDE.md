@@ -54,4 +54,5 @@ Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a dif
 - Small, focused commits. One commit per PLAN task, with the message `<task id>: <title>` and a short body.
 - The maintainer is the **sole author**. Never add `Co-Authored-By` trailers or any AI or tool attribution to commits or PRs.
 - Commits are signed through the repo's local git config. Don't change the git config, the identity or the remote.
+- A task that changes `apps/extension` must add a `[HUMAN]` task right after itself, telling the maintainer to update the installed extension: `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`, then reload every Cursor window. Skip it only if the next unchecked task is already such a check-in.
 - Never commit `loop/logs/`, `artifacts/`, `.c-board/` or `.privacy-denylist`.
