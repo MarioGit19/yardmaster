@@ -31,6 +31,17 @@ test('every pod has a header crew, session rows or a placeholder, and lanes', as
   await expect(page.locator('[data-lane]').first()).toBeVisible();
 });
 
+test('a lane exit badge settles at full size', async ({ page }) => {
+  await openRoute(page, '/');
+  const badge = page.locator('[data-lane] [data-exit]').first();
+  await expect(badge).toBeVisible();
+  // Once the pop has settled the badge rests untransformed with a real box.
+  await expect.poll(() => badge.evaluate((el) => getComputedStyle(el).transform)).toBe('none');
+  const box = await badge.boundingBox();
+  expect(box?.width).toBeGreaterThan(0);
+  expect(box?.height).toBeGreaterThan(0);
+});
+
 test('a project waiting for approval moves to the front and glows amber', async ({ page }) => {
   test.slow();
   await openRoute(page, '/');

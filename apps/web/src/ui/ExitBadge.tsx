@@ -18,7 +18,13 @@ export function ExitBadge({ code, className }: { code: number; className?: strin
       title={label}
       data-exit={code}
       initial={{ opacity: 0, transform: move(still, 'scale(0.9)') }}
-      animate={{ opacity: 1, transform: 'none' }}
+      // Spring to scale(1) and drop the transform at rest. Springing straight to `'none'` left a
+      // zero matrix that collapsed the badge.
+      animate={{
+        opacity: 1,
+        transform: move(still, 'scale(1)'),
+        transitionEnd: { transform: 'none' },
+      }}
       exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
       transition={spring.snappy}
       className={cx(
