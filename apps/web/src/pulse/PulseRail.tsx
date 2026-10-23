@@ -31,6 +31,7 @@ import { terminalTarget } from '../terminal/target.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
+import { SegmentThumb, useSegmentThumb } from '../ui/SegmentThumb.js';
 import {
   buildLanes,
   eventDetail,
@@ -294,6 +295,7 @@ function PulseTicker() {
 
 function FilterToggle() {
   const filter = usePreference(pulseFilterPreference);
+  const thumb = useSegmentThumb();
   return (
     <div
       role="radiogroup"
@@ -308,15 +310,23 @@ function FilterToggle() {
           role="radio"
           aria-checked={filter === option}
           data-filter={option}
-          onClick={() => pulseFilterPreference.set(option)}
+          onClick={(e) => {
+            thumb.pick(e);
+            pulseFilterPreference.set(option);
+          }}
           className={cx(
-            'h-6 rounded-chip px-2 text-meta transition-colors duration-fast',
-            filter === option
-              ? 'bg-bg-1 text-text-1 shadow-raised'
-              : 'text-text-3 hover:text-text-1',
+            'relative h-6 rounded-chip px-2 text-meta transition-colors duration-fast',
+            filter === option ? 'text-text-1' : 'text-text-3 hover:text-text-1',
           )}
         >
-          {FILTER_LABEL[option]}
+          {filter === option && (
+            <SegmentThumb
+              layoutId={thumb.layoutId}
+              byKeyboard={thumb.byKeyboard}
+              className="bg-bg-1"
+            />
+          )}
+          <span className="relative">{FILTER_LABEL[option]}</span>
         </button>
       ))}
     </div>

@@ -104,8 +104,9 @@ export function ApprovalCard({
       data-selected={selected || undefined}
       data-resolved={resolved ?? undefined}
       onClick={onSelect}
+      // Selection follows the keyboard (↑↓, j/k), so it moves at once, like the palette's.
       className={cx(
-        'relative flex flex-col gap-2.5 overflow-hidden rounded-panel border p-3 transition-[border-color,background-color] duration-fast',
+        'relative flex flex-col gap-2.5 overflow-hidden rounded-panel border p-3',
         selected && !resolved ? 'border-line-strong bg-bg-2' : 'border-line bg-bg-1',
       )}
     >

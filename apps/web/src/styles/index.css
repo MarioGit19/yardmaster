@@ -808,6 +808,10 @@
 .pod-ring[data-activity-border] {
   opacity: 0.5;
 }
+/* While the frame loop drives the opacity (PodActivity), a transition would restart per write. */
+.pod-ring[data-driven] {
+  transition: none;
+}
 .pod-ring-light {
   position: absolute;
   top: 50%;
@@ -1059,18 +1063,24 @@
   overscroll-behavior: contain;
   padding: 20px;
 }
-/* The maximized terminal stack covers the other columns; it settles in with a short fade. */
+/* The maximized terminal stack covers the other columns. The column itself jumps (it changes
+   layout); the cover under it fades the other columns out and, on the way back, in again. */
 .focus-col-max {
   position: absolute;
   inset: 0;
   z-index: 5;
-  background: var(--bg-1);
-  animation: focus-col-max-in var(--dur-fast) var(--ease-out);
 }
-@keyframes focus-col-max-in {
-  from {
-    opacity: 0.6;
-  }
+.focus-col-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: var(--bg-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.focus-col-cover[data-covering] {
+  opacity: 1;
 }
 
 /* A pane fades in once its renderer has mounted, instead of popping in (motion Off: at once). */

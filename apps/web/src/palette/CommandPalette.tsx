@@ -313,7 +313,7 @@ function PaletteBody({
             type="button"
             aria-label="Back to all commands"
             onClick={() => toPage({ kind: 'root' })}
-            className="-ml-1 grid size-7 shrink-0 place-items-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1"
+            className="-ml-1 grid size-7 shrink-0 place-items-center rounded-control text-text-3 transition-[background-color,color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 moving:active:scale-[0.97]"
           >
             <ArrowLeft className="size-4" strokeWidth={1.5} />
           </button>

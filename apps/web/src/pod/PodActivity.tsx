@@ -7,7 +7,7 @@ import {
   useDoneAt,
   useEventCount,
 } from '../data/index.js';
-import { moment, useMotionLevel } from '../motion.js';
+import { dur, moment, useMotionLevel } from '../motion.js';
 import { approach, borderOpacity, borderSpeed, isFreshDone, SWEEP_MS } from './activity.js';
 
 // The pod's activity layers, DESIGN.md §4.10: a light travelling around the border while the
@@ -98,9 +98,24 @@ export function ActivityBorder({ pulseKey, working }: { pulseKey: string; workin
   }, [visible]);
 
   useEffect(() => {
-    // Leaving the spin (quiet, or the motion level changed) hands opacity back to CSS.
-    if (!spinning && ringRef.current) ringRef.current.style.opacity = '';
-    if (!spinning) speed.current = 0;
+    const ring = ringRef.current;
+    if (!spinning) {
+      // Leaving the spin (quiet, or the motion level changed) hands opacity back to CSS, which
+      // fades it out.
+      speed.current = 0;
+      if (ring) {
+        delete ring.dataset.driven;
+        ring.style.opacity = '';
+      }
+      return;
+    }
+    if (!ring) return;
+    // The CSS fade carries the ring in; after it the frame loop owns opacity, and a transition
+    // would restart on every write.
+    const handOff = window.setTimeout(() => {
+      ring.dataset.driven = '';
+    }, dur.slow * 1000);
+    return () => window.clearTimeout(handOff);
   }, [spinning]);
 
   return (

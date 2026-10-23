@@ -102,7 +102,7 @@ export function Hud() {
               aria-expanded={sheetOpen}
               onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
               className={cx(
-                'rounded-control transition-[background-color,box-shadow] duration-fast hover:bg-bg-2',
+                'rounded-control transition-[background-color,box-shadow,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97]',
                 counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
               )}
             >
@@ -135,7 +135,7 @@ export function Hud() {
           aria-label="Open the command palette"
           aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
           onClick={() => paletteOpen.set('open')}
-          className="flex items-center gap-0.5 rounded-control p-1 transition-colors duration-fast hover:bg-bg-2 max-md:hidden"
+          className="flex items-center gap-0.5 rounded-control p-1 transition-[background-color,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97] max-md:hidden"
           data-hud="palette-hint"
         >
           <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd>

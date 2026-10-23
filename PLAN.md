@@ -683,7 +683,7 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - Then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Rename a terminal tab (right-click the tab, "Rename…") and check the board shows the new name within a few seconds.
   - Write anything that looks wrong as new tasks below this one, tick it, and restart the loop with `loop/loop.sh`.
 
-- [ ] **10.8f Small motion consistency fixes**
+- [x] **10.8f Small motion consistency fixes**
   - Press feedback on hand-rolled pressables, the same as `buttonClass`: `transition-[…,scale]` plus `moving:active:scale-[0.97]` on the HUD Waiting counter and ⌘K hint (`shell/Hud.tsx`), the palette back button (`palette/CommandPalette.tsx`), `lanes/PortChip.tsx`, "Jump to latest" (`claude/MessageList.tsx`) and the toast action (`ui/Toasts.tsx`).
   - Segmented controls (Settings, the Pulse filter, the ToolCard diff toggle) hard-cut their thumb (and `shadow-raised` isn't transitioned). Give them a `layoutId` thumb with `tabGlide(byKeyboard)`, unique per instance (`useId`).
   - `PodActivity.tsx:84` writes `ring.style.opacity` from a frame loop onto `.pod-ring`, which has a 420 ms CSS opacity transition, so every write restarts it. Transition only on enter/leave (a data attribute), not while the loop drives it.
@@ -691,6 +691,7 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - Approval selection (↑↓/j/k) transitions border and background (`ApprovalCard.tsx:105`). Keyboard is instant: drop the transition, as the palette does.
   - **Done when:** each is visible in a `pnpm motion:record chrome` / `focus` sheet or a `pnpm shots` pair, and `pnpm check` passes.
   - **Verify:** `pnpm check && pnpm motion:record chrome`
+  - Note: `@starting-style` doesn't fire on a class toggle (only on first style or after `display: none`), so the maximized column instead jumps over an always-mounted `.focus-col-cover` that fades in and out. Segmented thumbs share `ui/SegmentThumb.tsx`. New motion moments: `chrome-pulse-filter` and `focus-maximize`.
 
 - [ ] **10.8g Tokenise loop durations, and two seams from the sheets**
   - Hand-typed loop and spinner lengths: `skeleton-sweep 1.6s`, `hud-spin 0.9s`, `progress-sweep 1.4s`, `shimmer-sweep 2.4s`, `caret-glow 1.1s`, `onboarding-listen 2.4s`, `pod-breathe 2.4s` (§3 rule 4's breathing), `anim/dotPulse.ts` 1600, `lanes/TerminalLane.tsx` 2400, `pulse/PulseRail.tsx` `FLY_MS = 300`, `anim/useRateLoop.ts` `RAMP_MS = 500`, `orb/model.ts` `glitch: 0.12` (= `dur.fast`) and `expand: 0.3`. Name them in `motion.ts` (a `loop` group) with their `--dur-*` mirror, and keep `motion.test.ts` checking that the two stay equal.

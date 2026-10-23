@@ -291,6 +291,17 @@ const SCENARIOS = {
       },
       stackClip,
     );
+    await r.moment(
+      'maximize',
+      'transition',
+      'maximize and restore the terminals: the cover fades the other columns out, then back in',
+      async () => {
+        await stack.getByRole('button', { name: 'Maximize terminals' }).click();
+        await page.waitForTimeout(600);
+        await stack.getByRole('button', { name: 'Restore terminals' }).click();
+        await page.waitForTimeout(600);
+      },
+    );
     await r.moment('close', 'transition', 'Esc morphs it back into the pod', async () => {
       await page.keyboard.press('Escape');
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
@@ -398,6 +409,36 @@ const SCENARIOS = {
       await page.locator('[data-pulse="expanded"]').waitFor();
       await page.waitForTimeout(1000);
     });
+    const filters = page.locator('[role="radiogroup"][aria-label="Show"]');
+    const filterBox = await filters.boundingBox();
+    await r.moment(
+      'pulse-filter',
+      'transition',
+      'the Pulse filter: a click glides the thumb, a keyboard pick snaps it',
+      async () => {
+        const options = filters.getByRole('radio');
+        await options.last().click();
+        await page.waitForTimeout(500);
+        await options.first().click();
+        await page.waitForTimeout(500);
+        await options.last().focus();
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(400);
+        await options.first().click();
+        await page.waitForTimeout(500);
+      },
+      filterBox
+        ? visible(
+            {
+              x: filterBox.x - 24,
+              y: filterBox.y - 24,
+              width: filterBox.width + 48,
+              height: filterBox.height + 48,
+            },
+            DESKTOP,
+          )
+        : undefined,
+    );
     await r.moment('pulse-collapse', 'transition', 'the Pulse rail collapses', async () => {
       await toggle.click();
       await page.locator('[data-pulse="collapsed"]').waitFor();

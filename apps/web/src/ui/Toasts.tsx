@@ -60,7 +60,7 @@ export function Toasts() {
           icon: 'mt-0.5 flex shrink-0 [&_svg]:size-4',
           content: 'min-w-0 flex-1',
           actionButton:
-            'ml-auto h-7 shrink-0 self-center rounded-control border border-line bg-bg-1 px-2.5 text-label font-medium text-text-1 transition-colors duration-fast hover:border-line-strong',
+            'ml-auto h-7 shrink-0 self-center rounded-control border border-line bg-bg-1 px-2.5 text-label font-medium text-text-1 transition-[border-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.97]',
           info: '[&_[data-icon]]:text-st-work-ink',
           success: '[&_[data-icon]]:text-st-ok-ink',
           warning: '[&_[data-icon]]:text-st-wait-ink',

@@ -23,6 +23,7 @@ import { usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
 import { DrawnCheck } from '../../ui/DrawnCheck.js';
 import { ExitBadge } from '../../ui/ExitBadge.js';
+import { SegmentThumb, useSegmentThumb } from '../../ui/SegmentThumb.js';
 import { langFor, type TokenLine, useHighlight } from '../highlight.js';
 import { Markdown } from '../Markdown.js';
 import { type ToolRow, toolSummary } from '../transcript.js';
@@ -463,6 +464,7 @@ function EditCard({ row, cwd, call }: CardProps & { call: CallOf<'edit'> | CallO
 
 function LayoutToggle() {
   const layout = usePreference(diffLayoutPreference);
+  const thumb = useSegmentThumb();
   return (
     <div role="radiogroup" aria-label="Diff layout" className="flex rounded-control bg-bg-2 p-0.5">
       {DIFF_LAYOUTS.map((option) => (
@@ -472,15 +474,23 @@ function LayoutToggle() {
           type="button"
           role="radio"
           aria-checked={layout === option}
-          onClick={() => diffLayoutPreference.set(option)}
+          onClick={(e) => {
+            thumb.pick(e);
+            diffLayoutPreference.set(option);
+          }}
           className={cx(
-            'h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-fast',
-            layout === option
-              ? 'bg-bg-1 text-text-1 shadow-raised'
-              : 'text-text-3 hover:text-text-1',
+            'relative h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-fast',
+            layout === option ? 'text-text-1' : 'text-text-3 hover:text-text-1',
           )}
         >
-          {option}
+          {layout === option && (
+            <SegmentThumb
+              layoutId={thumb.layoutId}
+              byKeyboard={thumb.byKeyboard}
+              className="bg-bg-1"
+            />
+          )}
+          <span className="relative">{option}</span>
         </button>
       ))}
     </div>

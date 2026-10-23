@@ -18,6 +18,7 @@ import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { Button, buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
+import { SegmentThumb, useSegmentThumb } from '../ui/SegmentThumb.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { Page, PageHeader } from './Page.js';
 
@@ -475,6 +476,7 @@ function Segmented<T extends string>({
   onChange(value: T): void;
   disabled?: boolean;
 }) {
+  const thumb = useSegmentThumb();
   return (
     <fieldset
       disabled={disabled}
@@ -486,15 +488,23 @@ function Segmented<T extends string>({
           key={option}
           type="button"
           aria-pressed={option === value}
-          onClick={() => onChange(option)}
+          onClick={(e) => {
+            thumb.pick(e);
+            onChange(option);
+          }}
           className={cx(
-            'h-7 rounded-chip px-3 text-label transition-colors duration-fast',
-            option === value
-              ? 'bg-bg-2 text-text-1 shadow-raised'
-              : 'text-text-2 hover:text-text-1',
+            'relative h-7 rounded-chip px-3 text-label transition-colors duration-fast',
+            option === value ? 'text-text-1' : 'text-text-2 hover:text-text-1',
           )}
         >
-          {labels[option]}
+          {option === value && (
+            <SegmentThumb
+              layoutId={thumb.layoutId}
+              byKeyboard={thumb.byKeyboard}
+              className="bg-bg-2"
+            />
+          )}
+          <span className="relative">{labels[option]}</span>
         </button>
       ))}
     </fieldset>

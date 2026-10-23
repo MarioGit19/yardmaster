@@ -145,6 +145,7 @@ export function ResizableColumns({
       >
         {right}
       </motion.section>
+      <div aria-hidden data-covering={rightMaximized || undefined} className="focus-col-cover" />
     </motion.div>
   );
 }
