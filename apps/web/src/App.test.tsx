@@ -119,7 +119,9 @@ describe('routes', () => {
     expect(heading()).toBe('orbit-api');
     // Without a session in the route the Claude panel shows the project's live one.
     const claude = container.querySelector('[data-focus] section[aria-label="Claude"]');
-    expect(claude?.querySelector('h2')?.textContent).toBe('Rate limiter');
+    // Unnamed, so "Claude", with its first prompt as the subtitle.
+    expect(claude?.querySelector('h2')?.textContent).toBe('Claude');
+    expect(claude?.querySelector('[data-session-subtitle]')?.textContent).toBe('Rate limiter');
     // The overview stays behind it, inert and hidden from assistive tech.
     expect(backdrop()?.hasAttribute('inert')).toBe(true);
     expect(backdrop()?.getAttribute('aria-hidden')).toBe('true');

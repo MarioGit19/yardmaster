@@ -274,6 +274,57 @@ test.describe('focus view', () => {
   }
 });
 
+// Names: pixel-studio's two unnamed sessions ("Claude", "Claude 2"), ledger-sync's renamed
+// one, and orbit-api's `zsh` once renamed to `backend` (20 s into the demo).
+test.describe('names', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [VIEWPORTS[0], VIEWPORTS[2]]) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('names', async ({ page }) => {
+          test.setTimeout(60_000);
+          const shot = (name: string) =>
+            page.screenshot({
+              path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          const open = async (project: string) => {
+            await openRoute(page, '/');
+            // The previous project's card leaves first, so names below come from this one.
+            await expect(page.locator('[data-focus]')).toHaveCount(0);
+            await page.locator('a[href^="#/p/"]', { hasText: project }).first().click();
+            await expect(page.locator('[data-focus]')).toHaveCount(1);
+          };
+          await open('pixel-studio');
+          if (viewport.width < 768) await page.getByRole('tab', { name: 'Sessions' }).click();
+          const names = page.locator('[data-focus] [data-session-name]');
+          await expect(names.filter({ hasText: /^Claude 2$/ })).toHaveCount(1, {
+            timeout: 15_000,
+          });
+          await page.waitForTimeout(600);
+          await shot('names-sessions');
+
+          await open('ledger-sync');
+          if (viewport.width < 768) await page.getByRole('tab', { name: 'Sessions' }).click();
+          await expect(names.filter({ hasText: 'retry-backoff' })).toHaveCount(1, {
+            timeout: 15_000,
+          });
+          await page.waitForTimeout(600);
+          await shot('names-renamed-session');
+
+          await open('orbit-api');
+          if (viewport.width < 768) await page.getByRole('tab', { name: 'Terminals' }).click();
+          await expect(
+            page.locator('[data-terminal-stack] [data-terminal-name="backend"]'),
+          ).toBeVisible({ timeout: 30_000 });
+          await page.waitForTimeout(600);
+          await shot('names-terminals');
+        });
+      });
+    }
+  }
+});
+
 // The terminal stack: a tab with typed output and a failed command, the 2×2 grid, the
 // interactive-app card, a Claude terminal beside its chat, search and the maximized stack.
 test.describe('terminal stack', () => {
@@ -292,8 +343,8 @@ test.describe('terminal stack', () => {
             animations: 'disabled',
           });
 
-        await stack.getByRole('tab', { name: /^zsh\b/ }).click();
-        const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+        await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
+        const input = stack.getByRole('textbox', { name: 'Send to acme-shop · zsh' });
         for (const command of ['git status -sb', 'ls', 'pnpm typecheck']) {
           await input.fill(command);
           await input.press('Enter');
@@ -319,7 +370,7 @@ test.describe('terminal stack', () => {
         await expect(stack.locator('[data-interactive]')).toHaveCount(0);
 
         // With its session in the Claude column, the pane points to it.
-        const claude = stack.getByRole('tab', { name: /^claude\b/ });
+        const claude = stack.locator('[role="tab"][data-terminal-name="claude"]');
         await claude.click();
         await page
           .locator(`a[data-session="${await claude.getAttribute('data-claude-tab')}"]`)

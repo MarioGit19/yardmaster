@@ -9,6 +9,7 @@ import {
   type EditorWindow,
   type Execution,
   emptyBoardState,
+  nextSessionOrdinal,
   type PatchOp,
   type PortBinding,
   type ProcessStats,
@@ -259,8 +260,9 @@ export class BoardStore {
           ...defined(input),
         };
     this.put('sessions', session.id, session);
+    this.numberSession(session.id);
     if (session.projectId) this.touchProject(session.projectId, session.updatedAt);
-    return session;
+    return this.state.sessions[session.id] ?? session;
   }
 
   updateSession(id: string, fields: Partial<Omit<ClaudeSession, 'id'>>, ts = this.now()): void {
@@ -271,6 +273,7 @@ export class BoardStore {
       patch.lastAssistantAt = fields.lastAssistantText === null ? null : ts;
     }
     this.merge('sessions', id, patch);
+    this.numberSession(id);
   }
 
   setSessionStatus(id: string, status: SessionStatus, ts = this.now()): void {
@@ -280,7 +283,17 @@ export class BoardStore {
     if (status.kind === 'ended' && session.endedAt === null) fields.endedAt = ts;
     if (status.kind !== 'tool' && session.currentTool) fields.currentTool = null;
     this.merge('sessions', id, fields);
+    this.numberSession(id);
     if (session.projectId) this.touchProject(session.projectId, ts);
+  }
+
+  /** A live unnamed session gets its "Claude 2" number once, and keeps it for life. */
+  private numberSession(id: string): void {
+    const session = this.state.sessions[id];
+    if (!session || session.ordinal || session.customTitle?.trim()) return;
+    if (session.status.kind === 'ended') return;
+    const ordinal = nextSessionOrdinal(Object.values(this.state.sessions), session);
+    this.set(['sessions', id, 'ordinal'], ordinal);
   }
 
   removeSession(id: string): void {

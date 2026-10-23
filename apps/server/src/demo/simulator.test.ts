@@ -16,7 +16,7 @@ import { buildServer } from '../app.js';
 import type { ServerConfig } from '../config.js';
 import { BoardStore } from '../store.js';
 import { generateToken } from '../token.js';
-import { DEMO_PROJECTS } from './content.js';
+import { DEMO_PROJECTS, DEMO_RENAME_MS } from './content.js';
 import { DEMO_LONG_HISTORY, DemoSimulator } from './simulator.js';
 import {
   STRESS_LINES_PER_SECOND,
@@ -100,6 +100,30 @@ describe('DemoSimulator', () => {
       expect.arrayContaining([3000, 3001, 5173, 5174]),
     );
     expect(Object.values(state.approvals).some((a) => a.state === 'pending')).toBe(true);
+    sim.stop();
+  });
+
+  it('renames a terminal partway through and names sessions like Claude Code', () => {
+    const { store, sim, advance } = run();
+    sim.start();
+    const renamed = 'demo-term-orbit-api-2';
+    advance(DEMO_RENAME_MS - 1_000);
+    expect(store.state.terminals[renamed]?.name).toBe('zsh');
+    advance(1_000);
+    expect(store.state.terminals[renamed]?.name).toBe('backend');
+
+    const live = Object.values(store.state.sessions).filter((s) => s.status.kind !== 'ended');
+    const named = (project: string) => live.filter((s) => s.cwd?.endsWith(`/${project}`));
+    // pixel-studio runs two unnamed sessions; ledger-sync's was renamed.
+    expect(
+      named('pixel-studio')
+        .map((s) => [s.customTitle ?? null, s.ordinal])
+        .sort(),
+    ).toEqual([
+      [null, 1],
+      [null, 2],
+    ]);
+    expect(named('ledger-sync').map((s) => s.customTitle)).toEqual(['retry-backoff']);
     sim.stop();
   });
 

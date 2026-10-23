@@ -1,4 +1,9 @@
-import type { ClaudeSession, Project } from '@c-board/protocol';
+import {
+  type ClaudeSession,
+  type Project,
+  sessionDisplayName,
+  sessionSubtitle,
+} from '@c-board/protocol';
 import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -542,10 +547,11 @@ function SessionLink({
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span
+            data-session-name
             className="min-w-0 flex-1 truncate text-body-sm text-text-1"
-            title={session.title ?? undefined}
+            title={sessionSubtitle(session) ?? undefined}
           >
-            {session.title ?? 'Claude session'}
+            {sessionDisplayName(session)}
           </span>
           {session.origin === 'board' && <OriginBadge origin="board" compact />}
         </span>

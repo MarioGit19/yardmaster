@@ -1,4 +1,12 @@
-import type { ClaudeSession, StreamId, Terminal, UiAction } from '@c-board/protocol';
+import {
+  CLAUDE_NAME,
+  type ClaudeSession,
+  type StreamId,
+  sessionSubtitle,
+  type Terminal,
+  terminalDisplayName,
+  type UiAction,
+} from '@c-board/protocol';
 import {
   AppWindow,
   ChevronDown,
@@ -33,7 +41,7 @@ import {
 import type { BoardStoreState } from '../data/store.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
-import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
+import { laneView, selectLaneExecution, terminalDisplay } from '../lanes/lane.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
@@ -52,7 +60,6 @@ import { Tooltip } from '../ui/Tooltip.js';
 import {
   type ClaudeTerminalView,
   claudeTerminalLabel,
-  claudeTerminalTitle,
   claudeTerminalView,
   useClaudeTerminalView,
 } from './claudeTerminal.js';
@@ -406,9 +413,12 @@ function parseLinks(links: string): Map<string, string> {
   return map;
 }
 
+/** The terminal's newest execution, its live Claude session (10.9) and what it's called. */
 function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
-  return { execution, view: laneView(terminal, execution) };
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const display = terminalDisplay(terminal, execution, session);
+  return { execution, session, display, view: laneView(terminal, execution, display.name) };
 }
 
 function LayoutToggle({ layout }: { layout: StackLayout }) {
@@ -448,12 +458,12 @@ function StackTab({
   tabRef: (el: HTMLButtonElement | null) => void;
   onSelect: (byKeyboard: boolean) => void;
 }) {
-  const { view } = useTerminalView(terminal);
-  const session = useBoard(selectTerminalSession(terminal.id));
+  const { view, session, display } = useTerminalView(terminal);
   const caption = useSessionCaption(session);
   const closed = terminal.state === 'closed';
-  const name = terminalName(terminal);
-  const title = session ? claudeTerminalTitle(session) : name;
+  const title = display.name;
+  // The editor's own name (`zsh`, `claude`) stays in the tooltip when the board replaced it.
+  const raw = display.raw ? ` (${display.raw})` : '';
   return (
     // New tabs enter with a fade and a 4 px rise (DESIGN.md §3 rule 1); `y` stays still at Reduced.
     <motion.button
@@ -461,16 +471,17 @@ function StackTab({
       type="button"
       role="tab"
       aria-selected={selected}
-      aria-label={session && caption ? claudeTerminalLabel(name, caption.text) : view.label}
+      aria-label={session && caption ? claudeTerminalLabel(title, caption.text) : view.label}
       title={
         session && caption
-          ? `${title}: ${caption.text}`
-          : view.command
-            ? `${name}: ${view.command}`
-            : name
+          ? `${title}${raw}: ${caption.text}`
+          : view.command && view.command !== title
+            ? `${title}${raw}: ${view.command}`
+            : `${title}${raw}`
       }
       tabIndex={selected ? 0 : -1}
       data-tab={terminal.id}
+      data-terminal-name={terminal.name}
       data-claude-tab={session?.id}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0, transition: spring.smooth }}
@@ -573,17 +584,17 @@ function Pane({
   onActivate: () => void;
   onController: (controller: XtermController | null) => void;
 }) {
-  const { execution, view } = useTerminalView(terminal);
+  const { execution, view, session, display } = useTerminalView(terminal);
   const kind = paneKind(execution.id === null ? null : execution, terminal);
   const masked = useMasked(`term:${terminal.id}`);
-  const session = useBoard(selectTerminalSession(terminal.id));
+  const name = display.name;
   const chosenView = useClaudeTerminalView(terminal.id);
   // A Claude terminal shows its chat unless asked for the raw TUI; when the session ends it is a
   // plain terminal again, and the content cross-fades either way.
   const content: PaneContent = session ? (chosenView === 'chat' ? 'chat' : 'xterm') : kind;
   return (
     <section
-      aria-label={session ? `${terminalName(terminal)}, Claude` : terminalName(terminal)}
+      aria-label={session && !name.startsWith(CLAUDE_NAME) ? `${name}, ${CLAUDE_NAME}` : name}
       data-pane={terminal.id}
       data-pane-content={content}
       data-active={(inGrid && active) || undefined}
@@ -598,6 +609,7 @@ function Pane({
       {session ? (
         <ClaudePaneHeader
           terminal={terminal}
+          name={name}
           session={session}
           accent={accent}
           view={chosenView}
@@ -609,15 +621,15 @@ function Pane({
           <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-3 text-label">
             <StatusDot tone={view.tone} label={view.label} />
             <span
-              title={terminalName(terminal)}
+              title={display.raw ? `${name} (${display.raw})` : name}
               className={cx(
                 'max-w-[60%] shrink-0 truncate',
                 active ? 'text-text-1' : 'text-text-2',
               )}
             >
-              {terminalName(terminal)}
+              {name}
             </span>
-            {view.command && (
+            {view.command && view.command !== name && (
               <span
                 className="min-w-0 truncate font-mono text-meta text-text-2"
                 title={view.command}
@@ -663,7 +675,7 @@ function Pane({
                   <Suspense fallback={null}>
                     <XtermView
                       terminalId={terminal.id}
-                      label={`Output of ${terminalName(terminal)}`}
+                      label={`Output of ${name}`}
                       redact={masked}
                       onController={onController}
                     />
@@ -683,6 +695,7 @@ const VIEW_LABEL: Record<ClaudeTerminalView, string> = { chat: 'Chat', raw: 'Raw
 /** A Claude terminal's pane header: Claude's live caption and the chat / raw toggle. */
 function ClaudePaneHeader({
   terminal,
+  name,
   session,
   accent,
   view,
@@ -690,6 +703,7 @@ function ClaudePaneHeader({
   active,
 }: {
   terminal: Terminal;
+  name: string;
   session: ClaudeSession;
   accent: string;
   view: ClaudeTerminalView;
@@ -708,16 +722,16 @@ function ClaudePaneHeader({
             <ClaudeOrb state={orbStateFor(session.status)} size={14} accent={accent} />
           </span>
           <span
-            title={claudeTerminalTitle(session)}
+            title={sessionSubtitle(session) ?? name}
             className={cx('max-w-[40%] shrink-0 truncate', active ? 'text-text-1' : 'text-text-2')}
           >
-            {claudeTerminalTitle(session)}
+            {name}
           </span>
         </>
       )}
       {caption && <LiveCaption caption={caption} className="min-w-0 flex-1 text-label" />}
       <fieldset className="ml-auto flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5">
-        <legend className="sr-only">Show {claudeTerminalTitle(session)} as</legend>
+        <legend className="sr-only">Show {name} as</legend>
         {(['chat', 'raw'] as const).map((option) => (
           <button
             key={option}
@@ -1097,7 +1111,7 @@ function CommandLine({
         {running ? '›' : '$'}
       </span>
       <input
-        aria-label={`Send to ${terminalName(terminal)}`}
+        aria-label={`Send to ${terminalDisplayName(terminal).name}`}
         data-command-line={terminal.id}
         disabled={!open}
         value={value}
@@ -1109,7 +1123,7 @@ function CommandLine({
             ? 'Terminal closed'
             : running
               ? `Input for ${running}`
-              : `Run in ${terminalName(terminal)}`
+              : `Run in ${terminalDisplayName(terminal).name}`
         }
         onChange={(e) => {
           setValue(e.target.value);

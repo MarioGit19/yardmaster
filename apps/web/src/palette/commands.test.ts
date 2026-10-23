@@ -64,7 +64,8 @@ function board(): BoardState {
   b.approvals['ap-old'] = { ...approval('ap-old', 's-1'), state: 'allowed' };
   b.sessions['s-3'] = makeSession('s-3', 'p-acme', { kind: 'ended' }, 'Old spike');
   b.sessions['s-2'] = {
-    ...makeSession('s-2', 'p-orbit', { kind: 'working' }, 'Rate limiter'),
+    ...makeSession('s-2', 'p-orbit', { kind: 'working' }, 'orbit-api-k2'),
+    customTitle: 'Rate limiter',
     terminalId: 't-orbit',
   };
   b.terminals['t-acme'] = { ...makeTerminal('t-acme', 'p-acme'), name: 'next dev' };
@@ -100,8 +101,9 @@ describe('buildCommands', () => {
     ]);
     expect(byId(commands, 'project:p-acme')?.run).toEqual({ kind: 'navigate', href: '/p/p-acme' });
     expect(byId(commands, 'session:s-1')).toMatchObject({
-      label: 'Checkout fix',
-      hint: 'acme-shop · Waiting for approval',
+      // Unnamed: "Claude", with its automatic title as context.
+      label: 'Claude',
+      hint: 'acme-shop · Waiting for approval · Checkout fix',
       tone: 'wait',
       run: { kind: 'navigate', href: '/p/p-acme/s/s-1' },
     });
@@ -113,10 +115,10 @@ describe('buildCommands', () => {
       href: '/p/p-acme',
       terminal: { projectId: 'p-acme', terminalId: 't-acme' },
     });
-    // A Claude terminal goes by its session's title and opens in the stack, not the Claude column.
+    // A Claude terminal goes by its session's name and opens in the stack, not the Claude column.
     expect(byId(commands, 'terminal:t-orbit')).toMatchObject({
       label: 'Rate limiter',
-      hint: 'orbit-api · Claude in claude',
+      hint: 'orbit-api · Claude terminal',
       icon: 'session',
       tone: 'work',
       run: {

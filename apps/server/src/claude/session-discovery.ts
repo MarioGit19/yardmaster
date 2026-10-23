@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { claudeSettingsPath } from '@c-board/hook';
 import {
   type ClaudeSession,
+  isAutomaticSessionName,
   type SessionHistoryEntry,
   SessionRegistryEntry,
   type SessionStatus,
@@ -171,7 +172,11 @@ export class SessionDiscovery {
 
   private async applyAlive(entry: SessionRegistryEntry, ts: number): Promise<void> {
     const { sessionId: id, pid } = entry;
-    const title = entry.name ? clipLine(entry.name) : null;
+    const name = entry.name ? clipLine(entry.name) : null;
+    // Claude Code names a session `<folder>-<code>` until the user renames it.
+    const automatic = name !== null && isAutomaticSessionName(name, entry.cwd);
+    const title = automatic ? name : null;
+    const customTitle = automatic ? null : name;
     const existing = this.store.state.sessions[id];
     if (!existing) {
       const projectId = entry.cwd
@@ -184,6 +189,7 @@ export class SessionDiscovery {
         cwd: entry.cwd ?? null,
         claudePid: pid,
         title,
+        customTitle,
         status: registryStatus(entry.status),
         startedAt: ts,
         updatedAt: ts,
@@ -206,6 +212,7 @@ export class SessionDiscovery {
       if (projectId) fields.projectId = projectId;
     }
     if (existing.title === null && title) fields.title = title;
+    if (customTitle && customTitle !== existing.customTitle) fields.customTitle = customTitle;
     let updatedAt = existing.updatedAt;
     if (owned) {
       const status = registryStatus(entry.status);

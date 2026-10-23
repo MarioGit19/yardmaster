@@ -31,7 +31,14 @@ export interface DemoTerminal {
   quiet?: boolean;
   /** A shell tailing a busy log at this many lines per second (the stress board). */
   linesPerSecond?: number;
+  /** The user renames the tab this long after the demo starts (editors fire no event for it). */
+  renameTo?: { name: string; afterMs: number };
+  /** A name the user gave the Claude session in this terminal (`/rename`). */
+  sessionName?: string;
 }
+
+/** When orbit-api's `zsh` becomes `backend`; the e2e waits for it. */
+export const DEMO_RENAME_MS = 20_000;
 
 export interface DemoProject {
   name: string;
@@ -129,7 +136,7 @@ export const DEMO_PROJECTS: DemoProject[] = [
     window: 1,
     terminals: [
       { kind: 'rails', name: 'server', port: 3001 },
-      { kind: 'shell', name: 'zsh' },
+      { kind: 'shell', name: 'zsh', renameTo: { name: 'backend', afterMs: DEMO_RENAME_MS } },
       { kind: 'claude', name: 'claude' },
     ],
     testFiles: [],
@@ -223,7 +230,7 @@ export const DEMO_PROJECTS: DemoProject[] = [
     terminals: [
       { kind: 'jest', name: 'tests' },
       { kind: 'shell', name: 'zsh' },
-      { kind: 'claude', name: 'claude' },
+      { kind: 'claude', name: 'claude', sessionName: 'retry-backoff' },
     ],
     testFiles: ['src/sync/retry.test.ts', 'src/sync/batch.test.ts', 'src/ledger/parse.test.ts'],
     scenarios: [

@@ -16,6 +16,7 @@ import { type ReadResult, RingBuffer } from '../ring-buffer.js';
 import type { BoardStore } from '../store.js';
 import { JsonlTail } from './jsonl-tail.js';
 import {
+  customTitleOf,
   entryUuid,
   normalizeEntry,
   parseTranscriptLine,
@@ -287,7 +288,9 @@ export class TranscriptService {
     const streamId = transcriptStreamId(t.id);
     let usageChanged = false;
     let model: string | null = null;
+    let customTitle: string | null = null;
     for (const entry of entries) {
+      customTitle = customTitleOf(entry) ?? customTitle;
       const uuid = entryUuid(entry);
       if (uuid !== null) {
         if (t.seen.has(uuid)) continue;
@@ -306,18 +309,30 @@ export class TranscriptService {
         for (const listener of this.listeners) listener(streamId, seq, chunk);
       }
     }
-    this.publish(t, usageChanged, model);
+    this.publish(t, usageChanged, model, customTitle);
   }
 
-  private publish(t: Tracked, usageChanged: boolean, model: string | null): void {
+  private publish(
+    t: Tracked,
+    usageChanged: boolean,
+    model: string | null,
+    customTitle: string | null,
+  ): void {
     const session = this.store.state.sessions[t.id];
     if (!session) return;
-    const fields: { tokens?: TokenUsage; contextTokens?: number | null; model?: string } = {};
+    const fields: {
+      tokens?: TokenUsage;
+      contextTokens?: number | null;
+      model?: string;
+      customTitle?: string;
+    } = {};
     if (usageChanged) {
       fields.tokens = t.usage.tokens;
       fields.contextTokens = t.usage.contextTokens;
     }
     if (model !== null && model !== session.model) fields.model = model;
+    if (customTitle !== null && customTitle !== session.customTitle)
+      fields.customTitle = customTitle;
     if (Object.keys(fields).length === 0) return;
     // Transcript reads aren't session activity: keep `updatedAt` as the hooks set it.
     this.store.updateSession(t.id, { ...fields, updatedAt: session.updatedAt });

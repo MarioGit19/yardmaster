@@ -2,6 +2,8 @@ import {
   type Approval,
   type ApprovalState,
   parseToolCall,
+  sessionDisplayName,
+  sessionSubtitle,
   toolInputDetail,
 } from '@c-board/protocol';
 import { X } from 'lucide-react';
@@ -65,7 +67,8 @@ export function ApprovalCard({
 }: ApprovalCardProps) {
   const session = useBoard(selectSession(approval.sessionId));
   const project = useBoard(selectProject(session?.projectId ?? ''));
-  const title = session?.title?.trim() || null;
+  const title = session ? sessionDisplayName(session) : null;
+  const subtitle = session ? sessionSubtitle(session) : null;
   const always = canAlwaysAllow(approval);
   const accent = project ? `var(--accent-${project.accent})` : undefined;
   const headingId = `approval-${approval.id}`;
@@ -123,7 +126,7 @@ export function ApprovalCard({
               {project?.name ?? 'No project'}
             </span>
             {title && (
-              <span className="min-w-0 truncate text-text-2" title={title}>
+              <span className="min-w-0 truncate text-text-2" title={subtitle ?? title}>
                 <span aria-hidden>&nbsp;·&nbsp;</span>
                 {title}
               </span>

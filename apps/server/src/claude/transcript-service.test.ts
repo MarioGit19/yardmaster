@@ -96,6 +96,23 @@ describe('TranscriptService', () => {
     expect(session?.model).toBe('claude-sonnet-5-5');
   });
 
+  it('takes the newest /rename line as the custom title', async () => {
+    const rename = (customTitle: unknown) =>
+      JSON.stringify({ type: 'custom-title', customTitle, sessionId: FIXTURE_SESSION_ID });
+    await writeFile(path, `${fixture.trimEnd()}\n${rename('Cart  totals')}\n${rename(42)}\n`);
+    const watcher = manualWatcher();
+    const { store, service } = setup({ watchFile: watcher.watchFile });
+    store.upsertSession({ id: FIXTURE_SESSION_ID, cwd: FIXTURE_CWD, transcriptPath: path });
+    await settled(service);
+    expect(store.state.sessions[FIXTURE_SESSION_ID]?.customTitle).toBe('Cart totals');
+
+    await appendFile(path, `${rename('Checkout')}\n`);
+    watcher.fire();
+    await settled(service);
+    expect(store.state.sessions[FIXTURE_SESSION_ID]?.customTitle).toBe('Checkout');
+    expect(kinds(service.messages(FIXTURE_SESSION_ID))).toEqual(FIXTURE_KINDS);
+  });
+
   it('tails increments: completes the truncated line and appends new messages to the stream', async () => {
     await writeFile(path, fixture);
     const watcher = manualWatcher();

@@ -4,6 +4,7 @@ import {
   type ClaudeSession,
   type Project,
   PULSE_WINDOW_MS,
+  sessionDisplayName,
 } from '@c-board/protocol';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cubicBezier } from 'motion';
@@ -26,7 +27,6 @@ import { resolveColor } from '../orb/colors.js';
 import { orbStateFor } from '../orb/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
-import { claudeTerminalTitle } from '../terminal/claudeTerminal.js';
 import { terminalTarget } from '../terminal/target.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
@@ -718,7 +718,7 @@ function PulseTooltip({
               accent={`var(--accent-${project?.accent ?? 0})`}
             />
           </span>
-          <span className="truncate">{claudeTerminalTitle(session)}</span>
+          <span className="truncate">{sessionDisplayName(session)}</span>
         </p>
       )}
       {project && <p className="mt-0.5 text-meta text-text-2">{project.name}</p>}

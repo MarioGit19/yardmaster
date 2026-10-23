@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { errorLine, formatUptime, type LaneExecution, laneView, uptimePeriod } from './lane.js';
+import {
+  errorLine,
+  formatUptime,
+  type LaneExecution,
+  laneView,
+  terminalDisplay,
+  uptimePeriod,
+} from './lane.js';
 
-const terminal = { id: 't1', name: 'backend', state: 'open', exitCode: null } as const;
+const terminal = {
+  id: 't1',
+  name: 'backend',
+  cwd: '/home/dev/acme-shop',
+  state: 'open',
+  exitCode: null,
+} as const;
 const execution = (over: Partial<LaneExecution> = {}): LaneExecution => ({
   id: 'e1',
   commandLine: 'pnpm dev',
@@ -49,6 +62,29 @@ describe('laneView', () => {
   it('never calls a command running in a closed terminal', () => {
     const view = laneView({ ...terminal, state: 'closed', exitCode: null }, execution());
     expect(view.running).toBe(false);
+  });
+});
+
+describe('terminalDisplay', () => {
+  const zsh = { ...terminal, name: 'zsh' };
+
+  it('keeps a user name and replaces an automatic one with the command', () => {
+    expect(terminalDisplay(terminal, execution())).toEqual({ name: 'backend', raw: null });
+    expect(terminalDisplay(zsh, execution())).toEqual({ name: 'pnpm dev', raw: 'zsh' });
+    expect(terminalDisplay(zsh, execution({ endedAt: 2_000, exitCode: 0 })).name).toBe('pnpm dev');
+    expect(terminalDisplay(zsh, none).name).toBe('acme-shop · zsh');
+  });
+
+  it('names a Claude terminal after its session', () => {
+    const claude = { ...terminal, name: 'claude' };
+    const session = { title: 'acme-shop-c3', ordinal: 2 };
+    expect(terminalDisplay(claude, execution({ commandLine: 'claude' }), session).name).toBe(
+      'Claude 2',
+    );
+  });
+
+  it('does not repeat the command in the label when it is the name', () => {
+    expect(laneView(zsh, execution()).label).toBe('pnpm dev, running');
   });
 });
 

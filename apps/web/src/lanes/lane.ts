@@ -1,4 +1,11 @@
-import type { Execution, Terminal } from '@c-board/protocol';
+import {
+  type BoardState,
+  type Execution,
+  type SessionNameFields,
+  type Terminal,
+  type TerminalDisplayName,
+  terminalDisplayName,
+} from '@c-board/protocol';
 import type { BoardStoreState } from '../data/store.js';
 import type { Tone } from '../status.js';
 
@@ -23,19 +30,40 @@ const NO_EXECUTION = {
  */
 export const selectLaneExecution =
   (terminal: Pick<Terminal, 'executionIds'>) =>
-  (s: BoardStoreState): LaneExecution | typeof NO_EXECUTION => {
-    for (let i = terminal.executionIds.length - 1; i >= 0; i--) {
-      const execution = s.board.executions[terminal.executionIds[i] ?? ''];
-      if (!execution) continue;
-      const { id, commandLine, startedAt, endedAt, exitCode, interactive } = execution;
-      return { id, commandLine, startedAt, endedAt, exitCode, interactive };
-    }
-    return NO_EXECUTION;
-  };
+  (s: BoardStoreState): LaneExecution | typeof NO_EXECUTION =>
+    laneExecution(s.board, terminal);
 
-/** What a terminal is called on screen: editors allow an empty name, the board never shows one. */
-export const terminalName = (terminal: Pick<Terminal, 'name'>) =>
-  terminal.name.trim() || 'Terminal';
+/** `selectLaneExecution` over a plain board. */
+export function laneExecution(
+  board: Pick<BoardState, 'executions'>,
+  terminal: Pick<Terminal, 'executionIds'>,
+): LaneExecution | typeof NO_EXECUTION {
+  for (let i = terminal.executionIds.length - 1; i >= 0; i--) {
+    const execution = board.executions[terminal.executionIds[i] ?? ''];
+    if (!execution) continue;
+    const { id, commandLine, startedAt, endedAt, exitCode, interactive } = execution;
+    return { id, commandLine, startedAt, endedAt, exitCode, interactive };
+  }
+  return NO_EXECUTION;
+}
+
+/**
+ * What a terminal is called on screen (protocol `terminalDisplayName`): the name the user gave
+ * it, else its Claude session's name, its running or last command, or folder plus shell.
+ */
+export function terminalDisplay(
+  terminal: Pick<Terminal, 'name' | 'cwd' | 'state'>,
+  execution: LaneExecution | typeof NO_EXECUTION,
+  session?: SessionNameFields | null,
+): TerminalDisplayName {
+  const command = execution.commandLine?.trim() || null;
+  const running = execution.id !== null && execution.endedAt === null && terminal.state === 'open';
+  return terminalDisplayName(terminal, {
+    running: running ? command : null,
+    last: running ? null : command,
+    session: session ?? null,
+  });
+}
 
 export interface LaneView {
   /** The running or last command; null when the terminal never ran one we know of. */
@@ -50,8 +78,9 @@ export interface LaneView {
 }
 
 export function laneView(
-  terminal: Pick<Terminal, 'id' | 'name' | 'state' | 'exitCode'>,
+  terminal: Pick<Terminal, 'id' | 'name' | 'cwd' | 'state' | 'exitCode'>,
   execution: LaneExecution | typeof NO_EXECUTION,
+  name = terminalDisplay(terminal, execution).name,
 ): LaneView {
   const running = execution.id !== null && execution.endedAt === null && terminal.state === 'open';
   let exit: LaneView['exit'] = null;
@@ -75,7 +104,7 @@ export function laneView(
     startedAt: running ? execution.startedAt : null,
     exit,
     tone,
-    label: `${terminalName(terminal)}${command ? `: ${command}` : ''}, ${status}`,
+    label: `${name}${command && command !== name ? `: ${command}` : ''}, ${status}`,
   };
 }
 

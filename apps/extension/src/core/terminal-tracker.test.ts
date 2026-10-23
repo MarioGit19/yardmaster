@@ -139,6 +139,37 @@ describe('TerminalTracker', () => {
     ]);
   });
 
+  it('upserts only the terminals renamed since their last report', async () => {
+    const { tracker, take } = setup();
+    const backend = fakeTerminal('zsh');
+    const web = fakeTerminal('zsh');
+    tracker.opened(backend);
+    tracker.opened(web);
+    backend.resolvePid(undefined);
+    web.resolvePid(undefined);
+    await flush();
+    take();
+
+    tracker.refreshNames();
+    expect(take()).toEqual([]);
+
+    backend.name = 'backend';
+    tracker.refreshNames();
+    expect(
+      take().map((m) => m.type === 'upsert' && [m.terminal.terminalId, m.terminal.name]),
+    ).toEqual([['term-1', 'backend']]);
+    tracker.refreshNames();
+    expect(take()).toEqual([]);
+
+    // A closed terminal is no longer polled.
+    web.name = 'storefront';
+    web.exitStatus = { code: 0 };
+    tracker.closed(web);
+    take();
+    tracker.refreshNames();
+    expect(take()).toEqual([]);
+  });
+
   it('upserts both the previous and the new active terminal', () => {
     const { tracker, take, setActive } = setup();
     const a = fakeTerminal('a');

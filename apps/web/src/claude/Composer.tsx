@@ -2,6 +2,7 @@ import {
   type Approval,
   type ClaudeSession,
   type PermissionMode,
+  sessionDisplayName,
   terminalReplyBlock,
 } from '@c-board/protocol';
 import {
@@ -87,7 +88,7 @@ function BoardComposer({ session }: { session: ClaudeSession }) {
   return (
     <Composer
       key={session.id}
-      label={`Message ${session.title ?? 'Claude'}`}
+      label={`Message ${sessionDisplayName(session)}`}
       placeholder={running ? 'Queue a follow-up…' : 'Reply to Claude…'}
       running={running}
       model={session.model}
@@ -410,7 +411,7 @@ function TerminalSessionComposer({ session }: { session: ClaudeSession }) {
   return (
     <Composer
       key={session.id}
-      label={`Message ${session.title ?? 'Claude'}`}
+      label={`Message ${sessionDisplayName(session)}`}
       placeholder={ready ? 'Reply to Claude…' : 'Claude is working, reply when it’s idle'}
       running={busy}
       sendBlocked={!ready}

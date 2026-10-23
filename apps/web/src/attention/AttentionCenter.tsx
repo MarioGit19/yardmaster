@@ -1,4 +1,9 @@
-import type { Approval, ClaudeSession } from '@c-board/protocol';
+import {
+  type Approval,
+  type ClaudeSession,
+  sessionDisplayName,
+  sessionSubtitle,
+} from '@c-board/protocol';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
@@ -301,7 +306,8 @@ function useLingering(
 function WaitingItem({ session }: { session: ClaudeSession }) {
   const project = useBoard(selectProject(session.projectId ?? ''));
   const caption = sessionCaption(session, null);
-  const title = session.title?.trim() || null;
+  const title = sessionDisplayName(session);
+  const subtitle = sessionSubtitle(session);
   const href = project ? sessionHref(project.id, session.id) : null;
   const body = (
     <>
@@ -313,7 +319,7 @@ function WaitingItem({ session }: { session: ClaudeSession }) {
             {project?.name ?? 'No project'}
           </span>
           {title && (
-            <span className="min-w-0 truncate text-text-2" title={title}>
+            <span className="min-w-0 truncate text-text-2" title={subtitle ?? title}>
               <span aria-hidden>&nbsp;·&nbsp;</span>
               {title}
             </span>

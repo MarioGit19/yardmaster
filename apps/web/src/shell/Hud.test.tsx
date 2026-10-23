@@ -124,7 +124,7 @@ describe('Hud', () => {
     });
     expect(waitingButton()?.getAttribute('aria-expanded')).toBe('true');
     expect(sheet()?.textContent).toContain('acme-shop');
-    expect(sheet()?.textContent).toContain('Checkout fix');
+    expect(sheet()?.textContent).toMatch(/acme-shop\s·\sClaude/);
     expect(document.activeElement?.id).toBe('attention-title');
 
     act(() => {

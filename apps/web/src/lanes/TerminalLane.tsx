@@ -1,4 +1,4 @@
-import type { ClaudeSession, Terminal } from '@c-board/protocol';
+import { type ClaudeSession, sessionSubtitle, type Terminal } from '@c-board/protocol';
 import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -24,10 +24,16 @@ import { orbStateFor } from '../orb/model.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import { type Caption, sessionCaption } from '../pod/model.js';
 import { sessionHref } from '../routes.js';
-import { claudeTerminalLabel, claudeTerminalTitle } from '../terminal/claudeTerminal.js';
+import { claudeTerminalLabel } from '../terminal/claudeTerminal.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
-import { formatUptime, laneView, selectLaneExecution, terminalName, uptimePeriod } from './lane.js';
+import {
+  formatUptime,
+  laneView,
+  selectLaneExecution,
+  terminalDisplay,
+  uptimePeriod,
+} from './lane.js';
 import { PortChip } from './PortChip.js';
 import { Sparkline } from './Sparkline.js';
 import { TerminalPeek } from './TerminalPeek.js';
@@ -62,15 +68,17 @@ export interface TerminalLaneProps {
 export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const ports = useBoardList(selectPortsByTerminal(terminal.id));
-  const view = laneView(terminal, execution);
+  // A Claude terminal: its session's orb, name and caption, and it opens the session's chat.
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const display = terminalDisplay(terminal, execution, session);
+  const name = display.name;
+  const view = laneView(terminal, execution, name);
   const still = useMotionLevel() !== 'full';
   const rowRef = useRef<HTMLDivElement>(null);
   // Pulse speed and comet follow the store's activity level for the terminal (§4.10).
   const level = useActivityStep(activityKey.terminal(terminal.id));
   const crashed = isCrashExit(view.exit?.code);
   const errorLine = useErrorLine(crashed ? (view.exit?.key ?? null) : null);
-  // A Claude terminal: its session's orb, title and caption, and it opens the session's chat.
-  const session = useBoard(selectTerminalSession(terminal.id));
   const approvalId =
     session?.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
@@ -110,6 +118,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   return (
     <li
       data-lane={terminal.id}
+      data-terminal-name={terminal.name}
       data-streaming={streaming || undefined}
       data-level={streaming ? level : undefined}
       data-crashed={crashed || undefined}
@@ -134,7 +143,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
           <ClaudeLaneHead
             session={claude.session}
             caption={sessionCaption(claude.session, approval)}
-            name={terminalName(terminal)}
+            name={name}
+            title={sessionSubtitle(claude.session) ?? display.raw ?? name}
             href={sessionHref(claude.projectId, claude.session.id)}
             accent={accent}
           />
@@ -166,10 +176,11 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                 )}
               />
               <span
+                data-lane-name
                 className={cx('truncate', !terminal.name.trim() && 'text-text-3')}
-                title={terminalName(terminal)}
+                title={display.raw ? `${name} (${display.raw})` : name}
               >
-                {terminalName(terminal)}
+                {name}
               </span>
             </span>
             <LaneCaption command={view.command} running={view.running} error={errorLine} />
@@ -234,11 +245,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
             transition={{ duration: dur.fast, ease: ease.out }}
             className="pointer-events-none absolute inset-x-0 top-full z-20 mt-1 origin-top"
           >
-            <TerminalPeek
-              id={peekId}
-              terminalId={terminal.id}
-              label={`Latest output of ${terminalName(terminal)}`}
-            />
+            <TerminalPeek id={peekId} terminalId={terminal.id} label={`Latest output of ${name}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -251,16 +258,18 @@ function ClaudeLaneHead({
   session,
   caption,
   name,
+  title,
   href,
   accent,
 }: {
   session: ClaudeSession;
   caption: Caption;
   name: string;
+  /** The tooltip: Claude Code's own name or summary for the session. */
+  title: string;
   href: string;
   accent: string;
 }) {
-  const title = claudeTerminalTitle(session);
   return (
     <Link
       href={href}
@@ -278,8 +287,8 @@ function ClaudeLaneHead({
             showToolLabel={false}
           />
         </span>
-        <span className="truncate" title={title}>
-          {title}
+        <span data-lane-name className="truncate" title={title}>
+          {name}
         </span>
       </span>
       <LiveCaption caption={caption} className="text-meta" />

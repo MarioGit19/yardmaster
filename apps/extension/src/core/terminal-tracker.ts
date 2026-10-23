@@ -3,6 +3,8 @@ import type { EditorTerminal } from '@c-board/protocol';
 
 const MAX_NAME = 256;
 const MAX_PATH = 4_096;
+/** VS Code has no rename event, so names are re-read this often (and on window focus). */
+export const NAME_POLL_MS = 2_000;
 
 export interface UriLike {
   readonly scheme: string;
@@ -36,6 +38,10 @@ export function localPath(value: string | UriLike | undefined): string | null {
   return path.startsWith('/') && path.length <= MAX_PATH ? path : null;
 }
 
+function nameOf(terminal: TerminalLike): string {
+  return (terminal.name || terminal.creationOptions.name || 'terminal').slice(0, MAX_NAME);
+}
+
 /**
  * Keeps the window's terminal inventory: gives each terminal a stable id for this
  * activation and reports changes as `terminal.upsert` / `terminal.closed`, plus a full
@@ -45,6 +51,8 @@ export class TerminalTracker<T extends TerminalLike> {
   private readonly ids = new WeakMap<T, string>();
   /** Resolved shell pids; `null` while unknown or if the editor has none. */
   private readonly pids = new WeakMap<T, number | null>();
+  /** The name last reported for each terminal. */
+  private readonly names = new WeakMap<T, string>();
   /** Open terminals in the order they were seen. */
   private readonly open = new Set<T>();
   private readonly sink: TerminalSink;
@@ -102,6 +110,14 @@ export class TerminalTracker<T extends TerminalLike> {
     this.sink.closed(this.idOf(terminal), terminal.exitStatus?.code ?? null);
   }
 
+  /** Re-reads every open terminal's name and upserts the ones renamed since last reported. */
+  refreshNames(): void {
+    for (const terminal of this.open) {
+      if (terminal.exitStatus !== undefined) continue;
+      if (this.names.get(terminal) !== nameOf(terminal)) this.sink.upsert(this.describe(terminal));
+    }
+  }
+
   /** Reconciles with the editor's current terminals and sends the full list. */
   sync(current: readonly T[]): void {
     const live = new Set(current.filter((terminal) => terminal.exitStatus === undefined));
@@ -113,10 +129,11 @@ export class TerminalTracker<T extends TerminalLike> {
 
   describe(terminal: T): EditorTerminal {
     const closed = terminal.exitStatus !== undefined;
-    const name = terminal.name || terminal.creationOptions.name || 'terminal';
+    const name = nameOf(terminal);
+    this.names.set(terminal, name);
     return {
       terminalId: this.idOf(terminal),
-      name: name.slice(0, MAX_NAME),
+      name,
       shellPid: this.pidOf(terminal),
       cwd: localPath(terminal.shellIntegration?.cwd) ?? localPath(terminal.creationOptions.cwd),
       state: closed ? 'closed' : 'open',

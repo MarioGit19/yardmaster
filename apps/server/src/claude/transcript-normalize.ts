@@ -70,6 +70,18 @@ export function entryUuid(raw: unknown): string | null {
   return typeof uuid === 'string' && uuid.length > 0 ? uuid : null;
 }
 
+const CustomTitleEntry = z.looseObject({
+  type: z.literal('custom-title'),
+  customTitle: z.string().max(512),
+});
+
+/** The name a `/rename` line gives the session, or null for any other line. */
+export function customTitleOf(raw: unknown): string | null {
+  const parsed = CustomTitleEntry.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data.customTitle.replace(/\s+/g, ' ').trim() || null;
+}
+
 /**
  * Normalizes one raw entry into chat messages (one per content block).
  * Unknown line types, sidechain lines and unknown blocks yield nothing.

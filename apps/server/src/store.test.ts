@@ -2,6 +2,7 @@ import {
   type Approval,
   applyPatch,
   BoardState,
+  type ClaudeSession,
   type EditorWindow,
   type PatchOp,
   type PortBinding,
@@ -298,6 +299,26 @@ describe('BoardStore mutators', () => {
       projectId: 'p-acme',
     });
     expect(BoardState.safeParse(store.state).success).toBe(true);
+  });
+
+  it('numbers live unnamed sessions per project and keeps each number', () => {
+    const { store, tick } = seeded();
+    const start = (id: string, extra: Partial<ClaudeSession> = {}) => {
+      tick(1);
+      return store.upsertSession({ id, projectId: 'p-acme', status: { kind: 'idle' }, ...extra });
+    };
+    expect(start('a').ordinal).toBe(1);
+    expect(start('named', { customTitle: 'Checkout' }).ordinal).toBeUndefined();
+    expect(start('b').ordinal).toBe(2);
+    expect(store.upsertSession({ id: 'other', projectId: 'p-blog' }).ordinal).toBe(1);
+
+    store.setSessionStatus('a', { kind: 'ended' });
+    store.updateSession('b', { title: 'acme-shop-c3' });
+    expect(store.state.sessions.a?.ordinal).toBe(1);
+    expect(store.state.sessions.b?.ordinal).toBe(2);
+    expect(start('c').ordinal).toBe(1);
+    expect(start('d').ordinal).toBe(3);
+    expect(store.upsertSession({ id: 'gone', status: { kind: 'ended' } }).ordinal).toBeUndefined();
   });
 
   it('resolves approvals once and removes them with their session', () => {

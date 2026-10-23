@@ -50,7 +50,8 @@ test.describe('Claude terminals', () => {
       test.setTimeout(300_000);
       const stack = await openProject(page);
       const { tab, sessionId } = await claudeTab(stack);
-      await expect(tab).toHaveAccessibleName(/^claude, Claude, /);
+      // An unnamed Claude terminal goes by its session: "Claude", then what Claude does.
+      await expect(tab).toHaveAccessibleName(/^Claude( \d+)?, /);
 
       // The Claude column on something else: a new session's composer.
       await page.locator('[data-new-session]').click();
@@ -91,7 +92,7 @@ test.describe('Claude terminals', () => {
       await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(reply);
 
       // Another tab and back: the raw choice holds for the page's lifetime.
-      await stack.getByRole('tab', { name: /^zsh\b/ }).click();
+      await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
       await expect(stack.locator('[data-claude-pane]')).toHaveCount(0);
       await tab.click();
       await expect(stack.getByRole('button', { name: 'Raw terminal' })).toHaveAttribute(
@@ -133,7 +134,7 @@ test.describe('Claude terminals', () => {
 
       await page.keyboard.press('ControlOrMeta+K');
       const palette = page.getByRole('dialog', { name: 'Command palette' });
-      await palette.getByRole('combobox').fill('Claude in claude');
+      await palette.getByRole('combobox').fill('acme-shop Claude terminal');
       const command = palette.locator(
         `[data-command="terminal:${await tab.getAttribute('data-tab')}"]`,
       );

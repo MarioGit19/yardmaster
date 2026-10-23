@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import { CLAUDE_NAME } from '@c-board/protocol';
 import { useSyncExternalStore } from 'react';
 
 /** What Claude Code's TUI takes as "stop": its own interrupt key. */
@@ -6,10 +6,6 @@ export const ESC = '\u001b';
 
 /** A Claude terminal's pane: the session's chat, or the TUI's raw output. */
 export type ClaudeTerminalView = 'chat' | 'raw';
-
-/** The title a Claude terminal shows instead of its process name (`claude`, `node`). */
-export const claudeTerminalTitle = (session: Pick<ClaudeSession, 'title'>) =>
-  session.title?.trim() || 'Claude';
 
 // The chat/raw choice per terminal, for the page's lifetime (not persisted).
 const views = new Map<string, ClaudeTerminalView>();
@@ -35,8 +31,8 @@ export function useClaudeTerminalView(terminalId: string): ClaudeTerminalView {
   return useSyncExternalStore(claudeTerminalView.subscribe, get, get);
 }
 
-/** "acme-shop, Claude, waiting for approval: Bash(pnpm test)": its name, then what Claude does. */
+/** "Claude 2, waiting for approval: Bash(pnpm test)": its name, then what Claude does. */
 export function claudeTerminalLabel(name: string, caption: string): string {
   const what = caption.charAt(0).toLowerCase() + caption.slice(1);
-  return `${name}, Claude, ${what}`;
+  return name.startsWith(CLAUDE_NAME) ? `${name}, ${what}` : `${name}, ${CLAUDE_NAME}, ${what}`;
 }

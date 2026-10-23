@@ -280,7 +280,12 @@ export const ClaudeSession = z.object({
   projectId: ProjectId.nullable(),
   cwd: z.string().nullable(),
   status: SessionStatus,
+  /** An automatic name (Claude Code's `<folder>-<code>`, or the first prompt); a subtitle only. */
   title: z.string().nullable(),
+  /** A name the user gave the session (`/rename`), shown as its name. */
+  customTitle: z.string().max(512).nullable().optional(),
+  /** "Claude 2": the session's number among its project's unnamed live sessions, kept for life. */
+  ordinal: z.number().int().positive().nullable().optional(),
   model: z.string().nullable(),
   permissionMode: PermissionMode.nullable(),
   tokens: TokenUsage,

@@ -34,13 +34,13 @@ test.describe('terminal stack', () => {
     page,
   }) => {
     const stack = await openStack(page);
-    const tab = stack.getByRole('tab', { name: /^zsh\b/ });
+    const tab = stack.locator('[role="tab"][data-terminal-name="zsh"]');
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true');
 
     const xterm = stack.locator('[data-xterm]');
     await expect(xterm).toHaveAttribute('data-renderer', 'dom');
-    const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+    const input = stack.getByRole('textbox', { name: 'Send to acme-shop · zsh' });
     const hello = marker('hello');
     await input.fill(`echo ${hello}`);
     await input.press('Enter');
@@ -61,9 +61,9 @@ test.describe('terminal stack', () => {
     page,
   }) => {
     const stack = await openStack(page);
-    const zsh = stack.getByRole('tab', { name: /^zsh\b/ });
+    const zsh = stack.locator('[role="tab"][data-terminal-name="zsh"]');
     await zsh.click();
-    const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+    const input = stack.getByRole('textbox', { name: 'Send to acme-shop · zsh' });
     const kept = marker('kept');
     await input.fill(`echo ${kept}`);
     await input.press('Enter');
@@ -79,8 +79,8 @@ test.describe('terminal stack', () => {
 
   test('a running interactive app shows the open-in-editor card', async ({ page }) => {
     const stack = await openStack(page);
-    await stack.getByRole('tab', { name: /^zsh\b/ }).click();
-    const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+    await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
+    const input = stack.getByRole('textbox', { name: 'Send to acme-shop · zsh' });
     await input.fill('htop');
     await input.press('Enter');
     const card = stack.locator('[data-interactive]');
@@ -96,10 +96,10 @@ test.describe('terminal stack', () => {
   test('without a choice the stack opens on a terminal it can mirror', async ({ page }) => {
     const stack = await openStack(page);
     // Wait until the claude terminal's interactive run is known, then check the pick held.
-    await stack.getByRole('tab', { name: /^claude\b/ }).waitFor();
+    await stack.locator('[role="tab"][data-terminal-name="claude"]').waitFor();
     await expect(stack.locator('[data-xterm]')).toHaveCount(1, { timeout: 10_000 });
     await expect(stack.locator('[data-interactive]')).toHaveCount(0);
-    await expect(stack.getByRole('tab', { name: /^claude\b/ })).toHaveAttribute(
+    await expect(stack.locator('[role="tab"][data-terminal-name="claude"]')).toHaveAttribute(
       'aria-selected',
       'false',
     );
@@ -124,8 +124,8 @@ test.describe('terminal stack', () => {
 
   test('search highlights matches in the output', async ({ page }) => {
     const stack = await openStack(page);
-    await stack.getByRole('tab', { name: /^zsh\b/ }).click();
-    const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+    await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
+    const input = stack.getByRole('textbox', { name: 'Send to acme-shop · zsh' });
     const needle = marker('needle');
     await input.fill(`echo ${needle}`);
     await input.press('Enter');
@@ -142,7 +142,7 @@ test.describe('terminal stack', () => {
 
 test('the terminal uses the WebGL renderer where the browser has it', async ({ page }) => {
   const stack = await openStack(page);
-  await stack.getByRole('tab', { name: /^zsh\b/ }).click();
+  await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
   await expect(stack.locator('[data-xterm]')).toHaveAttribute('data-renderer', /^(webgl|dom)$/);
   const webgl = await page.evaluate(() =>
     Boolean(document.createElement('canvas').getContext('webgl2')),

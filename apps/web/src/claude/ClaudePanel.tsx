@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import { type ClaudeSession, sessionDisplayName, sessionSubtitle } from '@c-board/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
@@ -63,6 +63,8 @@ export function ClaudePanel({
   const caption =
     session.origin === 'terminal' && writing && tail === null ? sessionCaption(session) : null;
   const column = chatColumn(compact);
+  // Claude Code's automatic name or the first prompt: under the name, never in its place.
+  const subtitle = sessionSubtitle(session);
 
   return (
     <ChatDensityContext value={compact ? 'compact' : 'regular'}>
@@ -73,12 +75,21 @@ export function ClaudePanel({
       >
         {!compact && (
           <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
-            <h2
-              className="min-w-0 flex-1 truncate font-medium text-body text-text-1 leading-7"
-              title={session.title ?? undefined}
-            >
-              {session.title ?? 'Claude session'}
-            </h2>
+            <div className="flex min-w-0 flex-1 items-baseline gap-2">
+              <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">
+                {sessionDisplayName(session)}
+              </h2>
+              {subtitle && (
+                <p
+                  dir="auto"
+                  data-session-subtitle
+                  className="min-w-0 truncate text-meta text-text-2"
+                  title={subtitle}
+                >
+                  {subtitle}
+                </p>
+              )}
+            </div>
             <OriginBadge origin={session.origin} compact="narrow" />
             <StatusDot
               tone={status.tone}

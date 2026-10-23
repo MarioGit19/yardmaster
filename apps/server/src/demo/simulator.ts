@@ -248,6 +248,16 @@ export class DemoSimulator {
     for (const terminal of this.terminals) {
       this.backfillTerminal(terminal);
       this.bootTerminal(terminal);
+      const rename = terminal.def.renameTo;
+      if (rename) {
+        this.after(rename.afterMs, () =>
+          this.store.upsertTerminal({
+            id: terminal.id,
+            windowId: terminal.project.windowId,
+            name: rename.name,
+          }),
+        );
+      }
     }
     this.every(STATS_INTERVAL_MS, () => this.sampleStats());
     this.every(HEARTBEAT_INTERVAL_MS, () => {
@@ -838,6 +848,7 @@ export class DemoSimulator {
       claudePid: terminal.childPid,
       transcriptPath: `${DEMO_HOME}/.claude/projects/${encodedCwd}/${id}.jsonl`,
       contextTokens: this.rng.int(18_000, 120_000),
+      ...(terminal.def.sessionName ? { customTitle: terminal.def.sessionName } : {}),
     });
     session.timer = this.after(this.rng.int(500, 2_500), () => {
       this.store.setSessionStatus(id, { kind: 'idle' });

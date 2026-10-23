@@ -57,6 +57,8 @@ interface ProjectDef {
 interface SessionDef {
   status: SessionStatus;
   title?: string | null;
+  /** A name the user gave it (`/rename`). */
+  customTitle?: string;
   model?: string | null;
   tokens?: Partial<TokenUsage>;
   tool?: { tool: string; summary: string | null };
@@ -121,6 +123,7 @@ const PROJECTS: ProjectDef[] = [
       {
         status: { kind: 'waiting_permission', approvalId: null },
         title: 'Migrate every legacy subscription billing webhook handler to EventBridge',
+        customTitle: 'billing-webhooks-eventbridge-migration-with-a-name-nobody-should-type',
         model: 'claude-opus-5-5',
         tokens: {
           input: 1_204_881_337,
@@ -491,6 +494,7 @@ export class WorstBoard {
           cwd: path,
           status,
           title: s.title === undefined ? `Session ${i + 1}` : s.title,
+          ...(s.customTitle ? { customTitle: s.customTitle } : {}),
           model: s.model === undefined ? 'claude-sonnet-5-5' : s.model,
           permissionMode: s.model === null ? null : 'default',
           tokens: { ...SAMPLE_TOKENS, ...s.tokens },

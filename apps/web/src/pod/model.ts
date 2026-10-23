@@ -1,4 +1,10 @@
-import { type Approval, type ClaudeSession, type Terminal, toolFamily } from '@c-board/protocol';
+import {
+  type Approval,
+  type ClaudeSession,
+  isAutomaticSessionName,
+  type Terminal,
+  toolFamily,
+} from '@c-board/protocol';
 import type { BoardStoreState } from '../data/index.js';
 import { projectTone, type Tone } from '../status.js';
 
@@ -148,8 +154,12 @@ export function sessionCaption(session: ClaudeSession, approval?: Approval | nul
       return { glyph: null, text: status.alive ? 'Running' : 'Unknown', tone: 'rest' };
     case 'ended':
       return { glyph: null, text: 'Ended', tone: 'rest' };
-    case 'idle':
-      return { glyph: null, text: session.title?.trim() || 'Idle', tone: 'rest' };
+    case 'idle': {
+      // The last turn's title; Claude Code's automatic `<folder>-<code>` name says nothing.
+      const title = session.title?.trim();
+      const said = title && !isAutomaticSessionName(title, session.cwd) ? title : null;
+      return { glyph: null, text: said ?? 'Idle', tone: 'rest' };
+    }
   }
 }
 

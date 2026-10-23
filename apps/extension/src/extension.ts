@@ -14,7 +14,7 @@ import {
 import { EditorLink, type HelloPayload, type LinkStatus } from './core/editor-link.js';
 import { ExecStreamer } from './core/exec-streamer.js';
 import { STATUS_TEXT, statusTooltip } from './core/status.js';
-import { TerminalTracker } from './core/terminal-tracker.js';
+import { NAME_POLL_MS, TerminalTracker } from './core/terminal-tracker.js';
 import { cboardHome, readToken } from './core/token.js';
 
 const WINDOW_ID_KEY = 'cboard.windowId';
@@ -81,6 +81,8 @@ export function activate(context: vscode.ExtensionContext): void {
     reply: (id, ok, error) =>
       link?.send('cmd.result', error === undefined ? { id, ok } : { id, ok, error }),
   });
+  // Renaming a terminal tab fires no event, so names are polled.
+  const namePoll = setInterval(() => terminals.refreshNames(), NAME_POLL_MS);
   const showStatus = (status: LinkStatus) => {
     statusItem.tooltip = statusTooltip(status, config.port);
     // Every (re)connect gets the full list, so the server drops anything stale.
@@ -127,6 +129,7 @@ export function activate(context: vscode.ExtensionContext): void {
     statusItem,
     {
       dispose: () => {
+        clearInterval(namePoll);
         commands.dispose();
         executions.dispose();
         link?.stop();
@@ -158,6 +161,9 @@ export function activate(context: vscode.ExtensionContext): void {
       terminals.changed(terminal),
     ),
     vscode.window.onDidChangeActiveTerminal(() => terminals.activeChanged()),
+    vscode.window.onDidChangeWindowState((state) => {
+      if (state.focused) terminals.refreshNames();
+    }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration(CONFIG_SECTION)) return;
       const next = readConfig();

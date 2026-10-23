@@ -1,11 +1,18 @@
-import type { BoardState, ClaudeSession, Project, UiAction } from '@c-board/protocol';
+import {
+  type BoardState,
+  type ClaudeSession,
+  type Project,
+  sessionDisplayName,
+  sessionSubtitle,
+  type UiAction,
+} from '@c-board/protocol';
 import { isWaiting } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
-import { terminalName } from '../lanes/lane.js';
+import { laneExecution, terminalDisplay } from '../lanes/lane.js';
 import type { MotionSetting } from '../motion.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
-import { claudeTerminalTitle, ESC } from '../terminal/claudeTerminal.js';
+import { ESC } from '../terminal/claudeTerminal.js';
 import type { ThemeSetting } from '../theme/theme.js';
 import { type FuzzyMatch, fuzzyMatch } from './fuzzy.js';
 
@@ -83,8 +90,6 @@ const THEME_NAME: Record<ThemeSetting, string> = { dark: 'Dark', light: 'Light',
 
 const byName = (a: Project, b: Project) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 
-const sessionLabel = (session: ClaudeSession) => session.title?.trim() || 'Claude session';
-
 const isBusy = (session: ClaudeSession) =>
   session.status.kind === 'working' ||
   session.status.kind === 'tool' ||
@@ -144,8 +149,9 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
     commands.push({
       id: `session:${session.id}`,
       group: 'Sessions',
-      label: sessionLabel(session),
-      hint: `${project.name} · ${status.label}`,
+      label: sessionDisplayName(session),
+      // The automatic name or summary is context, so "Claude" sessions stay findable by it.
+      hint: [project.name, status.label, sessionSubtitle(session)].filter(Boolean).join(' · '),
       icon: 'session',
       tone: status.tone,
       searchOnly: session.status.kind === 'ended',
@@ -168,13 +174,14 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
     if (!project) continue;
     // A Claude terminal goes by its session; it opens in the stack, which shows its chat.
     const session = terminalSession(board, terminal.id);
+    const { name } = terminalDisplay(terminal, laneExecution(board, terminal), session);
     if (session) {
       const status = sessionStatusView(session.status);
       commands.push({
         id: `terminal:${terminal.id}`,
         group: 'Terminals',
-        label: claudeTerminalTitle(session),
-        hint: `${project.name} · Claude in ${terminalName(terminal)}`,
+        label: name,
+        hint: `${project.name} · Claude terminal`,
         icon: 'session',
         tone: status.tone,
         run: {
@@ -188,7 +195,7 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
     commands.push({
       id: `terminal:${terminal.id}`,
       group: 'Terminals',
-      label: terminalName(terminal),
+      label: name,
       hint: project.name,
       icon: 'terminal',
       run: {
@@ -252,7 +259,7 @@ function projectActions(
     commands.push({
       id: `interrupt:${session.id}`,
       group: 'Actions',
-      label: `Interrupt ${sessionLabel(session)}`,
+      label: `Interrupt ${sessionDisplayName(session)}`,
       hint: project.name,
       icon: 'interrupt',
       run: { kind: 'action', action, done: 'Interrupted' },

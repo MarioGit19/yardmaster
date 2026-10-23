@@ -83,7 +83,8 @@ describe('SessionDiscovery registry scan', () => {
       origin: 'terminal',
       cwd: CWD,
       claudePid: 101,
-      title: 'fix the cart totals',
+      title: null,
+      customTitle: 'fix the cart totals',
       status: { kind: 'working' },
       projectId: projectIdFromPath(CWD),
       endedAt: null,
@@ -91,6 +92,26 @@ describe('SessionDiscovery registry scan', () => {
     expect(store.state.projects[projectIdFromPath(CWD)]).toMatchObject({
       path: CWD,
       source: 'hook',
+    });
+  });
+
+  it("keeps Claude Code's automatic name as the title and picks up a rename", async () => {
+    const automatic = `${CWD.split('/').pop()}-c3`;
+    await writeEntry(101, LIVE_ID, { name: automatic });
+    const { store, service, advance } = setup({ alive: new Set([101]) });
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]).toMatchObject({
+      title: automatic,
+      customTitle: null,
+      ordinal: 1,
+    });
+
+    await writeEntry(101, LIVE_ID, { name: 'Checkout refactor' });
+    advance(1_000);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]).toMatchObject({
+      title: automatic,
+      customTitle: 'Checkout refactor',
     });
   });
 
