@@ -4,6 +4,7 @@
 #   loop/loop.sh                 run until all tasks are done / a [HUMAN] task / blocked
 #   MAX_ITERS=5 loop/loop.sh     cap iterations
 #   touch loop/.state/STOP       stop gracefully after the current iteration
+#   loop/loop.sh --resume <id>   first finish an interrupted iteration (its session id is in its log)
 #
 # Env:
 #   CBOARD_LOOP_PERMISSION_MODE  permission mode for claude -p (default: auto)
@@ -16,6 +17,12 @@ set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 mkdir -p loop/logs loop/.state
 rm -f loop/.state/BLOCKED loop/.state/STOP
+
+resume_id=""
+if [ "${1:-}" = --resume ]; then
+  resume_id="${2:-}"
+  [[ "$resume_id" =~ ^[0-9a-f-]{36}$ ]] || { echo "✗ --resume needs a session id"; exit 1; }
+fi
 
 MODE="${CBOARD_LOOP_PERMISSION_MODE:-auto}"
 PUSH="${CBOARD_LOOP_PUSH:-1}"
@@ -40,7 +47,7 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
     echo "⏸  Next task needs you:"; echo "   $task"
     echo "   Do it, tick it in PLAN.md, commit, then re-run loop/loop.sh"; exit 0
   fi
-  if [ -n "$(git status --porcelain)" ]; then
+  if [ -z "$resume_id" ] && [ -n "$(git status --porcelain)" ]; then
     echo "✗ Working tree is dirty. Commit or stash before running the loop."; git status --short; exit 1
   fi
 
@@ -51,25 +58,35 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   echo "▶ [$i] $task"
   echo "  log: $log"
 
-  claude -p "$(cat loop/PROMPT.md)" \
+  if [ -n "$resume_id" ]; then
+    prompt_args=(--resume "$resume_id" -p "This iteration was interrupted by the loop runner, not by you. Continue the same task from where you left off (the working tree has your changes), following the original instructions.")
+    resume_id=""
+  else
+    prompt_args=(-p "$(cat loop/PROMPT.md)")
+  fi
+  claude "${prompt_args[@]}" \
     --permission-mode "$MODE" \
+    --disallowedTools ScheduleWakeup CronCreate Monitor \
     --output-format stream-json --verbose \
     ${model_args[@]+"${model_args[@]}"} >"$log" 2>&1 &
   pid=$!
   # Background jobs ignore Ctrl+C in scripts, so pass it on.
   trap 'kill "$pid" 2>/dev/null; exit 130' INT TERM
-  # claude -p sometimes stays alive after its final result line; give it a minute, then end it.
-  finished_at=0
+  # A result event isn't always the end: claude -p resumes when a background task it started
+  # finishes. Only a run whose last event is a result, with no child processes and a log quiet
+  # for 3 minutes, is treated as hung and ended.
+  ended=0
   while kill -0 "$pid" 2>/dev/null; do
-    sleep 5
-    if [ "$finished_at" -eq 0 ] && tail -n 1 "$log" | grep -q '"type":"result"'; then finished_at=$SECONDS; fi
-    if [ "$finished_at" -gt 0 ] && [ $((SECONDS - finished_at)) -ge 60 ]; then
-      echo "  claude finished but didn't exit; ending it."; kill "$pid" 2>/dev/null; break
+    sleep 10
+    if tail -n 1 "$log" | python3 -c 'import sys,json; sys.exit(0 if json.loads(sys.stdin.read()).get("type")=="result" else 1)' 2>/dev/null \
+      && ! pgrep -P "$pid" >/dev/null \
+      && python3 -c 'import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime(sys.argv[1])>=180 else 1)' "$log"; then
+      echo "  claude finished but didn't exit; ending it."; kill "$pid" 2>/dev/null; ended=1; break
     fi
   done
   wait "$pid"; code=$?
   trap - INT TERM
-  [ "$finished_at" -gt 0 ] && tail -n 1 "$log" | grep -q '"is_error":false' && code=0
+  [ "$ended" = 1 ] && code=0
 
   # Show the final result line, if any
   tail -n 1 "$log" | python3 -c 'import sys,json
