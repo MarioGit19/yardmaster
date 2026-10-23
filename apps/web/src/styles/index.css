@@ -148,6 +148,31 @@
     background-color: var(--st-work-glow);
   }
 
+  /* Everything clickable shows the pointer (Tailwind's preflight resets buttons to the arrow).
+     Hand-rolled pressables take an interactive role so this covers them too. */
+  button:not(:disabled),
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  summary,
+  label[for],
+  a[href],
+  select {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--line-strong) transparent;
@@ -1483,7 +1508,6 @@
   font-size: 14px;
   line-height: 20px;
   color: var(--text-2);
-  cursor: default;
   user-select: none;
 }
 .palette-item[data-selected="true"] {

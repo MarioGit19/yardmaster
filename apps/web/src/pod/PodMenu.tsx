@@ -75,7 +75,7 @@ function MenuItem({
   return (
     <ContextMenu.Item
       onSelect={onSelect}
-      className="flex h-8 min-w-0 cursor-default select-none items-center gap-2.5 rounded-control px-2.5 text-body-sm text-text-2 outline-none data-highlighted:bg-bg-2 data-highlighted:text-text-1"
+      className="flex h-8 min-w-0 select-none items-center gap-2.5 rounded-control px-2.5 text-body-sm text-text-2 outline-none data-highlighted:bg-bg-2 data-highlighted:text-text-1"
     >
       <span aria-hidden className="flex shrink-0 text-text-3 [&_svg]:size-4 [&_svg]:stroke-[1.5]">
         {icon}

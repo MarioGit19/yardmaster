@@ -346,7 +346,7 @@ function Pill<V extends string>({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as V)}
-        className="absolute inset-0 cursor-pointer appearance-none opacity-0 disabled:cursor-default"
+        className="absolute inset-0 appearance-none opacity-0 disabled:cursor-default"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

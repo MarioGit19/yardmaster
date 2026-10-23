@@ -700,12 +700,13 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - **Verify:** `pnpm check && pnpm motion:record chrome`
   - Note: `loop` in motion.ts also holds the one-shot `fly` and `expand` and the `ramp`, so every hand-typed length has one home; `orb-breathe` (4 s) joined too. The crew sprites' CSS loops and `CrewMascot` timings stay literal, like fx internals; `motion.test.ts` now fails on a raw `infinite` period outside `crew-*`. The toast sits above the rail via a `translateY(-var(--pulse-h))` transform (still at Reduced/Off) instead of Sonner's `bottom` offset.
 
-- [ ] **10.10 Pointer cursor on everything clickable**
+- [x] **10.10 Pointer cursor on everything clickable**
   - Maintainer feedback: some clickable elements show the default arrow, so it isn't clear they can be clicked. Tailwind 4's preflight sets `cursor: default` on `button`, so every hand-rolled pressable that doesn't add `cursor-pointer` itself looks inert.
   - Add one base rule in `styles/index.css` (`@layer base`): `cursor: pointer` for `button:not(:disabled)`, `[role="button"]`, `[role="tab"]`, `[role="menuitem"]`, `[role="option"]`, `[role="switch"]`, `[role="checkbox"]`, `[role="radio"]`, `summary`, `label[for]`, `a[href]` and `select`, and `cursor: not-allowed` for `:disabled` / `[aria-disabled="true"]`. Then sweep `apps/web/src` for clickable things the rule misses (a `div`/`span`/`li`/`svg`/`canvas` with `onClick`, lane and pod cards, Pulse dots, mascot/orb hit areas, chips, the HUD counters, tool-card headers, the scene's actors): give them the right role (and keyboard handling, if missing) so the base rule covers them, or `cursor-pointer` where a role doesn't fit. Keep the existing special cursors (`col-resize` on dividers, `default` where it is deliberate, `grab`/`grabbing` on draggables).
   - Add a convention line to `docs/DESIGN.md` (and keep `buttonClass` and the shared primitives consistent), so new layouts in Phase 11 and 12 get it for free.
   - **Done when:** an e2e check on `--demo` (focus view, overview, Pulse, palette, settings, approvals) finds no element with a click handler or an interactive role whose computed `cursor` is `auto`/`default` (allow-list the deliberate ones), and `pnpm check` passes.
   - **Verify:** `pnpm check && pnpm e2e --grep cursor`
+  - Note: the base rule covered almost everything (all hand-rolled pressables were already real buttons/links/roles); only the approval card needed `cursor-pointer`. Palette and context-menu items now show the pointer too (they had `cursor: default`). The `cursor` specs pass with `--no-deps`, but the `perf-messages` long-task check upstream in the e2e chain was flaky on a loaded machine (it failed before any source change too), so `pnpm e2e --grep cursor` failed on some runs for that reason.
 
 ## Phase 11 — Layouts: Minimal, Office, Grid, Transit, Retro
 

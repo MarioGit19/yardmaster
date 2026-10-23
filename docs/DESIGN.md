@@ -251,6 +251,7 @@ Every project has a small original character, the **crew member**, that acts out
 - Focus ring: 2px `--line-strong` plus a 4px accent glow.
 - `aria-live="polite"` region announces new approvals and crashes.
 - Every action is reachable from the keyboard and appears in ⌘K with its shortcut.
+- **Cursor:** everything clickable shows the pointer. A base rule in `styles/index.css` gives it to `button`, `a[href]`, `summary`, `select`, `label[for]` and the interactive roles (`button`, `tab`, `menuitem`, `option`, `switch`, …), and `not-allowed` to disabled controls. Build pressables as a real `button`/link or give them a role (with keyboard handling); use `cursor-pointer` only where no role fits (a card holding its own buttons, a canvas hit area). Special cursors stay: `col-resize` on dividers, `grab`/`grabbing` on draggables, the text cursor in terminals. The `cursor` e2e check enforces it; mark a deliberate arrow with `data-cursor="default"`.
 
 ## 9. Visual QA checklist (used by the loop's screenshot review tasks)
 

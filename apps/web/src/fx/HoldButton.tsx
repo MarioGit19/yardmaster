@@ -174,7 +174,7 @@ export function HoldButton({
       data-input={input ?? undefined}
       aria-describedby={hintId}
       className={cx(
-        'relative isolate inline-grid min-h-11 cursor-pointer touch-manipulation select-none place-items-center overflow-hidden rounded-control border border-line bg-bg-2 px-5 font-medium text-body-sm text-text-1 [-webkit-touch-callout:none] hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default disabled:opacity-50',
+        'relative isolate inline-grid min-h-11 touch-manipulation select-none place-items-center overflow-hidden rounded-control border border-line bg-bg-2 px-5 font-medium text-body-sm text-text-1 [-webkit-touch-callout:none] hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default disabled:opacity-50',
         colors.ring,
         className,
       )}
