@@ -72,6 +72,13 @@ const CRASH_EXIT_CODE = 1;
 const STAYS_DOWN_AFTER_TICKS = 2;
 /** A quiet terminal's newest history is at least this old, past the board's idle threshold. */
 const QUIET_MS = 6 * 60_000;
+/** What the history's subagents were doing. */
+const PAST_SUBAGENTS = [
+  'Explore the checkout flow',
+  'Review the test coverage',
+  'Search for unused exports',
+  'Draft the migration notes',
+] as const;
 const quiet = (def: DemoProject) => def.terminals.every((t) => t.quiet === true);
 const COMPACT_AT_TOKENS = 150_000;
 const STATS_INTERVAL_MS = 2_000;
@@ -474,7 +481,8 @@ export class DemoSimulator {
     }
   }
 
-  // Pulse backfill: the last 15 minutes of synthetic activity, so the rail isn't empty on load.
+  // History backfill: the last hour of synthetic activity, so the Pulse rail and the Transit map
+  // aren't empty on load.
 
   private pastEvent(
     ts: number,
@@ -508,14 +516,14 @@ export class DemoSimulator {
       // One earlier crash and restart for some dev servers.
       if (!rng.chance(0.4)) return;
       const command = DEV_SERVERS[kind].command;
-      const at = now - rng.int(6, 13) * 60_000;
+      const at = now - rng.int(6, 50) * 60_000;
       this.pastEvent(at, 'exec.start', terminal, null, command);
       this.pastEvent(at + rng.int(60, 240) * 1_000, 'exec.end', terminal, null, command, {
         exitCode: 1,
       });
       return;
     }
-    let at = now - rng.int(13, 14) * 60_000;
+    let at = now - rng.int(52, 58) * 60_000;
     const until = now - (terminal.def.quiet ? QUIET_MS : 20_000);
     while (at < until) {
       const command = kind === 'jest' ? 'pnpm jest' : rng.pick(SHELL_COMMANDS).command;
@@ -531,7 +539,7 @@ export class DemoSimulator {
     const { terminal } = session;
     const scenarios = session.project.def.scenarios;
     const now = this.now();
-    let at = now - rng.int(12, 14) * 60_000;
+    let at = now - rng.int(48, 58) * 60_000;
     this.pastEvent(at, 'session.start', terminal, session, 'Session started');
     while (at < now - 60_000) {
       const scenario = rng.pick(scenarios);
@@ -547,6 +555,14 @@ export class DemoSimulator {
         this.pastEvent(at, failed ? 'tool.error' : 'tool.end', terminal, session, label, {
           tool_name: tool.tool,
         });
+      }
+      // Some turns hand part of the work to a subagent: a Transit branch line.
+      const end = at + rng.int(60, 240) * 1_000;
+      if (rng.chance(0.25) && end < now - 60_000) {
+        const description = rng.pick(PAST_SUBAGENTS);
+        const agentId = `past-agent-${this.seq + 1}`;
+        this.pastEvent(at, 'subagent.start', terminal, session, description, { agentId });
+        this.pastEvent(end, 'subagent.stop', terminal, session, description, { agentId });
       }
       const permission = scenario.permissions[0];
       if (permission && rng.chance(0.3)) {
@@ -1037,7 +1053,7 @@ export class DemoSimulator {
       },
     ];
     this.store.updateSession(session.id, { subagents });
-    this.activity('subagent.start', session, description, { agent_id: id });
+    this.activity('subagent.start', session, description, { agentId: id });
     this.after(this.rng.int(6_000, 16_000), () => {
       const latest = this.store.state.sessions[session.id];
       if (!latest) return;
@@ -1047,7 +1063,7 @@ export class DemoSimulator {
           agent.id === id ? { ...agent, status, endedAt: this.now() } : agent,
         ),
       });
-      this.activity('subagent.stop', session, description, { agent_id: id });
+      this.activity('subagent.stop', session, description, { agentId: id });
     });
   }
 
@@ -1392,7 +1408,8 @@ export class DemoSimulator {
       return {
         hash: projectIdFromPath(`${def.path}#${index}`).padEnd(40, '0').slice(0, 40),
         author: commit.author,
-        at: project.seededAt - (index + 1) * 5_400_000,
+        // The newest lands inside the last hour, so the Transit map has an interchange.
+        at: project.seededAt - (18 + ((def.name.length * 7) % 30) + index * 90) * 60_000,
         subject: commit.subject,
       };
     });

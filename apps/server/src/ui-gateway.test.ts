@@ -4,8 +4,8 @@ import {
   type ActivityEvent,
   applyPatch,
   emptyBoardState,
+  HISTORY_WINDOW_MS,
   type PatchOp,
-  PULSE_WINDOW_MS,
   type ServerToUi,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
@@ -248,10 +248,10 @@ describe('/ws/ui activity', () => {
     data: { exitCode: 1 },
   });
 
-  it('replays the Pulse window after the snapshot, then pushes live batches', async () => {
+  it('replays the history window after the snapshot, then pushes live batches', async () => {
     const { port, origin } = await boot();
     const now = Date.now();
-    app?.persistence.recordActivity(event('old', now - PULSE_WINDOW_MS - 60_000));
+    app?.persistence.recordActivity(event('old', now - HISTORY_WINDOW_MS - 60_000));
     app?.persistence.recordActivity(event('recent', now - 60_000));
     const client = await connect(port, origin);
     expect((await client.next()).type).toBe('snapshot');

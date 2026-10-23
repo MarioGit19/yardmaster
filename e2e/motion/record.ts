@@ -455,6 +455,46 @@ const SCENARIOS = {
     );
   },
 
+  /** 11.8: the Transit map: trains at "now", a new station scaling in, a train's inspector. */
+  async transit(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+    await openOverview(page);
+    await page.locator('[data-transit-line]').first().waitFor();
+    await page.waitForTimeout(1500);
+    await r.moment(
+      'activity',
+      'activity',
+      '8 s of the map: working trains trail speed lines',
+      hold(page, 8000),
+    );
+    await r.moment(
+      'glide',
+      'transition',
+      '2 s at 12 fps: speed lines slip back past the working trains, waiting doors pulse',
+      hold(page, 2000),
+    );
+    await catchMoment(
+      r,
+      'station',
+      'a new station scales in on its line (dur.base, ease.out)',
+      '.transit-pop',
+      { ms: 600, leadMs: 300 },
+    );
+    await r.moment(
+      'inspector',
+      'transition',
+      'click a train: the Actor inspector opens beside it, Esc closes it',
+      async () => {
+        await page.locator('[data-transit-line] [data-scene-actor]').first().click();
+        await page.locator('[data-actor-inspector] [data-actor]').waitFor();
+        await page.waitForTimeout(500);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(400);
+      },
+    );
+  },
+
   /** A fresh board's first attention change reorders the pods within seconds. */
   async reorder(r: Recorder) {
     await openOverview(r.page);

@@ -1,4 +1,4 @@
-import { type ActivityEvent, type Execution, PULSE_WINDOW_MS } from '@c-board/protocol';
+import { type ActivityEvent, type Execution, HISTORY_WINDOW_MS } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
 import {
@@ -42,9 +42,9 @@ describe('mergeActivity', () => {
     );
     expect(merged.map((e) => e.id)).toEqual(['a', 'late', 'b', 'c']);
 
-    const stale = mergeActivity(current, [event('old', NOW - PULSE_WINDOW_MS - 120_000)], NOW);
+    const stale = mergeActivity(current, [event('old', NOW - HISTORY_WINDOW_MS - 120_000)], NOW);
     expect(stale).toBe(current);
-    const later = mergeActivity(current, [], NOW + PULSE_WINDOW_MS + 60_000 - 2_500);
+    const later = mergeActivity(current, [], NOW + HISTORY_WINDOW_MS + 60_000 - 2_500);
     expect(later.map((e) => e.id)).toEqual(['b']);
   });
 

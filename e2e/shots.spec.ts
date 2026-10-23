@@ -1338,6 +1338,45 @@ test.describe('layouts', () => {
           await shot('center');
         });
       }
+
+      // 11.8: the Transit map (lines top to bottom on a phone), at rest and under demo activity,
+      // plus a station's hover card and a train's inspector.
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
+        { width: 390, height: 844 },
+      ]) {
+        test(`transit ${viewport.width}`, async ({ page }) => {
+          test.slow();
+          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-transit-line]').first()).toBeVisible();
+          await page.waitForTimeout(800);
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-transit-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+              fullPage: true,
+              animations: 'disabled',
+            });
+          await shot('rest');
+          await expect(page.locator('[data-transit-line][data-tone="wait"]').first()).toBeVisible({
+            timeout: 30_000,
+          });
+          await page.waitForTimeout(600);
+          await shot('active');
+          if (viewport.width < 768) return;
+          await page.locator('[data-transit-station][data-count="1"]').first().hover();
+          await expect(page.locator('[data-transit-tip]')).toBeVisible();
+          await shot('station');
+          await page.mouse.move(4, 4);
+          await page.locator('[data-transit-line] [data-scene-actor]').first().click();
+          await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot('inspector');
+        });
+      }
     });
   }
 });

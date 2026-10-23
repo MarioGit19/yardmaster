@@ -125,6 +125,18 @@ export function eventDetail(event: ActivityEvent): string | null {
   return event.summary;
 }
 
+/** How many events (oldest first) are at or after `since`: the rail's window of the hour kept. */
+export function countSince(events: readonly ActivityEvent[], since: number): number {
+  let lo = 0;
+  let hi = events.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if ((events[mid] as ActivityEvent).ts < since) lo = mid + 1;
+    else hi = mid;
+  }
+  return events.length - lo;
+}
+
 export function matchesFilter(event: ActivityEvent, filter: PulseFilter): boolean {
   switch (filter) {
     case 'all':

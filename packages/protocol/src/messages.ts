@@ -192,10 +192,15 @@ export const Toast = envelope(
     terminalId: TerminalId.optional(),
   }),
 );
-/** How far back the Pulse rail looks; the server replays this window on connect. */
+/** How far back the Pulse rail looks. */
 export const PULSE_WINDOW_MS = 15 * 60_000;
 /**
- * Activity events for the Pulse rail. `replace` carries the recent window on connect and
+ * How far back the board keeps activity: the Transit map's hour (DESIGN.md §10.5), which holds
+ * the Pulse window. The server replays this window on connect.
+ */
+export const HISTORY_WINDOW_MS = 60 * 60_000;
+/**
+ * Activity events for the Pulse rail and the Transit map. `replace` carries the recent window on connect and
  * replaces what the client holds; later batches append.
  */
 export const ActivityBatch = envelope(

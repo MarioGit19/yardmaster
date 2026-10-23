@@ -58,6 +58,7 @@ beforeAll(async () => {
     preloadLayout('office'),
     preloadLayout('grid'),
     preloadLayout('transit'),
+    preloadLayout('retro'),
   ]);
   // happy-dom's WAAPI rejects Motion's cancelled animations; the pod grid only needs to mount.
   MotionGlobalConfig.skipAnimations = true;
@@ -128,10 +129,12 @@ describe('routes', () => {
       act(() => layoutPreference.set('grid'));
       expect(container.querySelector('main [data-layout="grid"] [data-grid]')).not.toBeNull();
       act(() => layoutPreference.set('transit'));
-      const transit = container.querySelector('main [data-layout="transit"]');
-      expect(transit?.querySelector('[data-layout-placeholder="transit"]')).not.toBeNull();
+      expect(container.querySelector('main [data-layout="transit"] [data-transit]')).not.toBeNull();
+      act(() => layoutPreference.set('retro'));
+      const retro = container.querySelector('main [data-layout="retro"]');
+      expect(retro?.querySelector('[data-layout-placeholder="retro"]')).not.toBeNull();
       // The placeholder lists the scene: every actor is a button with its full name.
-      const actor = transit?.querySelector('[data-scene-actor="s:s-1"]');
+      const actor = retro?.querySelector('[data-scene-actor="s:s-1"]');
       expect(actor?.getAttribute('aria-label')).toBe('acme-shop, Claude, waiting for approval');
     } finally {
       act(() => layoutPreference.set('minimal'));

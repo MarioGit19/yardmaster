@@ -55,6 +55,8 @@ export const loop = {
   packetCalm: 2.4,
   packetBusy: 1.8,
   packetPeak: 1.1,
+  /** A working Transit train's speed lines slipping back past it. */
+  glide: 0.8,
 } as const;
 
 export const ease = {

@@ -22,7 +22,7 @@ const LOADERS: Record<LayoutId, Loader> = {
   minimal: () => import('./minimal/MinimalLayout.js'),
   office: () => import('../office/OfficeLayout.js'),
   grid: () => import('../grid/GridLayout.js'),
-  transit: () => import('./placeholder/TransitLayout.js'),
+  transit: () => import('../transit/TransitLayout.js'),
   retro: () => import('./placeholder/RetroLayout.js'),
 };
 

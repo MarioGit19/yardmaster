@@ -2810,3 +2810,362 @@ main[data-office-zoom] {
 .grid-node[data-variant="trunk"] {
   background: var(--bg-1);
 }
+
+/* ── Transit (DESIGN.md §10.5): a metro map, one accent line per project ─────────────────── */
+
+.transit-ground {
+  background:
+    radial-gradient(
+      120% 80% at 50% 0%,
+      transparent 40%,
+      color-mix(in srgb, var(--transit-ink) 35%, transparent) 100%
+    ),
+    var(--transit-ground);
+}
+[data-theme="light"] .transit-ground {
+  background: var(--transit-ground);
+}
+.transit-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* The time axis: hairline rules every ten minutes, a stronger one at "now". */
+.transit-axis line {
+  stroke: var(--transit-rule);
+  stroke-width: 1;
+}
+.transit-axis text {
+  fill: var(--text-3);
+  font:
+    500 11px / 1 "Geist Mono Variable",
+    ui-monospace,
+    monospace;
+  font-variant-numeric: tabular-nums;
+}
+[data-transit-axis-labels] text {
+  paint-order: stroke;
+  stroke: var(--transit-ground);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.transit-axis .transit-now line {
+  stroke: var(--line-strong);
+  stroke-dasharray: 3 3;
+}
+.transit-axis .transit-now text {
+  fill: var(--text-2);
+}
+
+/* Lines: thick, flat, round-capped, in the project's accent; the platform past "now" is fainter. */
+.transit-track,
+.transit-platform,
+.transit-branch {
+  fill: none;
+  stroke: var(--route);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.transit-track {
+  stroke-width: 6;
+}
+.transit-platform {
+  stroke-width: 6;
+  opacity: 0.32;
+}
+.transit-branch {
+  stroke-width: 3;
+  opacity: 0.85;
+}
+.transit-branch[data-transit-branch="open"] {
+  stroke-dasharray: 6 4;
+}
+.transit-line[data-dim] :is(.transit-track, .transit-branch) {
+  opacity: 0.55;
+}
+
+/* A line's name: sticky over the map on the desktop so stations slide under it. */
+.transit-name {
+  z-index: 3;
+  border-radius: var(--radius-control);
+}
+[data-transit-axis="horizontal"] .transit-name {
+  background: linear-gradient(
+    to right,
+    var(--transit-ground) 0,
+    var(--transit-ground) calc(100% - 20px),
+    transparent 100%
+  );
+}
+[data-transit-axis="vertical"] .transit-name {
+  background: var(--transit-ground);
+  text-align: center;
+  gap: 4px;
+}
+.transit-name:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.transit-swatch {
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--route);
+}
+
+/* Stations: buttons centered on their point; the mark is what shows. */
+.transit-stop {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border-radius: 9999px;
+  outline: none;
+}
+.transit-stop:hover,
+.transit-stop:focus-visible {
+  z-index: 2;
+}
+.transit-stop:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.transit-mark {
+  display: grid;
+  place-items: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--transit-stop);
+  box-shadow: 0 0 0 2.5px var(--transit-ink);
+  color: var(--transit-ink);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.transit-stop:focus-visible .transit-mark {
+  transform: scale(1.25);
+}
+@media (hover: hover) and (pointer: fine) {
+  .transit-stop:hover .transit-mark {
+    transform: scale(1.25);
+  }
+}
+.transit-mark[data-kind="ok"],
+.transit-mark[data-kind="fail"] {
+  width: 14px;
+  height: 14px;
+}
+.transit-mark[data-kind="ok"] {
+  box-shadow: 0 0 0 2px var(--st-ok);
+  color: var(--st-ok);
+}
+.transit-mark[data-kind="fail"] {
+  box-shadow: 0 0 0 2px var(--st-err);
+  color: var(--st-err-ink);
+}
+/* A commit is an interchange: the bigger white circle with a heavy ink ring. */
+.transit-mark[data-kind="commit"] {
+  width: 15px;
+  height: 15px;
+  box-shadow:
+    0 0 0 3px var(--transit-ink),
+    0 0 0 4.5px var(--route);
+}
+.transit-mark[data-kind="crash"] {
+  width: 14px;
+  height: 14px;
+  background: var(--st-err);
+  box-shadow:
+    0 0 0 2px var(--transit-ink),
+    0 0 10px var(--st-err-glow);
+  color: var(--transit-ink);
+}
+/* Merged stops: a pill with the count, ringed in the worst kind's color. */
+.transit-stop[data-count]:not([data-count="1"]) .transit-mark {
+  width: auto;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--transit-ink);
+}
+.transit-glyph {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes transit-pop {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes transit-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+[data-motion="full"] .transit-pop {
+  animation: transit-pop var(--dur-base) var(--ease-out) both;
+}
+[data-motion="reduced"] .transit-pop {
+  animation: transit-fade var(--dur-base) var(--ease-out) both;
+}
+
+/* Trains: a car with windows in the state's tone; it glides to a new place in the queue. */
+.transit-train-slot {
+  z-index: 2;
+}
+[data-motion="full"] .transit-train-slot {
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.transit-train {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 28px;
+  translate: -50% -50%;
+  border-radius: var(--radius-control);
+  outline: none;
+}
+.transit-train.is-vertical {
+  width: 28px;
+  height: 44px;
+}
+.transit-train.is-vertical .transit-car {
+  rotate: -90deg;
+}
+.transit-train:focus-visible,
+.transit-train[data-state="open"] {
+  box-shadow: var(--focus-ring);
+}
+.transit-body {
+  fill: var(--transit-car);
+  stroke: var(--route);
+  stroke-width: 1.5;
+}
+.transit-window {
+  fill: var(--transit-window);
+}
+.transit-light {
+  fill: var(--transit-window);
+}
+.transit-train[data-train="glide"][data-tone="work"] {
+  --tone: var(--st-work);
+}
+.transit-train[data-train="glide"] {
+  --tone: var(--st-tool);
+}
+.transit-train[data-train="glide"] :is(.transit-window, .transit-light),
+.transit-train[data-tone="ok"] .transit-window {
+  fill: var(--tone, var(--st-ok));
+}
+.transit-train[data-tone="ok"] {
+  --tone: var(--st-ok);
+}
+.transit-trail-glow {
+  fill: var(--tone);
+  opacity: 0.35;
+}
+.transit-speed-line {
+  stroke: var(--tone);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+@keyframes transit-speed {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-8px);
+  }
+}
+[data-motion="full"] .transit-speed {
+  animation: transit-speed var(--dur-glide) linear infinite;
+}
+/* Waiting: amber doors that pulse on the breathing period (§3 rule 4). */
+.transit-train[data-train="wait"] .transit-body {
+  stroke: var(--st-wait);
+  filter: drop-shadow(0 0 4px var(--st-wait-glow));
+}
+.transit-doors rect {
+  fill: var(--st-wait);
+}
+@keyframes transit-doors {
+  50% {
+    opacity: 0.35;
+  }
+}
+[data-motion="full"] .transit-doors {
+  animation: transit-doors var(--dur-breathe) var(--ease-in-out) infinite;
+}
+/* Off stage (a view on top, the page hidden) the loops hold. */
+.transit[data-paused] :is(.transit-speed, .transit-doors) {
+  animation-play-state: paused;
+}
+/* Errored: rose and stopped, with a "!" marker. */
+.transit-train[data-train="stop"] .transit-body {
+  fill: color-mix(in srgb, var(--st-err) 30%, var(--transit-car));
+  stroke: var(--st-err);
+}
+.transit-train[data-train="stop"] .transit-window {
+  fill: var(--st-err);
+}
+.transit-alert circle {
+  fill: var(--st-err);
+}
+.transit-alert path {
+  stroke: var(--transit-ink);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.transit-train.is-vertical .transit-alert {
+  rotate: 90deg;
+}
+.transit-more {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 20px;
+  margin: -10px 0 0 -16px;
+  border-radius: 9999px;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* Hover card: above its stop or train. */
+.transit-tip {
+  transform: translate(-50%, calc(-100% - 8px));
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .transit-stop {
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+  }
+  .transit-train {
+    width: 44px;
+    height: 44px;
+  }
+  .transit-train.is-vertical {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
 import {
   buildLanes,
+  countSince,
   eventDetail,
   eventLabel,
   eventTone,
@@ -213,5 +214,16 @@ describe('formatAgo', () => {
     expect(formatAgo(42_000)).toBe('42s ago');
     expect(formatAgo(130_000)).toBe('2m 10s ago');
     expect(formatAgo(600_000)).toBe('10m ago');
+  });
+});
+
+describe('countSince', () => {
+  it('counts the events at or after a moment', () => {
+    const events = [10, 20, 20, 30, 40].map((ts, i) => ({ ts, id: `e${i}` }) as ActivityEvent);
+    expect(countSince(events, 0)).toBe(5);
+    expect(countSince(events, 20)).toBe(4);
+    expect(countSince(events, 25)).toBe(2);
+    expect(countSince(events, 41)).toBe(0);
+    expect(countSince([], 0)).toBe(0);
   });
 });

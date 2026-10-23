@@ -570,19 +570,27 @@ describe('DemoSimulator', () => {
     });
   });
 
-  it('backfills the last 15 minutes of activity for the Pulse rail', () => {
+  it('backfills the last hour of activity for the Pulse rail and Transit', () => {
     const { store, sim, past, advance } = run();
     sim.start();
     advance(3_000);
     expect(past.length).toBeGreaterThan(40);
     for (const event of past) {
       expect(ActivityEvent.safeParse(event).success).toBe(true);
-      expect(event.ts).toBeGreaterThan(T0 - 15 * 60_000);
+      expect(event.ts).toBeGreaterThan(T0 - 60 * 60_000);
       expect(event.ts).toBeLessThan(Date.now());
       expect(store.state.terminals[event.terminalId ?? '']).toBeDefined();
     }
     const kinds = new Set(past.map((e) => e.kind));
-    for (const kind of ['prompt', 'tool.start', 'stop', 'exec.start', 'exec.end'] as const) {
+    for (const kind of [
+      'prompt',
+      'tool.start',
+      'stop',
+      'exec.start',
+      'exec.end',
+      'subagent.start',
+      'subagent.stop',
+    ] as const) {
       expect(kinds.has(kind), kind).toBe(true);
     }
     // Every project has a lane, and session events point at real sessions.

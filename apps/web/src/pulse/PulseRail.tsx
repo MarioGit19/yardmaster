@@ -19,6 +19,7 @@ import {
   useState,
 } from 'react';
 import { useLocation } from 'wouter';
+import { useNow } from '../anim/clock.js';
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
 import { dur, ease, loop, moment, move, useMotionLevel } from '../motion.js';
@@ -34,6 +35,7 @@ import { NumberTicker } from '../ui/NumberTicker.js';
 import { SegmentThumb, useSegmentThumb } from '../ui/SegmentThumb.js';
 import {
   buildLanes,
+  countSince,
   eventDetail,
   eventLabel,
   eventTone,
@@ -183,7 +185,9 @@ export function PulseRail() {
     usePreference(pulsePreference),
     useMediaQuery(PULSE_COMPACT_QUERY),
   );
-  const count = useBoard((s) => s.activity.length);
+  // The store keeps the last hour (Transit's map); the rail counts its own 15 minutes.
+  const now = useNow(DRIFT_MS);
+  const count = useBoard((s) => countSince(s.activity, now - PULSE_WINDOW_MS));
 
   return (
     <section

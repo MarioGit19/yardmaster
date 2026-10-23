@@ -96,6 +96,12 @@ export interface SceneTodo {
   done: boolean;
 }
 
+export interface SceneCommit {
+  hash: string;
+  at: number;
+  subject: string;
+}
+
 export interface SceneProject {
   id: string;
   name: string;
@@ -110,6 +116,8 @@ export interface SceneProject {
   /** The main session's todo list, or else its last assistant line (the Office whiteboard). */
   todos: SceneTodo[];
   summary: string | null;
+  /** Recent commits on the branch, newest first (Transit's interchanges). */
+  commits: SceneCommit[];
   /** 0..1, the project's activity level (§4.10). */
   activity: number;
   /** Nothing for five minutes: the pod dims, the Office's ceiling light goes down. */
@@ -500,6 +508,7 @@ function sceneProject(
       done: t.status === 'completed',
     })),
     summary: lastLine(main?.lastAssistantText ?? null),
+    commits: (git?.commits ?? []).map((c) => ({ hash: c.hash, at: c.at, subject: c.subject })),
     activity: levelAt(pulse, now),
     dim: isDimmed(tone, crashed, lastActivity, now),
   };

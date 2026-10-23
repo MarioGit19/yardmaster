@@ -1,8 +1,8 @@
 import {
   type ActivityEvent,
   type HealthResponse,
+  HISTORY_WINDOW_MS,
   ProjectId,
-  PULSE_WINDOW_MS,
   type ServerStatus,
   type SessionHistoryResponse,
 } from '@c-board/protocol';
@@ -311,7 +311,10 @@ export async function buildServer(
     },
     sendToSession: runner.send.bind(runner),
     recentActivity: () =>
-      persistence.listActivity({ since: Date.now() - PULSE_WINDOW_MS, limit: MAX_ACTIVITY_BATCH }),
+      persistence.listActivity({
+        since: Date.now() - HISTORY_WINDOW_MS,
+        limit: MAX_ACTIVITY_BATCH,
+      }),
     logger: logger.child({ component: 'ui-ws' }),
     ...options.gateway,
   });

@@ -3,8 +3,8 @@ import {
   applyPatch,
   type BoardState,
   emptyBoardState,
+  HISTORY_WINDOW_MS,
   type PatchOp,
-  PULSE_WINDOW_MS,
 } from '@c-board/protocol';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { ingestEvents, ingestOutput, type Pulses } from './activity.js';
@@ -31,7 +31,7 @@ export interface BoardStoreState {
   /** Whether `board` came from the server (false until the first snapshot). */
   hydrated: boolean;
   connection: ConnectionState;
-  /** Recent activity events for the Pulse rail, oldest first. */
+  /** Recent activity events (the last hour) for the Pulse rail and Transit, oldest first. */
   activity: readonly ActivityEvent[];
   /** Activity levels per project, session and terminal (`activityKey`), DESIGN.md §4.10. */
   pulses: Pulses;
@@ -45,20 +45,20 @@ export interface BoardStoreState {
 
 export type BoardStore = StoreApi<BoardStoreState>;
 
-/** Events older than the Pulse window (plus this slack) are dropped from the store. */
+/** Events older than the history window (plus this slack) are dropped from the store. */
 export const ACTIVITY_SLACK_MS = 60_000;
 export const MAX_ACTIVITY = 5_000;
 
 /**
  * Merges `incoming` into `current` (both oldest first), dropping duplicate ids and events
- * that fell out of the Pulse window. Returns `current` itself when nothing changed.
+ * that fell out of the history window. Returns `current` itself when nothing changed.
  */
 export function mergeActivity(
   current: readonly ActivityEvent[],
   incoming: readonly ActivityEvent[],
   now: number,
 ): readonly ActivityEvent[] {
-  const cutoff = now - PULSE_WINDOW_MS - ACTIVITY_SLACK_MS;
+  const cutoff = now - HISTORY_WINDOW_MS - ACTIVITY_SLACK_MS;
   const seen = new Set(current.map((e) => e.id));
   const fresh = incoming.filter((e) => {
     if (e.ts < cutoff || seen.has(e.id)) return false;

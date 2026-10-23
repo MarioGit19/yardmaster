@@ -5,8 +5,7 @@ import { LAYOUT_NAME, type LayoutId } from '../registry.js';
 import { actorKindName, actorStateLabel, type SceneActor, type SceneProject } from '../scene.js';
 import { useSceneModel } from '../useScene.js';
 
-const PITCH: Record<Exclude<LayoutId, 'minimal' | 'office' | 'grid'>, string> = {
-  transit: 'Each project becomes a metro line, and every session and terminal a train on it.',
+const PITCH: Record<Exclude<LayoutId, 'minimal' | 'office' | 'grid' | 'transit'>, string> = {
   retro: 'The whole board as a green-phosphor text console, in box drawing.',
 };
 
@@ -17,7 +16,7 @@ const PITCH: Record<Exclude<LayoutId, 'minimal' | 'office' | 'grid'>, string> = 
 export function PlaceholderLayout({
   layout,
 }: {
-  layout: Exclude<LayoutId, 'minimal' | 'office' | 'grid'>;
+  layout: Exclude<LayoutId, 'minimal' | 'office' | 'grid' | 'transit'>;
 }) {
   const scene = useSceneModel();
   return (
