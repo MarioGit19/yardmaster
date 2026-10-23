@@ -1,6 +1,15 @@
 import { AnimatePresence, animate, motion, type Transition } from 'motion/react';
-import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useInView } from '../anim/useFrame.js';
+import { useRateLoop } from '../anim/useRateLoop.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { cx } from '../ui/cx.js';
@@ -52,9 +61,9 @@ const SHOULDER = { l: { x: 23.5, y: 55.5 }, r: { x: 76.5, y: 55.5 } } as const;
 /**
  * The crew member, DESIGN.md §4.11: an original SVG character that acts out its session.
  * Poses blend through Motion variants; the repeating loops (breathing, taps, scanning) are
- * CSS keyframes, paused off screen and dropped at Reduced. The fastest loops (typing arms, the
- * terminal's scroll, the monitor's flicker) run on HTML layers, which the compositor animates,
- * rather than inside the SVG, which would repaint every frame.
+ * CSS keyframes, paused off screen and dropped at Reduced. Every loop runs on an HTML layer
+ * (`Layer`), which the compositor animates, rather than inside an SVG, which would repaint every
+ * frame. Layers span the mascot's box, so their offsets in % are viewBox units.
  */
 export function CrewMascot({
   state,
@@ -71,7 +80,7 @@ export function CrewMascot({
   const rootRef = useRef<HTMLSpanElement>(null);
   const inView = useInView(rootRef);
   const live = level === 'full' && inView;
-  useCrewCrowd(live);
+  useCrewCrowd(live, rootRef);
   const detail = mascotDetail(size);
   const id = useId();
 
@@ -98,8 +107,8 @@ export function CrewMascot({
   // Per-instance variety: a random phase for the loops, random blink and look-around timing.
   const [loopDelay] = useState(() => `${-between(0, 4).toFixed(2)}s`);
   const lookRef = useRef<HTMLDivElement>(null);
-  const eyeLookRef = useRef<SVGGElement>(null);
-  const blinkRef = useRef<SVGGElement>(null);
+  const eyeLookRef = useRef<HTMLSpanElement>(null);
+  const blinkRef = useRef<HTMLSpanElement>(null);
   const blinks = live && eyes === 'open';
   const looks = live && shown === 'idle';
 
@@ -136,7 +145,7 @@ export function CrewMascot({
           const side = Math.random() < 0.5 ? -1 : 1;
           const hold: Transition = { duration: 1.6, times: [0, 0.2, 0.75, 1], ease: ease.inOut };
           if (eyeLookRef.current)
-            animate(eyeLookRef.current, { x: [0, 4 * side, 4 * side, 0] }, hold);
+            animate(eyeLookRef.current, { x: ['0%', `${4 * side}%`, `${4 * side}%`, '0%'] }, hold);
           if (lookRef.current)
             animate(lookRef.current, { rotate: [0, 4 * side, 4 * side, 0] }, hold);
           next();
@@ -149,7 +158,7 @@ export function CrewMascot({
       clearTimeout(timer);
       // Off screen or at Full it eases back; a drop to Reduced lands at rest without moving.
       const back = stillRef.current ? { duration: 0 } : spring.smooth;
-      if (eyeLookRef.current) animate(eyeLookRef.current, { x: 0 }, back);
+      if (eyeLookRef.current) animate(eyeLookRef.current, { x: '0%' }, back);
       if (lookRef.current) animate(lookRef.current, { rotate: 0 }, back);
     };
   }, [looks]);
@@ -225,50 +234,30 @@ export function CrewMascot({
               />
               <rect x="33" y="44" width="34" height="22" rx="11" fill="var(--crew-visor)" />
               <rect x="33" y="44" width="34" height="22" rx="11" fill={`url(#${id}v)`} />
-              <motion.g
-                variants={eyeVariants}
-                style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-              >
-                <g ref={eyeLookRef}>
-                  <g className={cx('crew-anim', `crew-eyes-${shown}`)}>
-                    <g
-                      ref={blinkRef}
-                      style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-                    >
-                      <Eyes shape={eyes} color={eyeColor} />
-                    </g>
-                  </g>
-                </g>
-              </motion.g>
-
-              <AnimatePresence initial={false}>
-                {props && shown === 'reading' && (
-                  <Prop key="page">
-                    <rect x="37" y="65" width="26" height="19" rx="2" className="crew-prop" />
-                    <g stroke="var(--text-3)" strokeWidth="1.5" strokeLinecap="round">
-                      <line x1="41" y1="70" x2="57" y2="70" />
-                      <line x1="41" y1="74.5" x2="59" y2="74.5" />
-                      {detail === 'detailed' && <line x1="41" y1="79" x2="53" y2="79" />}
-                    </g>
-                    {detail === 'detailed' && (
-                      <g className="crew-anim crew-magnifier" fill="none" stroke="var(--text-2)">
-                        <circle cx="58" cy="73" r="4.5" strokeWidth="1.5" />
-                        <line x1="61.2" y1="76.2" x2="65" y2="80" strokeWidth="2" />
-                      </g>
-                    )}
-                  </Prop>
-                )}
-                {props && shown === 'error' && (
-                  <Prop key="sweat">
-                    <path
-                      d="M71 33 Q74.5 39 71 41.5 Q67.5 39 71 33Z"
-                      fill="var(--orb-read)"
-                      className="crew-anim crew-sweat"
-                    />
-                  </Prop>
-                )}
-              </AnimatePresence>
             </svg>
+            <motion.span
+              className="absolute inset-0"
+              style={{ originX: EYES.x / 100, originY: EYES.y / 100 }}
+              variants={eyeVariants}
+            >
+              <span ref={eyeLookRef} className="absolute inset-0">
+                <span className={cx('crew-anim absolute inset-0', `crew-eyes-${shown}`)}>
+                  <Layer ref={blinkRef} origin={EYES}>
+                    <Eyes shape={eyes} color={eyeColor} />
+                  </Layer>
+                </span>
+              </span>
+            </motion.span>
+            <AnimatePresence initial={false}>
+              {props && shown === 'reading' && <Page key="page" detail={detail} />}
+              {props && shown === 'error' && (
+                <PropLayer key="sweat" origin={{ x: 71, y: 37.25 }}>
+                  <Layer className="crew-anim crew-sweat">
+                    <path d="M71 33 Q74.5 39 71 41.5 Q67.5 39 71 33Z" fill="var(--orb-read)" />
+                  </Layer>
+                </PropLayer>
+              )}
+            </AnimatePresence>
             <Arm side="l" shown={shown} />
             <Arm side="r" shown={shown} />
             <span
@@ -295,12 +284,10 @@ export function CrewMascot({
       {props && (
         <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
           <AnimatePresence initial={false}>
-            {shown === 'typing' && <Keyboard key="keys" detail={detail} color={color} />}
+            {shown === 'typing' && <Keyboard key="keys" detail={detail} />}
             {shown === 'watching' && <Monitor key="mon" />}
             {shown === 'running' && <TerminalProp key="term" />}
             {bubbles && shown === 'thinking' && <ThinkBubble key="think" />}
-            {bubbles && shown === 'waiting' && <AlertBubble key="alert" />}
-            {bubbles && shown === 'sleeping' && <Snore key="z" detail={detail} />}
             {bubbles && shown === 'done' && <Sparkles key="spark" />}
           </AnimatePresence>
         </svg>
@@ -310,9 +297,19 @@ export function CrewMascot({
         <span aria-hidden className="pointer-events-none absolute inset-0">
           <AnimatePresence initial={false}>
             {shown === 'watching' && (
-              <MonitorScreen key="mon" detail={detail} activity={activity} size={size} />
+              <MonitorScreen
+                key="mon"
+                detail={detail}
+                activity={activity}
+                size={size}
+                live={live}
+              />
             )}
             {shown === 'running' && <TerminalScreen key="term" detail={detail} />}
+            {shown === 'typing' && <Glyphs key="keys" color={color} />}
+            {bubbles && shown === 'thinking' && <ThinkDots key="think" />}
+            {bubbles && shown === 'waiting' && <AlertBubble key="alert" />}
+            {bubbles && shown === 'sleeping' && <Snore key="z" detail={detail} />}
           </AnimatePresence>
           <AnimatePresence initial={false}>
             {Array.from({ length: minis }, (_, i) => (
@@ -412,6 +409,54 @@ const box = (x: number, y: number, width: number, height: number): CSSProperties
   height: `${height}%`,
 });
 
+type Point = { x: number; y: number };
+
+/** Where the eyes scale and blink from: the centre of the open eyes, in viewBox units. */
+const EYES: Point = { x: 50, y: 55 };
+
+/**
+ * An HTML layer over the whole mascot holding SVG in its viewBox, so a loop on it is a compositor
+ * transform or opacity. `origin` is in viewBox units.
+ */
+function Layer({
+  ref,
+  className,
+  origin,
+  style,
+  children,
+}: {
+  ref?: Ref<HTMLSpanElement>;
+  className?: string;
+  origin?: Point;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      ref={ref}
+      className={cx('absolute inset-0', className)}
+      style={origin ? { transformOrigin: `${origin.x}% ${origin.y}%`, ...style } : style}
+    >
+      <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
+        {children}
+      </svg>
+    </span>
+  );
+}
+
+/** HTML layers of a prop enter and leave like `Prop`, from the same origin (viewBox units). */
+function PropLayer({ origin, children }: { origin: Point; children: ReactNode }) {
+  return (
+    <motion.span
+      className="absolute inset-0"
+      style={{ originX: origin.x / 100, originY: origin.y / 100 }}
+      {...PROP_LAYER}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
 /** Props and bubbles enter and leave with a quick scale and fade. */
 function Prop({ children, origin = 'center' }: { children: ReactNode; origin?: string }) {
   return (
@@ -426,7 +471,32 @@ function Prop({ children, origin = 'center' }: { children: ReactNode; origin?: s
   );
 }
 
-function Keyboard({ detail, color }: { detail: MascotDetail; color: string }) {
+/** The page being read, on the body; the magnifier scans it on its own layer. */
+function Page({ detail }: { detail: MascotDetail }) {
+  const detailed = detail === 'detailed';
+  return (
+    <PropLayer origin={detailed ? { x: 51, y: 74.5 } : { x: 50, y: 74.5 }}>
+      <Layer>
+        <rect x="37" y="65" width="26" height="19" rx="2" className="crew-prop" />
+        <g stroke="var(--text-3)" strokeWidth="1.5" strokeLinecap="round">
+          <line x1="41" y1="70" x2="57" y2="70" />
+          <line x1="41" y1="74.5" x2="59" y2="74.5" />
+          {detailed && <line x1="41" y1="79" x2="53" y2="79" />}
+        </g>
+      </Layer>
+      {detailed && (
+        <Layer className="crew-anim crew-magnifier">
+          <g fill="none" stroke="var(--text-2)">
+            <circle cx="58" cy="73" r="4.5" strokeWidth="1.5" />
+            <line x1="61.2" y1="76.2" x2="65" y2="80" strokeWidth="2" />
+          </g>
+        </Layer>
+      )}
+    </PropLayer>
+  );
+}
+
+function Keyboard({ detail }: { detail: MascotDetail }) {
   return (
     <Prop>
       <rect x="22" y="77" width="56" height="12" rx="3" className="crew-prop" />
@@ -438,18 +508,28 @@ function Keyboard({ detail, color }: { detail: MascotDetail; color: string }) {
           <rect x="33" y="84" width="34" height="2.5" rx="0.8" />
         </g>
       )}
-      <g fill={color} className="font-mono" fontSize="8" textAnchor="middle">
-        <text x="38" y="76" className="crew-anim crew-glyph">
-          {'{'}
-        </text>
-        <text x="52" y="76" className="crew-anim crew-glyph" style={{ animationDelay: '-0.4s' }}>
-          ;
-        </text>
-        <text x="64" y="76" className="crew-anim crew-glyph" style={{ animationDelay: '-0.8s' }}>
-          /
-        </text>
-      </g>
     </Prop>
+  );
+}
+
+const GLYPHS = [
+  { x: 38, char: '{', delay: '0s' },
+  { x: 52, char: ';', delay: '-0.4s' },
+  { x: 64, char: '/', delay: '-0.8s' },
+];
+
+/** Code rising off the keyboard, over the `Keyboard` prop. */
+function Glyphs({ color }: { color: string }) {
+  return (
+    <PropLayer origin={{ x: 50, y: 79.5 }}>
+      {GLYPHS.map(({ x, char, delay }) => (
+        <Layer key={x} className="crew-anim crew-glyph" style={{ animationDelay: delay }}>
+          <text x={x} y="76" fill={color} className="font-mono" fontSize="8" textAnchor="middle">
+            {char}
+          </text>
+        </Layer>
+      ))}
+    </PropLayer>
   );
 }
 
@@ -471,28 +551,42 @@ function Monitor() {
   );
 }
 
-/** The monitor's screen, over the frame `Monitor` draws: its flicker is a compositor opacity. */
+const FLICKER_STEPS = 'steps(3, jump-none)';
+const FLICKER = {
+  keyframes: [
+    { offset: 0, opacity: 0.85, easing: FLICKER_STEPS },
+    { offset: 0.4, opacity: 0.45, easing: FLICKER_STEPS },
+    { offset: 0.6, opacity: 0.7, easing: FLICKER_STEPS },
+    { offset: 1, opacity: 0.85 },
+  ],
+  durationMs: 1200,
+};
+
+/**
+ * The monitor's screen, over the frame `Monitor` draws: its flicker is a compositor opacity
+ * whose speed eases with the output rate (WAAPI playback rate, so the loop never jumps).
+ */
 function MonitorScreen({
   detail,
   activity,
   size,
+  live,
 }: {
   detail: MascotDetail;
   activity: number;
   size: number;
+  live: boolean;
 }) {
-  // Busier output, faster flicker: 1.2 s at rest down to 0.25 s.
-  const rate = Math.min(1, Math.max(0, activity));
-  const flicker = `${(1.2 - 0.95 * rate).toFixed(2)}s`;
+  // Busier output, faster flicker: a 1.2 s cycle at rest down to 0.25 s.
+  const busy = Math.min(1, Math.max(0, activity));
+  const screenRef = useRef<HTMLSpanElement>(null);
+  useRateLoop(screenRef, FLICKER, 1.2 / (1.2 - 0.95 * busy), live);
   return (
     <motion.span className="absolute" style={box(4, 64, 24, 14)} {...PROP_LAYER}>
       <span
-        className="crew-anim crew-flicker absolute inset-0"
-        style={{
-          background: 'var(--st-ok)',
-          borderRadius: (size * 1.5) / 100,
-          animationDuration: flicker,
-        }}
+        ref={screenRef}
+        className="crew-flicker absolute inset-0"
+        style={{ background: 'var(--st-ok)', borderRadius: (size * 1.5) / 100 }}
       />
       {detail === 'detailed' && (
         <svg aria-hidden viewBox="0 0 24 14" className="absolute inset-0 size-full">
@@ -563,54 +657,60 @@ function ThinkBubble() {
     <Prop origin="0% 100%">
       <circle cx="66" cy="29" r="2" className="crew-prop" />
       <rect x="66" y="7" width="28" height="17" rx="8.5" className="crew-prop" />
-      <g fill="var(--text-2)">
-        {[73, 80, 87].map((cx, i) => (
-          <circle
-            key={cx}
-            cx={cx}
-            cy="15.5"
-            r="2"
-            className="crew-anim crew-dot"
-            style={{ animationDelay: `${i * 0.2}s` }}
-          />
-        ))}
-      </g>
     </Prop>
+  );
+}
+
+/** The thinking dots, over the bubble `ThinkBubble` draws (it grows from its bottom left). */
+function ThinkDots() {
+  return (
+    <PropLayer origin={{ x: 64, y: 31 }}>
+      {[73, 80, 87].map((cx, i) => (
+        <Layer key={cx} className="crew-anim crew-dot" style={{ animationDelay: `${i * 0.2}s` }}>
+          <circle cx={cx} cy="15.5" r="2" fill="var(--text-2)" />
+        </Layer>
+      ))}
+    </PropLayer>
   );
 }
 
 function AlertBubble() {
   return (
-    <Prop origin="0% 100%">
-      <g className="crew-anim crew-bounce">
+    <PropLayer origin={{ x: 13, y: 27 }}>
+      <Layer className="crew-anim crew-bounce">
         <circle cx="22" cy="18" r="9" fill="var(--st-wait)" />
         <rect x="20.8" y="12" width="2.4" height="7.5" rx="1.2" fill="var(--bg-0)" />
         <circle cx="22" cy="23" r="1.4" fill="var(--bg-0)" />
-      </g>
-    </Prop>
+      </Layer>
+    </PropLayer>
   );
 }
 
 function Snore({ detail }: { detail: MascotDetail }) {
+  const zs =
+    detail === 'detailed'
+      ? [
+          { x: 68, y: 30, size: 12, delay: '0s' },
+          { x: 74, y: 22, size: 8, delay: '-1.5s' },
+        ]
+      : [{ x: 68, y: 30, size: 12, delay: '0s' }];
   return (
-    <Prop>
-      <g className="font-mono" fill="var(--text-3)" fontWeight="600">
-        <text x="68" y="30" fontSize="12" className="crew-anim crew-z">
-          z
-        </text>
-        {detail === 'detailed' && (
+    <PropLayer origin={detail === 'detailed' ? { x: 73, y: 24 } : { x: 72, y: 26 }}>
+      {zs.map(({ x, y, size, delay }) => (
+        <Layer key={x} className="crew-anim crew-z" style={{ animationDelay: delay }}>
           <text
-            x="74"
-            y="22"
-            fontSize="8"
-            className="crew-anim crew-z"
-            style={{ animationDelay: '-1.5s' }}
+            x={x}
+            y={y}
+            fontSize={size}
+            className="font-mono"
+            fill="var(--text-3)"
+            fontWeight="600"
           >
             z
           </text>
-        )}
-      </g>
-    </Prop>
+        </Layer>
+      ))}
+    </PropLayer>
   );
 }
 
@@ -653,9 +753,8 @@ function MiniCrew({ index, size, color }: { index: number; size: number; color: 
       animate="shown"
       exit="gone"
     >
-      <motion.svg
-        viewBox="0 0 100 100"
-        className="absolute inset-0 overflow-visible"
+      <motion.span
+        className="absolute inset-0"
         style={{ originX: 0.5, originY: 1 }}
         variants={{
           hidden: { scale: 0.4, opacity: 0 },
@@ -663,15 +762,16 @@ function MiniCrew({ index, size, color }: { index: number; size: number; color: 
           gone: { scale: 0.4, opacity: 0, transition: { duration: dur.fast, ease: ease.out } },
         }}
       >
-        <g className="crew-anim crew-body-idle">
+        {/* Breathes from where its body meets the ground, as the parent does. */}
+        <Layer className="crew-anim crew-body-idle" origin={{ x: 50, y: 78.8 }}>
           <line x1="50" y1="33" x2="50" y2="20" stroke="var(--line-strong)" strokeWidth="3" />
           <circle cx="50" cy="17" r="6" fill="var(--orb-task)" />
           <rect x="27" y="32" width="46" height="56" rx="23" className="crew-shell" />
           <rect x="33" y="45" width="34" height="22" rx="11" fill="var(--crew-visor)" />
           <circle cx="43" cy="56" r="4" fill={color} />
           <circle cx="57" cy="56" r="4" fill={color} />
-        </g>
-      </motion.svg>
+        </Layer>
+      </motion.span>
       <motion.svg
         viewBox="0 0 100 100"
         className="absolute inset-0 overflow-visible"

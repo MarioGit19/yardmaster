@@ -427,20 +427,22 @@
   animation: crew-hop 2s var(--ease-out) infinite;
 }
 
+/* The loops below run on HTML layers spanning the mascot (`Layer` in CrewMascot.tsx), so a
+   percentage offset is one viewBox unit. */
 @keyframes crew-scan {
   from {
-    transform: translateX(-3px);
+    transform: translateX(-3%);
   }
   to {
-    transform: translateX(3px);
+    transform: translateX(3%);
   }
 }
 @keyframes crew-track {
   from {
-    transform: translateY(-1px);
+    transform: translateY(-1%);
   }
   to {
-    transform: translateY(3px);
+    transform: translateY(3%);
   }
 }
 .crew-eyes-reading {
@@ -480,24 +482,24 @@
 .crew-arm-r-waiting {
   animation: crew-wave 2s var(--ease-in-out) infinite;
 }
-:root[data-crew-crowd] .crew-arm-l-typing {
+.crew[data-crew-crowd] .crew-arm-l-typing {
   animation-duration: 0.5s; /* loop: the crowd's half rate */
 }
-:root[data-crew-crowd] .crew-arm-r-typing {
+.crew[data-crew-crowd] .crew-arm-r-typing {
   animation-duration: 0.5s; /* loop: the crowd's half rate */
   animation-delay: -0.25s;
 }
 
 @keyframes crew-rise {
   0% {
-    transform: translateY(2px);
+    transform: translateY(2%);
     opacity: 0;
   }
   25% {
     opacity: 1;
   }
   100% {
-    transform: translateY(-16px);
+    transform: translateY(-16%);
     opacity: 0;
   }
 }
@@ -505,21 +507,9 @@
   animation: crew-rise 1.2s var(--ease-out) infinite;
 }
 
-@keyframes crew-flicker {
-  0%,
-  100% {
-    opacity: 0.85;
-  }
-  40% {
-    opacity: 0.45;
-  }
-  60% {
-    opacity: 0.7;
-  }
-}
+/* The loop is WAAPI (`MonitorScreen`), so its speed can follow the output rate. */
 .crew-flicker {
   opacity: 0.7;
-  animation: crew-flicker 1.2s steps(3, jump-none) infinite;
 }
 
 @keyframes crew-scroll {
@@ -547,20 +537,31 @@
   animation: crew-dot 1.2s var(--ease-in-out) infinite;
 }
 
+/* The hop of the alert bubble: 4% of its own 18-unit height. */
+@keyframes crew-bounce {
+  0%,
+  20%,
+  100% {
+    transform: translateY(0);
+  }
+  10% {
+    transform: translateY(-0.72%);
+  }
+}
 .crew-bounce {
-  animation: crew-hop 2s var(--ease-out) infinite;
+  animation: crew-bounce 2s var(--ease-out) infinite;
 }
 
 @keyframes crew-z {
   0% {
-    transform: translate(0, 2px);
+    transform: translate(0, 2%);
     opacity: 0;
   }
   25% {
     opacity: 1;
   }
   100% {
-    transform: translate(6px, -14px);
+    transform: translate(6%, -14%);
     opacity: 0;
   }
 }
@@ -575,7 +576,7 @@
     opacity: 1;
   }
   100% {
-    transform: translateY(5px);
+    transform: translateY(5%);
     opacity: 0;
   }
 }

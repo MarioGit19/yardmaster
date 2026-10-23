@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures.js';
+import { formatMainThread, mainThread } from './perf.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 // Frame-rate checks: one at a time, so they don't share the CPU.
@@ -45,3 +46,21 @@ for (const ambient of ['nebula', 'veil', 'aurora'] as const) {
     expect(fps).toBeGreaterThanOrEqual(55);
   });
 }
+
+// 10.4 measured 342–378 ms/s here; 10.8e moved the last SVG loops onto HTML layers.
+test('@perf 30 crew mascots main-thread time', async ({ page }) => {
+  await page.goto('/#/_tokens');
+  const section = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Crew mascot' }),
+  });
+  await section.getByRole('button', { name: '30 on screen' }).click();
+  const grid = section.locator('[data-crew-stress]');
+  await expect(grid.locator('[data-crew]')).toHaveCount(30);
+  await grid.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await expect(grid.locator('[data-crew][data-crew-paused]')).toHaveCount(0);
+  await page.waitForTimeout(1_000);
+
+  const stats = await mainThread(page, 5_000);
+  console.log(`crew stress main thread: ${formatMainThread(stats)}`);
+  expect(stats.task).toBeLessThan(600);
+});

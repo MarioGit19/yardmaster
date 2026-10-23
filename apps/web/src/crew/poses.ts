@@ -77,9 +77,10 @@ export const armRVariants = variants(({ armR }) =>
     : { rotate: armR, transition: spring.smooth },
 );
 
+/** The eyes are an HTML layer spanning the mascot, so viewBox units are percentages. */
 export const eyeVariants = variants(({ eyes }) => ({
-  x: eyes.x,
-  y: eyes.y,
+  x: `${eyes.x}%`,
+  y: `${eyes.y}%`,
   scale: eyes.scale ?? 1,
   transition: spring.smooth,
 }));
