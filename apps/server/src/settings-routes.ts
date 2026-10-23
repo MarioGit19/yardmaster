@@ -18,6 +18,7 @@ import {
   DEFAULT_AWAY_TIMEOUT_SEC,
   DEFAULT_IDLE_HIDE_MIN,
   DEFAULT_RETENTION_DAYS,
+  EditorCliPath,
   HooksInstallRequest,
   type HooksInstallResponse,
   type HooksPlanResponse,
@@ -45,6 +46,7 @@ export const EDITOR_SEEN_KEY = 'setup.editorSeen';
 export const LIBRARY_ROOTS_KEY = 'library.roots';
 export const IDLE_HIDE_KEY = 'library.idleHideMin';
 export const PINNED_KEY = 'library.pinned';
+export const EDITOR_CLI_KEY = 'editor.cli';
 
 /** Claude's settings.json as the hooks routes see it. Demo mode swaps in an in-memory one. */
 export interface HookSettingsFile {
@@ -158,6 +160,12 @@ export function librarySettings(settings: Record<string, unknown>): {
   };
 }
 
+/** `editor.cli`: the stored editor CLI path, or null to look for `cursor`, then `code`. */
+export function editorCliSetting(settings: Record<string, unknown>): string | null {
+  const parsed = EditorCliPath.safeParse(settings[EDITOR_CLI_KEY]);
+  return parsed.success ? parsed.data : null;
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -189,6 +197,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     ...awaySettings(settings),
     terminalReply: terminalReplyEnabled(settings),
     ...librarySettings(settings),
+    editorCli: editorCliSetting(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -219,6 +228,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     if (patch.data.pinnedProjects !== undefined) {
       save(PINNED_KEY, [...new Set(patch.data.pinnedProjects)]);
     }
+    if (patch.data.editorCli !== undefined) save(EDITOR_CLI_KEY, patch.data.editorCli);
     return current();
   });
 

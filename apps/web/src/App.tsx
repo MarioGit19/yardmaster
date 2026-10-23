@@ -10,6 +10,7 @@ import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { useLayoutShortcuts } from './layouts/LayoutStage.js';
 import { OpenProjectDialog } from './library/OpenProject.js';
+import { EditorLaunchWatcher } from './library/opening.js';
 import { MotionRoot } from './MotionRoot.js';
 import { dur, ease } from './motion.js';
 import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
@@ -136,6 +137,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <AppRoutes />
           <CommandPalette />
           <OpenProjectDialog />
+          <EditorLaunchWatcher />
         </Router>
         <Toasts />
         <AttentionAlerts />

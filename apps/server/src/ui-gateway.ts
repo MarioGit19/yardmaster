@@ -2,6 +2,7 @@ import {
   type ActivityEvent,
   type ApprovalDecision,
   decodeUiToServer,
+  type EditorApp,
   encodeServerToUi,
   makeMessage,
   type PatchOp,
@@ -186,6 +187,7 @@ export class UiGateway {
         const result = await this.dispatch(message.payload);
         this.reply(client, message.id, result.ok, result.ok ? undefined : result.error, {
           ...(result.ok && result.sessionId !== undefined ? { sessionId: result.sessionId } : {}),
+          ...(result.ok && result.editor !== undefined ? { editor: result.editor } : {}),
         });
         return;
       }
@@ -281,7 +283,7 @@ export class UiGateway {
     id: string | undefined,
     ok: boolean,
     error?: string,
-    extra: { sessionId?: string } = {},
+    extra: { sessionId?: string; editor?: EditorApp } = {},
   ): void {
     if (id === undefined) return;
     const payload =

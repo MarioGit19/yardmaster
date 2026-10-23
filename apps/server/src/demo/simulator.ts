@@ -387,7 +387,7 @@ export class DemoSimulator {
       'project.openInEditor': ({ projectId }) => {
         const project = this.running ? this.projects.find((p) => p.id === projectId) : undefined;
         if (!project) return { ok: false, error: 'unknown_project' };
-        if (this.store.state.windows[project.windowId]) return { ok: true };
+        if (this.store.state.windows[project.windowId]) return { ok: true, editor: 'Cursor' };
         this.after(OPEN_EDITOR_DELAY_MS, () => {
           const ts = this.now();
           this.store.upsertWindow({
@@ -402,7 +402,7 @@ export class DemoSimulator {
             lastSeenAt: ts,
           });
         });
-        return { ok: true };
+        return { ok: true, editor: 'Cursor' };
       },
     };
   }

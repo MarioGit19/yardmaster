@@ -1,5 +1,6 @@
 import {
   decodeServerToUi,
+  type EditorApp,
   encodeUiToServer,
   makeMessage,
   type ServerToUi,
@@ -68,8 +69,12 @@ export interface ChunkInfo {
 
 export type ChunkListener = (chunk: string, info: ChunkInfo) => void;
 
-/** `sessionId`: the session the action started, if any. */
-export type RequestResult = { ok: true; sessionId?: string } | { ok: false; error: string };
+/** `sessionId`: the session the action started, if any. `editor`: the editor a launch opened. */
+export type RequestResult =
+  | { ok: true; sessionId?: string; editor?: EditorApp }
+  | { ok: false; error: string };
+
+export type ActionListener = (action: UiAction, result: RequestResult) => void;
 
 type RequestMessage = Extract<UiToServer, { type: 'action' | 'session.send' | 'approval.decide' }>;
 
@@ -119,6 +124,7 @@ export class BoardClient {
   private readonly streams = new Map<StreamId, StreamEntry>();
   private readonly pending = new Map<string, Pending>();
   private readonly messageListeners = new Set<MessageListener>();
+  private readonly actionListeners = new Set<ActionListener>();
 
   constructor(options: BoardClientOptions) {
     this.url = options.url;
@@ -186,9 +192,17 @@ export class BoardClient {
     return () => this.messageListeners.delete(listener);
   }
 
+  /** Every action's outcome, wherever in the UI it was sent from. */
+  onAction(listener: ActionListener): () => void {
+    this.actionListeners.add(listener);
+    return () => this.actionListeners.delete(listener);
+  }
+
   /** Sends an action and resolves with the server's `action.result`. Never rejects. */
-  action(action: UiAction): Promise<RequestResult> {
-    return this.request('action', action);
+  async action(action: UiAction): Promise<RequestResult> {
+    const result = await this.request('action', action);
+    for (const listener of this.actionListeners) listener(action, result);
+    return result;
   }
 
   request<T extends RequestMessage['type']>(
@@ -306,10 +320,14 @@ export class BoardClient {
         if (!pending) return;
         this.pending.delete(message.payload.id);
         clearTimeout(pending.timer);
-        const { ok, error, sessionId } = message.payload;
+        const { ok, error, sessionId, editor } = message.payload;
         pending.resolve(
           ok
-            ? { ok: true, ...(sessionId !== undefined ? { sessionId } : {}) }
+            ? {
+                ok: true,
+                ...(sessionId !== undefined ? { sessionId } : {}),
+                ...(editor !== undefined ? { editor } : {}),
+              }
             : { ok: false, error: error ?? 'action_failed' },
         );
         return;

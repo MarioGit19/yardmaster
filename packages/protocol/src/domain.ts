@@ -92,6 +92,10 @@ export const Project = z.object({
 });
 export type Project = z.infer<typeof Project>;
 
+/** The editor a CLI launch opens ("Opening in Cursor…"). */
+export const EditorApp = z.enum(['Cursor', 'VS Code']);
+export type EditorApp = z.infer<typeof EditorApp>;
+
 export const EditorCapabilities = z.object({
   /** The editor has the shell-integration execution API; without it only the inventory is mirrored. */
   shellExecution: z.boolean(),

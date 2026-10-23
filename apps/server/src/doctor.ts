@@ -2,17 +2,17 @@ import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { delimiter, join } from 'node:path';
 import { claudeSettingsPath, HOOK_MARKER } from '@c-board/hook';
 import { HealthResponse, ServerStatus } from '@c-board/protocol';
 import type { ServerConfig } from './config.js';
+import { findEditorCli, findOnPath } from './editor-cli.js';
 import { TOKEN_HEADER } from './security.js';
 import { isValidToken, tokenPath } from './token.js';
 
 export type CheckLevel = 'ok' | 'warn' | 'fail' | 'skip';
 
 export interface DoctorCheck {
-  id: 'node' | 'server' | 'token' | 'hooks' | 'extensions' | 'claude' | 'api-key';
+  id: 'node' | 'server' | 'token' | 'hooks' | 'extensions' | 'editor-cli' | 'claude' | 'api-key';
   label: string;
   level: CheckLevel;
   message: string;
@@ -357,19 +357,30 @@ function checkExtensions(
   };
 }
 
-async function findOnPath(deps: DoctorDeps, name: string): Promise<string | undefined> {
-  const dirs = (deps.env.PATH ?? deps.env.Path ?? '').split(delimiter).filter(Boolean);
-  const exts =
-    deps.platform === 'win32'
-      ? (deps.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').filter(Boolean)
-      : [''];
-  for (const dir of dirs) {
-    for (const ext of exts) {
-      const candidate = join(dir, name + ext);
-      if (await deps.isExecutable(candidate)) return candidate;
-    }
+/**
+ * The CLI "Open in Cursor" runs: what the running server found (it knows the path set in
+ * Settings), else the default lookup of `cursor`, then `code`.
+ */
+async function checkEditorCli(
+  deps: DoctorDeps,
+  status: ServerStatus | undefined,
+): Promise<DoctorCheck> {
+  const base = { id: 'editor-cli', label: 'Editor CLI' } as const;
+  const cli = status?.editorCli !== undefined ? status.editorCli : await findEditorCli(deps);
+  if (cli === null) {
+    return {
+      ...base,
+      level: 'warn',
+      message: 'neither `cursor` nor `code` was found',
+      hint: 'To open projects from the board, run "Shell Command: Install \'cursor\' command" in Cursor, or set the CLI path in Settings → Projects.',
+    };
   }
-  return undefined;
+  const where = tildify(cli.path, deps.home);
+  return {
+    ...base,
+    level: 'ok',
+    message: `${cli.app} at ${where}${cli.configured ? ' (set in Settings)' : ''}`,
+  };
 }
 
 async function checkClaude(deps: DoctorDeps): Promise<DoctorCheck> {
@@ -420,13 +431,18 @@ export async function runDoctor(
   const status =
     probe.state === 'board' ? await fetchStatus(config, deps, tokenResult.token) : undefined;
   const liveStatus = typeof status === 'object' ? status : undefined;
-  const [hooks, claude] = await Promise.all([checkHooks(deps, liveStatus, now), checkClaude(deps)]);
+  const [hooks, editorCli, claude] = await Promise.all([
+    checkHooks(deps, liveStatus, now),
+    checkEditorCli(deps, liveStatus),
+    checkClaude(deps),
+  ]);
   return [
     checkNode(deps),
     checkServer(config, probe, liveStatus),
     tokenResult.check,
     hooks,
     checkExtensions(probe, status),
+    editorCli,
     claude,
     checkApiKey(deps),
   ];

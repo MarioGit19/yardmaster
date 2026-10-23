@@ -1,7 +1,12 @@
-import type { UiAction, UiActionKind } from '@c-board/protocol';
+import type { EditorApp, UiAction, UiActionKind } from '@c-board/protocol';
 
-/** `sessionId`: the session an action started (`session.create`, a forked resume). */
-export type ActionResult = { ok: true; sessionId?: string } | { ok: false; error: string };
+/**
+ * `sessionId`: the session an action started (`session.create`, a forked resume). `editor`: the
+ * editor `project.openInEditor` launched.
+ */
+export type ActionResult =
+  | { ok: true; sessionId?: string; editor?: EditorApp }
+  | { ok: false; error: string };
 
 export type ActionOf<K extends UiActionKind> = Extract<UiAction, { kind: K }>;
 

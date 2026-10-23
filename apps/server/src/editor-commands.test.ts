@@ -8,6 +8,7 @@ import type { ServerConfig } from './config.js';
 import { INVALID_SESSION_ID } from './editor-actions.js';
 import { COMMAND_ERRORS, EDITOR_WS_PATH } from './editor-gateway.js';
 import { ROUTE_ERRORS } from './editor-router.js';
+import { OUTSIDE_LIBRARY } from './project-actions.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
 import { TERMINAL_REPLY_DISABLED } from './terminal-reply.js';
 import { generateToken } from './token.js';
@@ -323,6 +324,60 @@ describe('editor commands', () => {
     await app.editorGateway.idle();
     ed.send('cmd.result', { id: command.id, ok: true });
     expect(await result).toEqual({ ok: true });
+  });
+
+  it('opens a library project with the editor CLI, and refuses one outside the roots', async () => {
+    const spawned: [string, string[]][] = [];
+    app = await startServer(config, {
+      token,
+      dbPath: ':memory:',
+      processes: false,
+      git: false,
+      library: {
+        list: async () => ({ roots: [], entries: [] }),
+        resolve: async (roots, path) =>
+          roots.includes('/home/dev') && path.startsWith('/home/dev/') ? path : null,
+      },
+      editorCli: {
+        deps: {
+          env: { PATH: '/usr/local/bin' },
+          platform: 'linux',
+          home: '/home/dev',
+          isExecutable: async (path) => path === '/usr/local/bin/cursor',
+        },
+        spawn: async (file, args) => {
+          spawned.push([file, args]);
+          return { ok: true };
+        },
+      },
+    });
+    app.settings['library.roots'] = ['/home/dev'];
+    const port = (app.server.address() as AddressInfo).port;
+    const client = await ui(port);
+
+    client.send('action', { kind: 'project.add', path: '/home/dev/recipe-box' }, 'o-1');
+    expect((await client.next()).payload).toEqual({ id: 'o-1', ok: true });
+    const projectId = Object.keys(app.store.state.projects)[0];
+    client.send('action', { kind: 'project.openInEditor', projectId }, 'o-2');
+    expect((await client.next()).payload).toEqual({ id: 'o-2', ok: true, editor: 'Cursor' });
+    expect(spawned).toEqual([['/usr/local/bin/cursor', ['/home/dev/recipe-box']]]);
+
+    // No window has it open yet, and board terminals (12.4) don't exist yet.
+    client.send('action', { kind: 'terminal.create', projectId }, 'o-3');
+    expect((await client.next()).payload).toEqual({
+      id: 'o-3',
+      ok: false,
+      error: ROUTE_ERRORS.noEditor,
+    });
+
+    app.settings['library.roots'] = [];
+    client.send('action', { kind: 'project.openInEditor', projectId }, 'o-4');
+    expect((await client.next()).payload).toEqual({
+      id: 'o-4',
+      ok: false,
+      error: OUTSIDE_LIBRARY,
+    });
+    expect(spawned).toHaveLength(1);
   });
 
   it('answers routing errors without contacting an editor', async () => {

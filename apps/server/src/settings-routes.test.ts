@@ -19,6 +19,7 @@ import type { ServerConfig } from './config.js';
 import { SESSION_COOKIE } from './security.js';
 import {
   diskHookSettings,
+  editorCliSetting,
   type HookSettingsFile,
   librarySettings,
   memoryHookSettings,
@@ -28,7 +29,12 @@ import {
 import { generateToken } from './token.js';
 
 const host = '127.0.0.1:4317';
-const LIBRARY_DEFAULTS = { libraryRoots: [], libraryIdleHideMin: 30, pinnedProjects: [] };
+const LIBRARY_DEFAULTS = {
+  libraryRoots: [],
+  libraryIdleHideMin: 30,
+  pinnedProjects: [],
+  editorCli: null,
+};
 const HOOK = '/opt/c-board/bin/c-board-hook';
 
 let app: FastifyInstance | undefined;
@@ -218,6 +224,31 @@ describe('settings routes', () => {
       libraryIdleHideMin: 60,
       pinnedProjects: ['p-1', 'p-2'],
     });
+  });
+
+  it('stores the editor CLI path, absolute only, and clears it with null', async () => {
+    const { token, config } = await boot();
+    for (const bad of ['cursor', '', '~/bin/cursor']) {
+      const res = await call('PUT', '/api/settings', token, { editorCli: bad });
+      expect(res.statusCode, bad).toBe(400);
+    }
+    const res = await call('PUT', '/api/settings', token, { editorCli: ' /opt/tools/cursor ' });
+    expect(res.json()).toMatchObject({ editorCli: '/opt/tools/cursor' });
+
+    await app?.close();
+    app = await buildServer(config, {
+      token,
+      dbPath: join(config.home, 'board.db'),
+      processes: false,
+      git: false,
+      hookSettings: memoryHookSettings(),
+    });
+    expect((await call('GET', '/api/settings', token)).json()).toMatchObject({
+      editorCli: '/opt/tools/cursor',
+    });
+    const cleared = await call('PUT', '/api/settings', token, { editorCli: null });
+    expect(cleared.json()).toMatchObject({ editorCli: null });
+    expect(editorCliSetting({ 'editor.cli': 'relative' })).toBeNull();
   });
 
   it('ignores stored library settings that no longer validate', () => {

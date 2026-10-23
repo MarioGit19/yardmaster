@@ -38,6 +38,7 @@ beforeEach(() => {
     awayTimeoutSec: 120,
     terminalReply: true,
     libraryRoots: [],
+    editorCli: null,
     libraryIdleHideMin: 30,
     pinnedProjects: [],
   };

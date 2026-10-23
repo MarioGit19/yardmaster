@@ -6,6 +6,7 @@ import {
   ApprovalState,
   BoardState,
   CommandConfidence,
+  EditorApp,
   EditorCapabilities,
   ExecutionId,
   PermissionMode,
@@ -222,6 +223,8 @@ export const ActionResult = envelope(
     error: ShortText.optional(),
     /** The session the action started: `session.create`, or a forked `session.resume`. */
     sessionId: SessionId.optional(),
+    /** The editor `project.openInEditor` launched. */
+    editor: EditorApp.optional(),
   }),
 );
 

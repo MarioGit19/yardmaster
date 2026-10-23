@@ -25,6 +25,7 @@ import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
+import { EditorLauncher, type EditorLauncherOptions } from './editor-cli.js';
 import {
   EditorGateway,
   type EditorGatewayOptions,
@@ -35,13 +36,14 @@ import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
-import { createProjectActions } from './project-actions.js';
+import { createLaunchActions, createProjectActions } from './project-actions.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
   awaySettings,
   diskHookSettings,
   EDITOR_SEEN_KEY,
+  editorCliSetting,
   HOOK_SEEN_KEY,
   type HookSettingsFile,
   LIBRARY_ROOTS_KEY,
@@ -104,6 +106,8 @@ export interface BuildOptions {
   hookSettings?: HookSettingsFile;
   /** The project library behind `GET /api/library`. Defaults to the disk, or a synthetic one in demo mode. */
   library?: LibrarySource;
+  /** Editor CLI lookup and spawning, for tests (they never launch an editor). */
+  editorCli?: Omit<EditorLauncherOptions, 'configured'>;
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -293,19 +297,35 @@ export async function buildServer(
   if (options.demo && settings[LIBRARY_ROOTS_KEY] === undefined) {
     settings[LIBRARY_ROOTS_KEY] = [DEMO_LIBRARY_ROOT];
   }
+  const editorLauncher = new EditorLauncher({
+    configured: () => editorCliSetting(settings),
+    ...options.editorCli,
+  });
   const actions = options.actions ?? defaultActions();
   function defaultActions(): ActionHandlers {
+    const roots = () => librarySettings(settings).libraryRoots;
+    const editorActions = createEditorActions({
+      router: editorRouter,
+      send: editorGateway.sendCommand.bind(editorGateway),
+    });
+    const sessionActions = runner.actions();
     const handlers: ActionHandlers = {
       ...stubActionHandlers(),
-      ...createEditorActions({
+      ...editorActions,
+      ...sessionActions,
+      ...createLaunchActions({
+        store,
+        library,
+        roots,
         router: editorRouter,
-        send: editorGateway.sendCommand.bind(editorGateway),
+        editorTerminal: editorActions['terminal.create'],
+        sessionCreate: sessionActions['session.create'],
       }),
-      ...runner.actions(),
       ...createProjectActions({
         store,
         library,
-        roots: () => librarySettings(settings).libraryRoots,
+        roots,
+        launcher: editorLauncher,
         ...(demo
           ? {
               add: (project: Project) => demo?.addProject(project, demoFolderHasGit(project.path)),
@@ -420,6 +440,7 @@ export async function buildServer(
       setup: { hookSeen: seen(HOOK_SEEN_KEY), editorSeen: seen(EDITOR_SEEN_KEY) },
       watched: options.watched ?? false,
       boardSessions: runner.liveCount,
+      ...(demo ? {} : { editorCli: await editorLauncher.find() }),
     };
   });
   registerSettingsRoutes(app, {

@@ -1,4 +1,5 @@
 import {
+  EditorCliPath,
   IDLE_HIDE_MIN,
   type IdleHideMin,
   LIBRARY_MAX_ROOTS,
@@ -149,6 +150,7 @@ export function SettingsView() {
         <SettingsSection title="Projects">
           <LibraryRootsRow server={server} />
           <IdleHideRow server={server} />
+          <EditorCliRow server={server} />
         </SettingsSection>
 
         <SettingsSection title="Claude">
@@ -530,6 +532,102 @@ function IdleHideRow({ server: { settings, update } }: { server: ServerSettings 
         disabled={settings === null}
       />
     </SettingRow>
+  );
+}
+
+/** `editor.cli` (12.3): the Cursor or VS Code CLI that "Open in Cursor" runs. */
+function EditorCliRow({ server: { settings, update } }: { server: ServerSettings }) {
+  const saved = settings?.editorCli ?? null;
+  const [draft, setDraft] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const value = draft ?? saved ?? '';
+
+  const save = async (next: string | null) => {
+    if (next !== null) {
+      const parsed = EditorCliPath.safeParse(next);
+      if (!parsed.success) {
+        setError('Use the full path to the command, like /usr/local/bin/cursor.');
+        return;
+      }
+      next = parsed.data;
+    }
+    setError(null);
+    await update({ editorCli: next }, 'Could not save the editor command');
+    setDraft(null);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 p-5" data-setting="editor-cli">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="font-medium text-body text-text-1">Editor command</h3>
+        <p className="text-label text-text-2">
+          “Open in Cursor” runs this with the project folder. Leave it empty to use{' '}
+          <code className="font-mono">cursor</code>, or else <code className="font-mono">code</code>
+          , from your PATH or the app.
+        </p>
+        {settings && <EditorCliFound key={saved ?? ''} />}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save(value.trim() === '' ? null : value);
+        }}
+        className="flex min-w-0 flex-col gap-2 sm:flex-row"
+      >
+        <label className="flex h-8 min-w-0 flex-1 items-center rounded-control border border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
+          <input
+            aria-label="Editor command path"
+            placeholder="Found automatically"
+            value={value}
+            spellCheck={false}
+            autoComplete="off"
+            autoCapitalize="off"
+            disabled={settings === null}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError(null);
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none disabled:opacity-50"
+          />
+        </label>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            type="submit"
+            disabled={settings === null || draft === null || draft.trim() === (saved ?? '')}
+          >
+            Save
+          </Button>
+          {saved !== null && (
+            <Button variant="secondary" onClick={() => void save(null)}>
+              Find automatically
+            </Button>
+          )}
+        </div>
+      </form>
+      {error && (
+        <p role="alert" className="text-meta text-st-err-ink">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** What the server found for the editor command, checked again whenever the setting changes. */
+function EditorCliFound() {
+  const status = useServerStatus(null);
+  if (status === null || status === 'error' || status.editorCli === undefined) return null;
+  const cli = status.editorCli;
+  return (
+    <p
+      className={cx('min-w-0 truncate text-meta', cli ? 'text-text-3' : 'text-st-err-ink')}
+      data-editor-cli={cli ? cli.app : 'missing'}
+      title={cli?.path}
+    >
+      {cli
+        ? `Using ${cli.app}: ${cli.path}`
+        : 'Not found. Install the shell command from Cursor, or enter its path.'}
+    </p>
   );
 }
 

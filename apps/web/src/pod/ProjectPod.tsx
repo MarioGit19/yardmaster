@@ -1,4 +1,4 @@
-import type { ClaudeSession, Project } from '@c-board/protocol';
+import type { ClaudeSession, EditorApp, Project } from '@c-board/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type PointerEvent, useEffect, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import {
 } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
+import { type OpeningPhase, slowHint, useOpening } from '../library/opening.js';
 import { spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
@@ -69,6 +70,7 @@ export function ProjectPod({ project }: { project: Project }) {
   const accent = `var(--accent-${project.accent})`;
   const hiddenSessions = live.length - MAX_SESSION_ROWS;
   const hiddenLanes = openTerminals.length - MAX_LANES;
+  const opening = useOpening(project.id);
 
   // Activity, DESIGN.md §4.10.
   const pulseKey = activityKey.project(project.id);
@@ -205,7 +207,7 @@ export function ProjectPod({ project }: { project: Project }) {
             >
               {project.name}
             </Link>
-            <GitLine git={project.git} />
+            {opening ? <OpeningLine {...opening} /> : <GitLine git={project.git} />}
           </div>
           <PodCrew
             sessions={live.slice(0, MAX_CREW)}
@@ -255,6 +257,20 @@ export function ProjectPod({ project }: { project: Project }) {
         )}
       </motion.article>
     </PodMenu>
+  );
+}
+
+/** Launched from the board (12.3): waiting for the editor window's extension to connect. */
+function OpeningLine({ editor, phase }: { editor: EditorApp; phase: OpeningPhase }) {
+  return (
+    <span
+      role="status"
+      data-pod-opening={phase}
+      className={cx('truncate text-meta', phase === 'slow' ? 'text-st-wait-ink' : 'text-text-2')}
+      title={phase === 'slow' ? slowHint(editor) : undefined}
+    >
+      {phase === 'slow' ? slowHint(editor) : `Opening in ${editor}…`}
+    </span>
   );
 }
 

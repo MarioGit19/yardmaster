@@ -478,7 +478,10 @@ describe('DemoSimulator', () => {
       expect(windows()).toEqual([]);
 
       const open = sim.editorActions()['project.openInEditor'];
-      expect(await open({ kind: 'project.openInEditor', projectId: id })).toEqual({ ok: true });
+      expect(await open({ kind: 'project.openInEditor', projectId: id })).toEqual({
+        ok: true,
+        editor: 'Cursor',
+      });
       advance(1_000);
       expect(windows()).toMatchObject([
         { appName: 'Cursor', workspaceFolders: ['/home/dev/garden-planner'] },

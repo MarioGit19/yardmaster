@@ -104,6 +104,7 @@ describe('runDoctor', () => {
       'token',
       'hooks',
       'extensions',
+      'editor-cli',
       'claude',
       'api-key',
     ]);
@@ -351,6 +352,44 @@ describe('runDoctor', () => {
     it('warns when claude --version fails', async () => {
       const checks = await runDoctor(config, fakeDeps({ commands: {} }), NOW);
       expect(byId(checks, 'claude').message).toContain('failed');
+    });
+  });
+
+  describe('editor CLI', () => {
+    it('finds cursor on PATH', async () => {
+      const deps = fakeDeps({ executables: ['/usr/local/bin/claude', '/usr/local/bin/cursor'] });
+      const checks = await runDoctor(config, deps, NOW);
+      expect(byId(checks, 'editor-cli')).toMatchObject({
+        level: 'ok',
+        message: 'Cursor at /usr/local/bin/cursor',
+      });
+    });
+
+    it('falls back to code', async () => {
+      const deps = fakeDeps({ executables: ['/usr/bin/code'] });
+      const checks = await runDoctor(config, deps, NOW);
+      expect(byId(checks, 'editor-cli').message).toBe('VS Code at /usr/bin/code');
+    });
+
+    it('warns when neither is found', async () => {
+      const checks = await runDoctor(config, fakeDeps(), NOW);
+      expect(byId(checks, 'editor-cli')).toMatchObject({ level: 'warn' });
+      expect(byId(checks, 'editor-cli').hint).toContain('Settings → Projects');
+    });
+
+    it('reports what a running server found, including a path set in Settings', async () => {
+      const http = runningBoard({
+        editorCli: { path: '/home/dev/bin/cursor', app: 'Cursor', configured: true },
+      });
+      const checks = await runDoctor(config, fakeDeps({ portFree: false, http }), NOW);
+      expect(byId(checks, 'editor-cli').message).toBe('Cursor at ~/bin/cursor (set in Settings)');
+    });
+
+    it('trusts a running server that found none', async () => {
+      const http = runningBoard({ editorCli: null });
+      const deps = fakeDeps({ portFree: false, http, executables: ['/usr/local/bin/cursor'] });
+      const checks = await runDoctor(config, deps, NOW);
+      expect(byId(checks, 'editor-cli')).toMatchObject({ level: 'warn' });
     });
   });
 

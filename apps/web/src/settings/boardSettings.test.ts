@@ -8,6 +8,7 @@ const BASE: BoardSettings = {
   awayTimeoutSec: 120,
   terminalReply: false,
   libraryRoots: [],
+  editorCli: null,
   libraryIdleHideMin: 30,
   pinnedProjects: [],
 };

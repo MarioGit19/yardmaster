@@ -506,6 +506,27 @@ describe('BoardClient requests', () => {
     await expect(failed).resolves.toEqual({ ok: false, error: 'nope' });
   });
 
+  it('passes the launched editor through and tells action listeners', async () => {
+    const { client, connect, last } = setup();
+    client.start();
+    connect();
+    const heard: [string, unknown][] = [];
+    const stop = client.onAction((action, result) => heard.push([action.kind, result]));
+    const opened = client.action({ kind: 'project.openInEditor', projectId: 'p1' });
+    const [sent] = last().sent;
+    last().receive(
+      makeMessage<ServerToUi>('action.result', { id: sent?.id ?? '', ok: true, editor: 'VS Code' }),
+    );
+    await expect(opened).resolves.toEqual({ ok: true, editor: 'VS Code' });
+    expect(heard).toEqual([['project.openInEditor', { ok: true, editor: 'VS Code' }]]);
+    stop();
+    const focused = client.action({ kind: 'terminal.focus', terminalId: 't1' });
+    const next = last().sent.at(-1);
+    last().receive(makeMessage<ServerToUi>('action.result', { id: next?.id ?? '', ok: true }));
+    await focused;
+    expect(heard).toHaveLength(1);
+  });
+
   it('fails fast offline, on disconnect, on timeout and for invalid payloads', async () => {
     const { client, connect, last, logger } = setup({ requestTimeoutMs: 1000 });
     client.start();

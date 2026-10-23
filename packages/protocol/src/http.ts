@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SessionHistoryEntry } from './claude-sessions.js';
-import { ProjectId, Timestamp } from './domain.js';
+import { EditorApp, ProjectId, Timestamp } from './domain.js';
 
 // JSON bodies of the server's HTTP routes, shared by the CLI, the web app and tests.
 
@@ -32,6 +32,11 @@ export const ServerStatus = z.object({
   watched: z.boolean().optional(),
   /** Board sessions with a running query. */
   boardSessions: z.number().int().nonnegative().optional(),
+  /** The editor CLI "Open in Cursor" runs (12.3), or null when none was found. */
+  editorCli: z
+    .object({ path: z.string(), app: EditorApp, configured: z.boolean() })
+    .nullable()
+    .optional(),
 });
 export type ServerStatus = z.infer<typeof ServerStatus>;
 
@@ -73,6 +78,15 @@ export const LibraryRootPath = z
     message: 'an absolute path or one starting with ~/',
   });
 
+/** `editor.cli`: the Cursor or VS Code CLI to open projects with, as an absolute path. */
+export const EditorCliPath = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1024)
+  .refine((path) => !path.includes('\0'), 'no NUL bytes')
+  .refine((path) => path.startsWith('/'), { message: 'an absolute path' });
+
 /** `GET /api/settings` (authenticated): settings the server owns. */
 export const BoardSettings = z.object({
   retentionDays: RetentionDays,
@@ -87,6 +101,8 @@ export const BoardSettings = z.object({
   libraryIdleHideMin: IdleHideMin,
   /** Projects that stay on the overview however quiet they are. */
   pinnedProjects: z.array(ProjectId).max(MAX_PINNED_PROJECTS),
+  /** `editor.cli`: null finds `cursor`, then `code`, on PATH or in the app bundle. */
+  editorCli: EditorCliPath.nullable(),
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 
