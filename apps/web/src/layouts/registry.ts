@@ -23,7 +23,7 @@ const LOADERS: Record<LayoutId, Loader> = {
   office: () => import('../office/OfficeLayout.js'),
   grid: () => import('../grid/GridLayout.js'),
   transit: () => import('../transit/TransitLayout.js'),
-  retro: () => import('./placeholder/RetroLayout.js'),
+  retro: () => import('../retro/RetroLayout.js'),
 };
 
 /** Layouts whose chunk has arrived: these render without suspending. */

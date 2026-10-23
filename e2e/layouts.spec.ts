@@ -1,5 +1,5 @@
 import type { Browser, BrowserContextOptions, Page } from '@playwright/test';
-import { startDemoBoard } from './board.js';
+import { startBoard, startDemoBoard } from './board.js';
 import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -1199,6 +1199,230 @@ test.describe('the Transit map', () => {
               (a) =>
                 a instanceof CSSAnimation &&
                 /^transit-(speed|doors)$/.test(a.animationName) &&
+                a.playState === 'running',
+            ).length,
+      );
+      expect(running).toBe(0);
+    } finally {
+      await stop();
+    }
+  });
+});
+
+test.describe('the Retro console', () => {
+  test('shows the same amber and rose cues as Minimal, on its own screen', async ({ browser }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect
+        .poll(
+          async () => {
+            await page.keyboard.press('Alt+Digit1');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'minimal');
+            await expect(page.locator('main [data-layout="retro"]')).toHaveCount(0);
+            const minimal = await cues(page, false);
+            const pods = await page.locator('[data-pod]').count();
+            await page.keyboard.press('Alt+Digit5');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'retro');
+            await expect(page.locator('main [data-layout="minimal"]')).toHaveCount(0);
+            const count = (selector: string) => page.locator(selector).count();
+            const frames = await count('[data-retro-frame]');
+            const wait = await count('[data-retro-frame][data-tone="wait"]');
+            const err = await count('[data-retro-frame][data-tone="err"]');
+            return frames === pods && minimal.wait === wait && minimal.err === err && wait > 0;
+          },
+          { timeout: 40_000, intervals: [500] },
+        )
+        .toBe(true);
+      // Status in words as well as color: the waiting session's tag.
+      const waiting = page.locator('[data-retro-frame] [data-scene-actor][data-tone="wait"]');
+      await expect(waiting.first()).toContainText('[WAIT]');
+      await expect(page.locator('[data-retro-ground]')).toHaveCount(1);
+      await expect(page.locator('[data-ambient]')).toHaveCount(0);
+      // Something works: its cursor blinks.
+      await expect(page.locator('[data-retro] .retro-cursor[data-blink]').first()).toBeAttached();
+    } finally {
+      await stop();
+    }
+  });
+
+  test('number keys jump to a project and an actor, Enter inspects, Esc steps back', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit5');
+      const frames = page.locator('[data-retro-frame]');
+      await expect(frames.first()).toBeVisible();
+      await expect(frames.nth(1).locator('[data-retro-name]')).toContainText('[2]');
+
+      await page.keyboard.press('2');
+      const second = frames.nth(1);
+      const name = second.locator('[data-retro-name]');
+      await expect(name).toBeFocused();
+      await page.keyboard.press('1');
+      const actor = second.locator('[data-retro-key="1"]');
+      await expect(actor).toBeFocused();
+      await page.keyboard.press('Enter');
+      const inspector = page.locator('[data-actor-inspector]');
+      await expect(inspector.locator('[data-actor]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(inspector).toHaveCount(0);
+      await expect(actor).toBeFocused();
+      await page.keyboard.press('ArrowUp');
+      await expect(name).toBeFocused();
+      await page.keyboard.press('ArrowDown');
+      await expect(actor).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(name).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-retro]')).toBeFocused();
+
+      // Back on the board, a number picks a project again; Enter opens it.
+      await page.keyboard.press('1');
+      const first = frames.first().locator('[data-retro-name]');
+      await expect(first).toBeFocused();
+      const projectId = await frames.first().getAttribute('data-retro-frame');
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(new RegExp(`#/p/${projectId}$`));
+    } finally {
+      await stop();
+    }
+  });
+
+  test('fits 20 projects at 1440 × 900 on one character grid, and "12" jumps to the 12th', async ({
+    browser,
+  }) => {
+    test.slow();
+    const board = await startBoard({ demo: true, stress: true, projects: 20 });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      baseURL: board.url,
+      storageState: signedInState(board.url, board.cookie),
+    });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+      await openRoute(page, '/');
+      const frames = page.locator('[data-retro-frame]');
+      await expect(frames).toHaveCount(20);
+      await expect(page.locator('[data-retro]')).toHaveAttribute('data-retro-cols', '4');
+
+      const grid = await page.evaluate(() => {
+        const console = document.querySelector<HTMLElement>('[data-retro]');
+        const probe = console?.querySelector<HTMLElement>('.retro-probe');
+        const ch = (probe?.getBoundingClientRect().width ?? 0) / 100;
+        const main = document.querySelector('main')?.getBoundingClientRect();
+        const boxes = [...document.querySelectorAll<HTMLElement>('[data-retro-frame]')].map(
+          (frame) => {
+            const box = frame.getBoundingClientRect();
+            const widths = [...frame.querySelectorAll<HTMLElement>('.retro-line, .retro-row')].map(
+              (line) => line.getBoundingClientRect().width,
+            );
+            return { x: box.x, y: box.y, bottom: box.bottom, right: box.right, widths };
+          },
+        );
+        return { ch, mainBottom: main?.bottom ?? 0, mainRight: main?.right ?? 0, boxes };
+      });
+      expect(grid.ch).toBeGreaterThan(0);
+      const xs = new Set(grid.boxes.map((b) => Math.round(b.x)));
+      const ys = new Set(grid.boxes.map((b) => Math.round(b.y)));
+      expect(xs.size).toBe(4);
+      expect(ys.size).toBe(5);
+      for (const box of grid.boxes) {
+        // Every frame is on screen, and every line of it is the frame's width to the character.
+        expect(box.bottom).toBeLessThanOrEqual(grid.mainBottom);
+        expect(box.right).toBeLessThanOrEqual(grid.mainRight);
+        const width = box.right - box.x;
+        for (const line of box.widths) expect(Math.abs(line - width)).toBeLessThan(0.5);
+        expect(Math.abs(width / grid.ch - Math.round(width / grid.ch))).toBeLessThan(0.05);
+      }
+
+      await page.locator('[data-retro]').focus();
+      await page.keyboard.press('1');
+      await expect(frames.first().locator('[data-retro-name]')).toBeFocused();
+      await page.keyboard.press('2');
+      await expect(frames.nth(11).locator('[data-retro-name]')).toBeFocused();
+    } finally {
+      await context.close();
+      await board.stop();
+    }
+  });
+
+  test('on a touch phone: one frame per row, 44 px targets, the inspector a sheet', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser, {
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await page.evaluate(() => localStorage.setItem('cboard.layout', 'retro'));
+      await page.reload();
+      const console = page.locator('[data-retro]');
+      await expect(console).toHaveAttribute('data-stacked', '');
+      await expect(console).toHaveAttribute('data-retro-cols', '1');
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      const chars = await console.evaluate((el) => {
+        const probe = el.querySelector('.retro-probe')?.getBoundingClientRect().width ?? 0;
+        const frame = el.querySelector('[data-retro-frame]')?.getBoundingClientRect().width ?? 0;
+        return Math.round(frame / (probe / 100));
+      });
+      expect(chars).toBeGreaterThanOrEqual(40);
+
+      const frame = page.locator('[data-retro-frame]').first();
+      const name = frame.locator('[data-retro-name]');
+      const actor = frame.locator('[data-scene-actor]').first();
+      for (const target of [name, actor]) {
+        const box = await target.boundingBox();
+        expect(box?.width).toBeGreaterThanOrEqual(44);
+        expect(box?.height).toBeGreaterThanOrEqual(44);
+      }
+      await actor.tap();
+      const sheet = page.locator('[data-actor-inspector][data-sheet]');
+      await expect(sheet).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('the amber phosphor from Settings, and at Reduced nothing blinks', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await openRoute(page, '/settings');
+      await page
+        .locator('[data-setting="phosphor"]')
+        .getByRole('button', { name: 'Amber' })
+        .click();
+      await page.evaluate(() => {
+        localStorage.setItem('cboard.layout', 'retro');
+        localStorage.setItem('cboard.motion', 'reduced');
+      });
+      await openRoute(page, '/');
+      await page.reload();
+      const console = page.locator('[data-retro]');
+      await expect(console).toHaveAttribute('data-phosphor', 'amber');
+      await expect(page.locator('[data-retro-ground]')).toHaveAttribute('data-phosphor', 'amber');
+      await expect(page.locator('.retro-cursor[data-blink]').first()).toBeAttached({
+        timeout: 20_000,
+      });
+      const running = await page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter(
+              (a) =>
+                a instanceof CSSAnimation &&
+                a.animationName === 'retro-blink' &&
                 a.playState === 'running',
             ).length,
       );

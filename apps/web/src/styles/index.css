@@ -3169,3 +3169,265 @@ main[data-office-zoom] {
     height: 44px;
   }
 }
+
+/* ── Retro (DESIGN.md §10.6): a phosphor text console on one character grid ────────────────── */
+
+.retro,
+.retro-ground {
+  --retro-ink: var(--retro-fg);
+}
+:is(.retro, .retro-ground)[data-phosphor="amber"] {
+  --retro-ink: var(--retro-amber);
+}
+
+/* The tube: the phosphor's faint bloom in the middle, the curvature darkening the edges. */
+.retro-ground {
+  background:
+    radial-gradient(130% 120% at 50% 45%, transparent 55%, rgb(0 0 0 / 0.6) 100%),
+    radial-gradient(
+      80% 70% at 50% 40%,
+      color-mix(in srgb, var(--retro-ink) 7%, transparent),
+      transparent 70%
+    ),
+    var(--retro-bg);
+}
+/* Daylight is a line printer: ink on warm paper, no tube. */
+[data-theme="light"] .retro-ground {
+  background: var(--retro-bg);
+}
+
+.retro {
+  /* Status colors at reduced saturation (§10.6), read against the phosphor. */
+  --retro-gray: #9ba39d;
+  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 58%, var(--retro-bg));
+  --retro-tone-work: color-mix(in oklch, var(--st-work-ink) 75%, var(--retro-gray));
+  --retro-tone-tool: color-mix(in oklch, var(--st-tool-ink) 75%, var(--retro-gray));
+  --retro-tone-wait: color-mix(in oklch, var(--st-wait-ink) 80%, var(--retro-gray));
+  --retro-tone-ok: color-mix(in oklch, var(--st-ok-ink) 75%, var(--retro-gray));
+  --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
+  --retro-line: 14px;
+  --retro-glow: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: var(--retro-line);
+  font-variant-numeric: tabular-nums;
+  font-variant-ligatures: none;
+  color: var(--retro-ink);
+  text-shadow: var(--retro-glow) color-mix(in srgb, var(--retro-ink) 45%, transparent);
+}
+.retro[data-stacked] {
+  --retro-line: 22px;
+  font-size: 12px;
+}
+[data-theme="light"] .retro {
+  --retro-gray: #5d625e;
+  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 62%, var(--retro-bg));
+  text-shadow: none;
+}
+
+/* Scanlines over the text, faint enough to read through. */
+.retro::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 3px);
+}
+[data-theme="light"] .retro::after {
+  display: none;
+}
+
+/* 100 characters, measured to size the grid. */
+.retro-probe {
+  position: absolute;
+  visibility: hidden;
+  width: 100ch;
+  height: 0;
+  overflow: hidden;
+}
+
+.retro-grid {
+  display: grid;
+  row-gap: var(--retro-line);
+  justify-content: start;
+}
+.retro-frame {
+  min-width: 0;
+}
+.retro-frame[data-dim] {
+  opacity: 0.72;
+}
+/* Lines are blocks of preformatted text (a flex line would drop its space-only runs). */
+.retro-line,
+.retro-actor-line {
+  display: block;
+  height: var(--retro-line);
+  overflow: hidden;
+  white-space: pre;
+}
+.retro-row {
+  display: flex;
+  white-space: pre;
+}
+/* A frame side: a 1px rule down the middle of a character cell, joined across lines. */
+.retro-bar {
+  display: inline-block;
+  flex: none;
+  width: 1ch;
+  height: var(--retro-line);
+  vertical-align: top;
+  background:
+    linear-gradient(var(--retro-dim-ink), var(--retro-dim-ink)) center / 1px 100% no-repeat;
+}
+.retro-row > .retro-bar {
+  height: auto;
+}
+.retro-rule,
+.retro-corner {
+  display: inline-block;
+  height: var(--retro-line);
+  vertical-align: top;
+  background:
+    linear-gradient(var(--retro-dim-ink), var(--retro-dim-ink)) center / 100% 1px no-repeat;
+}
+.retro-corner {
+  --retro-corner-ink: linear-gradient(var(--retro-dim-ink), var(--retro-dim-ink));
+  width: 1ch;
+  background: none;
+}
+.retro-corner[data-corner="tl"] {
+  background:
+    var(--retro-corner-ink) right center / calc(50% + 0.5px) 1px no-repeat,
+    var(--retro-corner-ink) center bottom / 1px 50% no-repeat;
+}
+.retro-corner[data-corner="tr"] {
+  background:
+    var(--retro-corner-ink) left center / calc(50% + 0.5px) 1px no-repeat,
+    var(--retro-corner-ink) center bottom / 1px 50% no-repeat;
+}
+.retro-corner[data-corner="bl"] {
+  background:
+    var(--retro-corner-ink) right center / calc(50% + 0.5px) 1px no-repeat,
+    var(--retro-corner-ink) center top / 1px 50% no-repeat;
+}
+.retro-corner[data-corner="br"] {
+  background:
+    var(--retro-corner-ink) left center / calc(50% + 0.5px) 1px no-repeat,
+    var(--retro-corner-ink) center top / 1px 50% no-repeat;
+}
+.retro-cell {
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  white-space: pre;
+  vertical-align: top;
+}
+.retro-dim {
+  color: var(--retro-dim-ink);
+}
+.retro-bright,
+.retro-name {
+  color: var(--retro-ink);
+}
+.retro-name {
+  font-weight: 600;
+}
+.retro-key {
+  color: var(--retro-ink);
+  font-weight: 600;
+}
+.retro-spark {
+  flex: none;
+  color: var(--retro-ink);
+}
+
+.retro-tag[data-tone="work"] {
+  color: var(--retro-tone-work);
+}
+.retro-tag[data-tone="tool"] {
+  color: var(--retro-tone-tool);
+}
+.retro-tag[data-tone="wait"],
+.retro-tone-wait {
+  color: var(--retro-tone-wait);
+}
+.retro-tag[data-tone="ok"] {
+  color: var(--retro-tone-ok);
+}
+.retro-tag[data-tone="err"],
+.retro-tone-err {
+  color: var(--retro-tone-err);
+}
+.retro-tag[data-tone="idle"] {
+  color: var(--retro-dim-ink);
+}
+.retro-tag[data-tone="wait"],
+.retro-tag[data-tone="err"] {
+  font-weight: 600;
+}
+
+/* The caption's field: the text, then the cursor right after it. */
+.retro-caption {
+  display: inline-block;
+  vertical-align: top;
+}
+.retro-caption-text {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  white-space: pre;
+}
+.retro-hit {
+  text-align: left;
+  white-space: pre;
+  outline: none;
+}
+.retro-actor {
+  display: block;
+}
+.retro-hit:hover,
+.retro-hit[data-state="open"] {
+  background: color-mix(in srgb, var(--retro-ink) 10%, transparent);
+}
+/* Focus is inverse video, the console's own cursor. */
+.retro-hit:focus-visible {
+  background: var(--retro-ink);
+  text-shadow: none;
+}
+.retro .retro-hit:focus-visible,
+.retro .retro-hit:focus-visible * {
+  color: var(--retro-bg);
+}
+
+/* The block cursor blinks at 1 Hz on working items only; Reduced holds it lit. */
+.retro-cursor[data-blink] {
+  animation: retro-blink var(--dur-blink) steps(1, end) infinite;
+}
+@keyframes retro-blink {
+  50% {
+    opacity: 0;
+  }
+}
+[data-motion="reduced"] .retro-cursor[data-blink],
+.retro[data-paused] .retro-cursor[data-blink] {
+  animation: none;
+}
+
+/* A new actor's line scrolls up into place once; Reduced fades it in. */
+.retro-line-in {
+  animation: retro-scroll-in var(--dur-base) var(--ease-out) both;
+}
+@keyframes retro-scroll-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--retro-line));
+  }
+}
+[data-motion="reduced"] .retro-line-in {
+  animation-name: retro-fade-in;
+}
+@keyframes retro-fade-in {
+  from {
+    opacity: 0;
+  }
+}

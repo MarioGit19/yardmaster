@@ -9,6 +9,7 @@ import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { hooksInstalled } from '../onboarding/model.js';
 import { usePreference } from '../prefs.js';
+import { PHOSPHOR_LABEL, PHOSPHORS, phosphorPreference } from '../retro/phosphor.js';
 import { routes } from '../routes.js';
 import { api } from '../settings/api.js';
 import { type ServerSettings, useBoardSettings } from '../settings/boardSettings.js';
@@ -44,6 +45,7 @@ export function SettingsView() {
   const motion = usePreference(motionPreference);
   const layout = usePreference(layoutPreference);
   const ambient = usePreference(ambientStylePreference);
+  const phosphor = usePreference(phosphorPreference);
   const redact = usePreference(redactPreference);
   const status = useServerStatus(null);
   const demo = status !== null && status !== 'error' && status.demo;
@@ -97,6 +99,19 @@ export function SettingsView() {
               labels={AMBIENT_STYLE_LABEL}
               value={ambient}
               onChange={ambientStylePreference.set}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Retro phosphor"
+            data="phosphor"
+            description="The Retro layout's screen color. In the light theme it prints as ink on paper."
+          >
+            <Segmented
+              label="Retro phosphor"
+              options={PHOSPHORS}
+              labels={PHOSPHOR_LABEL}
+              value={phosphor}
+              onChange={phosphorPreference.set}
             />
           </SettingRow>
         </SettingsSection>

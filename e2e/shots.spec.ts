@@ -1,9 +1,11 @@
 import type { WebSocketRoute } from '@playwright/test';
+import { startBoard } from './board.js';
 import {
   disableWebgl,
   expect,
   firstProjectRoute,
   openRoute,
+  signedInState,
   type Theme,
   test,
 } from './fixtures.js';
@@ -1377,6 +1379,100 @@ test.describe('layouts', () => {
           await shot('inspector');
         });
       }
+
+      // 11.9: the Retro console at rest and under demo activity, a frame focused by its number,
+      // and an actor's inspector.
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
+        { width: 390, height: 844 },
+      ]) {
+        test(`retro ${viewport.width}`, async ({ page }) => {
+          test.slow();
+          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-retro-frame]').first()).toBeVisible();
+          await page.waitForTimeout(800);
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-retro-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+              fullPage: true,
+              animations: 'disabled',
+            });
+          await shot('rest');
+          await expect(page.locator('[data-retro-frame][data-tone="wait"]').first()).toBeVisible({
+            timeout: 30_000,
+          });
+          await page.waitForTimeout(600);
+          await shot('active');
+          if (viewport.width < 768) return;
+          await page.locator('[data-retro]').focus();
+          await page.keyboard.press('2');
+          await page.keyboard.press('1');
+          await shot('focus');
+          await page.keyboard.press('Enter');
+          await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot('inspector');
+        });
+      }
+
+      // 11.9: 20 projects (`--demo-stress --demo-projects 20`) on one screen, and on a phone.
+      test('retro stress', async ({ browser }) => {
+        test.slow();
+        const board = await startBoard({ demo: true, stress: true, projects: 20 });
+        try {
+          for (const viewport of [
+            { width: 1440, height: 900 },
+            { width: 390, height: 844 },
+          ]) {
+            const context = await browser.newContext({
+              viewport,
+              colorScheme: theme,
+              baseURL: board.url,
+              storageState: signedInState(board.url, board.cookie),
+            });
+            const page = await context.newPage();
+            await page.addInitScript((t) => {
+              localStorage.setItem('cboard.layout', 'retro');
+              localStorage.setItem('cboard.theme', t);
+            }, theme);
+            await openRoute(page, '/');
+            await expect(page.locator('[data-retro-frame]')).toHaveCount(20);
+            await page.waitForTimeout(2500);
+            await page.screenshot({
+              path: new URL(`layout-retro-stress-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              fullPage: viewport.width < 768,
+              animations: 'disabled',
+            });
+            await context.close();
+          }
+        } finally {
+          await board.stop();
+        }
+      });
+    });
+  }
+});
+
+test.describe('retro amber', () => {
+  for (const theme of THEMES) {
+    test(theme, async ({ page }) => {
+      await page.addInitScript((t) => {
+        localStorage.setItem('cboard.layout', 'retro');
+        localStorage.setItem('cboard.phosphor', 'amber');
+        localStorage.setItem('cboard.theme', t);
+      }, theme);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openRoute(page, '/');
+      await expect(page.locator('[data-retro][data-phosphor="amber"]')).toBeVisible();
+      await page.waitForTimeout(800);
+      await page.screenshot({
+        path: new URL(`layout-retro-amber-1440-${theme}.png`, OUT_DIR).pathname,
+        animations: 'disabled',
+      });
     });
   }
 });

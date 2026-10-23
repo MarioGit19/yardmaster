@@ -156,6 +156,8 @@ export interface DemoSimulatorOptions {
   transcripts?: DemoTranscripts;
   /** The `--demo-stress` board: 10 projects × 6 terminals, log firehoses and fast sessions. */
   stress?: boolean;
+  /** How many projects the stress board has (default `STRESS_PROJECTS`). */
+  projects?: number;
 }
 
 interface ProjectCtx {
@@ -249,7 +251,7 @@ export class DemoSimulator {
     this.approvalTimeoutMs =
       options.approvalTimeoutMs ??
       (options.stress ? STRESS_APPROVAL_TIMEOUT_MS : DEMO_APPROVAL_TIMEOUT_MS);
-    this.defs = options.stress ? stressProjects() : DEMO_PROJECTS;
+    this.defs = options.stress ? stressProjects(options.projects) : DEMO_PROJECTS;
     this.pace = options.stress ? STRESS_PACE : NORMAL_PACE;
   }
 

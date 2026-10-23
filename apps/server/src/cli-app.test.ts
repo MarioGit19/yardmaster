@@ -176,6 +176,20 @@ describe('c-board start', () => {
     expect(calls[0]?.[1].demo).toEqual({ stress: true });
   });
 
+  it('--demo-projects sizes the stress board, and only the stress board', async () => {
+    const { calls, startServer } = fakeServer(4317);
+    const t = testIo({}, { startServer, openBrowser: async () => true });
+    expect(
+      await runCli(['start', '--demo-stress', '--demo-projects', '20', '--no-open'], t.io),
+    ).toBeNull();
+    expect(calls[0]?.[1].demo).toEqual({ stress: true, projects: 20 });
+    expect(await runCli(['start', '--demo', '--demo-projects', '20'], t.io)).toBe(2);
+    expect(await runCli(['start', '--demo-stress', '--demo-projects', '0'], t.io)).toBe(2);
+    expect(await runCli(['start', '--demo-stress', '--demo-projects', 'many'], t.io)).toBe(2);
+    expect(t.err()).toContain('--demo-projects only applies to --demo-stress');
+    expect(calls).toHaveLength(1);
+  });
+
   it('prints the link when the browser cannot be opened', async () => {
     const { startServer } = fakeServer(4317);
     const t = testIo({}, { startServer, openBrowser: async () => false });

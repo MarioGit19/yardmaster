@@ -132,10 +132,10 @@ describe('routes', () => {
       expect(container.querySelector('main [data-layout="transit"] [data-transit]')).not.toBeNull();
       act(() => layoutPreference.set('retro'));
       const retro = container.querySelector('main [data-layout="retro"]');
-      expect(retro?.querySelector('[data-layout-placeholder="retro"]')).not.toBeNull();
-      // The placeholder lists the scene: every actor is a button with its full name.
+      expect(retro?.querySelector('[data-retro] [data-retro-frame="p-acme"]')).not.toBeNull();
+      // The console lists the scene: every actor is a button with its number and full name.
       const actor = retro?.querySelector('[data-scene-actor="s:s-1"]');
-      expect(actor?.getAttribute('aria-label')).toBe('acme-shop, Claude, waiting for approval');
+      expect(actor?.getAttribute('aria-label')).toBe('[1] acme-shop, Claude, waiting for approval');
     } finally {
       act(() => layoutPreference.set('minimal'));
     }
@@ -231,9 +231,9 @@ describe('routes', () => {
   it('renders settings and unknown routes', () => {
     render('/settings');
     expect(heading()).toBe('Settings');
-    // Layout (5), theme (3), motion (4), ambient (4), notifications (2), redact (2), away mode
-    // (2), retention (4) and terminal reply (2).
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(28);
+    // Layout (5), theme (3), motion (4), ambient (4), Retro phosphor (2), notifications (2),
+    // redact (2), away mode (2), retention (4) and terminal reply (2).
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(30);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');

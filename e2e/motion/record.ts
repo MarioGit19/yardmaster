@@ -496,6 +496,52 @@ const SCENARIOS = {
   },
 
   /** A fresh board's first attention change reorders the pods within seconds. */
+  async retro(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+    await openOverview(page);
+    await page.locator('[data-retro-frame]').first().waitFor();
+    await page.waitForTimeout(1500);
+    // The first two frames, so the typed captions and cursors are legible on the sheet.
+    const clip = { x: 256, y: 136, width: 600, height: 260 };
+    await r.moment(
+      'activity',
+      'activity',
+      '8 s of the console: captions type in, cursors blink on working items only',
+      hold(page, 8000),
+    );
+    await r.moment(
+      'typing',
+      'transition',
+      '2 s at 12 fps: a new caption types out (≤ dur.slow), the block cursor blinks at 1 Hz',
+      hold(page, 2000),
+      clip,
+    );
+    await catchMoment(
+      r,
+      'line-in',
+      "a new actor's line scrolls up into place (dur.base, ease.out)",
+      '.retro-line-in',
+      { ms: 600, leadMs: 300 },
+    );
+    await r.moment(
+      'numbers',
+      'transition',
+      'type 2 then 1: the second frame, then its first actor, in inverse video; Enter, Esc',
+      async () => {
+        await page.locator('[data-retro]').focus();
+        await page.keyboard.press('2');
+        await page.waitForTimeout(400);
+        await page.keyboard.press('1');
+        await page.waitForTimeout(400);
+        await page.keyboard.press('Enter');
+        await page.locator('[data-actor-inspector] [data-actor]').waitFor();
+        await page.waitForTimeout(500);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(400);
+      },
+    );
+  },
   async reorder(r: Recorder) {
     await openOverview(r.page);
     await catchMoment(

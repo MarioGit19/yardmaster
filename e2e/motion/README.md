@@ -14,6 +14,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `grid`     | Without WebGL (the 2D map): `activity` (8 s of the network), `packets` (2 s at 12 fps), `burst` (an event's three-packet burst), `enter` (a node cross-fades to its flat cockpit), `leave` (Esc back) |
 | `grid3d`   | `activity` (8 s of the 3D network and its idle orbit), `packets` (2 s at 12 fps), `drag` (turn the camera), `reset` (double-click home), `zoom` (wheel in and out to the clamps), `hover` (a label lights its pipeline), `dive` (into a node and the cockpit's phase-in), `center` and `uncenter` (a terminal screen to the center and back), `rise` (the reverse dive) |
 | `transit`  | `activity` (8 s of the metro map), `glide` (2 s at 12 fps: speed lines and amber doors), `station` (a new station scales in, when the demo gets there), `inspector` (click a train, Esc) |
+| `retro`    | `activity` (8 s of the console), `typing` (2 s at 12 fps, cropped to two frames: captions typing, the cursor's 1 Hz blink), `line-in` (a new actor's line scrolls up, when the demo gets there), `numbers` (2, 1, Enter, Esc) |
 | `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |

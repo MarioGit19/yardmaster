@@ -17,6 +17,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 import type { BuildOptions } from './app.js';
 import { ConfigError, loadConfig, type ServerConfig } from './config.js';
+import { STRESS_PROJECTS_MAX } from './demo/stress.js';
 import {
   baseUrl,
   type DoctorDeps,
@@ -50,6 +51,7 @@ export const USAGE = `Usage: c-board <command> [options]
 Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
         [--demo-stress]        A demo board at the performance target (PRD §9)
+        [--demo-projects <n>]  With --demo-stress: how many projects (default 10)
   doctor                       Check the setup and print a report
   token --rotate               Replace the install token (signs out every browser)
   hooks install|uninstall|status [--away] [--dry-run] [--yes] [--settings-path <file>]
@@ -87,9 +89,21 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
   const flags = parse(args, {
     demo: { type: 'boolean' },
     'demo-stress': { type: 'boolean' },
+    'demo-projects': { type: 'string' },
     'no-open': { type: 'boolean' },
   });
-  const demo = flags['demo-stress'] ? { stress: true } : (flags.demo ?? false);
+  const projects = flags['demo-projects'];
+  if (projects !== undefined) {
+    if (!flags['demo-stress'])
+      throw new UsageError('--demo-projects only applies to --demo-stress');
+    const count = Number(projects);
+    if (!Number.isInteger(count) || count < 1 || count > STRESS_PROJECTS_MAX) {
+      throw new UsageError(`--demo-projects takes a whole number from 1 to ${STRESS_PROJECTS_MAX}`);
+    }
+  }
+  const demo = flags['demo-stress']
+    ? { stress: true, ...(projects !== undefined && { projects: Number(projects) }) }
+    : (flags.demo ?? false);
   const token = await ensureToken(config.home);
   const webRoot = DEFAULT_WEB_ROOT;
   let app: FastifyInstance;

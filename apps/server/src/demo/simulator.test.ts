@@ -28,7 +28,14 @@ import {
 
 const T0 = 1_760_000_000_000;
 
-function run(options: { seed?: number; permissionIntervalMs?: number; stress?: boolean } = {}) {
+function run(
+  options: {
+    seed?: number;
+    permissionIntervalMs?: number;
+    stress?: boolean;
+    projects?: number;
+  } = {},
+) {
   const store = new BoardStore({ autoFlush: false });
   const activity: ActivityEvent[] = [];
   /** The Pulse backfill, kept apart so assertions about live behavior only see live events. */
@@ -621,6 +628,19 @@ describe('DemoSimulator', () => {
 });
 
 describe('DemoSimulator stress board', () => {
+  it('grows to more projects on request, each with its own made-up name', () => {
+    const { store, sim, advance } = run({ stress: true, projects: 20 });
+    sim.start();
+    advance(5_000);
+    const projects = Object.values(store.state.projects);
+    expect(projects).toHaveLength(20);
+    expect(new Set(projects.map((p) => p.name)).size).toBe(20);
+    expect(projects.every((p) => !/^project-\d+$/.test(p.name))).toBe(true);
+    expect(Object.keys(store.state.terminals)).toHaveLength(20 * STRESS_TERMINALS_PER_PROJECT);
+    // Still four fast sessions: a bigger board is not a heavier one.
+    expect(Object.values(store.state.sessions)).toHaveLength(STRESS_SESSIONS);
+  });
+
   it('runs 10 projects × 6 terminals, two log firehoses and four fast sessions', () => {
     const { store, sim, activity, advance } = run({ stress: true });
     const lines = new Map<string, number>();

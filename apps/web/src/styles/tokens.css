@@ -149,6 +149,7 @@
   --dur-packetBusy: 1800ms;
   --dur-packetPeak: 1100ms;
   --dur-glide: 800ms;
+  --dur-blink: 1000ms;
 }
 
 [data-theme="light"] {

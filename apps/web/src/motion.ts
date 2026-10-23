@@ -57,6 +57,8 @@ export const loop = {
   packetPeak: 1.1,
   /** A working Transit train's speed lines slipping back past it. */
   glide: 0.8,
+  /** The Retro console's block cursor on working items (1 Hz, DESIGN.md §10.6). */
+  blink: 1,
 } as const;
 
 export const ease = {
