@@ -1,8 +1,10 @@
+import { runningBackground } from '../background/model.js';
 import type { BoardStoreState } from '../data/store.js';
 import { laneView, selectLaneExecution } from '../lanes/lane.js';
 import { totalTokens } from '../status.js';
 
 export interface HudCounts {
+  /** Sessions working, or idle with background work running. */
   working: number;
   waiting: number;
   /** Terminals with a command running right now. */
@@ -39,6 +41,12 @@ export const selectHudCounts =
         case 'error':
           counts.errors++;
           break;
+        case 'ended':
+        case 'interrupted':
+          break;
+        default:
+          // Idle, but a watcher or subagent still runs: that is work going on.
+          if (runningBackground(session) > 0) counts.working++;
       }
       if (session.updatedAt >= since) counts.tokensToday += totalTokens(session);
     }

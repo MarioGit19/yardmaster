@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
 import {
   buildLanes,
+  eventDetail,
   eventLabel,
   eventTone,
   formatAgo,
@@ -58,6 +59,25 @@ describe('event tones and labels', () => {
     expect(eventLabel(event('a', 'exec.end', { data: { exitCode: 'x' } }))).toBe(
       'Command finished',
     );
+  });
+
+  it('labels background work by the kind the server names, with its outcome as the tone', () => {
+    const start = event('a', 'background.start', { summary: 'Background shell started' });
+    const failed = event('b', 'background.end', {
+      summary: 'Background shell failed',
+      data: { status: 'error', exitCode: 1 },
+    });
+    const stopped = event('c', 'background.end', { data: { status: 'stopped' } });
+    expect(eventLabel(start)).toBe('Background shell started');
+    expect(eventDetail(start)).toBeNull();
+    expect(eventTone(start)).toBe('tool');
+    expect(eventTone(failed)).toBe('err');
+    expect(eventTone(stopped)).toBe('idle');
+    expect(eventLabel(stopped)).toBe('Background task finished');
+    expect(eventTone(event('d', 'background.end', { data: { status: 'done' } }))).toBe('ok');
+    expect(matchesFilter(failed, 'errors')).toBe(true);
+    expect(matchesFilter(start, 'claude')).toBe(true);
+    expect(eventDetail(event('e', 'prompt', { summary: 'Fix it' }))).toBe('Fix it');
   });
 
   it('filters by source and errors', () => {

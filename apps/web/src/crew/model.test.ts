@@ -189,4 +189,37 @@ describe('mascotLabel', () => {
     expect(mascotLabel('delegating', 'Task', 2)).toBe('Delegating to a subagent, 2 subagents');
     expect(mascotLabel('sleeping', null, 0)).toBe('Asleep');
   });
+
+  it('says how much runs in the background', () => {
+    expect(mascotLabel('idle', null, 0, 1)).toBe('Idle, 1 in background');
+    expect(mascotLabel('idle', null, 1, 2)).toBe('Idle, 1 subagent, 2 in background');
+  });
+});
+
+describe('background work', () => {
+  const watcher = {
+    id: 'b1',
+    kind: 'shell' as const,
+    label: 'Watcher',
+    startedAt: NOW - SLEEP_AFTER_MS * 2,
+    endedAt: null,
+    status: 'running' as const,
+    exitCode: null,
+    pid: null,
+  };
+
+  it('keeps an idle crew member awake while its watcher runs', () => {
+    const old = { updatedAt: NOW - SLEEP_AFTER_MS };
+    expect(
+      mascotStateFor(session({ kind: 'idle' }, { ...old, background: [watcher] }), [], {
+        now: NOW,
+      }),
+    ).toBe('idle');
+    const finished = { ...watcher, status: 'done' as const, endedAt: NOW - SLEEP_AFTER_MS };
+    expect(
+      mascotStateFor(session({ kind: 'idle' }, { ...old, background: [finished] }), [], {
+        now: NOW,
+      }),
+    ).toBe('sleeping');
+  });
 });

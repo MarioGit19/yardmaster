@@ -1,4 +1,5 @@
 import { type ClaudeSession, type Terminal, toolFamily } from '@c-board/protocol';
+import { runningBackground } from '../background/model.js';
 import type { OrbState } from '../orb/model.js';
 
 /** The crew member's states, DESIGN.md §4.11. */
@@ -97,11 +98,16 @@ export function mascotStateFor(
       return restingState(Number.NEGATIVE_INFINITY, terminals, now);
     case 'unknown':
       if (!status.alive) return restingState(Number.NEGATIVE_INFINITY, terminals, now);
-      return restingState(session.updatedAt, terminals, now);
+      return awake(session, restingState(session.updatedAt, terminals, now));
     case 'idle':
       if (previous && isWorking(previous)) return 'done';
-      return restingState(session.updatedAt, terminals, now);
+      return awake(session, restingState(session.updatedAt, terminals, now));
   }
+}
+
+/** Nobody sleeps while their watcher or subagent still runs. */
+function awake(session: ClaudeSession, state: MascotState): MascotState {
+  return state === 'sleeping' && runningBackground(session) > 0 ? 'idle' : state;
 }
 
 /** The antenna orb follows the crew member's state. */
@@ -173,11 +179,20 @@ const STATE_LABEL: Record<MascotState, string> = {
   done: 'Done',
 };
 
-export function mascotLabel(state: MascotState, tool: string | null, minis: number): string {
-  const base =
+/** Background tasks drawn as helpers beside the crew member; more show as "+N". */
+export const MAX_HELPERS = 3;
+
+export function mascotLabel(
+  state: MascotState,
+  tool: string | null,
+  minis: number,
+  helpers = 0,
+): string {
+  let label =
     tool && (state === 'typing' || state === 'reading' || state === 'running')
       ? `${STATE_LABEL[state]} (${tool})`
       : STATE_LABEL[state];
-  if (minis <= 0) return base;
-  return `${base}, ${minis} subagent${minis === 1 ? '' : 's'}`;
+  if (minis > 0) label += `, ${minis} subagent${minis === 1 ? '' : 's'}`;
+  if (helpers > 0) label += `, ${helpers} in background`;
+  return label;
 }

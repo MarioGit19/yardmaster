@@ -619,6 +619,16 @@
   opacity: 0;
   animation: crew-spark var(--dur-spark) var(--ease-out) both;
 }
+/* A background task's helper drone hovers beside the crew member while its task runs. */
+@keyframes crew-helper {
+  50% {
+    transform: translateY(-8%);
+  }
+}
+.crew-helper {
+  animation: crew-helper 2.4s var(--ease-in-out) infinite;
+  animation-delay: var(--crew-delay);
+}
 .crew[data-crew-hold] .crew-spark {
   animation: crew-spark-hold 1.6s var(--ease-out) infinite;
 }

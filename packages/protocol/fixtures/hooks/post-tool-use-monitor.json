@@ -1,0 +1,19 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Monitor",
+  "tool_input": {
+    "description": "Errors in the dev server log",
+    "timeout_ms": 300000,
+    "command": "tail -f logs/dev.log | grep --line-buffered ERROR"
+  },
+  "tool_response": {
+    "taskId": "m3r8t1w6z",
+    "timeoutMs": 300000
+  },
+  "tool_use_id": "toolu_08MonitorStartAbCdEfGhIj",
+  "duration_ms": 12
+}

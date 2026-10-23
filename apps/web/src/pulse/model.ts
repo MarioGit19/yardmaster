@@ -47,6 +47,11 @@ export function eventTone(event: ActivityEvent): Tone {
       return 'wait';
     case 'stop':
       return 'ok';
+    case 'background.end': {
+      const status = event.data.status;
+      return status === 'error' ? 'err' : status === 'stopped' ? 'idle' : 'ok';
+    }
+    case 'background.start':
     case 'tool.start':
     case 'tool.end':
     case 'subagent.start':
@@ -93,6 +98,11 @@ export function eventLabel(event: ActivityEvent): string {
       return 'Subagent started';
     case 'subagent.stop':
       return 'Subagent finished';
+    // The server names the kind ("Background shell started"); never a label or command.
+    case 'background.start':
+      return event.summary ?? 'Background task started';
+    case 'background.end':
+      return event.summary ?? 'Background task finished';
     case 'compact.start':
       return 'Compacting';
     case 'compact.end':
@@ -107,6 +117,12 @@ export function eventLabel(event: ActivityEvent): string {
     case 'unknown':
       return 'Event';
   }
+}
+
+/** The line under the label; a background event's summary is its label already. */
+export function eventDetail(event: ActivityEvent): string | null {
+  if (event.kind === 'background.start' || event.kind === 'background.end') return null;
+  return event.summary;
 }
 
 export function matchesFilter(event: ActivityEvent, filter: PulseFilter): boolean {

@@ -75,9 +75,13 @@ export const NotificationHook = hook('Notification', {
   title: Str.optional(),
   notification_type: z.string().max(128).optional(),
 });
+/** Stop and SubagentStop: the parent session's live background tasks; read with `parseLiveTasks`. */
+const BackgroundTasksField = { background_tasks: z.unknown().optional() };
+
 export const StopHook = hook('Stop', {
   stop_hook_active: z.boolean().optional(),
   last_assistant_message: Str.optional(),
+  ...BackgroundTasksField,
 });
 export const StopFailureHook = hook('StopFailure', {
   error: z.unknown().optional(),
@@ -94,6 +98,7 @@ export const SubagentStopHook = hook('SubagentStop', {
   agent_type: z.string().max(256).optional(),
   agent_transcript_path: Str.optional(),
   last_assistant_message: Str.optional(),
+  ...BackgroundTasksField,
 });
 export const PreCompactHook = hook('PreCompact', {
   trigger: z.string().max(64).optional(),

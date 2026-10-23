@@ -1,7 +1,12 @@
 import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type ChatMessage, decodeChatMessage, transcriptStreamId } from '@c-board/protocol';
+import {
+  type ChatMessage,
+  decodeChatMessage,
+  startBackground,
+  transcriptStreamId,
+} from '@c-board/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
 import { FIXTURE_CWD, FIXTURE_SESSION_ID } from './fixtures.test-helpers.js';
@@ -334,6 +339,49 @@ describe('TranscriptService', () => {
       kind: 'user',
       text: 'Typed in a terminal',
     });
+  });
+
+  it('finishes background tasks the transcript reports done', async () => {
+    const { store, service } = setup({ loadHistory: async () => [] });
+    service.claim(FIXTURE_SESSION_ID);
+    store.upsertSession({
+      id: FIXTURE_SESSION_ID,
+      cwd: FIXTURE_CWD,
+      background: startBackground([], { id: 'b1', kind: 'shell', label: 'Build', ts: 1 }),
+    });
+    await settled(service);
+    const updatedAt = store.state.sessions[FIXTURE_SESSION_ID]?.updatedAt;
+    service.feed(FIXTURE_SESSION_ID, [
+      {
+        type: 'user',
+        uuid: 'note-1',
+        message: {
+          role: 'user',
+          content:
+            '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n<summary>Background command "Build" completed (exit code 0)</summary>\n</task-notification>',
+        },
+      },
+      {
+        type: 'user',
+        uuid: 'note-2',
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: '<task-notification><task-id>zz</task-id><status>failed</status></task-notification>',
+            },
+          ],
+        },
+      },
+    ]);
+    await settled(service);
+    const session = store.state.sessions[FIXTURE_SESSION_ID];
+    expect(session?.background).toEqual([
+      expect.objectContaining({ id: 'b1', status: 'done', exitCode: 0 }),
+    ]);
+    expect(session?.background?.[0]?.tail).toContain('completed');
+    expect(session?.updatedAt).toBe(updatedAt);
   });
 
   it('follows a real file with the default chokidar watcher', async () => {

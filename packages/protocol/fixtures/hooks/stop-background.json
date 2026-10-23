@@ -1,0 +1,26 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "The watcher is running; I will check its output when it settles.",
+  "background_tasks": [
+    {
+      "id": "b7k2m9q4x",
+      "type": "shell",
+      "status": "running",
+      "description": "Watch the web build",
+      "command": "pnpm --filter web build --watch"
+    },
+    {
+      "id": "w0housekeep",
+      "type": "monitor",
+      "status": "running",
+      "description": "Live update watcher",
+      "ambient": true
+    }
+  ],
+  "session_crons": []
+}

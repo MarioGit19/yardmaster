@@ -1,4 +1,5 @@
 import type { ClaudeSession } from '@c-board/protocol';
+import { runningHelpers } from '../background/model.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import type { CrewTerminal } from '../crew/model.js';
 import { useMascotState } from './useMascotState.js';
@@ -37,6 +38,7 @@ export function SessionCrew({
       color={accent}
       tool={session?.status.kind === 'tool' ? session.status.tool : null}
       subagents={session?.subagents.filter((a) => a.status === 'running').length ?? 0}
+      helpers={session ? runningHelpers(session) : undefined}
       countdown={countdown}
       activity={crew.activity}
     />

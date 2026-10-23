@@ -14,14 +14,22 @@ import {
   type ActivityKind,
   type Approval,
   type ApprovalDecision,
+  applyTaskNotifications,
+  backgroundKindOf,
+  backgroundLabel,
   type ClaudeSession,
+  exitCodeOf,
   makeMessage,
   nextSessionOrdinal,
+  notificationStatus,
   type PermissionMode,
   PermissionMode as PermissionModeSchema,
   PermissionSuggestion,
+  parseLiveTasks,
+  reconcileBackground,
   type ServerToUi,
   type SessionStatus,
+  startBackground,
   toolFamily,
 } from '@c-board/protocol';
 import type { FastifyBaseLogger } from 'fastify';
@@ -170,6 +178,28 @@ const StatusMessage = z.looseObject({
   subtype: z.literal('status'),
   status: z.string().nullable(),
   permissionMode: PermissionModeSchema.optional().catch(undefined),
+});
+// Background work (Agent SDK `task_started` / `task_notification` / `background_tasks_changed`).
+const TaskStarted = z.looseObject({
+  subtype: z.literal('task_started'),
+  task_id: z.string().min(1).max(256),
+  tool_use_id: z.string().max(256).optional(),
+  description: z.string().max(10_000).optional(),
+  task_type: z.string().max(64).optional(),
+  subagent_type: z.string().max(256).optional(),
+  is_backgrounded: z.boolean().optional(),
+  ambient: z.boolean().optional(),
+  skip_transcript: z.boolean().optional(),
+});
+const TaskNotificationMessage = z.looseObject({
+  subtype: z.literal('task_notification'),
+  task_id: z.string().min(1).max(256),
+  status: z.string().max(64),
+  summary: z.string().max(100_000).optional(),
+});
+const BackgroundTasksChanged = z.looseObject({
+  subtype: z.literal('background_tasks_changed'),
+  tasks: z.array(z.unknown()).max(500),
 });
 const Block = z.looseObject({ type: z.string() });
 const TextBlock = z.looseObject({ type: z.literal('text'), text: z.string() });
@@ -718,6 +748,7 @@ export class SessionRunner {
       }
       return;
     }
+    if (this.onBackground(run, message, ts)) return;
     const status = StatusMessage.safeParse(message);
     if (status.success) {
       const current = this.status(run.id);
@@ -732,6 +763,58 @@ export class SessionRunner {
         this.store.setSessionStatus(run.id, current.previous, ts);
       }
     }
+  }
+
+  /** Applies a background-task system message; false when `message` is none. */
+  private onBackground(run: Run, message: unknown, ts: number): boolean {
+    const session = this.store.state.sessions[run.id];
+    const background = session?.background ?? [];
+    const started = TaskStarted.safeParse(message);
+    if (started.success) {
+      const task = started.data;
+      // Foreground subagents and housekeeping watchers aren't background work.
+      if (task.is_backgrounded === false || task.ambient || task.skip_transcript) return true;
+      const kind = task.subagent_type ? 'agent' : backgroundKindOf(task.task_type);
+      this.store.updateSession(
+        run.id,
+        {
+          background: startBackground(background, {
+            id: task.task_id,
+            kind,
+            label: backgroundLabel({ description: task.description }),
+            toolUseId: task.tool_use_id ?? null,
+            ts,
+          }),
+        },
+        ts,
+      );
+      return true;
+    }
+    const done = TaskNotificationMessage.safeParse(message);
+    if (done.success) {
+      const { task_id: id, status, summary } = done.data;
+      const exitCode = exitCodeOf(summary);
+      const next = applyTaskNotifications(
+        background,
+        [{ id, status: notificationStatus(status, exitCode), exitCode, summary: summary ?? null }],
+        ts,
+      );
+      if (next !== background) this.store.updateSession(run.id, { background: [...next] }, ts);
+      return true;
+    }
+    const changed = BackgroundTasksChanged.safeParse(message);
+    if (changed.success) {
+      const live = parseLiveTasks(changed.data.tasks) ?? [];
+      if (live.length > 0 || background.some((t) => t.status === 'running')) {
+        this.store.updateSession(
+          run.id,
+          { background: reconcileBackground(background, live, ts) },
+          ts,
+        );
+      }
+      return true;
+    }
+    return false;
   }
 
   private onStreamEvent(run: Run, message: unknown): void {

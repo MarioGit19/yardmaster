@@ -9,6 +9,9 @@ import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from '
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
+import { BackgroundLine } from '../background/BackgroundLine.js';
+import { runningHelpers } from '../background/model.js';
+import { useBackgroundRequests } from '../background/open.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { NewSessionComposer, useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
@@ -155,6 +158,8 @@ function ProjectFocus({
   const terminalTargeted = useTerminalTarget(project.id) !== null;
   const newTerminalRequested = useNewTerminalRequest(project.id);
   const terminalRequested = terminalTargeted || newTerminalRequested;
+  // A row's background line opens the session's Background list, in the Claude tab.
+  const backgroundAsked = useBackgroundRequests();
   // "New session" swaps the Claude panel for a blank composer until the session exists.
   const [composing, setComposing] = useState(false);
   useEffect(() => {
@@ -267,7 +272,16 @@ function ProjectFocus({
         {tabs ? (
           <FocusTabs
             settle={settle}
-            show={composing ? 'claude' : terminalRequested ? 'terminals' : null}
+            show={
+              composing
+                ? 'claude'
+                : terminalRequested
+                  ? 'terminals'
+                  : backgroundAsked
+                    ? 'claude'
+                    : null
+            }
+            showNonce={backgroundAsked}
             panels={[
               { id: 'sessions', label: 'Sessions', content: sessionsColumn },
               { id: 'claude', label: 'Claude', content: claudeColumn },
@@ -300,18 +314,22 @@ interface TabPanel {
 function FocusTabs({
   panels,
   show,
+  showNonce = 0,
   settle,
 }: {
   panels: TabPanel[];
   show: string | null;
+  /** Changes when the same panel is asked for again. */
+  showNonce?: number;
   settle: HTMLMotionProps<'div'>;
 }) {
   const [active, setActive] = useState(show ?? 'claude');
   const [byKeyboard, setByKeyboard] = useState(false);
   // A panel asked for from outside (a terminal picked in ⌘K).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new nonce asks again for `show`.
   useEffect(() => {
     if (show) setActive(show);
-  }, [show]);
+  }, [show, showNonce]);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const index = Math.max(
     0,
@@ -577,6 +595,8 @@ function SessionLink({
         </span>
       </Link>
       {interrupted && <RowResume session={session} />}
+      {/* Outside the link: it is a control of its own. Indented to the row's text. */}
+      <BackgroundLine session={session} className="mb-1 ml-12" />
     </div>
   );
 }
@@ -634,6 +654,7 @@ function HeaderCrew({
         color={accent}
         tool={session?.status.kind === 'tool' ? session.status.tool : null}
         subagents={subagents}
+        helpers={session ? runningHelpers(session) : undefined}
         activity={crew.activity}
       />
     </span>

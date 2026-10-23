@@ -1,0 +1,16 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "pnpm dev:missing",
+    "description": "Start the missing dev script",
+    "run_in_background": true
+  },
+  "tool_use_id": "toolu_10BgShellFailAbCdEfGhIj",
+  "error": "Command failed to start",
+  "is_interrupt": false
+}

@@ -1047,3 +1047,57 @@ test.describe('claude terminals', () => {
     }
   }
 });
+
+// Background work: the pod row's line, the focus view's row, and the Claude panel's list.
+test.describe('background work', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [VIEWPORTS[0], VIEWPORTS[2]]) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('background', async ({ page }) => {
+          test.setTimeout(90_000);
+          const shot = (name: string) =>
+            page.screenshot({
+              path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          const narrow = viewport.width < 768;
+          await openRoute(page, '/');
+          const pod = page.locator('[data-pod]', { hasText: 'acme-shop' });
+          const line = pod.locator('[data-background-line]');
+          await expect(line).toBeVisible({ timeout: 30_000 });
+          await pod.scrollIntoViewIfNeeded();
+          await page.mouse.move(viewport.width / 2, viewport.height - 4);
+          await page.waitForTimeout(600);
+          if (narrow)
+            await pod.screenshot({
+              path: new URL(`background-pod-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          else await shot('background-overview');
+
+          await line.click();
+          const list = page.locator('[data-background-list]');
+          await expect(list).toBeVisible({ timeout: 15_000 });
+          // Wait for a finished run, so the shot has both states.
+          await expect(
+            list.locator('[data-background-item]:not([data-status="running"])').first(),
+          ).toBeVisible({ timeout: 30_000 });
+          await expect(
+            list.locator('[data-background-item][data-status="running"]').first(),
+          ).toBeVisible({
+            timeout: 30_000,
+          });
+          await page.mouse.move(viewport.width / 2, viewport.height - 4);
+          await page.waitForTimeout(800);
+          await shot('background-focus');
+          if (narrow) {
+            await page.getByRole('tab', { name: 'Sessions' }).click();
+            await page.waitForTimeout(600);
+            await shot('background-sessions');
+          }
+        });
+      });
+    }
+  }
+});

@@ -1,4 +1,9 @@
-import type { ChatMessage, TokenUsage } from '@c-board/protocol';
+import {
+  type ChatMessage,
+  parseTaskNotifications,
+  type TaskNotification,
+  type TokenUsage,
+} from '@c-board/protocol';
 import { z } from 'zod';
 
 // Defensive normalization of Claude Code transcript lines (PRD §6.3). The format is
@@ -50,6 +55,20 @@ const AssistantMessage = z.looseObject({
   content: z.array(z.unknown()),
   usage: z.unknown().optional(),
 });
+
+/** Background-task completions a user line reports (`<task-notification>` blocks). */
+export function taskNotificationsOf(raw: unknown): TaskNotification[] {
+  const entry = RawEntry.safeParse(raw);
+  if (!entry.success || entry.data.type !== 'user') return [];
+  const message = UserMessage.safeParse(entry.data.message);
+  if (!message.success) return [];
+  const { content } = message.data;
+  if (typeof content === 'string') return parseTaskNotifications(content);
+  return content.flatMap((block) => {
+    const text = TextBlock.safeParse(block);
+    return text.success ? parseTaskNotifications(text.data.text) : [];
+  });
+}
 
 /** Parses one JSONL line. Returns null for blank, invalid or non-object lines. */
 export function parseTranscriptLine(line: string): unknown {

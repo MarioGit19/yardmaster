@@ -58,6 +58,35 @@ describe('selectHudCounts', () => {
     expect(counts).toMatchObject({ working: 3, waiting: 2, errors: 2 });
   });
 
+  it('counts an idle session with background work running as working, once', () => {
+    const shell = {
+      id: 'b1',
+      kind: 'shell' as const,
+      label: 'Watcher',
+      startedAt: NOW,
+      endedAt: null,
+      status: 'running' as const,
+      exitCode: null,
+      pid: null,
+    };
+    const counts = countsOf((board) => {
+      board.sessions.bg = { ...makeSession('bg', 'p-acme', { kind: 'idle' }), background: [shell] };
+      board.sessions.busy = {
+        ...makeSession('busy', 'p-acme', { kind: 'working' }),
+        background: [shell],
+      };
+      board.sessions.gone = {
+        ...makeSession('gone', 'p-acme', { kind: 'ended' }),
+        background: [shell],
+      };
+      board.sessions.done = {
+        ...makeSession('done', 'p-acme', { kind: 'idle' }),
+        background: [{ ...shell, status: 'done', endedAt: NOW }],
+      };
+    });
+    expect(counts.working).toBe(3);
+  });
+
   it('counts running commands and failed last commands like the lanes do', () => {
     const counts = countsOf((board) => {
       const running = makeTerminal('t-run', 'p-acme');

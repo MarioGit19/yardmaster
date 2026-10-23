@@ -12,6 +12,7 @@ import { pino } from 'pino';
 import { z } from 'zod';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { AwayApprovals, registerAwayRoutes } from './claude/away.js';
+import { BackgroundTracker } from './claude/background-tracker.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
@@ -117,6 +118,7 @@ declare module 'fastify' {
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
     sessionLinker: SessionLinker | null;
+    backgroundTracker: BackgroundTracker;
     gitScanner: GitScanner | null;
   }
 }
@@ -174,6 +176,7 @@ export async function buildServer(
     processScanner?.stop();
     sessionLinker?.stop();
     gitScanner?.stop();
+    background.stop();
     // Running board sessions stay listed as interrupted, to resume on the next start.
     await runner.suspendAll();
     await discovery?.stop();
@@ -195,6 +198,9 @@ export async function buildServer(
     persistence.recordActivity(event);
     gateway.pushActivity(event);
   };
+
+  const background = new BackgroundTracker({ store, onActivity: recordActivity });
+  app.decorate('backgroundTracker', background);
 
   // Constructed first so the gateway can route approvals to it; it starts once the app is ready.
   demo = options.demo
@@ -248,6 +254,7 @@ export async function buildServer(
           onSample: (tree) => {
             processOptions.onSample?.(tree);
             sessionLinker?.link();
+            background.sample(tree);
           },
         });
   const sessionLinker = processScanner

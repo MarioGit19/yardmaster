@@ -1,5 +1,6 @@
 export const PACKAGE_NAME = '@c-board/protocol';
 
+export * from './background.js';
 export * from './claude-sessions.js';
 export * from './display-names.js';
 export * from './domain.js';

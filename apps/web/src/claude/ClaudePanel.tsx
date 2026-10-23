@@ -3,6 +3,7 @@ import { GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'wouter';
+import { BackgroundPanel } from '../background/BackgroundPanel.js';
 import { useBoard } from '../data/index.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { dur, ease } from '../motion.js';
@@ -117,6 +118,7 @@ export function ClaudePanel({
             </span>
           </header>
         )}
+        <BackgroundPanel session={session} />
         {/* The skeleton cross-fades into the transcript, and one session's into the next's; the old
           one leaves faster than the new one arrives. */}
         <div className="relative flex min-h-0 flex-1 flex-col">

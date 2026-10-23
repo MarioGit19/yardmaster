@@ -2,6 +2,7 @@ import type { ClaudeSession } from '@c-board/protocol';
 import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { useInView } from '../anim/useFrame.js';
+import { BackgroundLine } from '../background/BackgroundLine.js';
 import { selectApproval, useBoard } from '../data/index.js';
 import { DraftMarker } from '../drafts/DraftMarker.js';
 import { draftKey } from '../drafts/drafts.js';
@@ -91,6 +92,7 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
         >
           {line ?? fallback}
         </p>
+        <BackgroundLine session={session} className="mt-0.5" />
       </div>
     </li>
   );

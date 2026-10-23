@@ -4,7 +4,9 @@ import {
   type Approval,
   type ApprovalDecision,
   accentIndexForProject,
+  type BackgroundTask,
   type ClaudeSession,
+  endBackground,
   GIT_MAX_COMMITS,
   GIT_MAX_FILES,
   type GitFileChange,
@@ -15,6 +17,7 @@ import {
   type ResumableSessionStatus,
   type ServerToUi,
   type SessionHistoryEntry,
+  startBackground,
   type ToolActivity,
   toolFamily,
 } from '@c-board/protocol';
@@ -22,6 +25,8 @@ import type { ActionHandlers, ActionResult } from '../actions.js';
 import { NOTHING_TO_RERUN, type TerminalActionKind } from '../editor-actions.js';
 import type { BoardStore } from '../store.js';
 import {
+  DEMO_BACKGROUND_GAP_MS,
+  DEMO_BACKGROUND_SHELL_MS,
   DEMO_CHANGED_FILES,
   DEMO_COMMITS,
   DEMO_HOME,
@@ -29,6 +34,7 @@ import {
   DEMO_PAST_SESSIONS,
   DEMO_PROJECTS,
   DEMO_WINDOWS,
+  type DemoBackground,
   type DemoProject,
   type DemoScenario,
   type DemoTerminal,
@@ -201,6 +207,8 @@ export class DemoSimulator {
   private readonly textRng: Rng;
   /** The Pulse backfill only, for the same reason. */
   private readonly pastRng: Rng;
+  /** Background work draws apart, so it doesn't shift the rest of the seeded demo. */
+  private readonly bgRng: Rng;
   private readonly historySeed: number;
   private readonly history = new Map<string, SessionHistoryEntry[]>();
   private readonly onActivity: (event: ActivityEvent) => void;
@@ -224,6 +232,7 @@ export class DemoSimulator {
     this.rng = new Rng(options.seed ?? 0xc0ffee);
     this.textRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x5eed);
     this.pastRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x9a57);
+    this.bgRng = new Rng((options.seed ?? 0xc0ffee) ^ 0xb6b6);
     this.historySeed = (options.seed ?? 0xc0ffee) ^ 0x4157;
     this.transcripts = options.transcripts ?? new DemoTranscripts();
     this.onActivity = options.onActivity ?? (() => {});
@@ -879,6 +888,7 @@ export class DemoSimulator {
     session.timer = this.after(this.rng.int(500, 2_500), () => {
       this.store.setSessionStatus(id, { kind: 'idle' });
       this.activity('session.start', session, 'Session started');
+      if (terminal.def.background) this.backgroundShell(session, terminal.def.background);
       this.scheduleTurn(session, this.rng.int(1_000, 6_000));
     });
   }
@@ -1039,6 +1049,89 @@ export class DemoSimulator {
       });
       this.activity('subagent.stop', session, description, { agent_id: id });
     });
+  }
+
+  /**
+   * A background shell that runs for a while and finishes (now and then with an error), and
+   * an async subagent alongside every other run, then again after a pause. The tracker turns
+   * the starts and ends into Pulse events.
+   */
+  private backgroundShell(session: SessionCtx, def: DemoBackground, round = 0): void {
+    if (!this.isLive(session)) return;
+    const ts = this.now();
+    const id = `b${this.bgRng.hex(8)}`;
+    let background = startBackground(this.backgroundOf(session), {
+      id,
+      kind: 'shell',
+      label: def.shell.description,
+      command: def.shell.command,
+      toolUseId: `toolu_${this.bgRng.hex(12)}`,
+      ts,
+    });
+    const agentId = round % 2 === 0 ? this.bgRng.hex(12) : null;
+    if (agentId !== null) {
+      background = startBackground(background, {
+        id: agentId,
+        kind: 'agent',
+        label: def.agent.description,
+        ts,
+      });
+    }
+    const current = this.store.state.sessions[session.id];
+    this.store.updateSession(session.id, {
+      background,
+      ...(agentId !== null && current
+        ? {
+            subagents: [
+              ...current.subagents.slice(-(MAX_SUBAGENTS - 1)),
+              {
+                id: `agent-${agentId}`,
+                type: def.agent.type,
+                description: def.agent.description,
+                status: 'running' as const,
+                startedAt: ts,
+                endedAt: null,
+              },
+            ],
+          }
+        : {}),
+    });
+    const runFor = this.bgRng.int(...DEMO_BACKGROUND_SHELL_MS);
+    if (agentId !== null) {
+      this.after(Math.round(runFor * 0.6), () => this.finishBackground(session, agentId, 0));
+    }
+    this.after(runFor, () => {
+      this.finishBackground(session, id, this.bgRng.chance(0.2) ? 1 : 0);
+      this.after(this.bgRng.int(...DEMO_BACKGROUND_GAP_MS), () =>
+        this.backgroundShell(session, def, round + 1),
+      );
+    });
+  }
+
+  private finishBackground(session: SessionCtx, id: string, exitCode: number): void {
+    const latest = this.store.state.sessions[session.id];
+    if (!latest || !this.isLive(session)) return;
+    const ts = this.now();
+    const background = this.backgroundOf(session).map((task) =>
+      task.id === id
+        ? endBackground(task, { status: exitCode === 0 ? 'done' : 'error', ts, exitCode })
+        : task,
+    );
+    const subagents = latest.subagents.map((agent) =>
+      agent.id === `agent-${id}` && agent.status === 'running'
+        ? { ...agent, status: 'done' as const, endedAt: ts }
+        : agent,
+    );
+    this.store.updateSession(session.id, { background, subagents });
+  }
+
+  private backgroundOf(session: SessionCtx): BackgroundTask[] {
+    return [...(this.store.state.sessions[session.id]?.background ?? [])];
+  }
+
+  private isLive(session: SessionCtx): boolean {
+    const status = this.store.state.sessions[session.id]?.status.kind;
+    return this.running && status !== undefined && status !== 'ended';
   }
 
   private compact(session: SessionCtx, previous: ResumableSessionStatus): void {

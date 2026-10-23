@@ -1,10 +1,21 @@
 import {
+  type BackgroundTask,
+  backgroundCommand,
+  backgroundLabel,
+  backgroundLaunchKind,
+  backgroundTaskIdOf,
   type ClaudeSession,
+  endBackground,
   type HookCommon,
   type KnownHookEvent,
   PermissionMode,
+  parseLiveTasks,
+  reconcileBackground,
   type SessionStatus,
   type Subagent,
+  sameTaskId,
+  startBackground,
+  stopAllBackground,
   type ToolActivity,
   toolFamily,
   toolInputDetail,
@@ -114,6 +125,7 @@ export function sessionReducer(
     case 'PostToolUse':
     case 'PostToolUseFailure': {
       const id = hook.tool_use_id ?? null;
+      next = withLaunch(next, hook, ts);
       const finishesTool =
         status.kind === 'tool' &&
         (id === null || status.toolUseId === null || status.toolUseId === id);
@@ -137,6 +149,7 @@ export function sessionReducer(
 
     case 'Stop':
       next = withAssistantText(next, hook.last_assistant_message, ts);
+      next = withLiveTasks(next, hook.background_tasks, ts);
       return ended ? next : to({ kind: 'idle' });
 
     case 'StopFailure':
@@ -156,15 +169,88 @@ export function sessionReducer(
     case 'SubagentStart':
       return {
         ...next,
-        subagents: startSubagent(next.subagents, hook.agent_id, hook.agent_type, ts),
+        subagents: startSubagent(
+          next.subagents,
+          hook.agent_id,
+          hook.agent_type,
+          ts,
+          subagentDescription(next, hook.agent_id),
+        ),
       };
 
-    case 'SubagentStop':
+    case 'SubagentStop': {
+      next = withLiveTasks(next, hook.background_tasks, ts);
+      const agentId = hook.agent_id;
+      const background = next.background ?? [];
       return {
         ...next,
-        subagents: stopSubagent(next.subagents, hook.agent_id, hook.agent_type, ts),
+        subagents: stopSubagent(next.subagents, agentId, hook.agent_type, ts),
+        ...(agentId !== undefined && background.some((t) => sameTaskId(t.id, agentId))
+          ? {
+              background: background.map((task) =>
+                task.kind === 'agent' && sameTaskId(task.id, agentId)
+                  ? endBackground(task, { status: 'done', ts })
+                  : task,
+              ),
+            }
+          : {}),
       };
+    }
   }
+}
+
+type ToolResultHook = Extract<
+  KnownHookEvent,
+  { hook_event_name: 'PostToolUse' | 'PostToolUseFailure' }
+>;
+
+/** A tool call that left work running in the background adds it to the session's list. */
+function withLaunch(session: ClaudeSession, hook: ToolResultHook, ts: number): ClaudeSession {
+  const failed = hook.hook_event_name === 'PostToolUseFailure';
+  const response = failed ? undefined : hook.tool_response;
+  const kind = backgroundLaunchKind(hook.tool_name, hook.tool_input, response);
+  if (kind === null) return session;
+  const toolUseId = hook.tool_use_id ?? null;
+  const id = backgroundTaskIdOf(response) ?? toolUseId ?? `bg-${ts}`;
+  const background = startBackground(session.background ?? [], {
+    id,
+    kind,
+    label: backgroundLabel(hook.tool_input),
+    command: backgroundCommand(hook.tool_input),
+    toolUseId,
+    ts,
+    // It never started: shown as failed, not as running.
+    ...(failed ? { status: 'error' as const } : {}),
+  });
+  let subagents = session.subagents;
+  if (kind === 'agent' && !failed) {
+    const description = backgroundLabel(hook.tool_input);
+    subagents = subagents.map((agent) =>
+      agent.description === null && sameTaskId(agent.id, id) ? { ...agent, description } : agent,
+    );
+  }
+  return { ...session, background, subagents };
+}
+
+/** A `background_tasks` snapshot (Stop, SubagentStop) is the full live set: reconcile with it. */
+function withLiveTasks(session: ClaudeSession, raw: unknown, ts: number): ClaudeSession {
+  const live = parseLiveTasks(raw);
+  if (live === null) return session;
+  const background = session.background ?? [];
+  if (live.length === 0 && !background.some((t) => t.status === 'running')) return session;
+  return { ...session, background: reconcileBackground(background, live, ts) };
+}
+
+/** What a new subagent is doing: its async launch's label, else the Agent call in flight. */
+function subagentDescription(session: ClaudeSession, agentId: string | undefined): string | null {
+  if (agentId !== undefined) {
+    const task = session.background?.find(
+      (t: BackgroundTask) => t.kind === 'agent' && sameTaskId(t.id, agentId),
+    );
+    if (task) return task.label;
+  }
+  const tool = session.currentTool;
+  return tool?.family === 'task' && tool.status === 'running' ? tool.summary : null;
 }
 
 function withAssistantText(
@@ -180,8 +266,10 @@ function withStatus(session: ClaudeSession, status: SessionStatus, ts: number): 
   const next: ClaudeSession = { ...session, status };
   // Keep the tool visible while it waits for a permission decision.
   if (status.kind !== 'tool' && status.kind !== 'waiting_permission') next.currentTool = null;
-  if (status.kind === 'ended') next.endedAt = session.endedAt ?? ts;
-  else if (status.kind !== 'compacting') next.endedAt = null;
+  if (status.kind === 'ended') {
+    next.endedAt = session.endedAt ?? ts;
+    if (session.background) next.background = [...stopAllBackground(session.background, ts)];
+  } else if (status.kind !== 'compacting') next.endedAt = null;
   return next;
 }
 
@@ -190,13 +278,14 @@ function startSubagent(
   id: string | undefined,
   type: string | undefined,
   ts: number,
+  description: string | null,
 ): Subagent[] {
   const agentId = id ?? `subagent-${ts}`;
   if (list.some((agent) => agent.id === agentId)) return [...list];
   const agent: Subagent = {
     id: agentId,
     type: type ?? null,
-    description: null,
+    description,
     status: 'running',
     startedAt: ts,
     endedAt: null,

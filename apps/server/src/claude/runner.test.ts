@@ -327,6 +327,64 @@ describe('SessionRunner start', () => {
     expect(runner.isLive(SESSION_A)).toBe(true);
   });
 
+  it('tracks background tasks from the task_* system messages', async () => {
+    const { store, transcripts, runner } = setup();
+    await runner.startSession({ projectId: PROJECT.id, prompt: 'Watch the build' });
+    const [q] = queries;
+    const system = (fields: Record<string, unknown>) => ({
+      type: 'system',
+      uuid: `sys-${String(fields.subtype)}-${String(fields.task_id)}`,
+      session_id: SESSION_A,
+      ...fields,
+    });
+
+    q?.emit(
+      system({
+        subtype: 'task_started',
+        task_id: 'b1',
+        tool_use_id: 'toolu_1',
+        description: 'Watch the web build',
+        task_type: 'local_bash',
+        is_backgrounded: true,
+      }),
+    );
+    q?.emit(
+      system({
+        subtype: 'task_started',
+        task_id: 'a1',
+        description: 'Find terminal names',
+        task_type: 'local_agent',
+        subagent_type: 'Explore',
+      }),
+    );
+    // A foreground subagent and a housekeeping watcher are not background work.
+    q?.emit(
+      system({ subtype: 'task_started', task_id: 'f1', description: 'x', is_backgrounded: false }),
+    );
+    q?.emit(system({ subtype: 'task_started', task_id: 'w1', description: 'x', ambient: true }));
+    await settle(transcripts);
+    expect(session(store, SESSION_A).background?.map((t) => [t.id, t.kind, t.status])).toEqual([
+      ['b1', 'shell', 'running'],
+      ['a1', 'agent', 'running'],
+    ]);
+
+    q?.emit(
+      system({
+        subtype: 'task_notification',
+        task_id: 'b1',
+        status: 'failed',
+        summary: 'Background command "Watch the web build" failed with exit code 2',
+        output_file: '/tmp/out',
+      }),
+    );
+    q?.emit(system({ subtype: 'background_tasks_changed', tasks: [], uuid: 'sys-changed' }));
+    await settle(transcripts);
+    expect(session(store, SESSION_A).background).toEqual([
+      expect.objectContaining({ id: 'b1', status: 'error', exitCode: 2 }),
+      expect.objectContaining({ id: 'a1', status: 'done' }),
+    ]);
+  });
+
   it('marks the session as failed when the SDK throws', async () => {
     const { store, runner } = setup();
     await runner.startSession({ projectId: PROJECT.id, prompt: 'Go' });

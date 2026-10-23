@@ -35,7 +35,18 @@ export interface DemoTerminal {
   renameTo?: { name: string; afterMs: number };
   /** A name the user gave the Claude session in this terminal (`/rename`). */
   sessionName?: string;
+  /** The session keeps a background shell and an async subagent going, on a cycle. */
+  background?: DemoBackground;
 }
+
+export interface DemoBackground {
+  shell: { command: string; description: string };
+  agent: { type: string; description: string };
+}
+
+/** How long the demo's background shell runs, and the pause before it starts again. */
+export const DEMO_BACKGROUND_SHELL_MS: readonly [number, number] = [9_000, 14_000];
+export const DEMO_BACKGROUND_GAP_MS: readonly [number, number] = [4_000, 7_000];
 
 /** When orbit-api's `zsh` becomes `backend`; the e2e waits for it. */
 export const DEMO_RENAME_MS = 20_000;
@@ -74,7 +85,14 @@ export const DEMO_PROJECTS: DemoProject[] = [
       { kind: 'next', name: 'next dev', port: 3000 },
       { kind: 'jest', name: 'tests' },
       { kind: 'shell', name: 'zsh' },
-      { kind: 'claude', name: 'claude' },
+      {
+        kind: 'claude',
+        name: 'claude',
+        background: {
+          shell: { command: 'pnpm tsc --watch --noEmit', description: 'Typecheck watcher' },
+          agent: { type: 'Explore', description: 'Find discount rules' },
+        },
+      },
     ],
     testFiles: [
       'src/cart/total.test.ts',

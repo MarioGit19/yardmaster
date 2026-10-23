@@ -1,0 +1,22 @@
+{
+  "session_id": "3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70",
+  "transcript_path": "/home/dev/.claude/projects/-home-dev-acme-shop/3f6c1a2e-8b7d-4c5e-9a10-2b3c4d5e6f70.jsonl",
+  "cwd": "/home/dev/acme-shop",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Find terminal names",
+    "prompt": "Find where terminal names are set and list the files.",
+    "subagent_type": "Explore"
+  },
+  "tool_response": {
+    "status": "async_launched",
+    "agentId": "a5c9e2f7b1d3",
+    "description": "Find terminal names",
+    "prompt": "Find where terminal names are set and list the files.",
+    "outputFile": "/tmp/claude-1000/-home-dev-acme-shop/tasks/a5c9e2f7b1d3.output"
+  },
+  "tool_use_id": "toolu_09AgentAsyncAbCdEfGhIj",
+  "duration_ms": 30
+}

@@ -1,3 +1,4 @@
+import type { BackgroundKind } from '@c-board/protocol';
 import { AnimatePresence, animate, motion, type Transition } from 'motion/react';
 import {
   type CSSProperties,
@@ -20,6 +21,7 @@ import {
   DONE_MS,
   ERROR_X_EYES_MS,
   LOOK_AROUND_EVERY_MS,
+  MAX_HELPERS,
   type MascotDetail,
   type MascotState,
   mascotDetail,
@@ -40,6 +42,8 @@ export interface CrewMascotProps {
   tool?: string | null;
   /** Running subagents, shown as mini crew members beside this one. */
   subagents?: number;
+  /** Running background shells, monitors and tasks: a helper drone each (3 at most, then "+N"). */
+  helpers?: readonly BackgroundKind[];
   /** 0..1 terminal output rate; the "watching" monitor flickers faster with it. */
   activity?: number;
   /** Epoch ms; the antenna orb fills a countdown ring while an approval waits. */
@@ -71,6 +75,7 @@ export function CrewMascot({
   color = 'var(--st-work)',
   tool = null,
   subagents = 0,
+  helpers = NO_HELPERS,
   activity = 0,
   countdown = null,
   settle = true,
@@ -164,7 +169,7 @@ export function CrewMascot({
   }, [looks]);
 
   const minis = detail === 'posture' ? 0 : miniCrewCount(shown, subagents);
-  const label = mascotLabel(shown, tool, miniCrewCount(shown, subagents));
+  const label = mascotLabel(shown, tool, miniCrewCount(shown, subagents), helpers.length);
   const orbSize = Math.max(7, Math.round(size * 0.2));
   const props = detail !== 'posture';
   const bubbles = props && level !== 'off';
@@ -310,6 +315,26 @@ export function CrewMascot({
             {bubbles && shown === 'thinking' && <ThinkDots key="think" />}
             {bubbles && shown === 'waiting' && <AlertBubble key="alert" />}
             {bubbles && shown === 'sleeping' && <Snore key="z" detail={detail} />}
+          </AnimatePresence>
+          <AnimatePresence initial={false}>
+            {helpers.slice(0, MAX_HELPERS).map((kind, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a slot keeps its drone while tasks come and go.
+              <Helper key={i} slot={i} kind={kind} />
+            ))}
+            {helpers.length > MAX_HELPERS && (
+              <motion.span
+                key="more"
+                data-crew-helpers-more
+                className="absolute rounded-chip border border-line bg-bg-2 px-0.5 font-mono text-text-2 tabular leading-none"
+                style={{ ...HELPER_SLOTS[MAX_HELPERS], fontSize: Math.max(8, size * 0.09) }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+                transition={{ duration: dur.base, ease: ease.out }}
+              >
+                +{helpers.length - MAX_HELPERS}
+              </motion.span>
+            )}
           </AnimatePresence>
           <AnimatePresence initial={false}>
             {Array.from({ length: minis }, (_, i) => (
@@ -741,6 +766,47 @@ const PUFF = [
   [-1, 1],
   [1, 1],
 ] as const;
+
+const NO_HELPERS: readonly BackgroundKind[] = [];
+
+/** Where helper drones hover, in % of the mascot's box: beside the head, then by the left arm. */
+const HELPER_SLOTS: readonly CSSProperties[] = [
+  { left: '1%', top: '6%' },
+  { left: '79%', top: '6%' },
+  { left: '1%', top: '30%' },
+  { left: '79%', top: '30%' },
+];
+
+const HELPER_EYE: Record<BackgroundKind, string> = {
+  shell: 'var(--st-tool)',
+  monitor: 'var(--st-tool)',
+  agent: 'var(--orb-task)',
+  other: 'var(--st-work)',
+};
+
+/** A background task's helper: a small drone that pops in beside the crew member and hovers. */
+function Helper({ slot, kind }: { slot: number; kind: BackgroundKind }) {
+  return (
+    <motion.span
+      data-crew-helper={kind}
+      className="absolute"
+      style={{ ...HELPER_SLOTS[slot], width: '20%', height: '20%', originX: 0.5, originY: 0.5 }}
+      initial={{ scale: 0.4, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1, transition: spring.snappy }}
+      exit={{ scale: 0.4, opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+    >
+      <span className="crew-anim crew-helper absolute inset-0">
+        <svg aria-hidden viewBox="0 0 20 20" className="absolute inset-0 overflow-visible">
+          <line x1="5" y1="3" x2="15" y2="3" className="crew-outline" strokeLinecap="round" />
+          <line x1="10" y1="3" x2="10" y2="6" className="crew-outline" />
+          <rect x="3" y="6" width="14" height="11" rx="5" className="crew-shell" />
+          <rect x="5.5" y="9" width="9" height="4.5" rx="2.25" fill="var(--crew-visor)" />
+          <circle cx="10" cy="11.25" r="1.4" fill={HELPER_EYE[kind]} />
+        </svg>
+      </span>
+    </motion.span>
+  );
+}
 
 /** A subagent: pops out beside its parent with a small puff and leaves the same way. */
 function MiniCrew({ index, size, color }: { index: number; size: number; color: string }) {

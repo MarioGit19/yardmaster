@@ -33,6 +33,7 @@ import { cx } from '../ui/cx.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
 import {
   buildLanes,
+  eventDetail,
   eventLabel,
   eventTone,
   FILTER_LABEL,
@@ -661,7 +662,8 @@ function PulsePlot() {
 }
 
 function describe(event: ActivityEvent): string {
-  const summary = event.summary ? `: ${event.summary}` : '';
+  const detail = eventDetail(event);
+  const summary = detail ? `: ${detail}` : '';
   return `${eventLabel(event)}${summary}, ${formatAgo(Date.now() - event.ts)}`;
 }
 
@@ -701,9 +703,9 @@ function PulseTooltip({
         <span className="font-medium text-text-1">{eventLabel(event)}</span>
         <span className="tabular text-text-2">{formatAgo(Date.now() - event.ts)}</span>
       </div>
-      {event.summary && (
+      {eventDetail(event) && (
         <p className="mt-0.5 line-clamp-2 break-words font-mono text-meta text-text-2">
-          {event.summary}
+          {eventDetail(event)}
         </p>
       )}
       {session && (

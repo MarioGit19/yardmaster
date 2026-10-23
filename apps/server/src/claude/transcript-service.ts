@@ -3,10 +3,12 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { claudeSettingsPath } from '@c-board/hook';
 import {
+  applyTaskNotifications,
   type ChatMessage,
   type ClaudeSession,
   decodeChatMessage,
   sessionIdFromStream,
+  type TaskNotification,
   type TokenUsage,
   transcriptStreamId,
 } from '@c-board/protocol';
@@ -20,6 +22,7 @@ import {
   entryUuid,
   normalizeEntry,
   parseTranscriptLine,
+  taskNotificationsOf,
   UsageTracker,
 } from './transcript-normalize.js';
 
@@ -293,8 +296,10 @@ export class TranscriptService {
     let usageChanged = false;
     let model: string | null = null;
     let customTitle: string | null = null;
+    const notes: TaskNotification[] = [];
     for (const entry of entries) {
       customTitle = customTitleOf(entry) ?? customTitle;
+      notes.push(...taskNotificationsOf(entry));
       const uuid = entryUuid(entry);
       if (uuid !== null) {
         if (t.seen.has(uuid)) continue;
@@ -314,6 +319,16 @@ export class TranscriptService {
       }
     }
     this.publish(t, usageChanged, model, customTitle);
+    if (notes.length > 0) this.finishBackground(t.id, notes);
+  }
+
+  /** Background tasks the transcript reports finished (a fallback to the hooks and process tree). */
+  private finishBackground(id: string, notes: readonly TaskNotification[]): void {
+    const session = this.store.state.sessions[id];
+    if (!session?.background) return;
+    const background = applyTaskNotifications(session.background, notes, Date.now());
+    if (background === session.background) return;
+    this.store.updateSession(id, { background: [...background], updatedAt: session.updatedAt });
   }
 
   private publish(

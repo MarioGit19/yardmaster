@@ -277,6 +277,39 @@ export const Subagent = z.object({
 });
 export type Subagent = z.infer<typeof Subagent>;
 
+export const BackgroundKind = z.enum(['shell', 'monitor', 'agent', 'other']);
+export type BackgroundKind = z.infer<typeof BackgroundKind>;
+
+export const BackgroundTaskStatus = z.enum(['running', 'done', 'error', 'stopped']);
+export type BackgroundTaskStatus = z.infer<typeof BackgroundTaskStatus>;
+
+export const BACKGROUND_LABEL_MAX = 120;
+export const BACKGROUND_COMMAND_MAX = 2_000;
+export const BACKGROUND_TAIL_MAX = 2_000;
+export const MAX_BACKGROUND_TASKS = 20;
+
+/** Work a session left running in the background: a shell, a Monitor watch, an async subagent. */
+export const BackgroundTask = z.object({
+  /** Claude Code's task id (`backgroundTaskId`, Monitor's `taskId`, an agent id), else the tool call's id. */
+  id: Id,
+  kind: BackgroundKind,
+  /** One line: the tool's `description`, else the command. */
+  label: z.string().max(BACKGROUND_LABEL_MAX),
+  /** The command as typed, for shells and monitors. Lives only as long as the session. */
+  command: z.string().max(BACKGROUND_COMMAND_MAX).nullable().optional(),
+  /** The tool call that started it. */
+  toolUseId: z.string().max(256).nullable().optional(),
+  startedAt: Timestamp,
+  endedAt: Timestamp.nullable(),
+  status: BackgroundTaskStatus,
+  exitCode: z.number().int().nullable(),
+  /** The process running it, once found under the session's Claude process. */
+  pid: Pid.nullable(),
+  /** The end of its output, or its completion summary, when the transcript has it. */
+  tail: z.string().max(BACKGROUND_TAIL_MAX).nullable().optional(),
+});
+export type BackgroundTask = z.infer<typeof BackgroundTask>;
+
 export const ClaudeSession = z.object({
   id: SessionId,
   origin: SessionOrigin,
@@ -298,6 +331,8 @@ export const ClaudeSession = z.object({
   currentTool: ToolActivity.nullable(),
   todos: z.array(TodoItem),
   subagents: z.array(Subagent),
+  /** Background shells, monitors and async subagents, newest last. Not persisted. */
+  background: z.array(BackgroundTask).max(MAX_BACKGROUND_TASKS).optional(),
   terminalId: TerminalId.nullable(),
   claudePid: Pid.nullable(),
   transcriptPath: z.string().nullable(),
@@ -368,6 +403,8 @@ export const ActivityKind = z.enum([
   'stop.failure',
   'subagent.start',
   'subagent.stop',
+  'background.start',
+  'background.end',
   'compact.start',
   'compact.end',
   'exec.start',

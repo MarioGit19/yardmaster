@@ -5,6 +5,7 @@ import { type PointerEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { useInView } from '../anim/useFrame.js';
+import { runningBackground, runningHelpers } from '../background/model.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { type CrewTerminal, miniCrewCount } from '../crew/model.js';
 import { useCrewTerminals } from '../crew/useCrewTerminals.js';
@@ -72,7 +73,10 @@ export function ProjectPod({ project }: { project: Project }) {
   // Activity, DESIGN.md §4.10.
   const pulseKey = activityKey.project(project.id);
   const crashed = useBoard(selectCrashedCount(project.id)) > 0;
-  const working = sessions.filter((s) => WORKING.has(s.status.kind)).length;
+  // Background work keeps the border's light moving after the turn ends.
+  const working = sessions.filter(
+    (s) => WORKING.has(s.status.kind) || (isLive(s) && runningBackground(s) > 0),
+  ).length;
   const now = useNow(IDLE_CLOCK_MS);
   // The crew watches streaming terminals and falls asleep after five quiet minutes (§4.11).
   const crew = useCrewTerminals(terminals);
@@ -357,11 +361,14 @@ function CrewMember({
         color={accent}
         tool={session?.status.kind === 'tool' ? session.status.tool : null}
         subagents={subagents}
+        helpers={session ? runningHelpers(session) : undefined}
         activity={activity}
       />
     </span>
   );
 }
+
+const isLive = (s: ClaudeSession) => s.status.kind !== 'ended' && s.status.kind !== 'interrupted';
 
 /** Pod-shaped loading placeholder: the real pod's header, crew, session rows and lane tracks. */
 export function ProjectPodSkeleton() {
