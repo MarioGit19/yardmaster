@@ -1,5 +1,6 @@
 import { type ToolFamily, toolFamily } from '@c-board/protocol';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { frameDue } from '../ambient/signal.js';
 import { useFrame, useInView } from '../anim/useFrame.js';
 import { useMotionLevel } from '../motion.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
@@ -19,6 +20,12 @@ import {
 } from './model.js';
 import { CANVAS_SCALE, drawOrb, type OrbFrame, type OrbPalette } from './render.js';
 import { ToolChip } from './ToolChip.js';
+
+/** Orbs are soft and slow-moving; display rate (60–120 Hz) buys nothing over 30 fps. */
+const ORB_FPS = 30;
+/** Crew antennas and other tiny orbs. */
+const SMALL_ORB = 12;
+const SMALL_ORB_FPS = 20;
 
 const STATUS_TOKEN: Record<OrbState, string> = {
   idle: '--st-idle',
@@ -152,7 +159,16 @@ export function ClaudeOrb({
   };
 
   const animating = moving && (orbAnimates(state, satellites) || effectOn);
-  useFrame(draw, { visible: inView, enabled: animating });
+  const lastFrameAt = useRef<number | null>(null);
+  const fps = size <= SMALL_ORB ? SMALL_ORB_FPS : ORB_FPS;
+  useFrame(
+    (now) => {
+      if (!frameDue(lastFrameAt.current, now, fps)) return;
+      lastFrameAt.current = now;
+      draw(now);
+    },
+    { visible: inView, enabled: animating },
+  );
 
   // Still orbs draw once per change; a countdown still advances once a second.
   const drawRef = useRef(draw);

@@ -56,6 +56,36 @@ const BLACK: Rgb = [0, 0, 0];
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 
+const MAX_CACHED = 48;
+const gradients = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasGradient>>();
+
+/**
+ * A gradient built once per context and key. Keys carry every input (size, colors, so theme and
+ * state), and moving things are drawn by translating, scaling and `globalAlpha`, so a running orb
+ * reuses the same few gradients every frame instead of allocating them.
+ */
+function cached(
+  ctx: CanvasRenderingContext2D,
+  key: string,
+  make: () => CanvasGradient,
+): CanvasGradient {
+  let cache = gradients.get(ctx);
+  if (!cache) {
+    cache = new Map();
+    gradients.set(ctx, cache);
+  }
+  let gradient = cache.get(key);
+  if (!gradient) {
+    // Keys only churn during short scale effects; dropping everything then is cheap.
+    if (cache.size >= MAX_CACHED) cache.clear();
+    gradient = make();
+    cache.set(key, gradient);
+  }
+  return gradient;
+}
+
+const rgbKey = ([r, g, b]: Rgb) => `${r | 0},${g | 0},${b | 0}`;
+
 interface Look {
   core: Rgb;
   /** Halo strength 0..1. */
@@ -132,12 +162,17 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
 
   // Halo.
   if (look.halo > 0) {
-    const halo = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R * 2.6);
-    halo.addColorStop(0, rgba(look.core, look.halo));
-    halo.addColorStop(0.45, rgba(look.core, look.halo * 0.3));
-    halo.addColorStop(1, rgba(look.core, 0));
-    ctx.fillStyle = halo;
+    // Built at full strength; the (breathing) strength is the alpha.
+    ctx.fillStyle = cached(ctx, `halo ${rgbKey(look.core)} ${R}`, () => {
+      const halo = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R * 2.6);
+      halo.addColorStop(0, rgba(look.core, 1));
+      halo.addColorStop(0.45, rgba(look.core, 0.3));
+      halo.addColorStop(1, rgba(look.core, 0));
+      return halo;
+    });
+    ctx.globalAlpha = Math.min(1, look.halo);
     ctx.fillRect(-c, -c, extent, extent);
+    ctx.globalAlpha = 1;
   }
 
   // Orbiting things behind the sphere.
@@ -149,11 +184,19 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
       if (p.depth > 0 !== front) continue;
       const r = Math.max(1.2, unit * (1.7 + 0.5 * p.depth));
       const a = 0.6 + 0.4 * p.depth;
-      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
-      glow.addColorStop(0, rgba(palette.family, 0.4 * a));
-      glow.addColorStop(1, rgba(palette.family, 0));
-      ctx.fillStyle = glow;
-      ctx.fillRect(p.x - r * 3, p.y - r * 3, r * 6, r * 6);
+      // A unit glow, moved and sized by the transform.
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(r, r);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = cached(ctx, `particle ${rgbKey(palette.family)}`, () => {
+        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 3);
+        glow.addColorStop(0, rgba(palette.family, 0.4));
+        glow.addColorStop(1, rgba(palette.family, 0));
+        return glow;
+      });
+      ctx.fillRect(-3, -3, 6, 6);
+      ctx.restore();
       ctx.fillStyle = rgba(mix(palette.family, WHITE, 0.25), a);
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, TAU);
@@ -168,18 +211,26 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
       const p = orbit(angle, R * 1.85, 0.5);
       if (p.depth > 0 !== front) continue;
       const r = Math.max(1.6, R * 0.2);
-      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.4);
-      glow.addColorStop(0, rgba(palette.satellite, 0.35));
-      glow.addColorStop(1, rgba(palette.satellite, 0));
-      ctx.fillStyle = glow;
-      ctx.fillRect(p.x - r * 2.4, p.y - r * 2.4, r * 4.8, r * 4.8);
-      const body = ctx.createRadialGradient(p.x - r * 0.3, p.y - r * 0.35, 0, p.x, p.y, r);
-      body.addColorStop(0, rgba(mix(palette.satellite, WHITE, 0.45), 1));
-      body.addColorStop(1, rgba(mix(palette.satellite, BLACK, 0.25), 1));
-      ctx.fillStyle = body;
+      const key = `${rgbKey(palette.satellite)} ${r}`;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = cached(ctx, `satellite glow ${key}`, () => {
+        const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.4);
+        glow.addColorStop(0, rgba(palette.satellite, 0.35));
+        glow.addColorStop(1, rgba(palette.satellite, 0));
+        return glow;
+      });
+      ctx.fillRect(-r * 2.4, -r * 2.4, r * 4.8, r * 4.8);
+      ctx.fillStyle = cached(ctx, `satellite ${key}`, () => {
+        const body = ctx.createRadialGradient(-r * 0.3, -r * 0.35, 0, 0, 0, r);
+        body.addColorStop(0, rgba(mix(palette.satellite, WHITE, 0.45), 1));
+        body.addColorStop(1, rgba(mix(palette.satellite, BLACK, 0.25), 1));
+        return body;
+      });
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, TAU);
+      ctx.arc(0, 0, r, 0, TAU);
       ctx.fill();
+      ctx.restore();
     }
   };
   drawParticles(false);
@@ -201,11 +252,17 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
 
   // Sphere body: a lit core falling off to a dark limb.
   ctx.globalAlpha = look.alpha;
-  const body = ctx.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.05, 0, 0, R);
-  body.addColorStop(0, rgba(mix(look.core, WHITE, look.light), 1));
-  body.addColorStop(0.55, rgba(look.core, 1));
-  body.addColorStop(1, rgba(mix(look.core, palette.light ? look.core : BLACK, 0.55), 1));
-  ctx.fillStyle = body;
+  ctx.fillStyle = cached(
+    ctx,
+    `body ${rgbKey(look.core)} ${look.light} ${palette.light} ${R}`,
+    () => {
+      const body = ctx.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.05, 0, 0, R);
+      body.addColorStop(0, rgba(mix(look.core, WHITE, look.light), 1));
+      body.addColorStop(0.55, rgba(look.core, 1));
+      body.addColorStop(1, rgba(mix(look.core, palette.light ? look.core : BLACK, 0.55), 1));
+      return body;
+    },
+  );
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, TAU);
   ctx.fill();
@@ -222,12 +279,17 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
     for (const [i, angle] of angles.entries()) {
       const x = Math.cos(angle) * R * 0.42;
       const y = Math.sin(angle) * R * 0.42;
-      const lobe = ctx.createRadialGradient(x, y, 0, x, y, R * (0.8 - i * 0.15));
       const tint = mix(look.core, i === 0 ? WHITE : palette.accent, i === 0 ? 0.4 : 0.5);
-      lobe.addColorStop(0, rgba(tint, palette.light ? 0.4 : 0.32));
-      lobe.addColorStop(1, rgba(tint, 0));
-      ctx.fillStyle = lobe;
-      ctx.fillRect(-R, -R, R * 2, R * 2);
+      const strength = palette.light ? 0.4 : 0.32;
+      ctx.translate(x, y);
+      ctx.fillStyle = cached(ctx, `lobe ${i} ${rgbKey(tint)} ${strength} ${R}`, () => {
+        const lobe = ctx.createRadialGradient(0, 0, 0, 0, 0, R * (0.8 - i * 0.15));
+        lobe.addColorStop(0, rgba(tint, strength));
+        lobe.addColorStop(1, rgba(tint, 0));
+        return lobe;
+      });
+      ctx.fillRect(-R - x, -R - y, R * 2, R * 2);
+      ctx.translate(-x, -y);
     }
     ctx.restore();
   }
@@ -306,13 +368,17 @@ export function drawOrb(ctx: CanvasRenderingContext2D, frame: OrbFrame, palette:
     ctx.beginPath();
     ctx.arc(0, 0, ringRadius, Math.max(-Math.PI / 2, head - 1.4), head);
     ctx.stroke();
-    const tint = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-    tint.addColorStop(0, rgba(palette.ok, 0.35 * fade));
-    tint.addColorStop(1, rgba(palette.ok, 0));
-    ctx.fillStyle = tint;
+    ctx.fillStyle = cached(ctx, `sweep ${rgbKey(palette.ok)} ${R}`, () => {
+      const tint = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      tint.addColorStop(0, rgba(palette.ok, 0.35));
+      tint.addColorStop(1, rgba(palette.ok, 0));
+      return tint;
+    });
+    ctx.globalAlpha = fade;
     ctx.beginPath();
     ctx.arc(0, 0, R, 0, TAU);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   ctx.restore();

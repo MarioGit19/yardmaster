@@ -1,5 +1,5 @@
-import { animate, motion, useMotionValue, useTransform } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { type AnimationPlaybackControls, animate } from 'motion/react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { spring, useMotionLevel } from '../motion.js';
 import { cx } from './cx.js';
 
@@ -59,34 +59,71 @@ export function NumberTicker({ value, format = String, className }: NumberTicker
   );
 }
 
-function Digit({ digit, dir, still }: { digit: number; dir: 1 | -1; still: boolean }) {
-  const pos = useMotionValue(digit);
-  // A full transform string stays on the compositor while the HUD ticks during streaming.
-  const transform = useTransform(pos, (p) => `translateY(${-p * STEP}%)`);
+const at = (pos: number) => `translateY(${-pos * STEP}%)`;
 
-  useEffect(() => {
-    if (still) {
-      pos.jump(digit);
+/** Where a strip is mid-roll, read from its animated transform; null before layout. */
+function currentPosition(strip: HTMLElement): number | null {
+  const height = strip.offsetHeight;
+  const transform = getComputedStyle(strip).transform;
+  if (!height || !transform || transform === 'none') return null;
+  return (-new DOMMatrixReadOnly(transform).m42 / height) * STRIP.length;
+}
+
+function Digit({ digit, dir, still }: { digit: number; dir: 1 | -1; still: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  // Where the strip rests, or is rolling to.
+  const rest = useRef(digit);
+  const roll = useRef<AnimationPlaybackControls | null>(null);
+  // Set once: after mount only the animation writes the transform.
+  const [initial] = useState(() => at(digit));
+
+  useLayoutEffect(() => {
+    const strip = ref.current;
+    if (!strip) return;
+    let pos = rest.current;
+    if (roll.current) {
+      pos = currentPosition(strip) ?? pos;
+      roll.current.stop();
+      roll.current = null;
+    }
+    const { from, to } = still ? { from: digit, to: digit } : rollTarget(pos, digit, dir);
+    rest.current = to;
+    if (from === to) {
+      strip.style.transform = at(to);
       return;
     }
-    const { from, to } = rollTarget(pos.get(), digit, dir);
-    if (from === to) return;
-    pos.jump(from);
-    // Rests on whichever turn it reached; the next change starts with the invisible jump.
-    const roll = animate(pos, to, spring.smooth);
-    return () => roll.stop();
-  }, [digit, dir, still, pos]);
+    // A full transform with a spring runs as WAAPI (a `linear()` curve) on the compositor, so the
+    // HUD ticking while sessions stream writes no styles per frame. It rests on whichever turn it
+    // reached; the next change starts with the invisible jump.
+    roll.current = animate(
+      strip,
+      // motion-still: never runs at Reduced, which places the digit above.
+      { transform: [at(from), at(to)] },
+      {
+        ...spring.smooth,
+        onComplete: () => {
+          roll.current = null;
+        },
+      },
+    );
+  }, [digit, dir, still]);
+
+  useEffect(() => () => roll.current?.stop(), []);
 
   return (
     <span className="relative inline-block overflow-hidden">
       {/* Sizes the column: tabular digits all share this width. */}
       <span className="invisible">0</span>
-      <motion.span className="absolute inset-x-0 top-0 flex flex-col" style={{ transform }}>
+      <span
+        ref={ref}
+        className="absolute inset-x-0 top-0 flex flex-col"
+        style={{ transform: initial }}
+      >
         {STRIP.map((d, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: the strip is static.
           <span key={i}>{d}</span>
         ))}
-      </motion.span>
+      </span>
     </span>
   );
 }
