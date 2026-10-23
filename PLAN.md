@@ -606,9 +606,10 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - Note: the submit check watches the session leave its prompt (idle or waiting for input), which a `UserPromptSubmit` hook, or the demo, causes. The toast carries a new optional `terminalId`, and the board adds "Focus in <editor>" to it. The demo's Claude prompt is modelled in `apps/server/src/demo/tui-input.ts`, shared with the unit test.
   - Note: a long reply showed a transcript bug: the composer grows with the text and shrinks once it's sent, and the chat stopped following new messages. `MessageList` now stays at the bottom when its own height changes. On this machine `messages.spec.ts` (long tasks, jump back) is flaky on main too, and a few focus, attention and onboarding e2e timing tests fail under full parallel load but pass when rerun.
 
-- [ ] **10.9a2 Fix: the terminal-stack shot still expects the interactive card on the claude tab**
+- [x] **10.9a2 Fix: the terminal-stack shot still expects the interactive card on the claude tab**
   - `e2e/shots.spec.ts` "terminal stack" waits for `[data-interactive]` after clicking the claude tab, but since 10.9 that tab opens on the chat, so the shot fails (on main too). Switch to "Raw terminal" before the interactive-card shot, or shoot the chat-beside state instead.
   - **Verify:** `pnpm shots`
+  - Note: a Claude terminal's raw view is an xterm, never the card, so the shot runs `htop` in zsh for `terminals-interactive` (then Ctrl+C), and a new `terminals-claude` shot shows the claude tab pointing to the chat beside. Under load (avg ~34) the full parallel `pnpm shots` had 7 timing failures, including one of these; all 20 affected shots passed on a 2-worker rerun.
 
 - [ ] **10.9b Terminals open in the terminal column, sessions in the Claude column**
   - Maintainer feedback on 10.9: selecting a terminal in the focus view's Terminals column (right) switches the Claude column (center) to that terminal's session, and the stack only says the chat is open beside. The column the maintainer clicked in should be the one that changes.

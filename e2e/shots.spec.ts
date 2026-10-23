@@ -275,7 +275,7 @@ test.describe('focus view', () => {
 });
 
 // The terminal stack: a tab with typed output and a failed command, the 2×2 grid, the
-// interactive-app card, search and the maximized stack.
+// interactive-app card, a Claude terminal beside its chat, search and the maximized stack.
 test.describe('terminal stack', () => {
   for (const theme of THEMES) {
     test.describe(theme, () => {
@@ -309,10 +309,20 @@ test.describe('terminal stack', () => {
         await shot('terminals-search');
         await stack.getByRole('searchbox').press('Escape');
 
-        await stack.getByRole('tab', { name: /^claude\b/ }).click();
+        // A Claude terminal shows its chat (or its raw TUI), never the card: run htop instead.
+        await input.fill('htop');
+        await input.press('Enter');
         await expect(stack.locator('[data-interactive]')).toBeVisible({ timeout: 10_000 });
         await page.waitForTimeout(300);
         await shot('terminals-interactive');
+        await stack.getByRole('button', { name: 'Send Ctrl+C' }).click();
+        await expect(stack.locator('[data-interactive]')).toHaveCount(0);
+
+        // The Claude column already shows the chat, so the pane points to it.
+        await stack.getByRole('tab', { name: /^claude\b/ }).click();
+        await expect(stack.locator('[data-chat-beside]')).toBeVisible({ timeout: 10_000 });
+        await page.waitForTimeout(600);
+        await shot('terminals-claude');
 
         await stack.getByRole('tab', { name: /^next dev\b/ }).click();
         await stack.getByRole('button', { name: 'Show up to four terminals' }).click();
