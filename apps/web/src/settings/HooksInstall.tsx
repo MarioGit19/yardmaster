@@ -118,7 +118,8 @@ export function InstallHooksButton({
                 <motion.div
                   data-hooks-dialog
                   className="palette fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] w-[min(640px,calc(100vw-32px))] flex-col gap-4 overflow-hidden rounded-modal border border-line-strong p-5 shadow-raised outline-none"
-                  style={{ x: '-50%', y: '-50%' }}
+                  // Centred, so it scales from its centre (`.palette` scales from its top edge).
+                  style={{ x: '-50%', y: '-50%', transformOrigin: '50% 50%' }}
                   initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1, transition: spring.smooth }}
                   exit={{

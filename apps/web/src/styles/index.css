@@ -3,6 +3,10 @@
 @import "@fontsource-variable/geist-mono";
 @import "./tokens.css";
 
+/* `moving:` applies at motion Full only: travel such as a press scale or a chevron turn, which
+   Reduced keeps still (DESIGN.md §3 rule 10). `data-motion` is set before the first paint. */
+@custom-variant moving (&:where([data-motion="full"] *));
+
 /* Tokens only: Tailwind's default palette and type scale are cleared so utilities stay on-system. */
 @theme inline {
   --color-*: initial;
@@ -920,6 +924,10 @@
   .pod:hover .pod-spotlight {
     opacity: 1;
   }
+}
+/* The spotlight follows the pointer: travel that Reduced leaves out. */
+[data-motion="reduced"] .pod-spotlight {
+  display: none;
 }
 
 /* Session caption, DESIGN.md §4.10: a new action slides in with one shimmer sweep across it. */

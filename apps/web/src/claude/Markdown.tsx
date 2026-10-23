@@ -67,13 +67,16 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
           type="button"
           onClick={copy}
           aria-label={copied ? 'Copied' : 'Copy code'}
-          className="flex size-6 items-center justify-center rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color] duration-fast hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100"
+          className="flex size-6 items-center justify-center rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100 moving:active:scale-[0.97]"
         >
-          {copied ? (
-            <Check className="size-3.5 text-st-ok-ink" strokeWidth={1.75} />
-          ) : (
-            <Copy className="size-3.5" strokeWidth={1.5} />
-          )}
+          <span className="copy-swap grid place-items-center" data-state={copied ? 'done' : 'idle'}>
+            <Copy aria-hidden className="copy-swap-idle size-3.5" strokeWidth={1.5} />
+            <Check
+              aria-hidden
+              className="copy-swap-done size-3.5 text-st-ok-ink"
+              strokeWidth={1.75}
+            />
+          </span>
         </button>
       </div>
       <pre

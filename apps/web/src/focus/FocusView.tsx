@@ -1,6 +1,6 @@
 import type { ClaudeSession, Project } from '@c-board/protocol';
 import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
-import { AnimatePresence, type HTMLMotionProps, motion } from 'motion/react';
+import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
@@ -388,6 +388,8 @@ function SessionsColumn({
   const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
   // Rows only measure when the list itself changes, not on every status tick.
   const orderKey = ordered.map((s) => s.id).join('|');
+  // The highlight pill glides to a clicked row and snaps for keyboard picks (§3 rule 11).
+  const [byKeyboard, setByKeyboard] = useState(false);
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -430,6 +432,8 @@ function SessionsColumn({
                     crew={crew}
                     now={now}
                     shared={sharedOrbs}
+                    pillGlide={byKeyboard ? tabGlide(true) : spring.smooth}
+                    onPick={setByKeyboard}
                   />
                 </motion.li>
               ))}
@@ -456,6 +460,8 @@ function SessionLink({
   crew,
   now,
   shared,
+  pillGlide,
+  onPick,
 }: {
   session: ClaudeSession;
   projectId: string;
@@ -464,6 +470,9 @@ function SessionLink({
   crew: CrewView;
   now: number;
   shared: boolean;
+  pillGlide: Transition;
+  /** Called on click with whether the keyboard picked the row. */
+  onPick: (byKeyboard: boolean) => void;
 }) {
   const status = sessionStatusView(session.status);
   const approvalId =
@@ -478,6 +487,7 @@ function SessionLink({
       href={sessionHref(projectId, session.id)}
       aria-current={active ? 'page' : undefined}
       data-session={session.id}
+      onClick={(e) => onPick(e.detail === 0)}
       className={cx(
         'relative isolate flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
         !active && 'hover:bg-bg-2/60',
@@ -487,7 +497,7 @@ function SessionLink({
         // One highlight that slides from row to row as the session changes.
         <motion.span
           layoutId={`focus-session-pill:${projectId}`}
-          transition={spring.smooth}
+          transition={pillGlide}
           aria-hidden
           data-session-pill
           className="absolute inset-0 -z-10 rounded-control bg-bg-2 shadow-raised"

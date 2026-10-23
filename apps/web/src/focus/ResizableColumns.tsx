@@ -173,10 +173,11 @@ function Handle({
   const direction = column === 'left' ? 1 : -1;
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
 
-  const settle = (target: number) => {
+  const settle = (target: number, byKeyboard = false) => {
     const to = Math.round(clamp(target));
-    // A width change is movement: Reduced and Off land on it directly.
-    if (level === 'full') animate(value, to, spring.snappy);
+    // A width change is movement: Reduced and Off land on it directly. Keys land at once too
+    // (DESIGN.md §3 rule 11): a spring per arrow press lags behind a held key.
+    if (level === 'full' && !byKeyboard) animate(value, to, spring.snappy);
     else value.jump(to);
     onCommit(column, to);
   };
@@ -215,7 +216,7 @@ function Handle({
     else if (e.key === 'Enter') next = defaultSizes(width)[column];
     if (next === null) return;
     e.preventDefault();
-    settle(next);
+    settle(next, true);
   };
 
   return (

@@ -32,7 +32,7 @@ function StepMark({ state, index }: { state: MarkState; index: number }) {
             className="absolute inset-0 grid place-items-center rounded-full bg-st-ok text-bg-0"
             initial={{ opacity: 0, scale: 0.6 }}
             animate={{ opacity: 1, scale: 1, transition: spring.snappy }}
-            exit={{ opacity: 0, transition: { duration: dur.fast } }}
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
           >
             <Check className="size-3.5" strokeWidth={2.5} />
           </motion.span>
@@ -45,7 +45,7 @@ function StepMark({ state, index }: { state: MarkState; index: number }) {
             )}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: dur.base, ease: ease.out } }}
-            exit={{ opacity: 0, transition: { duration: dur.fast } }}
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
           >
             {/* The ring breathes while the board listens for this step's first signal. */}
             {state === 'active' && (

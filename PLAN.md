@@ -532,9 +532,50 @@ Comes from a motion audit of the built UI (screen recording plus code review, 20
   - Note: Ambient styles are `cboard.ambient` (`ambient/style.ts`), Settings → Appearance → Ambient: Nebula / Veil / Aurora / None. Veil and Aurora implement the nebula's `FieldRenderer` (same energy, attention bloom and palette, so the max-luminance rule holds) and fall back to the CSS field without WebGL2; None shows the bare page. Aurora renders at 0.35× DPR (its fields are smooth) with two noise octaves and a cheaper gradient hash: at 0.5× it ran the 30-mascot test at 39 fps on software WebGL. New tokens: `--grid-neon`, `--retro-fg`, `--retro-amber`, `--retro-bg` (both themes), for Phase 11 to refine.
   - Note: The 30-mascot test now runs per ambient style (nebula 58–60, veil 60, aurora 57–60 fps) in serial mode; the stress overview FPS test also runs with Veil and Aurora (59.9 fps each, no long tasks). New: `e2e/fx.spec.ts` (slot hand-off, the Ambient setting, swipe, hold), `fx-*` and `ambient-{veil,aurora,none}` shots at Full/Reduced/Off, and a `fx` scenario in `pnpm motion:record`. In the full `pnpm e2e` run only `attention.spec`'s keyboard approval failed under load (passes alone; untouched by this task).
 
-- [ ] **10.8 Motion review pass**
+- [x] **10.8 Motion review pass**
   - Run `pnpm motion:record all`, `review-animations` on the whole motion surface, the `improve-animations` audit (read its SKILL.md; write its plans as follow-up tasks `10.8b…` below this one instead of a `plans/` folder), and the `motion` skill's best-practices check. Fix up to 10 issues; leave the rest as follow-up tasks.
   - **Verify:** `pnpm check && pnpm motion:record all`
+  - Note: Fixed 10: (1) presses never animated: Tailwind 4 `active:scale-*` sets the `scale` property, but `Button`/`CopyCommand` transitioned `transform`; they now transition `scale`. (2) New `moving:` variant (index.css, `[data-motion="full"]` only) keeps press scales and disclosure chevrons (MessageList, ToolCard, TerminalLane) still at Reduced. (3) Keyboard column resize lands at once instead of a spring per arrow press. (4) The focus session pill snaps for keyboard picks, glides on clicks. (5) Screen (`ScreenFade`) and transcript cross-fades exit at `dur.fast` (§3 rule 2), shortening the double exposure. (6) The hooks dialog scales from its centre, not `.palette`'s top edge. (7) Onboarding exits and `SwipeRow` fade get `ease.out` (they fell back to Motion's default curve). (8) The pod spotlight is hidden at Reduced (it followed the pointer). (9) The crew's look-around reset lands without a spring when the level drops to Reduced. (10) The Markdown code-block copy button gets the `copy-swap` cross-fade and press feedback of its twin `CopyCommand`.
+  - Note: Reviewed and kept, per DESIGN.md: the palette's open animation (§4.8), the tool check pop from 0.6 (10.6), and the `y`/`scale` shorthands that compose with `layout`. Audit findings not fixed here are the tasks below.
+
+- [ ] **10.8b Column resize off the layout path**
+  - `focus/ResizableColumns.tsx` springs `gridTemplateColumns` (a layout property) through `useMotionTemplate`. Each spring frame lays out the whole focus grid, re-renders both `Handle`s through `setNow` (`value.on('change', …)`, ~line 168), and refits every xterm in the column (`terminal/XtermView.tsx` ResizeObserver → `refit` per frame).
+  - Fix: update `aria-valuenow` from the `change` handler by writing the DOM attribute (no React state). While a settle spring or a drag runs, set `data-resizing` on the grid, and have `XtermView` skip `refit` while an ancestor has it, then refit once on the spring's `onComplete` / pointer up. Keep the spring (`spring.snappy`) and the instant keyboard path from 10.8.
+  - **Done when:** a Performance trace of a pointer-released snap shows one xterm refit per pane (not one per frame) and no React commits during the spring; the `focus.spec` resize tests pass.
+  - **Verify:** `pnpm check && pnpm e2e --grep focus`
+
+- [ ] **10.8c Compositor-friendly HUD digits and orbs**
+  - `ui/NumberTicker.tsx:65` maps a JS spring through `useTransform(pos, (p) => …)` (the deprecated callback form) into `style.transform`, so every roll writes styles on the main thread while sessions stream. The comment there claims the compositor. Fix: drive each strip with `animate(stripEl, { transform: [`translateY(${-from * STEP}%)`, `translateY(${-to * STEP}%)`] }, spring.smooth)`, which Motion runs as WAAPI with a `linear()` spring. Track the resting position in a ref, and on interrupt read it from the computed transform. Keep `rollTarget` and its tests.
+  - `orb/ClaudeOrb.tsx:154` redraws its canvas at display rate (60/120 Hz) in the working, tool, waiting and compacting states, allocating radial gradients per frame (`orb/render.ts`). Fix: cap orbs at 30 fps with `frameDue` (as `AmbientField` does), and 20 fps for orbs ≤ 12 px (crew antennas), and cache the static gradients per size, theme and state.
+  - **Done when:** the `@perf` main-thread test drops below its 10.4 number (444–478 ms/s on `--demo-stress`) and the 30-mascot FPS test still passes; record both numbers.
+  - **Verify:** `pnpm check && pnpm e2e --grep @perf`
+
+- [ ] **10.8d Pulse plot: per-frame work only for what moves**
+  - `pulse/PulseRail.tsx` draw (~lines 316–369) runs `buildLanes`, `placeDots`, a sort and a `Map` of the newest dots, and `truncate()` (`measureText` per lane) on every frame while a dot flies in, and calls `setLaneCount`/`setDotCount` inside rAF.
+  - Fix: memoise lanes, truncated labels and order per data/filter/width change. During a fly-in, compute only the flying dots' x (`FLY_MS` eased). Move the counts to the data-change path.
+  - **Done when:** a trace of the expanded rail during `--demo-stress` shows no `measureText` in steady frames and no React commits from the draw; the Pulse e2e tests pass.
+  - **Verify:** `pnpm check && pnpm e2e --grep pulse`
+
+- [ ] **10.8e Crew loops: last SVG loops and rate changes**
+  - The eye scan/track and magnifier, `crew-glyph`, `crew-dot`, `crew-bounce`, `crew-z` and `crew-sweat` loops still animate nodes inside the mascot's SVG (`styles/index.css` ~442–579, `crew/CrewMascot.tsx`), so each mascot repaints its SVG every frame. Move each onto an HTML layer (as 10.4 did with `Arm`, `TerminalScreen`, `MonitorScreen`) where the part allows it.
+  - The monitor flicker changes speed by rewriting `animationDuration` (`CrewMascot.tsx` ~481), which jumps the loop. Use `useRateLoop`'s `updatePlaybackRate()` approach instead. `:root[data-crew-crowd]` restyles the whole document when it toggles; scope it to the crew's containers.
+  - **Done when:** the 30-mascot sheet's main-thread time drops below 10.4's 342–378 ms/s, and the `crew` contact sheets show no change in look; the 30-mascot FPS tests pass per ambient style.
+  - **Verify:** `pnpm check && pnpm e2e --grep @perf && pnpm motion:record crew`
+
+- [ ] **10.8f Small motion consistency fixes**
+  - Press feedback on hand-rolled pressables, the same as `buttonClass`: `transition-[…,scale]` plus `moving:active:scale-[0.97]` on the HUD Waiting counter and ⌘K hint (`shell/Hud.tsx`), the palette back button (`palette/CommandPalette.tsx`), `lanes/PortChip.tsx`, "Jump to latest" (`claude/MessageList.tsx`) and the toast action (`ui/Toasts.tsx`).
+  - Segmented controls (Settings, the Pulse filter, the ToolCard diff toggle) hard-cut their thumb (and `shadow-raised` isn't transitioned). Give them a `layoutId` thumb with `tabGlide(byKeyboard)`, unique per instance (`useId`).
+  - `PodActivity.tsx:84` writes `ring.style.opacity` from a frame loop onto `.pod-ring`, which has a 420 ms CSS opacity transition, so every write restarts it. Transition only on enter/leave (a data attribute), not while the loop drives it.
+  - `.focus-col-max` enters with a keyframe and leaves with a cut: make it a reversible opacity transition (`@starting-style` for entry).
+  - Approval selection (↑↓/j/k) transitions border and background (`ApprovalCard.tsx:105`). Keyboard is instant: drop the transition, as the palette does.
+  - **Done when:** each is visible in a `pnpm motion:record chrome` / `focus` sheet or a `pnpm shots` pair, and `pnpm check` passes.
+  - **Verify:** `pnpm check && pnpm motion:record chrome`
+
+- [ ] **10.8g Tokenise loop durations, and two seams from the sheets**
+  - Hand-typed loop and spinner lengths: `skeleton-sweep 1.6s`, `hud-spin 0.9s`, `progress-sweep 1.4s`, `shimmer-sweep 2.4s`, `caret-glow 1.1s`, `onboarding-listen 2.4s`, `pod-breathe 2.4s` (§3 rule 4's breathing), `anim/dotPulse.ts` 1600, `lanes/TerminalLane.tsx` 2400, `pulse/PulseRail.tsx` `FLY_MS = 300`, `anim/useRateLoop.ts` `RAMP_MS = 500`, `orb/model.ts` `glitch: 0.12` (= `dur.fast`) and `expand: 0.3`. Name them in `motion.ts` (a `loop` group) with their `--dur-*` mirror, and keep `motion.test.ts` checking that the two stay equal.
+  - From the 10.8 contact sheets: `chrome-approval-allow`, where "Nothing is waiting for you." pops in after the last card leaves (fade it in at `dur.base`); and `chrome-pulse-collapse`, where the bottom-right toast jumps down in one frame when the rail shrinks (move the toast offset with a `dur.base` transform transition, or anchor it so the rail doesn't move it).
+  - **Done when:** `grep` finds no literal loop durations outside `tokens.css`/`motion.ts` (fx internals excepted), and both seams read smoothly in a fresh `pnpm motion:record chrome`.
+  - **Verify:** `pnpm check && pnpm motion:record chrome`
 
 ## Phase 11 — Layouts: Minimal, Office, Grid, Transit, Retro
 

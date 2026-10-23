@@ -183,7 +183,7 @@ function Chevron({ open }: { open: boolean }) {
     <ChevronRight
       aria-hidden
       className={cx(
-        'size-3.5 shrink-0 text-text-3 transition-transform duration-base ease-out',
+        'size-3.5 shrink-0 text-text-3 moving:transition-transform duration-base ease-out',
         open && 'rotate-90',
       )}
       strokeWidth={1.75}

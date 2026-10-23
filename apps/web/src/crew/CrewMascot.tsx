@@ -124,6 +124,9 @@ export function CrewMascot({
     return () => clearTimeout(timer);
   }, [blinks]);
 
+  // Read by the look-around's cleanup, which runs after the level has already changed.
+  const stillRef = useRef(level !== 'full');
+  stillRef.current = level !== 'full';
   useEffect(() => {
     if (!looks) return;
     let timer: ReturnType<typeof setTimeout>;
@@ -144,8 +147,10 @@ export function CrewMascot({
     next();
     return () => {
       clearTimeout(timer);
-      if (eyeLookRef.current) animate(eyeLookRef.current, { x: 0 }, spring.smooth);
-      if (lookRef.current) animate(lookRef.current, { rotate: 0 }, spring.smooth);
+      // Off screen or at Full it eases back; a drop to Reduced lands at rest without moving.
+      const back = stillRef.current ? { duration: 0 } : spring.smooth;
+      if (eyeLookRef.current) animate(eyeLookRef.current, { x: 0 }, back);
+      if (lookRef.current) animate(lookRef.current, { rotate: 0 }, back);
     };
   }, [looks]);
 

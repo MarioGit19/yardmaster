@@ -75,14 +75,15 @@ export function ClaudePanel({
           {formatCount(totalTokens(session))} tok
         </span>
       </header>
-      {/* The skeleton cross-fades into the transcript, and one session's into the next's. */}
+      {/* The skeleton cross-fades into the transcript, and one session's into the next's; the old
+          one leaves faster than the new one arrives. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={loaded ? session.id : 'skeleton'}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
             transition={{ duration: dur.base, ease: ease.out }}
             className="flex min-h-0 flex-1 flex-col"
           >

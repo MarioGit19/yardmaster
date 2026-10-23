@@ -215,7 +215,7 @@ export function SwipeRow({ children, right, left, disabled = false, className }:
       data-committed={committed ?? undefined}
       className={cx('relative isolate overflow-hidden rounded-panel', className)}
       animate={{ opacity: committed && level === 'reduced' ? 0 : 1 }}
-      transition={{ duration: dur.base }}
+      transition={{ duration: dur.base, ease: ease.out }}
     >
       {right && (
         <motion.div

@@ -67,8 +67,9 @@ function Screens() {
 }
 
 /**
- * Screens cross-fade (`dur.base`): the old one fades out over the new one as it fades in. The
- * leaving screen is inert and hidden from assistive tech while it goes.
+ * Screens cross-fade: the new one fades in (`dur.base`) while the old one leaves faster
+ * (`dur.fast`, §3 rule 2), so the two overlap only briefly. The leaving screen is inert and hidden
+ * from assistive tech while it goes.
  */
 function ScreenFade({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivElement> }) {
   const present = useIsPresent();
@@ -77,7 +78,7 @@ function ScreenFade({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivE
       ref={ref}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
       transition={{ duration: dur.base, ease: ease.out }}
       inert={!present}
       aria-hidden={!present || undefined}

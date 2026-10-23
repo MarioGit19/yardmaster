@@ -427,7 +427,7 @@ function Thinking({
         <ChevronRight
           aria-hidden
           className={cx(
-            'size-3.5 shrink-0 transition-transform duration-base ease-out',
+            'size-3.5 shrink-0 moving:transition-transform duration-base ease-out',
             expanded && 'rotate-90',
           )}
           strokeWidth={1.75}
