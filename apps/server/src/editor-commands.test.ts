@@ -250,12 +250,19 @@ describe('editor commands', () => {
 
     expect((await setReply(true)).json()).toMatchObject({ terminalReply: true });
     client.send('action', reply, 'reply-2');
-    const command = await ed.next();
-    expect(command).toMatchObject({
+    // Pasted, then Enter on its own.
+    const paste = await ed.next();
+    expect(paste).toMatchObject({
       type: 'cmd.sendText',
-      payload: { terminalId: 'term-1', text: 'run the tests', execute: true },
+      payload: { terminalId: 'term-1', text: '\x1b[200~run the tests\x1b[201~', execute: false },
     });
-    ed.send('cmd.result', { id: command.id, ok: true });
+    ed.send('cmd.result', { id: paste.id, ok: true });
+    const enter = await ed.next();
+    expect(enter).toMatchObject({
+      type: 'cmd.sendText',
+      payload: { terminalId: 'term-1', text: '\r', execute: false },
+    });
+    ed.send('cmd.result', { id: enter.id, ok: true });
     expect((await client.next()).payload).toEqual({ id: 'reply-2', ok: true });
 
     // Mid-turn, the line would land in Claude's input box half-typed: refused.

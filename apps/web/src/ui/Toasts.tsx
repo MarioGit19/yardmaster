@@ -1,7 +1,8 @@
 import type { ToastLevel } from '@c-board/protocol';
 import { useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
-import { useBoardClient } from '../data/index.js';
+import { useBoardClient, useBoardStore } from '../data/index.js';
+import { actionErrorText } from '../terminal/stack.js';
 import { useTheme } from '../theme/theme.js';
 
 const SHOW: Record<ToastLevel, typeof toast.info> = {
@@ -15,15 +16,30 @@ const SHOW: Record<ToastLevel, typeof toast.info> = {
 export function Toasts() {
   const { theme } = useTheme();
   const client = useBoardClient();
+  const store = useBoardStore();
 
   useEffect(
     () =>
       client.onMessage((message) => {
         if (message.type !== 'toast') return;
-        const { level, title, body } = message.payload;
-        SHOW[level](title, { description: body });
+        const { level, title, body, terminalId } = message.payload;
+        const board = store.getState().board;
+        const windowId = terminalId && board.terminals[terminalId]?.windowId;
+        const editor = (windowId && board.windows[windowId]?.appName) || 'Cursor';
+        SHOW[level](title, {
+          description: body,
+          ...(terminalId && {
+            action: {
+              label: `Focus in ${editor}`,
+              onClick: async () => {
+                const result = await client.action({ kind: 'terminal.focus', terminalId });
+                if (!result.ok) toast.error(actionErrorText(result.error));
+              },
+            },
+          }),
+        });
       }),
-    [client],
+    [client, store],
   );
 
   return (

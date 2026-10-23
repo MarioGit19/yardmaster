@@ -188,6 +188,8 @@ export const Toast = envelope(
     body: ShortText.optional(),
     projectId: ProjectId.optional(),
     sessionId: SessionId.optional(),
+    /** A terminal the toast is about: the board offers to focus it in its editor. */
+    terminalId: TerminalId.optional(),
   }),
 );
 /** How far back the Pulse rail looks; the server replays this window on connect. */

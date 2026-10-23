@@ -129,12 +129,12 @@ test.describe('Claude terminals', () => {
   test.describe('phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('the tab shows the chat; a reply from its composer lands in the terminal, under the last answer', async ({
+    test('the tab shows the chat; long and multi-line replies from its composer are submitted in the terminal', async ({
       page,
     }) => {
       // The reply waits for the demo session to finish its turn, or a permission request to expire
-      // (approving it here would take it from the attention tests running alongside).
-      test.setTimeout(240_000);
+      // (approving it here would take it from the attention tests running alongside), twice.
+      test.setTimeout(480_000);
       const stack = await openProject(page, true);
       const { tab, sessionId } = await claudeTab(stack);
       await tab.click();
@@ -147,14 +147,15 @@ test.describe('Claude terminals', () => {
       await stack.getByRole('button', { name: 'Chat' }).click();
       await expect(chat).toBeVisible();
 
-      // Wait for Claude to be at its prompt.
       const input = chat.getByRole('textbox', { name: /^Message / });
-      await expect
-        .poll(async () => ((await input.isVisible()) ? input.getAttribute('placeholder') : null), {
-          timeout: 200_000,
-          intervals: [500],
-        })
-        .toBe('Reply to Claude…');
+      const atPrompt = () =>
+        expect
+          .poll(
+            async () => ((await input.isVisible()) ? input.getAttribute('placeholder') : null),
+            { timeout: 200_000, intervals: [500] },
+          )
+          .toBe('Reply to Claude…');
+      await atPrompt();
 
       // The finished turn's answer: where it sits, and its first line.
       const answer = chat.locator('[data-row="assistant"]').last();
@@ -162,8 +163,15 @@ test.describe('Claude terminals', () => {
       const previous = ((await answer.innerText()).split('\n')[0] ?? '').trim();
       expect(previous).not.toBe('');
 
+      // 500 characters: Claude's TUI reads it as a paste, and it must still be submitted. The chat
+      // clamps it, and the terminal has scrolled past its start: a marker at each end.
       const reply = marker('reply');
-      await input.fill(`Also cover ${reply}`);
+      const end = marker('end');
+      const filler = 'Check the totals with discounts and tax. '.repeat(13);
+      const long = `Also cover ${reply}. ${filler}`.slice(0, 500 - end.length - 1).trimEnd();
+      const longReply = `${long} ${end}`;
+      expect(longReply.length).toBeGreaterThan(490);
+      await input.fill(longReply);
       await chat.getByRole('button', { name: 'Send' }).click();
       await expect(input).toHaveValue('');
       const sent = chat.locator('[data-row="user"]', { hasText: reply });
@@ -189,7 +197,23 @@ test.describe('Claude terminals', () => {
       expect(await laterCopies()).toBe(0);
 
       await stack.getByRole('button', { name: 'Raw terminal' }).click();
-      await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(reply);
+      await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(end);
+
+      // A multi-line reply keeps its lines.
+      await stack.getByRole('button', { name: 'Chat' }).click();
+      await atPrompt();
+      const first = marker('first');
+      const second = marker('second');
+      await input.fill(`Then ${first}\nand ${second}`);
+      await chat.getByRole('button', { name: 'Send' }).click();
+      await expect(input).toHaveValue('');
+      const lines = chat.locator('[data-row="user"]', { hasText: first });
+      await expect(lines).toBeVisible();
+      await expect(lines).toContainText(second);
+      await stack.getByRole('button', { name: 'Raw terminal' }).click();
+      const rows = stack.locator('[data-xterm] .xterm-rows');
+      await expect(rows).toContainText(`Then ${first}`);
+      await expect(rows).toContainText(`and ${second}`);
     });
   });
 });

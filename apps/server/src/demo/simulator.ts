@@ -54,6 +54,7 @@ import {
   demoToolCall,
   TODO_RESULT,
 } from './transcripts.js';
+import { readTuiInput } from './tui-input.js';
 
 /** PRD F12: a permission request roughly every 45 s. */
 export const DEMO_PERMISSION_INTERVAL_MS = 45_000;
@@ -166,6 +167,8 @@ interface TerminalCtx {
   busyUntil: number;
   /** Dev server ticks so far, for the one that crashes on purpose. */
   ticks: number;
+  /** What sits typed at Claude's prompt, for a terminal running claude. */
+  prompt: string;
 }
 
 interface Turn {
@@ -383,6 +386,7 @@ export class DemoSimulator {
           session: null,
           busyUntil: 0,
           ticks: 0,
+          prompt: '',
         };
         this.terminals.push(terminal);
         this.store.upsertTerminal({
@@ -656,6 +660,7 @@ export class DemoSimulator {
       session: null,
       busyUntil: 0,
       ticks: 0,
+      prompt: '',
     };
     this.after(CREATE_DELAY_MS, () => {
       for (const other of this.terminals) {
@@ -716,15 +721,23 @@ export class DemoSimulator {
 
   private sendText(terminal: TerminalCtx, text: string, execute: boolean): void {
     // A running program gets the input, and the pty echoes it into its output.
+    const session = terminal.session;
+    if (terminal.execId && session) {
+      // Claude's TUI: text and Enter in one burst is a paste, where the Enter is a newline.
+      const input = readTuiInput(terminal.prompt, execute ? `${text}\r` : text);
+      terminal.prompt = input.buffer;
+      if (input.echo !== '') this.write(terminal, terminal.execId, input.echo);
+      // Claude at its prompt takes a submitted prompt as the next turn's.
+      for (const prompt of input.submitted) {
+        const status = this.store.state.sessions[session.id]?.status.kind;
+        if (status !== 'idle' && status !== 'waiting_input') continue;
+        this.cancel(session.timer);
+        this.beginTurn(session, prompt.trim());
+      }
+      return;
+    }
     if (terminal.execId) {
       this.write(terminal, terminal.execId, execute ? `${text}\r\n` : text);
-      // Claude at its prompt takes a submitted line as the next turn's prompt.
-      const session = terminal.session;
-      const status = session && this.store.state.sessions[session.id]?.status.kind;
-      if (session && execute && (status === 'idle' || status === 'waiting_input')) {
-        this.cancel(session.timer);
-        this.beginTurn(session, text.trim());
-      }
       return;
     }
     // At the prompt, only a submitted line does anything visible.

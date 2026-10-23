@@ -282,6 +282,8 @@ export async function buildServer(
         state: () => store.state,
         enabled: () => terminalReplyEnabled(settings),
         sendText: handlers['terminal.sendText'],
+        onChange: (listener) => store.onPatch(listener),
+        notify: (message) => gateway.broadcast(message),
       }),
     };
   }

@@ -466,6 +466,64 @@ describe('DemoSimulator', () => {
       sim.stop();
     });
 
+    it('reads a long line sent with its Enter as a paste; a pasted reply submits on a lone Enter', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(3_000);
+      const session = Object.values(store.state.sessions).find(
+        (s) => s.terminalId !== null && s.status.kind === 'idle',
+      );
+      const sessionId = session?.id ?? '';
+      const terminalId = session?.terminalId ?? '';
+      const send = (text: string, execute: boolean) =>
+        sim.terminalActions()['terminal.sendText']({
+          kind: 'terminal.sendText',
+          terminalId,
+          text,
+          execute,
+        });
+      const long = `cover the checkout flow ${'and its edge cases '.repeat(4)}`.trim();
+
+      await send(long, true);
+      expect(store.state.sessions[sessionId]?.status.kind).toBe('idle');
+      await send('\r', false);
+      expect(store.state.sessions[sessionId]?.status.kind).toBe('working');
+      expect(JSON.stringify(sim.transcripts.read(`transcript:${sessionId}`))).toContain(long);
+
+      sim.stop();
+    });
+
+    it('keeps the lines of a multi-line paste in the prompt', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(3_000);
+      const session = Object.values(store.state.sessions).find(
+        (s) => s.terminalId !== null && s.status.kind === 'idle',
+      );
+      const sessionId = session?.id ?? '';
+      const terminalId = session?.terminalId ?? '';
+      const send = (text: string) =>
+        sim.terminalActions()['terminal.sendText']({
+          kind: 'terminal.sendText',
+          terminalId,
+          text,
+          execute: false,
+        });
+
+      await send('\x1b[200~first line\nsecond line\x1b[201~');
+      expect(store.state.sessions[sessionId]?.status.kind).toBe('idle');
+      await send('\r');
+      expect(store.state.sessions[sessionId]?.status.kind).toBe('working');
+      const claude = execsOf(store, terminalId).at(-1);
+      expect(outputOf(store, claude?.id)).toContain('first line\r\nsecond line\r\n');
+      const prompts = (sim.transcripts.read(`transcript:${sessionId}`)?.chunks ?? [])
+        .map((c) => JSON.parse(c.chunk) as { kind: string; text?: string })
+        .filter((m) => m.kind === 'user')
+        .map((m) => m.text);
+      expect(prompts).toContain('first line\nsecond line');
+      sim.stop();
+    });
+
     it('rejects unknown terminals and leaves closing to a real editor', async () => {
       const { sim } = run();
       sim.start();
