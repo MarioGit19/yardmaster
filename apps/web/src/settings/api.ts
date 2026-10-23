@@ -5,6 +5,7 @@ import {
   HooksInstallResponse,
   HooksPlanResponse,
   HooksStatusResponse,
+  LibraryResponse,
   OkResponse,
   ServerStatus,
 } from '@c-board/protocol';
@@ -63,4 +64,6 @@ export const api = {
   installHooks: (fingerprint: string) =>
     request(HooksInstallResponse, 'POST', '/api/hooks/install', { fingerprint }),
   rotateToken: () => request(OkResponse, 'POST', '/api/token/rotate', {}),
+  library: (signal?: AbortSignal) =>
+    request(LibraryResponse, 'GET', '/api/library', undefined, signal),
 };

@@ -1,9 +1,14 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { useNow } from '../anim/clock.js';
 import { useBoard } from '../data/index.js';
+import { useActiveProjects } from '../library/useActive.js';
+import { dur } from '../motion.js';
 import {
   buildSceneModel,
   buildSceneProject,
+  type LeavingProject,
+  lingerProjects,
+  type SceneActor,
   type SceneModel,
   type SceneProject,
   shareScene,
@@ -25,6 +30,54 @@ export function useSceneModel(): SceneModel {
     last.current = shareScene(last.current, buildSceneModel(board, pulses, now));
     return last.current;
   }, [board, pulses, now]);
+}
+
+/** How long a project that went inactive stays drawn for its exit: `dur.fast`, plus a frame. */
+export const LEAVE_MS = dur.fast * 1000 + 40;
+
+/**
+ * The overview's scene: only active projects (F26). One that goes inactive stays a moment,
+ * marked `leaving`, so the layout can fade it out (`data-scene-leaving`) instead of dropping it.
+ */
+export function useOverviewScene(): SceneModel {
+  const scene = useSceneModel();
+  const active = useActiveProjects();
+  const [tick, wake] = useReducer((n: number) => n + 1, 0);
+  const last = useRef<{ shown: SceneModel | null; leaving: Map<string, LeavingProject> }>({
+    shown: null,
+    leaving: new Map(),
+  });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` drops expired exits
+  const shown = useMemo(() => {
+    const visible = scene.projects.filter((p) => active.has(p.id));
+    const prev = last.current.shown?.projects ?? [];
+    const { projects, leaving } = lingerProjects(
+      prev,
+      visible,
+      last.current.leaving,
+      Date.now(),
+      LEAVE_MS,
+    );
+    let model: SceneModel;
+    if (leaving.size === 0 && projects.length === scene.projects.length) model = scene;
+    else {
+      const actors = new Map<string, SceneActor>();
+      for (const project of projects) {
+        for (const actor of project.actors) actors.set(actor.id, actor);
+      }
+      model = { projects, actors };
+    }
+    last.current = { shown: model, leaving };
+    return model;
+  }, [scene, active, tick]);
+  const leaving = last.current.leaving;
+  useEffect(() => {
+    if (leaving.size === 0) return;
+    const until = Math.min(...[...leaving.values()].map((l) => l.until));
+    const timer = setTimeout(wake, Math.max(0, until - Date.now()) + 1);
+    return () => clearTimeout(timer);
+  }, [leaving]);
+  return shown;
 }
 
 /** One project's scene, for a view of a single project (the Actor inspector). */

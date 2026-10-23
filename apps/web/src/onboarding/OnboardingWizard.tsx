@@ -1,9 +1,12 @@
 import { Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
+import { Link } from 'wouter';
 import { Logomark } from '../brand/Logo.js';
 import { selectConnection, selectWindowCount, useBoard } from '../data/index.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { routes } from '../routes.js';
+import { SUGGESTED_ROOT, useBoardSettings } from '../settings/boardSettings.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { Button } from '../ui/Button.js';
@@ -200,6 +203,8 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
           </Step>
         </ol>
 
+        <LibrarySuggestion />
+
         <footer className="flex items-center justify-between gap-3 border-line border-t pt-4">
           <span className="text-meta text-text-3 tabular-nums" aria-live="polite" data-progress>
             {doneCount} of {steps.length} done
@@ -215,6 +220,56 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
           )}
         </footer>
       </motion.section>
+    </div>
+  );
+}
+
+/**
+ * Optional, not a step: offers `~/Desktop` as the library root, so "Open project" has folders to
+ * list (F25). Settings → Projects changes it.
+ */
+function LibrarySuggestion() {
+  const { settings, update } = useBoardSettings();
+  if (!settings) return null;
+  const roots = settings.libraryRoots;
+  return (
+    <div
+      data-onboarding-library
+      className="flex flex-col gap-2 rounded-control border border-line bg-bg-0 p-3"
+    >
+      <p className="text-body-sm text-text-1">Open projects from the board (optional)</p>
+      {roots.length === 0 ? (
+        <>
+          <p className="text-meta text-text-2">
+            c-board can list the folders in one place, such as {SUGGESTED_ROOT}, so you can start
+            Claude or a terminal in a project that isn’t open anywhere. It only reads folder names.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              onClick={() =>
+                void update({ libraryRoots: [SUGGESTED_ROOT] }, 'Could not add the folder')
+              }
+            >
+              Use {SUGGESTED_ROOT}
+            </Button>
+            <Link
+              href={routes.settings}
+              className="text-meta text-text-2 underline underline-offset-2 hover:text-text-1"
+            >
+              Choose another in Settings
+            </Link>
+          </div>
+        </>
+      ) : (
+        <p className="text-meta text-text-2">
+          Listing <span className="font-mono text-text-1">{roots.join(', ')}</span>. Change it in{' '}
+          <Link href={routes.settings} className="underline underline-offset-2 hover:text-text-1">
+            Settings
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }

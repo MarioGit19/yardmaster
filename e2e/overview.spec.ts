@@ -59,3 +59,21 @@ test('a project waiting for approval moves to the front and glows amber', async 
   expect(tones[0]).toBe('wait');
   await expect(waiting.first().locator('[data-session]').first()).toContainText('Waiting');
 });
+
+test('a pod menu pins its project to the overview, and unpins it', async ({ page }) => {
+  await openRoute(page, '/');
+  const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+  // By id: a project that starts waiting jumps to the front between the two menus.
+  const pod = page.locator(`[data-pod="${id}"]`);
+  const menu = page.locator(`[data-pod-menu="${id}"]`);
+  const pinned = async () =>
+    (await page.request.get('/api/settings')).json().then((s) => s.pinnedProjects as string[]);
+
+  await pod.click({ button: 'right', position: { x: 24, y: 24 } });
+  await menu.getByRole('menuitem', { name: 'Pin to the overview' }).click();
+  await expect.poll(pinned).toContain(id);
+
+  await pod.click({ button: 'right', position: { x: 24, y: 24 } });
+  await menu.getByRole('menuitem', { name: 'Unpin from the overview' }).click();
+  await expect.poll(pinned).not.toContain(id);
+});

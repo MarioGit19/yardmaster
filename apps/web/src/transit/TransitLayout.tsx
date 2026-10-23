@@ -17,7 +17,7 @@ import { OffstageContext } from '../anim/useFrame.js';
 import { useBoard, useBoardStore } from '../data/index.js';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import { actorKindName, type SceneActor, type SceneProject } from '../layouts/scene.js';
-import { SCENE_TICK_MS, useSceneModel } from '../layouts/useScene.js';
+import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { dur, ease, useMotionLevel } from '../motion.js';
 import { formatAgo, pulseTarget } from '../pulse/model.js';
 import { projectHref } from '../routes.js';
@@ -69,7 +69,7 @@ interface Tip {
  */
 export default function TransitLayout() {
   useOwnBackdrop();
-  const scene = useSceneModel();
+  const scene = useOverviewScene();
   const activity = useBoard((s) => s.activity);
   const now = useNow(SCENE_TICK_MS);
   const offstage = useContext(OffstageContext);
@@ -366,6 +366,8 @@ function TransitLine({
       data-transit-line={project.id}
       data-tone={project.tone}
       data-dim={project.dim || undefined}
+      data-scene-leaving={project.leaving}
+      inert={project.leaving}
       onKeyDown={onKeyDown}
       className="transit-line absolute"
       style={

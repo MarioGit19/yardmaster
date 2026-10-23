@@ -58,6 +58,7 @@ export function GridMap({ projects, width, onEnter }: GridMapProps) {
               tone={project.tone}
               tool={projectTool(project)}
               hot={hot === project.id}
+              leaving={project.leaving}
             />
           );
         })}
@@ -74,6 +75,8 @@ export function GridMap({ projects, width, onEnter }: GridMapProps) {
           return (
             <li
               key={project.id}
+              data-scene-leaving={project.leaving}
+              inert={project.leaving}
               className="absolute"
               style={{ left: node.x - NODE_W / 2, top: node.y - NODE_H / 2 }}
             >

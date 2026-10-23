@@ -1,17 +1,18 @@
 import type { Project } from '@c-board/protocol';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { ArrowUpRight, ExternalLink, SquareTerminal } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, Pin, PinOff, SquareTerminal } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useBoard, useBoardClient } from '../data/index.js';
+import { usePin } from '../library/useActive.js';
 import { projectHref } from '../routes.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 
 /**
  * A pod's context menu (right click, or the context-menu key on its link): open it, open a new
- * terminal in it (the focus view's popover), or open it in the editor.
+ * terminal in it (the focus view's popover), open it in the editor, or pin it to the overview.
  */
 export function PodMenu({ project, children }: { project: Project; children: ReactElement }) {
   const [, navigate] = useLocation();
@@ -22,6 +23,7 @@ export function PodMenu({ project, children }: { project: Project; children: Rea
       'Cursor',
   );
   const href = projectHref(project.id);
+  const pin = usePin(project.id);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
@@ -56,6 +58,9 @@ export function PodMenu({ project, children }: { project: Project; children: Rea
             }}
           >
             Open in {editor}
+          </MenuItem>
+          <MenuItem icon={pin.pinned ? <PinOff /> : <Pin />} onSelect={pin.toggle}>
+            {pin.pinned ? 'Unpin from the overview' : 'Pin to the overview'}
           </MenuItem>
         </ContextMenu.Content>
       </ContextMenu.Portal>

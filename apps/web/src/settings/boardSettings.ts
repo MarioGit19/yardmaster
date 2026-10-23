@@ -55,6 +55,9 @@ export function createBoardSettingsStore(io: {
   };
 }
 
+/** The library folder onboarding and Settings suggest (F25). */
+export const SUGGESTED_ROOT = '~/Desktop';
+
 export const boardSettings = createBoardSettingsStore({
   fetch: () => api.settings(),
   save: (patch) => api.updateSettings(patch),

@@ -99,6 +99,9 @@ const BURST_GAP_MS = 600;
 /** The rose glitch: two frames, ±0.35 units, once (DESIGN.md §3 rule 6). */
 const GLITCH_MS = 120;
 const GLITCH_SHIFT = 0.35;
+/** A leaving node sinks to almost nothing within its label's fade (`dur.fast`). */
+const LEAVING_HEIGHT = 0.001;
+const LEAVING_TAU_MS = 40;
 const RESET_MS = 700;
 /** A press that moves less than this is a click, not a drag. */
 const CLICK_SLOP = 4;
@@ -285,6 +288,8 @@ interface NodeEntry {
   doneAt: number | null;
   burstAt: number;
   glitchUntil: number;
+  /** Its project is leaving the overview: the monolith sinks into the floor before it's removed. */
+  leaving: boolean;
   satellites: SatellitePlan[];
   /** Each satellite's own spin offset, so it carries on where it was when the scene updates. */
   spin: Map<string, number>;
@@ -528,7 +533,8 @@ export class GridRenderer {
         if (project.tone === 'err' && !wasErr) entry.glitchUntil = performance.now() + GLITCH_MS;
         this.paintNode(entry);
       }
-      entry.satellites = planSatellites(project.actors);
+      entry.leaving = project.leaving === true;
+      entry.satellites = entry.leaving ? [] : planSatellites(project.actors);
       entry.more = moreAngle(project.actors);
     });
     if (reordered) {
@@ -691,6 +697,7 @@ export class GridRenderer {
       doneAt: pulse?.doneAt ?? null,
       burstAt: 0,
       glitchUntil: 0,
+      leaving: false,
       satellites: [],
       spin: new Map(),
       more: null,
@@ -1358,7 +1365,9 @@ export class GridRenderer {
 
     // Heights follow activity, the core's light follows the board, a new error glitches once.
     for (const entry of this.nodes.values()) {
-      const height = approach(entry.height, nodeHeight(entry.activity), dt, 600);
+      const height = entry.leaving
+        ? approach(entry.height, LEAVING_HEIGHT, dt, LEAVING_TAU_MS)
+        : approach(entry.height, nodeHeight(entry.activity), dt, 600);
       if (Math.abs(height - entry.height) > 0.001) moving = true;
       entry.height = height;
       entry.body.scale.y = height;

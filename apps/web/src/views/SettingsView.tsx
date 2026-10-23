@@ -1,4 +1,13 @@
-import { RETENTION_DAYS, type RetentionDays } from '@c-board/protocol';
+import {
+  IDLE_HIDE_MIN,
+  type IdleHideMin,
+  LIBRARY_MAX_ROOTS,
+  LibraryRootPath,
+  type LibraryRootStatus,
+  RETENTION_DAYS,
+  type RetentionDays,
+} from '@c-board/protocol';
+import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
@@ -12,7 +21,11 @@ import { usePreference } from '../prefs.js';
 import { PHOSPHOR_LABEL, PHOSPHORS, phosphorPreference } from '../retro/phosphor.js';
 import { routes } from '../routes.js';
 import { api } from '../settings/api.js';
-import { type ServerSettings, useBoardSettings } from '../settings/boardSettings.js';
+import {
+  type ServerSettings,
+  SUGGESTED_ROOT,
+  useBoardSettings,
+} from '../settings/boardSettings.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { redactPreference } from '../settings/prefs.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
@@ -131,6 +144,11 @@ export function SettingsView() {
             />
           </SettingRow>
           <AwayRow server={server} />
+        </SettingsSection>
+
+        <SettingsSection title="Projects">
+          <LibraryRootsRow server={server} />
+          <IdleHideRow server={server} />
         </SettingsSection>
 
         <SettingsSection title="Claude">
@@ -336,6 +354,177 @@ function TerminalReplyRow({ server: { settings, update } }: { server: ServerSett
           void update(
             { terminalReply: value === 'on' },
             'Could not save the terminal reply setting',
+          )
+        }
+        disabled={settings === null}
+      />
+    </SettingRow>
+  );
+}
+
+/** `GET /api/library`'s per-root status, refetched whenever the roots change. */
+function useLibraryRoots(roots: readonly string[] | null): Map<string, LibraryRootStatus> | null {
+  const [statuses, setStatuses] = useState<Map<string, LibraryRootStatus> | null>(null);
+  const key = roots?.join('\n') ?? null;
+  useEffect(() => {
+    if (key === null) return;
+    const controller = new AbortController();
+    api.library(controller.signal).then(
+      (library) => setStatuses(new Map(library.roots.map((r) => [r.root, r]))),
+      () => {},
+    );
+    return () => controller.abort();
+  }, [key]);
+  return statuses;
+}
+
+/** `library.roots` (F25): the folders the "Open project" picker lists. */
+function LibraryRootsRow({ server: { settings, update } }: { server: ServerSettings }) {
+  const roots = settings?.libraryRoots ?? null;
+  const statuses = useLibraryRoots(roots);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const full = (roots?.length ?? 0) >= LIBRARY_MAX_ROOTS;
+
+  const add = async (value: string) => {
+    const parsed = LibraryRootPath.safeParse(value);
+    if (!parsed.success) {
+      setError('Use a full path, like /Users/you/code, or one starting with ~/.');
+      return;
+    }
+    setError(null);
+    if (!roots || roots.includes(parsed.data)) {
+      setDraft('');
+      return;
+    }
+    await update({ libraryRoots: [...roots, parsed.data] }, 'Could not add the folder');
+    setDraft('');
+  };
+  const remove = (root: string) =>
+    void update(
+      { libraryRoots: (roots ?? []).filter((r) => r !== root) },
+      'Could not remove the folder',
+    );
+
+  return (
+    <div className="flex flex-col gap-3 p-5" data-setting="library">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="font-medium text-body text-text-1">Project folders</h3>
+        <p className="text-label text-text-2">
+          “Open project” lists the folders directly inside these. c-board only reads their names and
+          whether they are git repositories.
+        </p>
+      </div>
+      {roots && roots.length > 0 && (
+        <ul className="flex flex-col divide-y divide-line rounded-control border border-line bg-bg-0">
+          {roots.map((root) => {
+            const status = statuses?.get(root);
+            return (
+              <li
+                key={root}
+                data-library-root={root}
+                className="flex min-w-0 items-start gap-3 py-2 pr-1.5 pl-3"
+              >
+                <span className="mt-1.5 flex shrink-0">
+                  <StatusDot
+                    tone={!status ? 'idle' : status.error ? 'err' : 'ok'}
+                    label={!status ? 'Checking' : status.error ? 'Not readable' : 'Readable'}
+                  />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
+                  <span className="truncate font-mono text-label text-text-1" title={root}>
+                    {root}
+                  </span>
+                  {status && (
+                    <span
+                      className={cx('text-meta', status.error ? 'text-st-err-ink' : 'text-text-3')}
+                      data-library-status={status.error ?? 'ok'}
+                    >
+                      {status.error
+                        ? status.message
+                        : `${status.count} ${status.count === 1 ? 'folder' : 'folders'}`}
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${root}`}
+                  title="Remove"
+                  onClick={() => remove(root)}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 [&_svg]:size-4 [&_svg]:stroke-[1.5]"
+                >
+                  <X aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void add(draft);
+        }}
+        className="flex min-w-0 flex-col gap-2 sm:flex-row"
+      >
+        <label className="flex h-8 min-w-0 flex-1 items-center rounded-control border border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
+          <input
+            aria-label="Folder to add"
+            placeholder={roots?.length ? 'Another folder, such as ~/code' : SUGGESTED_ROOT}
+            value={draft}
+            spellCheck={false}
+            autoComplete="off"
+            autoCapitalize="off"
+            disabled={settings === null || full}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError(null);
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none disabled:opacity-50"
+          />
+        </label>
+        <div className="flex shrink-0 gap-2">
+          <Button type="submit" disabled={settings === null || full || !draft.trim()}>
+            Add folder
+          </Button>
+          {roots !== null && roots.length === 0 && (
+            <Button variant="secondary" onClick={() => void add(SUGGESTED_ROOT)}>
+              Use {SUGGESTED_ROOT}
+            </Button>
+          )}
+        </div>
+      </form>
+      {error && (
+        <p role="alert" className="text-meta text-st-err-ink">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const IDLE_HIDE_LABEL = Object.fromEntries(
+  IDLE_HIDE_MIN.map((min) => [String(min), min < 60 ? `${min} min` : `${min / 60} h`]),
+) as Record<`${IdleHideMin}`, string>;
+const IDLE_HIDE_OPTIONS = IDLE_HIDE_MIN.map((min) => `${min}` as const);
+
+/** `library.idleHideMin` (F26): how long a quiet project stays on the overview. */
+function IdleHideRow({ server: { settings, update } }: { server: ServerSettings }) {
+  return (
+    <SettingRow
+      title="Hide quiet projects after"
+      description="The overview shows projects with an editor window, a terminal or a Claude session, or recent activity. Pinned projects always stay."
+      data="idle-hide"
+    >
+      <Segmented
+        label="Hide quiet projects after"
+        options={IDLE_HIDE_OPTIONS}
+        labels={IDLE_HIDE_LABEL}
+        value={settings ? (`${settings.libraryIdleHideMin}` as const) : '30'}
+        onChange={(value) =>
+          void update(
+            { libraryIdleHideMin: Number(value) as IdleHideMin },
+            'Could not save the setting',
           )
         }
         disabled={settings === null}

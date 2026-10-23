@@ -1603,3 +1603,51 @@ test.describe('grid reduced', () => {
     });
   });
 });
+
+// Settings → Projects (12.1): two library roots, one readable and one blocked by macOS privacy
+// settings. Both routes are faked for this page only, so the shared demo board keeps no roots.
+for (const theme of THEMES) {
+  for (const width of [1440, 390]) {
+    test.describe(`settings projects ${theme} ${width}`, () => {
+      test.use({ theme, viewport: { width, height: width < 1024 ? 844 : 900 } });
+
+      test('library roots', async ({ page }) => {
+        const roots = ['~/Desktop', '/home/dev/archive'];
+        await page.route('**/api/settings', async (route) => {
+          if (route.request().method() !== 'GET') return route.fallback();
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            json: { ...(await response.json()), libraryRoots: roots },
+          });
+        });
+        await page.route('**/api/library', (route) =>
+          route.fulfill({
+            json: {
+              roots: [
+                { root: roots[0], count: 14, error: null, message: null },
+                {
+                  root: roots[1],
+                  count: 0,
+                  error: 'permission',
+                  message:
+                    'macOS blocks access to this folder. Allow it under System Settings → Privacy & Security → Files and Folders, then reload.',
+                },
+              ],
+              entries: [],
+            },
+          }),
+        );
+        await openRoute(page, '/settings');
+        const section = page.getByRole('region', { name: 'Projects' });
+        await expect(section.locator('[data-library-status="permission"]')).toBeVisible();
+        await section.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
+        await section.screenshot({
+          path: new URL(`settings-projects-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      });
+    });
+  }
+}

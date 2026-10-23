@@ -3485,3 +3485,12 @@ main[data-office-zoom] {
     opacity: 0;
   }
 }
+
+/* A project leaving the overview (F26): every layout fades it out on `dur.fast` before it is
+   dropped. Exits don't stagger and only touch opacity (DESIGN.md §3 rule 2). Last in the file,
+   and with a class, so it wins over each layout's own dim. */
+:is(.office-cell, .grid-float, .grid-pipe, .transit-line, .retro-frame, li)[data-scene-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}

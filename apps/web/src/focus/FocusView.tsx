@@ -33,6 +33,7 @@ import { DraftMarker } from '../drafts/DraftMarker.js';
 import { draftKey } from '../drafts/drafts.js';
 import { GitPanel } from '../git/GitPanel.js';
 import { SessionHistory } from '../history/SessionHistory.js';
+import { markOpened } from '../library/useActive.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
 import { podSessions } from '../pod/model.js';
 import { DoneSweep } from '../pod/PodActivity.js';
@@ -89,6 +90,14 @@ export function FocusView({
 }: FocusViewProps) {
   const hydrated = useBoard(selectHydrated);
   const project = useBoard(selectProject(projectId));
+  const known = project !== undefined;
+  // Opened from the board: it's on the overview when the user comes back (F26), however long
+  // they stayed.
+  useEffect(() => {
+    if (!known) return;
+    markOpened(projectId);
+    return () => markOpened(projectId);
+  }, [known, projectId]);
 
   if (!project) {
     return (

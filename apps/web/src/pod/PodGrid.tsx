@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type Variants } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { selectProject, useBoard, useBoardList } from '../data/index.js';
+import { useActiveProjects } from '../library/useActive.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { risingPods, selectPodOrder } from './model.js';
 import { ProjectPod, ProjectPodSkeleton } from './ProjectPod.js';
@@ -37,7 +38,10 @@ const variants: Variants = {
  * with `layout`; peeks raise their pod above its neighbours.
  */
 export function PodGrid() {
-  const order = useBoardList(selectPodOrder);
+  const all = useBoardList(selectPodOrder);
+  // Only active projects (F26); one that goes quiet leaves through the exit variant.
+  const active = useActiveProjects();
+  const order = useMemo(() => all.filter((id) => active.has(id)), [all, active]);
   // Only a reorder measures the slots; any other re-render would measure every pod on the page.
   const orderKey = order.join('|');
   const level = useMotionLevel();

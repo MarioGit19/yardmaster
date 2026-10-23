@@ -115,7 +115,13 @@ export default function Grid3D({ projects, entered, now, onEnter, onBack, onLost
         className="grid-labels pointer-events-none absolute inset-0"
       >
         {projects.map((project) => (
-          <li key={project.id} data-grid-label={project.id} className="grid-float">
+          <li
+            key={project.id}
+            data-grid-label={project.id}
+            data-scene-leaving={project.leaving}
+            inert={project.leaving}
+            className="grid-float"
+          >
             <GridNode
               project={project}
               variant="float"

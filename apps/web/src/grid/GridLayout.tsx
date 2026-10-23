@@ -14,7 +14,7 @@ import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
-import { SCENE_TICK_MS, useSceneModel } from '../layouts/useScene.js';
+import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { dur, ease, useMotionLevel } from '../motion.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { FlatCockpit } from './FlatCockpit.js';
@@ -40,7 +40,7 @@ const Grid3D = lazy(() => import('./Grid3D.js'));
  */
 export default function GridLayout() {
   useOwnBackdrop();
-  const scene = useSceneModel();
+  const scene = useOverviewScene();
   const now = useNow(SCENE_TICK_MS);
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);

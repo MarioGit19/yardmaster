@@ -12,7 +12,7 @@ import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
-import { SCENE_TICK_MS, useSceneModel } from '../layouts/useScene.js';
+import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { useMediaQuery } from '../prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
@@ -38,7 +38,7 @@ const HISTORY_KEY = 'cboardOfficeRoom';
 
 export default function OfficeLayout() {
   useOwnBackdrop();
-  const scene = useSceneModel();
+  const scene = useOverviewScene();
   const now = useNow(SCENE_TICK_MS);
   const ref = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -290,7 +290,8 @@ export default function OfficeLayout() {
                     transition={{ layout: spring.smooth }}
                     data-office-cell={project.id}
                     data-away={away || undefined}
-                    inert={away || undefined}
+                    data-scene-leaving={project.leaving}
+                    inert={away || project.leaving}
                     className="office-cell"
                     style={{ height: ROOM_HEIGHT * fit }}
                   >

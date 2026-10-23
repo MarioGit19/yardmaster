@@ -16,11 +16,17 @@ import {
   type BoardSettings,
   BoardSettingsPatch,
   DEFAULT_AWAY_TIMEOUT_SEC,
+  DEFAULT_IDLE_HIDE_MIN,
   DEFAULT_RETENTION_DAYS,
   HooksInstallRequest,
   type HooksInstallResponse,
   type HooksPlanResponse,
   type HooksStatusResponse,
+  IdleHideMin,
+  LIBRARY_MAX_ROOTS,
+  LibraryRootPath,
+  MAX_PINNED_PROJECTS,
+  ProjectId,
   RetentionDays,
 } from '@c-board/protocol';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -36,6 +42,9 @@ export const AWAY_MODE_KEY = 'awayMode';
 export const AWAY_TIMEOUT_KEY = 'awayTimeoutSec';
 export const HOOK_SEEN_KEY = 'setup.hookSeen';
 export const EDITOR_SEEN_KEY = 'setup.editorSeen';
+export const LIBRARY_ROOTS_KEY = 'library.roots';
+export const IDLE_HIDE_KEY = 'library.idleHideMin';
+export const PINNED_KEY = 'library.pinned';
 
 /** Claude's settings.json as the hooks routes see it. Demo mode swaps in an in-memory one. */
 export interface HookSettingsFile {
@@ -123,6 +132,32 @@ export function migrateTerminalReply(
   save(TERMINAL_REPLY_KEY, false);
 }
 
+/** A stored list, keeping only the items that still validate (and dropping duplicates). */
+function storedList(value: unknown, item: { safeParse(v: unknown): { success: boolean } }) {
+  if (!Array.isArray(value)) return [];
+  const items = value.filter(
+    (v): v is string => typeof v === 'string' && item.safeParse(v).success,
+  );
+  return [...new Set(items)];
+}
+
+/** The stored library settings (12.1): no roots, a 30-minute idle window and no pins by default. */
+export function librarySettings(settings: Record<string, unknown>): {
+  libraryRoots: string[];
+  libraryIdleHideMin: IdleHideMin;
+  pinnedProjects: string[];
+} {
+  const idle = IdleHideMin.safeParse(settings[IDLE_HIDE_KEY]);
+  return {
+    libraryRoots: storedList(settings[LIBRARY_ROOTS_KEY], LibraryRootPath).slice(
+      0,
+      LIBRARY_MAX_ROOTS,
+    ),
+    libraryIdleHideMin: idle.success ? idle.data : DEFAULT_IDLE_HIDE_MIN,
+    pinnedProjects: storedList(settings[PINNED_KEY], ProjectId).slice(0, MAX_PINNED_PROJECTS),
+  };
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -153,6 +188,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     retentionDays: retentionDays(settings[RETENTION_KEY]),
     ...awaySettings(settings),
     terminalReply: terminalReplyEnabled(settings),
+    ...librarySettings(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -174,6 +210,15 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
     if (patch.data.awayTimeoutSec !== undefined) save(AWAY_TIMEOUT_KEY, patch.data.awayTimeoutSec);
     if (patch.data.terminalReply !== undefined) save(TERMINAL_REPLY_KEY, patch.data.terminalReply);
+    if (patch.data.libraryRoots !== undefined) {
+      save(LIBRARY_ROOTS_KEY, [...new Set(patch.data.libraryRoots)]);
+    }
+    if (patch.data.libraryIdleHideMin !== undefined) {
+      save(IDLE_HIDE_KEY, patch.data.libraryIdleHideMin);
+    }
+    if (patch.data.pinnedProjects !== undefined) {
+      save(PINNED_KEY, [...new Set(patch.data.pinnedProjects)]);
+    }
     return current();
   });
 

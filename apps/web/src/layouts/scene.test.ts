@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { SLEEP_AFTER_MS } from '../crew/model.js';
 import type { Pulses } from '../data/activity.js';
 import { makeProject, makeSession, makeTerminal, sampleBoard } from '../test/board.js';
-import { actorId, buildSceneModel, buildSceneProject, opsStateFor, shareScene } from './scene.js';
+import {
+  actorId,
+  buildSceneModel,
+  buildSceneProject,
+  lingerProjects,
+  opsStateFor,
+  type SceneProject,
+  shareScene,
+} from './scene.js';
 
 const T0 = 1_760_000_000_000;
 const NOW = T0 + 60_000;
@@ -338,5 +346,46 @@ describe('shareScene', () => {
     expect(a).toBe(first.projects.find((p) => p.id === 'a'));
     expect(b).not.toBe(first.projects.find((p) => p.id === 'b'));
     expect(next.actors.get(actorId.terminal('t2'))?.name).toContain('renamed');
+  });
+});
+
+describe('lingerProjects', () => {
+  const scene = buildSceneModel(sampleBoard(), {}, NOW);
+  const byId = (id: string) => scene.projects.find((p) => p.id === id) as SceneProject;
+  const ids = (projects: SceneProject[]) =>
+    projects.map((p) => `${p.id}${p.leaving ? ' (leaving)' : ''}`);
+
+  it('keeps a project that left in its place, marked leaving, until its exit is over', () => {
+    const [first, second, third] = scene.projects;
+    if (!first || !second || !third) throw new Error('three projects expected');
+    const shown = [first, second, third];
+
+    const left = lingerProjects(shown, [first, third], new Map(), NOW, 160);
+    expect(ids(left.projects)).toEqual([first.id, `${second.id} (leaving)`, third.id]);
+    expect(left.leaving.get(second.id)?.until).toBe(NOW + 160);
+
+    // Still leaving on the next update, and not re-timed.
+    const again = lingerProjects(left.projects, [first, third], left.leaving, NOW + 100, 160);
+    expect(ids(again.projects)).toEqual(ids(left.projects));
+    expect(again.leaving.get(second.id)?.until).toBe(NOW + 160);
+
+    const gone = lingerProjects(again.projects, [first, third], again.leaving, NOW + 160, 160);
+    expect(ids(gone.projects)).toEqual([first.id, third.id]);
+    expect(gone.leaving.size).toBe(0);
+  });
+
+  it('brings a leaving project straight back when it becomes active again', () => {
+    const acme = byId('p-acme');
+    const zen = byId('p-zen');
+    const left = lingerProjects([acme, zen], [acme], new Map(), NOW, 160);
+    const back = lingerProjects(left.projects, [acme, zen], left.leaving, NOW + 50, 160);
+    expect(ids(back.projects)).toEqual(['p-acme', 'p-zen']);
+    expect(back.leaving.size).toBe(0);
+  });
+
+  it('changes nothing when nobody left', () => {
+    const result = lingerProjects(scene.projects, scene.projects, new Map(), NOW, 160);
+    expect(result.projects).toEqual(scene.projects);
+    expect(result.leaving.size).toBe(0);
   });
 });

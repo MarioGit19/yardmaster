@@ -67,6 +67,7 @@ export function GridTrunk({ projects, onEnter }: GridTrunkProps) {
               trimTo={HEX_R + 3}
               tone={project.tone}
               tool={projectTool(project)}
+              leaving={project.leaving}
             />
           );
         })}
@@ -79,7 +80,7 @@ export function GridTrunk({ projects, onEnter }: GridTrunkProps) {
         style={{ paddingTop: TOP }}
       >
         {projects.map((project) => (
-          <li key={project.id}>
+          <li key={project.id} data-scene-leaving={project.leaving} inert={project.leaving}>
             <GridNode project={project} variant="trunk" onEnter={() => onEnter(project.id)} />
           </li>
         ))}

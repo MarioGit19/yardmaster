@@ -15,7 +15,7 @@ import { useBoardStore } from '../data/index.js';
 import { throughputSampler } from '../lanes/useThroughput.js';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
-import { useSceneModel } from '../layouts/useScene.js';
+import { useOverviewScene } from '../layouts/useScene.js';
 import type { CaptionTone } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { projectHref } from '../routes.js';
@@ -66,7 +66,7 @@ interface Metrics {
  */
 export default function RetroLayout() {
   useOwnBackdrop();
-  const scene = useSceneModel();
+  const scene = useOverviewScene();
   const phosphor = usePreference(phosphorPreference);
   const offstage = useContext(OffstageContext);
   const root = useRef<HTMLElement>(null);
@@ -290,6 +290,8 @@ function RetroFrame({ project, number, width, body, stacked, fresh }: FrameProps
       data-retro-frame={project.id}
       data-tone={project.tone}
       data-dim={project.dim || undefined}
+      data-scene-leaving={project.leaving}
+      inert={project.leaving}
       onKeyDown={onKeyDown}
       className="retro-frame"
     >

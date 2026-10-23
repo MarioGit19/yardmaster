@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import type { BoardSettings } from '@c-board/protocol';
 import { MotionGlobalConfig } from 'motion/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -9,6 +10,7 @@ import {
   type BoardStore,
   createBoardStore,
 } from '../data/index.js';
+import { boardSettings } from '../settings/boardSettings.js';
 import { makeProject, makeSession, sampleBoard } from '../test/board.js';
 import { TooltipProvider } from '../ui/Tooltip.js';
 import { PodGrid } from './PodGrid.js';
@@ -25,8 +27,21 @@ beforeAll(() => {
   vi.stubGlobal('cancelAnimationFrame', () => {});
 });
 
+let serverSettings: BoardSettings;
+
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', undefined);
+  // The pods read the server settings (pins, the idle window).
+  serverSettings = {
+    retentionDays: 7,
+    awayMode: false,
+    awayTimeoutSec: 120,
+    terminalReply: true,
+    libraryRoots: [],
+    libraryIdleHideMin: 30,
+    pinnedProjects: [],
+  };
+  vi.stubGlobal('fetch', async () => Response.json(serverSettings));
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -59,6 +74,8 @@ function sampleStore() {
   return store;
 }
 
+const HOUR = 60 * 60_000;
+
 const podIds = () =>
   Array.from(container.querySelectorAll<HTMLElement>('[data-pod]'), (el) => el.dataset.pod);
 const pod = (id: string) => container.querySelector<HTMLElement>(`[data-pod="${id}"]`);
@@ -82,6 +99,20 @@ describe('PodGrid', () => {
       });
     });
     expect(podIds()).toEqual(['p-zen', 'p-acme', 'p-orbit']);
+  });
+
+  it('leaves out quiet projects unless they are pinned (F26)', async () => {
+    const store = sampleStore();
+    const board = store.getState().board;
+    const quiet = { ...makeProject('p-quiet', 'quiet-lab'), lastActivityAt: Date.now() - HOUR };
+    store.getState().replaceBoard({ ...board, projects: { ...board.projects, 'p-quiet': quiet } });
+    render(store);
+    expect(podIds()).toEqual(['p-acme', 'p-zen', 'p-orbit']);
+
+    await act(() => boardSettings.load()); // the request the grid made on mount
+    serverSettings = { ...serverSettings, pinnedProjects: ['p-quiet'] };
+    await act(() => boardSettings.load());
+    expect(podIds()).toContain('p-quiet');
   });
 });
 

@@ -2,6 +2,7 @@ import {
   type ActivityEvent,
   type HealthResponse,
   HISTORY_WINDOW_MS,
+  type LibraryResponse,
   ProjectId,
   type ServerStatus,
   type SessionHistoryResponse,
@@ -19,6 +20,7 @@ import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { createDemoQuery } from './demo/demo-query.js';
+import { demoLibrary } from './demo/library.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
@@ -29,6 +31,7 @@ import {
 } from './editor-gateway.js';
 import { EditorRouter } from './editor-router.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
+import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
@@ -39,6 +42,7 @@ import {
   EDITOR_SEEN_KEY,
   HOOK_SEEN_KEY,
   type HookSettingsFile,
+  librarySettings,
   memoryHookSettings,
   migrateTerminalReply,
   RETENTION_KEY,
@@ -95,6 +99,8 @@ export interface BuildOptions {
   git?: Omit<GitScannerOptions, 'store' | 'logger' | 'active'> | false;
   /** Claude's settings.json for the hooks routes. Defaults to the real one, or a synthetic one in demo mode. */
   hookSettings?: HookSettingsFile;
+  /** The project library behind `GET /api/library`. Defaults to the disk, or a synthetic one in demo mode. */
+  library?: LibrarySource;
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -409,6 +415,12 @@ export async function buildServer(
           token = await rotateTokenFile(config.home);
           return token;
         },
+  });
+
+  const library = options.library ?? (options.demo ? demoLibrary() : new ProjectLibrary());
+  app.get('/api/library', async (): Promise<LibraryResponse> => {
+    const { libraryRoots } = librarySettings(settings);
+    return library.list(libraryRoots, Object.values(store.state.projects));
   });
 
   app.get('/api/projects/:projectId/sessions', async (request, reply) => {

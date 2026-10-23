@@ -92,7 +92,8 @@ export function sampleBoard(): BoardState {
   const projects = [
     makeProject('p-acme', 'acme-shop', 3),
     makeProject('p-orbit', 'orbit-api', 6),
-    makeProject('p-zen', 'zen-notes', 8),
+    // Its terminal just crashed: recent activity keeps it on the active-only overview.
+    { ...makeProject('p-zen', 'zen-notes', 8), lastActivityAt: Date.now() },
   ];
   for (const p of projects) board.projects[p.id] = p;
   const sessions = [

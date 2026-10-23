@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { OBSERVER_EVENTS } from '@c-board/hook';
@@ -7,6 +7,7 @@ import {
   HooksInstallResponse,
   HooksPlanResponse,
   HooksStatusResponse,
+  LibraryResponse,
   ServerStatus,
 } from '@c-board/protocol';
 import type { FastifyInstance } from 'fastify';
@@ -19,6 +20,7 @@ import { SESSION_COOKIE } from './security.js';
 import {
   diskHookSettings,
   type HookSettingsFile,
+  librarySettings,
   memoryHookSettings,
   migrateTerminalReply,
   terminalReplyEnabled,
@@ -26,6 +28,7 @@ import {
 import { generateToken } from './token.js';
 
 const host = '127.0.0.1:4317';
+const LIBRARY_DEFAULTS = { libraryRoots: [], libraryIdleHideMin: 30, pinnedProjects: [] };
 const HOOK = '/opt/c-board/bin/c-board-hook';
 
 let app: FastifyInstance | undefined;
@@ -125,6 +128,7 @@ describe('settings routes', () => {
       ['POST', '/api/hooks/plan'],
       ['POST', '/api/hooks/install'],
       ['POST', '/api/token/rotate'],
+      ['GET', '/api/library'],
     ] as const) {
       expect((await call(method, url, null, {})).statusCode, url).toBe(401);
     }
@@ -137,6 +141,7 @@ describe('settings routes', () => {
       awayMode: false,
       awayTimeoutSec: 120,
       terminalReply: true,
+      ...LIBRARY_DEFAULTS,
     });
     expect((await call('PUT', '/api/settings', token, { retentionDays: 5 })).statusCode).toBe(400);
     expect((await call('PUT', '/api/settings', token, { nope: true })).statusCode).toBe(400);
@@ -147,6 +152,7 @@ describe('settings routes', () => {
       awayMode: false,
       awayTimeoutSec: 120,
       terminalReply: true,
+      ...LIBRARY_DEFAULTS,
     });
     await call('PUT', '/api/settings', token, {
       awayMode: true,
@@ -169,8 +175,88 @@ describe('settings routes', () => {
       awayMode: true,
       awayTimeoutSec: 45,
       terminalReply: false,
+      ...LIBRARY_DEFAULTS,
     });
     expect(app.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
+  });
+
+  it('stores the library roots, idle window and pins, validated and deduplicated', async () => {
+    const { token, config } = await boot();
+    for (const bad of [
+      { libraryRoots: ['Desktop'] },
+      { libraryRoots: [''] },
+      { libraryRoots: Array.from({ length: 9 }, (_, i) => `/srv/code/${i}`) },
+      { libraryIdleHideMin: 7 },
+      { pinnedProjects: [''] },
+    ]) {
+      expect((await call('PUT', '/api/settings', token, bad)).statusCode, JSON.stringify(bad)).toBe(
+        400,
+      );
+    }
+    const res = await call('PUT', '/api/settings', token, {
+      libraryRoots: ['~/Desktop', ' /srv/code ', '~/Desktop'],
+      libraryIdleHideMin: 60,
+      pinnedProjects: ['p-1', 'p-1', 'p-2'],
+    });
+    expect(res.json()).toMatchObject({
+      libraryRoots: ['~/Desktop', '/srv/code'],
+      libraryIdleHideMin: 60,
+      pinnedProjects: ['p-1', 'p-2'],
+    });
+    expect(app?.settings['library.roots']).toEqual(['~/Desktop', '/srv/code']);
+
+    await app?.close();
+    app = await buildServer(config, {
+      token,
+      dbPath: join(config.home, 'board.db'),
+      processes: false,
+      git: false,
+      hookSettings: memoryHookSettings(),
+    });
+    expect((await call('GET', '/api/settings', token)).json()).toMatchObject({
+      libraryRoots: ['~/Desktop', '/srv/code'],
+      libraryIdleHideMin: 60,
+      pinnedProjects: ['p-1', 'p-2'],
+    });
+  });
+
+  it('ignores stored library settings that no longer validate', () => {
+    expect(
+      librarySettings({
+        'library.roots': ['relative', '/srv/code', 4],
+        'library.idleHideMin': 9,
+        'library.pinned': 'p-1',
+      }),
+    ).toEqual({ libraryRoots: ['/srv/code'], libraryIdleHideMin: 30, pinnedProjects: [] });
+  });
+
+  it('lists the library from the configured roots', async () => {
+    const { token, home } = await boot();
+    const root = join(home, 'Desktop');
+    await mkdir(join(root, 'acme-shop', '.git'), { recursive: true });
+    await writeFile(join(root, 'notes.md'), 'synthetic');
+
+    const empty = LibraryResponse.parse((await call('GET', '/api/library', token)).json());
+    expect(empty).toEqual({ roots: [], entries: [] });
+
+    await call('PUT', '/api/settings', token, { libraryRoots: [root, join(home, 'missing')] });
+    const listed = LibraryResponse.parse((await call('GET', '/api/library', token)).json());
+    expect(listed.roots.map((r) => [r.count, r.error])).toEqual([
+      [1, null],
+      [0, 'missing'],
+    ]);
+    expect(listed.entries.map((e) => [e.name, e.git])).toEqual([['acme-shop', true]]);
+  });
+
+  it('gives the demo board a synthetic library', async () => {
+    const { token } = await boot({ demo: true });
+    expect((await call('GET', '/api/library', token)).json()).toEqual({ roots: [], entries: [] });
+    await call('PUT', '/api/settings', token, { libraryRoots: ['~/Desktop'] });
+    const listed = LibraryResponse.parse((await call('GET', '/api/library', token)).json());
+    expect(listed.entries.length).toBeGreaterThan(4);
+    expect(listed.entries.every((e) => e.path.startsWith('/home/dev/'))).toBe(true);
+    expect(listed.entries.find((e) => e.name === 'garden-planner')?.projectId).toBeNull();
+    expect(listed.entries[0]?.projectId).not.toBeNull();
   });
 
   it('plans, confirms and installs the hooks, writing only what was shown', async () => {

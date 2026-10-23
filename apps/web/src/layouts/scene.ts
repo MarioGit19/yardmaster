@@ -122,6 +122,8 @@ export interface SceneProject {
   activity: number;
   /** Nothing for five minutes: the pod dims, the Office's ceiling light goes down. */
   dim: boolean;
+  /** Leaving the overview (it went inactive, F26): drawn for its exit, then dropped. */
+  leaving?: true;
 }
 
 export interface SceneModel {
@@ -574,6 +576,39 @@ export function shareScene(prev: SceneModel | null, next: SceneModel): SceneMode
   const actors = new Map<string, SceneActor>();
   for (const project of projects) for (const actor of project.actors) actors.set(actor.id, actor);
   return { projects, actors };
+}
+
+/** A project on its way out of the overview: where it stood, and until when it's drawn. */
+export interface LeavingProject {
+  project: SceneProject;
+  index: number;
+  until: number;
+}
+
+/**
+ * The overview's projects with the ones that just left kept in place, marked `leaving`, until
+ * `ms` after they left, so every layout can play an exit (F26). `prev` is what was shown last.
+ */
+export function lingerProjects(
+  prev: readonly SceneProject[],
+  next: readonly SceneProject[],
+  leaving: ReadonlyMap<string, LeavingProject>,
+  now: number,
+  ms: number,
+): { projects: SceneProject[]; leaving: Map<string, LeavingProject> } {
+  const ids = new Set(next.map((p) => p.id));
+  const still = new Map<string, LeavingProject>();
+  for (const [id, entry] of leaving) if (!ids.has(id) && entry.until > now) still.set(id, entry);
+  prev.forEach((project, index) => {
+    if (project.leaving || ids.has(project.id) || still.has(project.id)) return;
+    still.set(project.id, { project: { ...project, leaving: true }, index, until: now + ms });
+  });
+  if (still.size === 0) return { projects: [...next], leaving: still };
+  const projects = [...next];
+  for (const entry of [...still.values()].sort((a, b) => a.index - b.index)) {
+    projects.splice(Math.min(entry.index, projects.length), 0, entry.project);
+  }
+  return { projects, leaving: still };
 }
 
 /** One project's scene (what an open inspector needs), or null when it's gone. */

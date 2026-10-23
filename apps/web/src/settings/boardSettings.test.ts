@@ -7,6 +7,9 @@ const BASE: BoardSettings = {
   awayMode: false,
   awayTimeoutSec: 120,
   terminalReply: false,
+  libraryRoots: [],
+  libraryIdleHideMin: 30,
+  pinnedProjects: [],
 };
 
 describe('createBoardSettingsStore', () => {

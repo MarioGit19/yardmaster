@@ -25,6 +25,8 @@ export interface PipelineProps {
   tool: string | null;
   /** The node is hovered or focused: its pipeline brightens. */
   hot?: boolean;
+  /** Its project is leaving the overview: the pipeline fades with the node. */
+  leaving?: true | undefined;
 }
 
 /**
@@ -43,6 +45,7 @@ export function Pipeline({
   tone,
   tool,
   hot,
+  leaving,
 }: PipelineProps) {
   const key = activityKey.project(projectId);
   const step = useActivityStep(key);
@@ -86,6 +89,7 @@ export function Pipeline({
       data-tone={tone}
       data-step={step}
       data-hot={hot || undefined}
+      data-scene-leaving={leaving}
       className="grid-pipe"
     >
       <line
