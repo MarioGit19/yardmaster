@@ -187,6 +187,33 @@ describe('TranscriptService', () => {
     expect(kinds(service.messages(FIXTURE_SESSION_ID))).toEqual(FIXTURE_KINDS);
   });
 
+  it('starts a new fork from the conversation of its parent', async () => {
+    const fork = '00000000-0000-4000-8000-00000000f0f0';
+    const loadHistory = vi.fn<HistoryLoader>(async (sessionId) =>
+      sessionId === FIXTURE_SESSION_ID
+        ? [
+            {
+              type: 'user',
+              uuid: '00000000-0000-4000-8000-0000000000a1',
+              timestamp: '2026-01-15T12:00:00.000Z',
+              message: { role: 'user', content: 'Fix the checkout' },
+            },
+          ]
+        : [],
+    );
+    const { store, service } = setup({ loadHistory });
+    service.claim(fork);
+    store.upsertSession({
+      id: fork,
+      origin: 'board',
+      cwd: FIXTURE_CWD,
+      forkedFrom: { sessionId: FIXTURE_SESSION_ID, at: Date.UTC(2026, 0, 15, 13) },
+    });
+    await settled(service);
+    expect(loadHistory).toHaveBeenCalledWith(FIXTURE_SESSION_ID, FIXTURE_CWD);
+    expect(kinds(service.messages(fork))).toEqual(['user']);
+  });
+
   it('falls back to the JSONL file when the SDK fails or finds nothing', async () => {
     await writeFile(path, fixture);
     for (const loadHistory of [

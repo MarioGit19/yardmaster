@@ -392,6 +392,38 @@ describe('SessionDiscovery history', () => {
     expect(listHistory).toHaveBeenCalledTimes(2);
   });
 
+  // 10.9e: the board lists sessions it knows above History; when the newest 20 listed were all
+  // on the board (the build loop starts one per task), History came back empty.
+  it('reaches past the sessions on the board to fill the history', async () => {
+    const ids = Array.from(
+      { length: 30 },
+      (_, i) => `00000000-0000-4000-8000-0000000000${String(i).padStart(2, '0')}`,
+    );
+    const listHistory = vi.fn<HistoryLister>(async (_dir, limit) =>
+      ids.slice(0, limit).map((sessionId, i) => ({ sessionId, lastModified: 1_000 - i })),
+    );
+    const { store, service } = setup({ listHistory });
+    const projectId = withProject(store);
+    const onBoard = new Set(ids.slice(0, 25));
+    const past = await service.freshHistory(projectId, onBoard);
+    expect(listHistory).toHaveBeenLastCalledWith(PROJECT, 45);
+    expect(past.map((e) => e.id)).toEqual(ids.slice(25));
+  });
+
+  it('lists again once a session of the project ends', async () => {
+    const listHistory = vi.fn<HistoryLister>(async () => [
+      { sessionId: LIVE_ID, summary: 'Work', lastModified: 1 },
+    ]);
+    const { store, service, advance } = setup({ listHistory });
+    const projectId = withProject(store);
+    await service.freshHistory(projectId);
+    store.upsertSession({ id: OTHER_ID, projectId, status: { kind: 'idle' } });
+    advance(1_000);
+    store.setSessionStatus(OTHER_ID, { kind: 'ended' });
+    await service.freshHistory(projectId);
+    expect(listHistory).toHaveBeenCalledTimes(2);
+  });
+
   it('returns nothing for unknown projects', async () => {
     const { service } = setup({ listHistory: async () => [] });
     expect(await service.loadHistory('nope')).toEqual([]);

@@ -1,9 +1,13 @@
 import { type ClaudeSession, sessionDisplayName, sessionSubtitle } from '@c-board/protocol';
+import { GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { Link } from 'wouter';
+import { useBoard } from '../data/index.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { dur, ease } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
+import { sessionHref } from '../routes.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
@@ -79,15 +83,19 @@ export function ClaudePanel({
               <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">
                 {sessionDisplayName(session)}
               </h2>
-              {subtitle && (
-                <p
-                  dir="auto"
-                  data-session-subtitle
-                  className="min-w-0 truncate text-meta text-text-2"
-                  title={subtitle}
-                >
-                  {subtitle}
-                </p>
+              {session.forkedFrom ? (
+                <ForkedFrom parentId={session.forkedFrom.sessionId} />
+              ) : (
+                subtitle && (
+                  <p
+                    dir="auto"
+                    data-session-subtitle
+                    className="min-w-0 truncate text-meta text-text-2"
+                    title={subtitle}
+                  >
+                    {subtitle}
+                  </p>
+                )
               )}
             </div>
             <OriginBadge origin={session.origin} compact="narrow" />
@@ -138,6 +146,7 @@ export function ClaudePanel({
                     tail={tail}
                     caption={caption}
                     cwd={session.cwd ?? undefined}
+                    forkedAt={session.forkedFrom?.at ?? null}
                   />
                 </Suspense>
               )}
@@ -147,6 +156,29 @@ export function ClaudePanel({
         <SessionComposer session={session} />
       </div>
     </ChatDensityContext>
+  );
+}
+
+/** A fork's header names its parent, linking to it while the board still lists it. */
+function ForkedFrom({ parentId }: { parentId: string }) {
+  const parent = useBoard((s) => s.board.sessions[parentId]);
+  const name = parent ? sessionDisplayName(parent) : 'an earlier session';
+  const icon = <GitFork aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />;
+  const className = 'flex min-w-0 items-center gap-1 truncate text-meta text-text-2';
+  return parent?.projectId ? (
+    <Link
+      href={sessionHref(parent.projectId, parent.id)}
+      data-forked-from={parent.id}
+      className={cx(className, 'rounded-chip transition-colors duration-fast hover:text-text-1')}
+    >
+      {icon}
+      <span className="truncate">Forked from {name}</span>
+    </Link>
+  ) : (
+    <p data-forked-from className={className}>
+      {icon}
+      <span className="truncate">Forked from {name}</span>
+    </p>
   );
 }
 

@@ -13,6 +13,7 @@ import {
   ExternalLink,
   GitFork,
   LoaderCircle,
+  Play,
   ShieldCheck,
   Square,
   TriangleAlert,
@@ -72,6 +73,13 @@ export function SessionComposer({ session }: { session: ClaudeSession }) {
 }
 
 function BoardComposer({ session }: { session: ClaudeSession }) {
+  if (session.status.kind === 'interrupted') {
+    return <ResumeBar session={session} turnRunning={session.status.turnRunning} />;
+  }
+  return <LiveBoardComposer session={session} />;
+}
+
+function LiveBoardComposer({ session }: { session: ClaudeSession }) {
   const client = useBoardClient();
   const running = isTurnRunning(session.status);
   // Model and mode switch on the live query; a stopped session picks them up on resume.
@@ -418,7 +426,9 @@ function TerminalSessionComposer({ session }: { session: ClaudeSession }) {
   // On by default: until the settings load, assume it is.
   const replyEnabled = settings?.terminalReply ?? true;
   const fork = useFork(session);
-  if (!replyEnabled || session.terminalId === null || !isSessionLive(session.status)) {
+  // Claude has exited: the board carries on the same conversation, no fork needed.
+  if (!isSessionLive(session.status)) return <ContinueBar session={session} />;
+  if (!replyEnabled || session.terminalId === null) {
     return <ForkBar session={session} fork={fork} />;
   }
   const terminalId = session.terminalId;
@@ -469,7 +479,30 @@ interface Fork {
   start: () => Promise<void>;
 }
 
-/** Continues a terminal session as a board session that starts from its conversation. */
+/**
+ * Resumes a session under its own id: an interrupted board session, or a terminal session whose
+ * Claude has exited ("Continue in board"). Nothing is sent; the composer takes over.
+ */
+export function useResume(session: ClaudeSession): {
+  resuming: boolean;
+  resume: () => Promise<void>;
+} {
+  const client = useBoardClient();
+  const [resuming, setResuming] = useState(false);
+  const resume = async () => {
+    setResuming(true);
+    const result = await client.action({
+      kind: 'session.resume',
+      sessionId: session.id,
+      ...(session.projectId ? { projectId: session.projectId } : {}),
+    });
+    setResuming(false);
+    if (!result.ok) toast.error(errorText(result.error, 'Could not resume the session'));
+  };
+  return { resuming, resume };
+}
+
+/** Branches a terminal session that still runs off into a board session of its own. */
 function useFork(session: ClaudeSession): Fork {
   const client = useBoardClient();
   const [, navigate] = useLocation();
@@ -537,10 +570,9 @@ function ComposerMenu({ fork }: { fork: Fork }) {
           <ForkIcon forking={fork.forking} />
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="font-medium text-body-sm text-text-1">Resume here (fork)</span>
+          <span className="font-medium text-body-sm text-text-1">Fork into the board</span>
           <span className="text-meta text-text-2">
-            A board session that starts from this conversation. It won't see what happens in the
-            terminal next.
+            Running in a terminal; reply there from the chat, or fork to branch off.
           </span>
         </span>
       </button>
@@ -549,57 +581,141 @@ function ComposerMenu({ fork }: { fork: Fork }) {
 }
 
 /**
- * Where the board can't type into the terminal (no linked terminal, the session ended, or the
- * setting is off), it continues the session as a fork.
+ * A session still running in a terminal the board can't type into (no linked terminal, or the
+ * setting is off): it can only branch off as a fork.
  */
 function ForkBar({ session, fork }: { session: ClaudeSession; fork: Fork }) {
-  const live = isSessionLive(session.status);
+  return (
+    <DockCard
+      data-fork-bar
+      text="Running in a terminal. Reply there, or fork it into a board session that branches off this conversation."
+      action={
+        <button
+          type="button"
+          onClick={() => void fork.start()}
+          disabled={fork.forking}
+          aria-busy={fork.forking}
+          className={buttonClass('primary', 'sm')}
+        >
+          <ForkIcon forking={fork.forking} />
+          Fork into the board
+        </button>
+      }
+    >
+      <SessionDraft sessionId={session.id} goesTo="the fork" />
+      <p role="note" className="flex min-w-0 items-start gap-1.5 text-meta text-text-2">
+        <TriangleAlert
+          aria-hidden
+          className="mt-px size-3.5 shrink-0 text-st-wait"
+          strokeWidth={1.5}
+        />
+        The fork continues separately and won't see what happens in the terminal next.
+      </p>
+    </DockCard>
+  );
+}
+
+/** Claude exited in its terminal: the board continues the same session (no fork). */
+function ContinueBar({ session }: { session: ClaudeSession }) {
+  const { resuming, resume } = useResume(session);
+  return (
+    <DockCard
+      data-continue-bar
+      text="Claude has exited in its terminal. Continue this conversation here on the board."
+      action={
+        <ResumeButton busy={resuming} onClick={() => void resume()}>
+          Continue in board
+        </ResumeButton>
+      }
+    >
+      <SessionDraft sessionId={session.id} goesTo="the conversation" />
+    </DockCard>
+  );
+}
+
+/** A board session stopped by a server restart: nothing was re-sent; Resume picks it up again. */
+function ResumeBar({ session, turnRunning }: { session: ClaudeSession; turnRunning: boolean }) {
+  const { resuming, resume } = useResume(session);
+  return (
+    <DockCard
+      data-resume-bar
+      text={
+        turnRunning
+          ? 'Interrupted by a board restart. Claude stopped mid-turn; resume to pick the conversation up again.'
+          : 'This session stopped when the board restarted. Resume to carry on.'
+      }
+      action={
+        <ResumeButton busy={resuming} onClick={() => void resume()}>
+          Resume
+        </ResumeButton>
+      }
+    >
+      <SessionDraft sessionId={session.id} goesTo="the session" />
+    </DockCard>
+  );
+}
+
+function ResumeButton({
+  busy,
+  onClick,
+  children,
+}: {
+  busy: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-busy={busy}
+      className={buttonClass('primary', 'sm')}
+    >
+      {busy ? (
+        <LoaderCircle className="hud-spin size-3.5" strokeWidth={1.5} />
+      ) : (
+        <Play className="size-3.5" strokeWidth={1.5} />
+      )}
+      {children}
+    </button>
+  );
+}
+
+/** The card the composer dock shows in place of the composer. */
+function DockCard({
+  text,
+  action,
+  children,
+  ...data
+}: {
+  text: string;
+  action: ReactNode;
+  children?: ReactNode;
+} & { [key: `data-${string}`]: boolean }) {
   const column = chatColumn(useCompactChat());
   return (
-    <div data-fork-bar className={column.dock}>
+    <div {...data} className={column.dock}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 py-2.5 shadow-raised">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <p className="min-w-0 flex-1 basis-56 text-body-sm text-text-2">
-            This session runs in a terminal. Continue it here as a board session that starts from
-            this conversation.
-          </p>
-          <button
-            type="button"
-            onClick={() => void fork.start()}
-            disabled={fork.forking}
-            aria-busy={fork.forking}
-            className={buttonClass('primary', 'sm')}
-          >
-            <ForkIcon forking={fork.forking} />
-            Resume here (fork)
-          </button>
+          <p className="min-w-0 flex-1 basis-56 text-body-sm text-text-2">{text}</p>
+          {action}
         </div>
-        <ForkDraft sessionId={session.id} />
-        {live && (
-          <p role="note" className="flex min-w-0 items-start gap-1.5 text-meta text-text-2">
-            <TriangleAlert
-              aria-hidden
-              className="mt-px size-3.5 shrink-0 text-st-wait"
-              strokeWidth={1.5}
-            />
-            The original is still running in its terminal. The fork continues separately and won't
-            see what happens there next.
-          </p>
-        )}
+        {children}
       </div>
     </div>
   );
 }
 
-/** A draft typed before the session ended: kept for the fork, or discarded here. */
-function ForkDraft({ sessionId }: { sessionId: string }) {
+/** A draft typed for the session while it can't take one: kept for later, or discarded here. */
+function SessionDraft({ sessionId, goesTo }: { sessionId: string; goesTo: string }) {
   const key = draftKey.session(sessionId);
   const text = useDraftText(key);
   if (text === '') return null;
   return (
     <div data-fork-draft className="flex min-w-0 items-center gap-2 text-meta text-text-2">
       <p className="min-w-0 flex-1 truncate" title={text}>
-        Your draft goes to the fork: <span className="text-text-1">{text}</span>
+        Your draft goes to {goesTo}: <span className="text-text-1">{text}</span>
       </p>
       <button
         type="button"

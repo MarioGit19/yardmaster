@@ -2,7 +2,7 @@ import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { ActivityEvent, Project } from '@c-board/protocol';
+import type { ActivityEvent, ClaudeSession, Project } from '@c-board/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from './app.js';
 import type { ServerConfig } from './config.js';
@@ -11,6 +11,7 @@ import {
   DB_FILE,
   Persistence,
   type PersistenceOptions,
+  toSessionRecord,
 } from './persistence.js';
 import { BoardStore } from './store.js';
 import { generateToken } from './token.js';
@@ -122,6 +123,19 @@ describe('Persistence', () => {
     expect(session).not.toHaveProperty('lastAssistantText');
     expect(session).not.toHaveProperty('todos');
     expect(session).not.toHaveProperty('status');
+  });
+
+  it('remembers whether a board session was running, for a restart', () => {
+    const store = new BoardStore();
+    const base = { origin: 'board' as const, projectId: 'p', status: { kind: 'idle' as const } };
+    const runOf = (status: ClaudeSession['status'], origin: 'board' | 'terminal' = 'board') =>
+      toSessionRecord(store.upsertSession({ ...base, id: 's', origin, status })).run ?? null;
+    expect(runOf({ kind: 'idle' })).toBe('idle');
+    expect(runOf({ kind: 'tool', tool: 'Bash', toolUseId: null })).toBe('turn');
+    expect(runOf({ kind: 'interrupted', turnRunning: true })).toBe('turn');
+    expect(runOf({ kind: 'interrupted', turnRunning: false })).toBe('idle');
+    expect(runOf({ kind: 'ended' })).toBeNull();
+    expect(runOf({ kind: 'working' }, 'terminal')).toBeNull();
   });
 
   it('mirrors store project changes and keeps sessions after removal', () => {

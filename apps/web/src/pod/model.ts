@@ -78,6 +78,7 @@ const SESSION_RANK: Record<ClaudeSession['status']['kind'], number> = {
   compacting: 3,
   unknown: 1,
   idle: 1,
+  interrupted: 1,
   ended: 0,
 };
 
@@ -154,6 +155,12 @@ export function sessionCaption(session: ClaudeSession, approval?: Approval | nul
       return { glyph: null, text: status.alive ? 'Running' : 'Unknown', tone: 'rest' };
     case 'ended':
       return { glyph: null, text: 'Ended', tone: 'rest' };
+    case 'interrupted':
+      return {
+        glyph: null,
+        text: status.turnRunning ? 'Interrupted by a board restart' : 'Stopped by a board restart',
+        tone: 'rest',
+      };
     case 'idle': {
       // The last turn's title; Claude Code's automatic `<folder>-<code>` name says nothing.
       const title = session.title?.trim();

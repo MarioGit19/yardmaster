@@ -28,7 +28,7 @@ import {
 } from './editor-gateway.js';
 import { EditorRouter } from './editor-router.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
-import { Persistence } from './persistence.js';
+import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
@@ -94,6 +94,8 @@ export interface BuildOptions {
   git?: Omit<GitScannerOptions, 'store' | 'logger' | 'active'> | false;
   /** Claude's settings.json for the hooks routes. Defaults to the real one, or a synthetic one in demo mode. */
   hookSettings?: HookSettingsFile;
+  /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
+  watched?: boolean;
 }
 
 /** Tools whose completion can change a repository's state. */
@@ -147,6 +149,7 @@ export async function buildServer(
   const store = new BoardStore();
   let demo: DemoSimulator | null = null;
   for (const project of persistence.loadProjects()) store.upsertProject(project);
+  if (!options.demo) restoreBoardSessions(store, persistence.loadSessions());
   // Boot state is already on disk; only later changes need writing back.
   store.flush();
   persistence.attach(store);
@@ -171,7 +174,8 @@ export async function buildServer(
     processScanner?.stop();
     sessionLinker?.stop();
     gitScanner?.stop();
-    await runner.closeAll();
+    // Running board sessions stay listed as interrupted, to resume on the next start.
+    await runner.suspendAll();
     await discovery?.stop();
     await editorGateway.idle();
     await hookIngest.idle();
@@ -375,6 +379,8 @@ export async function buildServer(
       editors,
       hooks: { ...app.hookStats },
       setup: { hookSeen: seen(HOOK_SEEN_KEY), editorSeen: seen(EDITOR_SEEN_KEY) },
+      watched: options.watched ?? false,
+      boardSessions: runner.liveCount,
     };
   });
   registerSettingsRoutes(app, {
@@ -398,9 +404,15 @@ export async function buildServer(
     const worstHistory = worst?.sessionHistory(projectId);
     if (worstHistory) return { sessions: worstHistory } satisfies SessionHistoryResponse;
     if (!store.state.projects[projectId]) return reply.code(404).send({ error: 'unknown_project' });
+    // Sessions on the board are listed there, not here.
+    const onBoard = new Set(
+      Object.values(store.state.sessions)
+        .filter((s) => s.projectId === projectId)
+        .map((s) => s.id),
+    );
     const listed = demo
       ? demo.sessionHistory(projectId)
-      : ((await discovery?.freshHistory(projectId)) ?? []);
+      : ((await discovery?.freshHistory(projectId, onBoard)) ?? []);
     // The SDK listing carries no usage: fill it in for sessions the board has seen live.
     const stored = demo ? new Map() : persistence.sessionTokens(projectId);
     const sessions = listed.map((entry) => ({
@@ -423,6 +435,20 @@ export async function buildServer(
   processScanner?.start();
   gitScanner?.start();
   return app;
+}
+
+/**
+ * Board sessions whose query was still open when the last server stopped (a restart, a crash):
+ * listed as interrupted, with their transcript loaded from disk, until resumed. Nothing is re-sent.
+ */
+export function restoreBoardSessions(store: BoardStore, records: readonly SessionRecord[]): void {
+  for (const { run, ...record } of records) {
+    if (record.origin !== 'board' || !run || record.endedAt !== null) continue;
+    store.upsertSession({
+      ...record,
+      status: { kind: 'interrupted', turnRunning: run === 'turn' },
+    });
+  }
 }
 
 export async function startServer(

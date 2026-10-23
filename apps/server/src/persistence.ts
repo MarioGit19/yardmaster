@@ -15,7 +15,10 @@ export const MAX_WRITE_BATCH = 500;
 const SCHEMA_VERSION = 1;
 const MAX_SETTING_KEY = 128;
 
-/** What survives a restart of a session: metadata only, no live status or transcript content. */
+/**
+ * What survives a restart of a session: metadata only, no transcript content. `run` is a board
+ * session's query, still open (`idle`, or mid-`turn`) when written; it comes back interrupted.
+ */
 export const SessionRecord = ClaudeSession.pick({
   id: true,
   origin: true,
@@ -24,6 +27,7 @@ export const SessionRecord = ClaudeSession.pick({
   title: true,
   customTitle: true,
   ordinal: true,
+  forkedFrom: true,
   model: true,
   permissionMode: true,
   tokens: true,
@@ -31,7 +35,7 @@ export const SessionRecord = ClaudeSession.pick({
   startedAt: true,
   updatedAt: true,
   endedAt: true,
-});
+}).extend({ run: z.enum(['idle', 'turn']).nullable().optional() });
 export type SessionRecord = z.infer<typeof SessionRecord>;
 
 export interface PersistenceLogger {
@@ -446,6 +450,7 @@ export class Persistence {
 }
 
 export function toSessionRecord(session: ClaudeSession | SessionRecord): SessionRecord {
+  const run = 'status' in session ? boardRun(session) : (session.run ?? null);
   return {
     id: session.id,
     origin: session.origin,
@@ -454,6 +459,7 @@ export function toSessionRecord(session: ClaudeSession | SessionRecord): Session
     title: session.title,
     ...(session.customTitle ? { customTitle: session.customTitle } : {}),
     ...(session.ordinal ? { ordinal: session.ordinal } : {}),
+    ...(session.forkedFrom ? { forkedFrom: session.forkedFrom } : {}),
     model: session.model,
     permissionMode: session.permissionMode,
     tokens: session.tokens,
@@ -461,7 +467,20 @@ export function toSessionRecord(session: ClaudeSession | SessionRecord): Session
     startedAt: session.startedAt,
     updatedAt: session.updatedAt,
     endedAt: session.endedAt,
+    ...(run ? { run } : {}),
   };
+}
+
+/** Statuses of a board session whose query is still open. */
+const IDLE_RUN = new Set(['idle', 'waiting_input', 'unknown']);
+const TURN_RUN = new Set(['working', 'tool', 'waiting_permission', 'compacting']);
+
+function boardRun(session: ClaudeSession): SessionRecord['run'] {
+  if (session.origin !== 'board') return null;
+  const { status } = session;
+  if (status.kind === 'interrupted') return status.turnRunning ? 'turn' : 'idle';
+  if (TURN_RUN.has(status.kind)) return 'turn';
+  return IDLE_RUN.has(status.kind) ? 'idle' : null;
 }
 
 function migrate(db: DatabaseSync): void {

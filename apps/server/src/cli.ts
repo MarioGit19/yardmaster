@@ -8,6 +8,13 @@ function handleSignals(app: FastifyInstance): void {
     if (closing) return;
     closing = true;
     app.log.info({ signal }, 'shutting down');
+    const running = app.sessionRunner.liveCount;
+    if (running > 0) {
+      process.stderr.write(
+        `c-board: stopping ${running} running board session${running === 1 ? '' : 's'}. ` +
+          'They show as interrupted on the next start, with Resume.\n',
+      );
+    }
     app.close().then(
       () => process.exit(0),
       (err: unknown) => {

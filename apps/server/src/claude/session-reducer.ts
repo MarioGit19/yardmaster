@@ -75,6 +75,9 @@ export function sessionReducer(
   const ended = status.kind === 'ended';
   const to = (target: SessionStatus): ClaudeSession => withStatus(next, target, ts);
 
+  // Its process is gone with the old server: a late hook (its SessionEnd) changes nothing.
+  if (status.kind === 'interrupted' && hook.hook_event_name !== 'SessionStart') return next;
+
   switch (hook.hook_event_name) {
     case 'SessionStart':
       next = { ...next, model: hook.model ?? next.model, endedAt: null };
@@ -144,6 +147,7 @@ export function sessionReducer(
 
     case 'PreCompact':
       if (status.kind === 'ended' || status.kind === 'compacting') return next;
+      if (status.kind === 'interrupted') return next;
       return to({ kind: 'compacting', previous: status });
 
     case 'PostCompact':

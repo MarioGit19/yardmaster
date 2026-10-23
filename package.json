@@ -11,6 +11,7 @@
     "dev": "pnpm --parallel --filter @c-board/server --filter @c-board/web dev",
     "dev:demo": "pnpm --parallel --filter @c-board/server --filter @c-board/web dev:demo",
     "c-board": "pnpm --silent --filter @c-board/server cli",
+    "board": "pnpm --filter \"@c-board/server...\" --filter @c-board/web build && node --conditions=c-board-build apps/server/dist/cli.js start --no-open",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

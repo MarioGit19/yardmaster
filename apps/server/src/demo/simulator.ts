@@ -412,6 +412,32 @@ export class DemoSimulator {
         });
       });
     }
+    for (const project of this.projects) this.seedInterrupted(project);
+  }
+
+  /** A board session left `interrupted` by a restart (10.9e); resuming it runs the demo query. */
+  private seedInterrupted(project: ProjectCtx): void {
+    const def = project.def.interrupted;
+    if (!def) return;
+    const ts = this.now();
+    const model = DEMO_MODELS[0];
+    this.transcripts.open(def.id, model);
+    const seed = Number.parseInt(def.id.slice(0, 8), 16);
+    for (const { entry, ts: at } of demoHistory(project.def, seed, 14, ts - 4 * 60_000)) {
+      this.transcripts.append(def.id, entry, at);
+    }
+    this.store.upsertSession({
+      id: def.id,
+      origin: 'board',
+      projectId: project.id,
+      cwd: project.def.path,
+      status: { kind: 'interrupted', turnRunning: true },
+      title: def.title,
+      model,
+      permissionMode: 'default',
+      startedAt: ts - 25 * 60_000,
+      updatedAt: ts - 4 * 60_000,
+    });
   }
 
   private bootTerminal(terminal: TerminalCtx): void {

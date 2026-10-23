@@ -4,13 +4,13 @@ import {
   sessionDisplayName,
   sessionSubtitle,
 } from '@c-board/protocol';
-import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
+import { ArrowLeft, GitBranch, LoaderCircle, Play, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
-import { NewSessionComposer } from '../claude/Composer.js';
+import { NewSessionComposer, useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { miniCrewCount } from '../crew/model.js';
@@ -512,65 +512,96 @@ function SessionLink({
     approval?.state === 'pending' && approval.expiresAt !== null
       ? { startedAt: approval.createdAt, endsAt: approval.expiresAt }
       : null;
+  const interrupted = session.status.kind === 'interrupted';
   return (
-    <Link
-      href={sessionHref(projectId, session.id)}
-      aria-current={active ? 'page' : undefined}
-      data-session={session.id}
-      onClick={(e) => onPick(e.detail === 0)}
-      className={cx(
-        'relative isolate flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
-        !active && 'hover:bg-bg-2/60',
-      )}
-    >
-      {active && (
-        // One highlight that slides from row to row as the session changes.
-        <motion.span
-          layoutId={`focus-session-pill:${projectId}`}
-          transition={pillGlide}
-          aria-hidden
-          data-session-pill
-          className="absolute inset-0 -z-10 rounded-control bg-bg-2 shadow-raised"
-        />
-      )}
-      <motion.span
-        layoutId={shared ? sharedId.orb(session.id) : undefined}
-        transition={spring.smooth}
-        className="flex w-7 shrink-0 justify-center"
+    <div className="relative">
+      <Link
+        href={sessionHref(projectId, session.id)}
+        aria-current={active ? 'page' : undefined}
+        data-session={session.id}
+        onClick={(e) => onPick(e.detail === 0)}
+        className={cx(
+          'relative isolate flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 transition-colors duration-fast',
+          !active && 'hover:bg-bg-2/60',
+        )}
       >
-        <SessionCrew
-          session={session}
-          accent={accent}
-          crew={crew}
-          now={now}
-          countdown={countdown}
-        />
-      </motion.span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            data-session-name
-            className="min-w-0 flex-1 truncate text-body-sm text-text-1"
-            title={sessionSubtitle(session) ?? undefined}
-          >
-            {sessionDisplayName(session)}
-          </span>
-          <DraftMarker draft={draftKey.session(session.id)} />
-          {session.origin === 'board' && <OriginBadge origin="board" compact />}
-        </span>
-        <span className="flex min-w-0 items-center justify-between gap-2">
-          <StatusDot
-            tone={status.tone}
-            label={status.label}
-            showLabel
-            className="min-w-0 text-meta text-text-2"
+        {active && (
+          // One highlight that slides from row to row as the session changes.
+          <motion.span
+            layoutId={`focus-session-pill:${projectId}`}
+            transition={pillGlide}
+            aria-hidden
+            data-session-pill
+            className="absolute inset-0 -z-10 rounded-control bg-bg-2 shadow-raised"
           />
-          <span className="tabular shrink-0 font-mono text-meta text-text-2">
-            {formatCount(totalTokens(session))} tok
+        )}
+        <motion.span
+          layoutId={shared ? sharedId.orb(session.id) : undefined}
+          transition={spring.smooth}
+          className="flex w-7 shrink-0 justify-center"
+        >
+          <SessionCrew
+            session={session}
+            accent={accent}
+            crew={crew}
+            now={now}
+            countdown={countdown}
+          />
+        </motion.span>
+        <span className={cx('flex min-w-0 flex-1 flex-col gap-0.5', interrupted && 'pr-9')}>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              data-session-name
+              className="min-w-0 flex-1 truncate text-body-sm text-text-1"
+              title={sessionSubtitle(session) ?? undefined}
+            >
+              {sessionDisplayName(session)}
+            </span>
+            <DraftMarker draft={draftKey.session(session.id)} />
+            {session.origin === 'board' && <OriginBadge origin="board" compact />}
+          </span>
+          <span className="flex min-w-0 items-center justify-between gap-2">
+            <StatusDot
+              tone={status.tone}
+              label={status.label}
+              showLabel
+              className="min-w-0 text-meta text-text-2"
+            />
+            {/* An interrupted session's Resume button sits here, outside the link. */}
+            {!interrupted && (
+              <span className="tabular shrink-0 font-mono text-meta text-text-2">
+                {formatCount(totalTokens(session))} tok
+              </span>
+            )}
           </span>
         </span>
-      </span>
-    </Link>
+      </Link>
+      {interrupted && <RowResume session={session} />}
+    </div>
+  );
+}
+
+/** Resumes a board session a restart interrupted, from its row; the panel offers it too. */
+function RowResume({ session }: { session: ClaudeSession }) {
+  const { resuming, resume } = useResume(session);
+  return (
+    <IconButton
+      label={`Resume ${sessionDisplayName(session)}`}
+      variant="secondary"
+      size="sm"
+      data-row-resume
+      onClick={() => void resume()}
+      disabled={resuming}
+      aria-busy={resuming}
+      className="absolute top-1/2 right-2 -translate-y-1/2"
+      icon={
+        resuming ? (
+          <LoaderCircle aria-hidden className="hud-spin size-3.5" strokeWidth={1.5} />
+        ) : (
+          <Play aria-hidden className="size-3.5" strokeWidth={1.5} />
+        )
+      }
+    />
   );
 }
 

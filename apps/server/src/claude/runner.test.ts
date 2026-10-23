@@ -579,12 +579,56 @@ describe('SessionRunner resume', () => {
       sessionId: SESSION_A,
       cwd: PROJECT.path,
     });
+    // Its own "Claude N", never the parent's title; it remembers where it branched off.
     expect(session(store, SESSION_A)).toMatchObject({
       origin: 'board',
       projectId: PROJECT.id,
-      title: 'Fix the checkout',
+      title: null,
+      customTitle: null,
+      ordinal: 2,
+      forkedFrom: { sessionId: SESSION_B },
     });
     expect(session(store, SESSION_B).status.kind).toBe('working');
+  });
+
+  it('numbers a fork past every session of the project, ended ones included', async () => {
+    const { store, runner } = setup();
+    store.upsertSession({
+      id: SESSION_B,
+      origin: 'terminal',
+      projectId: PROJECT.id,
+      cwd: PROJECT.path,
+      status: { kind: 'idle' },
+      customTitle: 'retry-backoff',
+    });
+    const other = '00000000-0000-4000-8000-00000000aaaa';
+    store.upsertSession({ id: other, projectId: PROJECT.id, status: { kind: 'idle' } });
+    store.setSessionStatus(other, { kind: 'ended' });
+    expect(session(store, other).ordinal).toBe(1);
+
+    await runner.resumeSession(SESSION_B, { fork: true });
+    // "Claude" is still listed (ended), and the parent's own name isn't copied.
+    expect(session(store, SESSION_A)).toMatchObject({ ordinal: 2, customTitle: null });
+  });
+
+  it('leaves running sessions interrupted when the server stops, not ended', async () => {
+    const { store, runner } = setup();
+    await runner.startSession({ projectId: PROJECT.id, prompt: 'Fix the checkout' });
+    await runner.resumeSession(SESSION_B, { projectId: PROJECT.id });
+    const [busy, idle] = queries;
+    busy?.emit({ type: 'system', subtype: 'session_state_changed', state: 'running' });
+    idle?.emit({ type: 'system', subtype: 'session_state_changed', state: 'idle' });
+    await settle();
+    expect(runner.liveCount).toBe(2);
+
+    await runner.suspendAll();
+    expect(busy?.close).toHaveBeenCalled();
+    expect(runner.liveCount).toBe(0);
+    expect(session(store, SESSION_A)).toMatchObject({
+      status: { kind: 'interrupted', turnRunning: true },
+      endedAt: null,
+    });
+    expect(session(store, SESSION_B).status).toEqual({ kind: 'interrupted', turnRunning: false });
   });
 
   it('resumes a past session from the history browser by project', async () => {

@@ -749,12 +749,14 @@ test.describe('composer', () => {
           await openRoute(page, await firstProjectRoute(page));
           const narrow = viewport.width < 1024;
           if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-          // Parallel shots start board sessions in this project too.
+          // Parallel shots start board sessions in this project too, and the demo's Claude
+          // sometimes exits (then relaunches): pick a terminal session that is running.
           const forkable = page
             .locator('[data-focus] a[data-session]')
             .filter({ hasNot: page.locator('[data-origin="board"]') })
+            .filter({ hasNotText: 'Ended' })
             .first();
-          await forkable.click();
+          await forkable.click({ timeout: 40_000 });
           if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
           // Typing into the terminal, or (mid-request) the approval in its place.
           await expect(
@@ -795,14 +797,59 @@ test.describe('composer', () => {
           await page
             .locator('[data-focus] a[data-session]')
             .filter({ hasNot: page.locator('[data-origin="board"]') })
+            .filter({ hasNotText: 'Ended' })
             .first()
-            .click();
+            .click({ timeout: 40_000 });
           if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
           // On phones the Terminals tab holds the same chat, hidden.
           await expect(page.locator('[data-fork-bar]').filter({ visible: true })).toBeVisible();
           await page.waitForTimeout(600);
           await page.screenshot({
             path: new URL(`composer-fork-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+
+          // The fork: its own "Claude N", "Forked from …", and the parent's messages dimmed
+          // above the "Forked here" divider.
+          await page
+            .locator('[data-fork-bar]')
+            .filter({ visible: true })
+            .getByRole('button', { name: 'Fork into the board' })
+            .click();
+          await expect(page.locator('[data-fork-divider]').filter({ visible: true })).toBeVisible({
+            timeout: 15_000,
+          });
+          await page.waitForTimeout(600);
+          await page.screenshot({
+            path: new URL(`composer-forked-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        });
+
+        test('interrupted session', async ({ page }) => {
+          await openRoute(page, '/');
+          const href = await page
+            .locator('a[href^="#/p/"]', { hasText: 'docs-site' })
+            .first()
+            .getAttribute('href');
+          await openRoute(page, (href ?? '#/').slice(1));
+          const narrow = viewport.width < 1024;
+          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
+          const row = page.locator('[data-focus] a[data-session]', { hasText: 'Interrupted' });
+          if (!narrow) {
+            await page.waitForTimeout(400);
+            await page.screenshot({
+              path: new URL(`session-interrupted-row-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+              animations: 'disabled',
+            });
+          }
+          await row.click();
+          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
+          await expect(page.locator('[data-resume-bar]').filter({ visible: true })).toBeVisible();
+          await page.waitForTimeout(600);
+          await page.screenshot({
+            path: new URL(`session-interrupted-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
             animations: 'disabled',
           });
         });

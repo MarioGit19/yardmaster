@@ -1,6 +1,12 @@
 import type { ChatMessage } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
-import { streamingTail, TranscriptModel, toolSummary } from './transcript.js';
+import {
+  inheritedRows,
+  streamingTail,
+  TranscriptModel,
+  type TranscriptRow,
+  toolSummary,
+} from './transcript.js';
 
 const base = { uuid: null, ts: 1_760_000_000_000 };
 const assistant = { messageId: 'msg_1', model: null, usage: null };
@@ -120,5 +126,21 @@ describe('toolSummary', () => {
     expect(toolSummary('Grep', { pattern: 'applyDiscount' })).toBe('applyDiscount');
     expect(toolSummary('Task', { description: 'Find callers' })).toBe('Find callers');
     expect(toolSummary('Mystery', null)).toBe('');
+  });
+});
+
+describe('inheritedRows', () => {
+  const row = (id: string, ts: number | null): TranscriptRow => ({
+    kind: 'user',
+    id,
+    ts,
+    text: id,
+  });
+  it('counts the rows a fork took over from its parent', () => {
+    const rows = [row('a', 100), row('b', 200), row('c', 300)];
+    expect(inheritedRows(rows, 200)).toBe(2);
+    expect(inheritedRows(rows, 50)).toBe(0);
+    expect(inheritedRows(rows, null)).toBe(0);
+    expect(inheritedRows([row('a', null), row('b', 100)], 200)).toBe(0);
   });
 });

@@ -100,6 +100,7 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
       token,
       demo,
       webRoot,
+      watched: io.env.CBOARD_WATCH === '1',
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw err;
@@ -113,6 +114,11 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
   const url = baseUrl({ host: config.host, port: listeningPort(app, config.port) });
   const authUrl = `${url}/auth?t=${encodeURIComponent(token)}`;
   if (demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
+  if (io.env.CBOARD_WATCH === '1') {
+    io.stdout.write(
+      'Watching for changes: an edit restarts the server and interrupts board sessions. Use `pnpm board` for a board that stays up.\n',
+    );
+  }
   if (!hasWebBuild(webRoot)) {
     io.stdout.write('The web app is not built yet; run `pnpm --filter @c-board/web build`.\n');
   }

@@ -16,6 +16,7 @@ import {
   type ApprovalDecision,
   type ClaudeSession,
   makeMessage,
+  nextSessionOrdinal,
   type PermissionMode,
   PermissionMode as PermissionModeSchema,
   PermissionSuggestion,
@@ -135,6 +136,8 @@ interface Run {
   query: Query;
   input: MessageQueue<SDKUserMessage>;
   closing: boolean;
+  /** Stopped with the server: the session stays `interrupted`, not ended. */
+  suspended: boolean;
   /** An interrupt is pending; the turn's error result is expected. */
   interrupted: boolean;
   draft: string | null;
@@ -239,6 +242,11 @@ export class SessionRunner {
     return this.runs.has(sessionId);
   }
 
+  /** Board sessions with a running query. */
+  get liveCount(): number {
+    return this.runs.size;
+  }
+
   async startSession(input: StartSessionInput): Promise<RunnerResult> {
     // Loaded before any check, so everything after it runs in one synchronous step.
     const queryFn = await this.loadQuery();
@@ -285,17 +293,26 @@ export class SessionRunner {
 
     const id = input.fork ? this.newId() : sessionId;
     const ts = this.now();
+    const projectIdOf = project?.id ?? session?.projectId ?? null;
     this.transcripts?.claim(id);
     this.store.upsertSession({
       id,
       origin: 'board',
-      projectId: project?.id ?? session?.projectId ?? null,
+      projectId: projectIdOf,
       cwd,
       status: { kind: 'idle' },
-      title: session?.title ?? null,
       model: session?.model ?? null,
       permissionMode: session?.permissionMode ?? null,
-      ...(input.fork || !session ? { startedAt: ts } : {}),
+      ...(input.fork
+        ? {
+            // Its own name, never a copy of the parent's: "Forked from" says where it came from.
+            title: null,
+            customTitle: null,
+            ordinal: this.forkOrdinal(id, projectIdOf),
+            forkedFrom: { sessionId, at: ts },
+            startedAt: ts,
+          }
+        : { title: session?.title ?? null, ...(session ? {} : { startedAt: ts }) }),
       endedAt: null,
       updatedAt: ts,
     });
@@ -361,6 +378,35 @@ export class SessionRunner {
 
   async closeAll(): Promise<void> {
     await Promise.all([...this.runs.keys()].map((id) => this.close(id)));
+  }
+
+  /**
+   * The server is stopping: every running query ends, and its session stays `interrupted`
+   * (saying whether a turn was cut off) so the next server lists it with a Resume action.
+   */
+  async suspendAll(): Promise<void> {
+    const ts = this.now();
+    const runs = [...this.runs.values()];
+    for (const run of runs) {
+      const status = this.status(run.id);
+      const turnRunning = status !== undefined && TURN_STATUSES.has(status.kind);
+      run.suspended = true;
+      run.closing = true;
+      this.store.setSessionStatus(run.id, { kind: 'interrupted', turnRunning }, ts);
+    }
+    for (const run of runs) {
+      run.input.end();
+      run.query.close();
+    }
+    await Promise.all(runs.map((run) => run.done));
+  }
+
+  /** "Claude N" for a fork: a number no session of the project shows, ended ones included. */
+  private forkOrdinal(id: string, projectId: string | null): number {
+    const sessions = Object.values(this.store.state.sessions).map((s) =>
+      s.status.kind === 'ended' ? { ...s, status: { kind: 'idle' as const } } : s,
+    );
+    return nextSessionOrdinal(sessions, { id, projectId });
   }
 
   /** Handles a UI `approval.decide` for a board session's pending approval. */
@@ -437,6 +483,7 @@ export class SessionRunner {
       query,
       input,
       closing: false,
+      suspended: false,
       interrupted: false,
       draft: null,
       draftTimer: null,
@@ -616,6 +663,7 @@ export class SessionRunner {
       });
     }
     this.transcripts?.release(run.id);
+    if (run.suspended) return;
     const ts = this.now();
     if (failure !== null || (!run.closing && this.status(run.id)?.kind !== 'idle')) {
       this.store.setSessionStatus(run.id, { kind: 'error', message: failure }, ts);
@@ -677,7 +725,7 @@ export class SessionRunner {
         this.store.updateSession(run.id, { permissionMode: status.data.permissionMode }, ts);
       }
       if (status.data.status === 'compacting' && current && current.kind !== 'compacting') {
-        if (current.kind !== 'ended') {
+        if (current.kind !== 'ended' && current.kind !== 'interrupted') {
           this.store.setSessionStatus(run.id, { kind: 'compacting', previous: current }, ts);
         }
       } else if (status.data.status !== 'compacting' && current?.kind === 'compacting') {
@@ -846,8 +894,16 @@ function toolUse(approval: Approval): { toolUseID?: string } {
   return approval.toolUseId ? { toolUseID: approval.toolUseId } : {};
 }
 
+/** A turn is under way in these; a restart then says the turn was interrupted. */
+const TURN_STATUSES = new Set<SessionStatus['kind']>([
+  'working',
+  'tool',
+  'waiting_permission',
+  'compacting',
+]);
+
 function isLiveStatus(status: SessionStatus): boolean {
-  if (status.kind === 'ended') return false;
+  if (status.kind === 'ended' || status.kind === 'interrupted') return false;
   if (status.kind === 'unknown') return status.alive;
   return true;
 }

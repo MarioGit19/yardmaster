@@ -12,6 +12,16 @@
 
 Your existing workflow doesn't change. You keep using Cursor and its terminals exactly as before.
 
+## Running it
+
+```bash
+pnpm install
+pnpm board        # builds once, then serves the board on http://127.0.0.1:4317
+pnpm dev          # development: server and web in watch mode
+```
+
+Use `pnpm board` for the board you work with day to day. `pnpm dev` restarts the server on every edit under `apps/server/src`, and a restart stops the board's own Claude sessions. They come back as **interrupted**, with a Resume button, but a turn that was running is cut off. `c-board doctor` warns when board sessions are running on a watched server.
+
 ## Privacy
 
 - Runs entirely on your machine, bound to `127.0.0.1`. No telemetry and no cloud.

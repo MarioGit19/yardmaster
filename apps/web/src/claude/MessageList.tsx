@@ -1,6 +1,6 @@
 import { parseToolCall, type TodoStatus } from '@c-board/protocol';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { ArrowDown, ChevronRight, Eye, EyeOff, GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   memo,
@@ -22,7 +22,7 @@ import { chatColumn, useCompactChat } from './density.js';
 import { Markdown } from './Markdown.js';
 import { ToolCard } from './tools/ToolCard.js';
 import { ToolViewState } from './tools/viewState.js';
-import type { ToolRow, TranscriptRow } from './transcript.js';
+import { inheritedRows, type ToolRow, type TranscriptRow } from './transcript.js';
 
 /** Within this many px of the bottom the list counts as "at the latest" and follows new rows. */
 export const STICK_THRESHOLD_PX = 48;
@@ -33,13 +33,15 @@ const USER_CLAMP_CHARS = 700;
 const USER_CLAMP_LINES = 12;
 
 const TAIL_ID = '__tail';
+const FORK_ID = '__forked';
 /** Frames a jump to the end keeps re-aiming while rows measure. */
 const SETTLE_FRAMES = 30;
 
 type Item =
   | TranscriptRow
   | { kind: 'tail'; id: typeof TAIL_ID; text: string }
-  | { kind: 'caption'; id: typeof TAIL_ID; caption: Caption };
+  | { kind: 'caption'; id: typeof TAIL_ID; caption: Caption }
+  | { kind: 'fork'; id: typeof FORK_ID };
 
 /** `collapsed`: tool cards start closed (a compact chat), so only their header counts. */
 function estimate(item: Item | undefined, collapsed: boolean): number {
@@ -50,6 +52,8 @@ function estimate(item: Item | undefined, collapsed: boolean): number {
     case 'thinking':
     case 'caption':
       return 40;
+    case 'fork':
+      return 44;
     case 'user':
       return 56 + Math.min(10, Math.floor(item.text.length / 80)) * 20;
     default:
@@ -108,23 +112,36 @@ export interface MessageListProps {
   caption?: Caption | null;
   /** Session cwd, so tool paths show relative. */
   cwd?: string;
+  /** A fork: rows up to this time are its parent's, dimmed above a "Forked here" divider. */
+  forkedAt?: number | null;
 }
 
 /**
  * The virtualized transcript. It follows new messages while it is scrolled to the bottom, and
  * offers a "Jump to latest" pill once the reader scrolls away.
  */
-export function MessageList({ rows, tail, caption = null, cwd }: MessageListProps) {
+export function MessageList({
+  rows,
+  tail,
+  caption = null,
+  cwd,
+  forkedAt = null,
+}: MessageListProps) {
   const still = useMotionLevel() !== 'full';
   const compact = useCompactChat();
   const column = chatColumn(compact);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inherited = inheritedRows(rows, forkedAt);
+  const body: Item[] =
+    inherited > 0
+      ? [...rows.slice(0, inherited), { kind: 'fork', id: FORK_ID }, ...rows.slice(inherited)]
+      : [...rows];
   const items: Item[] =
     tail !== null
-      ? [...rows, { kind: 'tail', id: TAIL_ID, text: tail }]
+      ? [...body, { kind: 'tail', id: TAIL_ID, text: tail }]
       : caption !== null
-        ? [...rows, { kind: 'caption', id: TAIL_ID, caption }]
-        : [...rows];
+        ? [...body, { kind: 'caption', id: TAIL_ID, caption }]
+        : body;
   const [atEnd, setAtEnd] = useState(true);
   const atEndRef = useRef(true);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -256,15 +273,22 @@ export function MessageList({ rows, tail, caption = null, cwd }: MessageListProp
               const item = items[v.index];
               if (!item) return null;
               const prev = items[v.index - 1];
-              const turnStart = item.kind === 'user' && v.index > 0;
-              const enter = item.id !== TAIL_ID && entering(item.id);
+              const turnStart = item.kind === 'user' && v.index > 0 && prev?.kind !== 'fork';
+              const enter = item.id !== TAIL_ID && item.id !== FORK_ID && entering(item.id);
+              // The parent's messages, before the divider, read as context.
+              const parentRow = v.index < inherited;
               return (
                 <div
                   key={v.key}
                   ref={virtualizer.measureElement}
                   data-index={v.index}
                   data-row={item.kind}
-                  className={cx('absolute top-0 left-0 w-full', column.gutter)}
+                  data-inherited={parentRow ? '' : undefined}
+                  className={cx(
+                    'absolute top-0 left-0 w-full',
+                    column.gutter,
+                    parentRow && 'opacity-55',
+                  )}
                   style={{ transform: `translateY(${v.start}px)` }}
                 >
                   <div
@@ -338,6 +362,7 @@ export function MessageList({ rows, tail, caption = null, cwd }: MessageListProp
 
 /** The row with its secrets masked; the same object when it has none. */
 export function redactItem(item: Item): Item {
+  if (item.kind === 'fork') return item;
   if (item.kind === 'caption') {
     const text = redact(item.caption.text);
     return text === item.caption.text ? item : { ...item, caption: { ...item.caption, text } };
@@ -417,9 +442,24 @@ function RowBody({ item, cwd, expanded, onToggle, entering, previousTodos }: Row
       );
     case 'thinking':
       return <Thinking row={item} expanded={expanded} onToggle={onToggle} />;
+    case 'fork':
+      return <ForkDivider />;
     case 'tool':
       return <ToolCard row={item} cwd={cwd} entering={entering} previousTodos={previousTodos} />;
   }
+}
+
+function ForkDivider() {
+  return (
+    <div data-fork-divider className="flex items-center gap-3 py-2 text-meta text-text-2">
+      <span aria-hidden className="h-px flex-1 bg-line-strong" />
+      <span className="flex shrink-0 items-center gap-1.5">
+        <GitFork aria-hidden className="size-3.5" strokeWidth={1.75} />
+        Forked here
+      </span>
+      <span aria-hidden className="h-px flex-1 bg-line-strong" />
+    </div>
+  );
 }
 
 function UserBubble({

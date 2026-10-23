@@ -84,15 +84,24 @@ test.describe('composer', () => {
     const more = panel.getByRole('button', { name: 'More actions' });
     await expect(more).toBeVisible({ timeout: 150_000 });
     await more.click();
-    await page
-      .locator('[data-composer-menu]')
-      .getByRole('button', { name: /Resume here \(fork\)/ })
-      .click();
+    const menu = page.locator('[data-composer-menu]');
+    await expect(menu).toContainText('Running in a terminal; reply there from the chat');
+    const parentName = await panel.locator('header h2').textContent();
+    await menu.getByRole('button', { name: /Fork into the board/ }).click();
     await expect(page).toHaveURL(/#\/p\/[^/]+\/s\/[^/]+$/);
     await expect(page).not.toHaveURL(new RegExp(`/s/${parentId}$`));
     const fork = page.locator('[data-session-panel]');
     await expect(fork.locator('header [data-origin="board"]')).toBeVisible();
     await expect(fork.locator('form[data-composer]')).toBeVisible();
+    // Its own "Claude N", a link back to the parent, and the parent's messages above a divider.
+    const name = fork.locator('header h2');
+    await expect(name).toHaveText(/^Claude( \d+)?$/);
+    await expect(name).not.toHaveText(parentName ?? '');
+    await expect(fork.locator(`header [data-forked-from="${parentId}"]`)).toHaveText(
+      `Forked from ${parentName}`,
+    );
+    await expect(fork.locator('[data-fork-divider]')).toHaveCount(1);
+    await expect(fork.locator('[data-inherited]').first()).toBeAttached();
   });
 
   test('with replies turned off in Settings, a terminal session offers the fork bar', async ({
@@ -126,7 +135,7 @@ test.describe('composer', () => {
     await page.locator(`[data-focus] a[data-session="${sessionId}"]`).click();
     const panel = page.locator(`[data-session-panel="${sessionId}"]`);
     await expect(panel.locator('[data-fork-bar]')).toBeVisible();
-    await expect(panel.getByRole('button', { name: 'Resume here (fork)' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Fork into the board' })).toBeVisible();
     await expect(panel.locator('form[data-composer]')).toHaveCount(0);
   });
 });

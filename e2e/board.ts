@@ -60,15 +60,21 @@ export function startDemoBoard(): Promise<DemoBoard> {
 export async function startBoard({
   demo,
   stress = false,
+  built = false,
 }: {
   demo: boolean;
   stress?: boolean;
+  /** Run the build (`dist/`, as `pnpm board` does) instead of the sources through tsx. */
+  built?: boolean;
 }): Promise<DemoBoard> {
   const home = await mkdtemp(join(tmpdir(), 'c-board-e2e-'));
   const claudeDir = join(home, 'claude');
   const mode = stress ? ['--demo-stress'] : demo ? ['--demo'] : [];
-  const args = ['src/cli.ts', 'start', ...mode, '--no-open'];
-  const child = spawn(TSX, args, {
+  const [command, entry] = built
+    ? [process.execPath, ['--conditions=c-board-build', 'dist/cli.js']]
+    : [TSX, ['src/cli.ts']];
+  const args = [...entry, 'start', ...mode, '--no-open'];
+  const child = spawn(command, args, {
     cwd: SERVER_DIR,
     env: {
       ...process.env,

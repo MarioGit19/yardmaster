@@ -43,8 +43,10 @@ export function stressProjects(): DemoProject[] {
         ? { kind: 'claude', name: 'claude' }
         : { kind: 'shell', name: 'zsh 2' },
     ];
+    // Only the regular demo has an interrupted board session.
     return {
       ...base,
+      interrupted: undefined,
       name,
       path: `${DEMO_HOME}/${name}`,
       window: index % 4,

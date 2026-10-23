@@ -93,6 +93,7 @@ export function mascotStateFor(
     case 'compacting':
       return 'thinking';
     case 'ended':
+    case 'interrupted':
       return restingState(Number.NEGATIVE_INFINITY, terminals, now);
     case 'unknown':
       if (!status.alive) return restingState(Number.NEGATIVE_INFINITY, terminals, now);

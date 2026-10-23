@@ -207,7 +207,7 @@ export class TranscriptService {
       // The hook reported the real path after we guessed one from the cwd.
       this.enqueue(t, () => this.repoint(t, path));
     }
-    if (session.status.kind === 'ended' && !t.ended) {
+    if (isStopped(session) && !t.ended) {
       t.ended = true;
       this.enqueue(t, async () => {
         await this.readNew(t);
@@ -223,13 +223,17 @@ export class TranscriptService {
     t.path = path;
     const fed = this.fed.has(t.id);
     t.tail = path === null || fed ? null : new JsonlTail(path);
-    t.ended ||= session.status.kind === 'ended';
+    t.ended ||= isStopped(session);
 
     const sizeBefore = path === null ? 0 : await fileSize(path);
     const history = session.cwd ? await this.history(t.id, session.cwd) : null;
     if (history !== null && history.length > 0) {
       this.ingest(t, history);
       await t.tail?.seekToLineEnd(sizeBefore);
+    } else if (session.forkedFrom && session.cwd) {
+      // A new fork has no transcript of its own yet: it starts from its parent's conversation.
+      const parent = await this.history(session.forkedFrom.sessionId, session.cwd);
+      if (parent !== null) this.ingest(t, parent);
     }
     await this.readNew(t);
     if (!t.ended && !fed) this.startWatching(t);
@@ -385,6 +389,11 @@ export class TranscriptService {
     if (!session.cwd) return null;
     return join(this.configDir, 'projects', encodeProjectDir(session.cwd), `${session.id}.jsonl`);
   }
+}
+
+/** Nothing writes the transcript of an ended session, or of one interrupted by a restart. */
+function isStopped(session: ClaudeSession): boolean {
+  return session.status.kind === 'ended' || session.status.kind === 'interrupted';
 }
 
 /** Claude Code's folder name for a cwd under `~/.claude/projects`. */

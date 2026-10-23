@@ -1,11 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Options, Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { projectIdFromPath, ServerStatus, SessionHistoryResponse } from '@c-board/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
-import { buildServer, startServer } from './app.js';
+import { type BuildOptions, buildServer, startServer } from './app.js';
+import { MessageQueue } from './claude/runner.js';
 import type { ServerConfig } from './config.js';
 import { toSessionRecord } from './persistence.js';
 import { generateToken } from './token.js';
@@ -97,7 +99,7 @@ describe('server', () => {
     expect(app.store.state.sessions['sess-1']?.terminalId).toBe('t-1');
   });
 
-  it('GET /api/projects/:id/sessions lists past sessions with known token usage', async () => {
+  it('GET /api/projects/:id/sessions lists past sessions not on the board, with known token usage', async () => {
     const path = '/home/dev/acme-shop';
     const projectId = projectIdFromPath(path);
     const ids = [
@@ -150,8 +152,8 @@ describe('server', () => {
     });
     expect(res.statusCode).toBe(200);
     const { sessions } = SessionHistoryResponse.parse(res.json());
+    // The session on the board is listed there, not in History.
     expect(sessions.map((s) => [s.id, s.title, s.tokens?.input ?? null])).toEqual([
-      [ids[0], 'Live one', 10],
       [ids[1], 'Stored one', 20],
       [ids[2], 'Oldest', null],
     ]);
@@ -177,6 +179,94 @@ describe('server', () => {
     expect(sessions.every((s) => s.projectId === projectId)).toBe(true);
     const times = sessions.map((s) => s.updatedAt);
     expect(times).toEqual([...times].sort((a, b) => b - a));
+  });
+
+  it('lists a board session as interrupted after a restart, and resumes the same id', async () => {
+    tmpHome = await mkdtemp(join(tmpdir(), 'cboard-restart-'));
+    const path = '/home/dev/acme-shop';
+    const projectId = projectIdFromPath(path);
+    const sessionId = '0b6f6a52-3c1e-4d7a-9f0e-5a1b2c3d4e0f';
+    const calls: { options: Options; prompts: string[] }[] = [];
+    // A scripted SDK: each query reports a running turn until it is closed.
+    const query = ({
+      prompt,
+      options,
+    }: {
+      prompt: AsyncIterable<SDKUserMessage>;
+      options: Options;
+    }) => {
+      const call = { options, prompts: [] as string[] };
+      calls.push(call);
+      const outbox = new MessageQueue<unknown>();
+      void (async () => {
+        for await (const message of prompt) {
+          call.prompts.push(String(message.message.content));
+          outbox.push({ type: 'system', subtype: 'session_state_changed', state: 'running' });
+        }
+      })();
+      const generator = (async function* () {
+        yield* outbox;
+      })();
+      return Object.assign(generator, { close: () => outbox.end() }) as unknown as Query;
+    };
+    const boot = () =>
+      buildServer(config, {
+        token,
+        dbPath: join(tmpHome as string, 'board.db'),
+        processes: false,
+        git: false,
+        discovery: { listHistory: null, registryDir: '/nonexistent/c-board-test' },
+        transcripts: { loadHistory: async () => [], watchFile: () => async () => {} },
+        runner: { query, newId: () => sessionId },
+      } satisfies BuildOptions);
+
+    app = await boot();
+    app.store.upsertProject({
+      id: projectId,
+      path,
+      name: 'acme-shop',
+      accent: 0,
+      source: 'manual',
+      git: null,
+      createdAt: 1,
+      lastActivityAt: null,
+    });
+    const started = await app.sessionRunner.startSession({
+      projectId,
+      prompt: 'Fix the checkout',
+      model: 'opus',
+      permissionMode: 'acceptEdits',
+    });
+    expect(started).toEqual({ ok: true, sessionId });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(app.store.state.sessions[sessionId]?.status.kind).toBe('working');
+    await app.close();
+
+    app = await boot();
+    expect(app.store.state.sessions[sessionId]).toMatchObject({
+      origin: 'board',
+      projectId,
+      model: 'opus',
+      permissionMode: 'acceptEdits',
+      status: { kind: 'interrupted', turnRunning: true },
+    });
+    expect(app.sessionRunner.isLive(sessionId)).toBe(false);
+    // Nothing is re-sent on its own.
+    expect(calls).toHaveLength(1);
+
+    expect(await app.sessionRunner.resumeSession(sessionId)).toEqual({ ok: true, sessionId });
+    expect(calls[1]?.options).toMatchObject({ resume: sessionId, model: 'opus' });
+    expect(calls[1]?.options).not.toHaveProperty('forkSession');
+    expect(app.store.state.sessions[sessionId]?.status.kind).toBe('idle');
+    expect(await app.sessionRunner.send(sessionId, 'Go on')).toEqual({ ok: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(calls[1]?.prompts).toEqual(['Go on']);
+
+    // A session closed on purpose doesn't come back.
+    await app.sessionRunner.close(sessionId);
+    await app.close();
+    app = await boot();
+    expect(app.store.state.sessions[sessionId]).toBeUndefined();
   });
 
   it('returns 404 for unknown routes', async () => {

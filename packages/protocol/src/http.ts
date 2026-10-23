@@ -28,6 +28,10 @@ export const ServerStatus = z.object({
     hookSeen: z.boolean(),
     editorSeen: z.boolean(),
   }),
+  /** Started under a file watcher (`pnpm dev`): an edit restarts it and interrupts board sessions. */
+  watched: z.boolean().optional(),
+  /** Board sessions with a running query. */
+  boardSessions: z.number().int().nonnegative().optional(),
 });
 export type ServerStatus = z.infer<typeof ServerStatus>;
 

@@ -18,6 +18,8 @@ export const DISCOVERY_INTERVAL_MS = 10_000;
 /** How long a project's `listSessions` result is reused. */
 export const HISTORY_TTL_MS = 60_000;
 export const HISTORY_LIMIT = 20;
+/** The most sessions listed to fill `HISTORY_LIMIT` past ones around those already on the board. */
+export const HISTORY_LISTING_MAX = 200;
 /** Registry files are a few hundred bytes; anything far larger isn't one. */
 const MAX_REGISTRY_FILE = 64 * 1024;
 const TITLE_MAX = 120;
@@ -65,7 +67,10 @@ export class SessionDiscovery {
   private readonly now: () => number;
   private readonly resolvePath: PathResolver;
   private readonly discovered = new Map<string, Discovered>();
-  private readonly histories = new Map<string, { at: number; entries: SessionHistoryEntry[] }>();
+  private readonly histories = new Map<
+    string,
+    { at: number; limit: number; entries: SessionHistoryEntry[] }
+  >();
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> = Promise.resolve();
   private registryAvailable: boolean | null = null;
@@ -116,20 +121,43 @@ export class SessionDiscovery {
     return this.histories.get(projectId)?.entries ?? [];
   }
 
-  /** The cached list while it is fresh, else a new listing. */
-  async freshHistory(projectId: string): Promise<SessionHistoryEntry[]> {
+  /**
+   * Up to `HISTORY_LIMIT` past sessions of a project, leaving out `exclude` (the sessions on the
+   * board). The listing reaches past them, so a project whose newest sessions are all on the board
+   * still has a history. The cached listing is reused while it is fresh, long enough, and no
+   * session of the project ended since.
+   */
+  async freshHistory(
+    projectId: string,
+    exclude: ReadonlySet<string> = new Set(),
+  ): Promise<SessionHistoryEntry[]> {
+    const limit = Math.min(HISTORY_LIMIT + exclude.size, HISTORY_LISTING_MAX);
     const cached = this.histories.get(projectId);
-    if (cached && this.now() - cached.at < this.historyTtlMs) return cached.entries;
-    return this.loadHistory(projectId);
+    const fresh =
+      cached !== undefined &&
+      this.now() - cached.at < this.historyTtlMs &&
+      cached.limit >= limit &&
+      !this.endedSince(projectId, cached.at);
+    const entries = fresh ? cached.entries : await this.loadHistory(projectId, limit);
+    return entries.filter((e) => !exclude.has(e.id)).slice(0, HISTORY_LIMIT);
+  }
+
+  private endedSince(projectId: string, at: number): boolean {
+    for (const session of Object.values(this.store.state.sessions)) {
+      if (session.projectId === projectId && session.endedAt !== null && session.endedAt >= at) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Lists a project's recent sessions through the SDK now. */
-  async loadHistory(projectId: string): Promise<SessionHistoryEntry[]> {
+  async loadHistory(projectId: string, limit = HISTORY_LIMIT): Promise<SessionHistoryEntry[]> {
     const project = this.store.state.projects[projectId];
     if (!project || this.listHistory === null) return [];
     let raw: unknown[];
     try {
-      raw = await this.listHistory(project.path, HISTORY_LIMIT);
+      raw = await this.listHistory(project.path, limit);
     } catch (err) {
       this.log.debug({ err, projectId }, 'listSessions failed');
       return this.history(projectId);
@@ -144,7 +172,7 @@ export class SessionDiscovery {
       entries.push(toHistoryEntry(projectId, info.data));
     }
     entries.sort((a, b) => b.updatedAt - a.updatedAt);
-    this.histories.set(projectId, { at: this.now(), entries });
+    this.histories.set(projectId, { at: this.now(), limit, entries });
     return entries;
   }
 
@@ -284,7 +312,7 @@ export class SessionDiscovery {
     for (const project of Object.values(this.store.state.projects)) {
       const cached = this.histories.get(project.id);
       if (cached && ts - cached.at < this.historyTtlMs) continue;
-      await this.loadHistory(project.id);
+      await this.loadHistory(project.id, cached?.limit);
     }
   }
 }

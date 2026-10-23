@@ -49,6 +49,8 @@ export interface DemoProject {
   terminals: DemoTerminal[];
   testFiles: string[];
   scenarios: DemoScenario[];
+  /** A board session the last server stopped mid-turn: it starts `interrupted`, with Resume. */
+  interrupted?: { id: string; title: string };
 }
 
 export const DEMO_HOME = '/home/dev';
@@ -264,6 +266,10 @@ export const DEMO_PROJECTS: DemoProject[] = [
     path: `${DEMO_HOME}/docs-site`,
     branch: 'main',
     window: 2,
+    interrupted: {
+      id: 'd0c5517e-0000-4000-8000-00000000c0de',
+      title: 'Add a search shortcut to the docs header',
+    },
     terminals: [
       { kind: 'vite', name: 'docs dev', port: 5174 },
       { kind: 'vite', name: 'storybook', port: 6006, staysDown: true },

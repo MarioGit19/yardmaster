@@ -202,13 +202,21 @@ function checkServer(
         level: 'ok',
         message: `not running (port ${config.port} is free); start it with \`c-board start\``,
       };
-    case 'board':
-      return {
-        id: 'server',
-        label: 'Server',
-        level: 'ok',
-        message: `c-board ${probe.version} is running on ${where}${status?.demo ? ' (demo mode)' : ''}`,
-      };
+    case 'board': {
+      const message = `c-board ${probe.version} is running on ${where}${status?.demo ? ' (demo mode)' : ''}`;
+      const live = status?.boardSessions ?? 0;
+      // Under `pnpm dev` any edit restarts the server, and its board sessions with it.
+      if (status?.watched && live > 0) {
+        return {
+          id: 'server',
+          label: 'Server',
+          level: 'warn',
+          message: `${message} under a file watcher, with ${live} board session${live === 1 ? '' : 's'} running`,
+          hint: 'An edit restarts it and interrupts them. Run `pnpm board` for a board that stays up.',
+        };
+      }
+      return { id: 'server', label: 'Server', level: 'ok', message };
+    }
     case 'foreign':
       return {
         id: 'server',

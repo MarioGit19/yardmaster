@@ -116,6 +116,17 @@ export function streamingTail(
   return text;
 }
 
+/** How many leading rows came from a fork's parent. */
+export function inheritedRows(rows: readonly TranscriptRow[], forkedAt: number | null): number {
+  if (forkedAt === null) return 0;
+  let count = 0;
+  for (const row of rows) {
+    if (row.ts === null || row.ts > forkedAt) break;
+    count++;
+  }
+  return count;
+}
+
 const str = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() !== '' ? value : null;
 

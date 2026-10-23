@@ -31,6 +31,7 @@ export function orbStateFor(status: SessionStatus): OrbState {
     case 'unknown':
       return status.alive ? 'idle' : 'ended';
     case 'ended':
+    case 'interrupted':
       return 'ended';
   }
 }

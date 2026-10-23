@@ -28,6 +28,8 @@ export function sessionStatusView(status: SessionStatus): StatusView {
       return { tone: 'idle', label: status.alive ? 'Running' : 'Unknown' };
     case 'ended':
       return { tone: 'idle', label: 'Ended' };
+    case 'interrupted':
+      return { tone: 'idle', label: 'Interrupted' };
   }
 }
 

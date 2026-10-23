@@ -46,7 +46,7 @@ export function isTurnRunning(status: ClaudeSession['status']): boolean {
 
 /** The original of a terminal session may still be writing its transcript. */
 export function isSessionLive(status: ClaudeSession['status']): boolean {
-  if (status.kind === 'ended') return false;
+  if (status.kind === 'ended' || status.kind === 'interrupted') return false;
   if (status.kind === 'unknown') return status.alive;
   return true;
 }

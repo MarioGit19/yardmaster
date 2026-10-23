@@ -152,6 +152,24 @@ describe('runDoctor', () => {
       expect(byId(checks, 'server').message).toContain('(demo mode)');
     });
 
+    it('warns when board sessions run on a server that restarts on edits', async () => {
+      const watched = await runDoctor(
+        config,
+        fakeDeps({ portFree: false, http: runningBoard({ watched: true, boardSessions: 2 }) }),
+        NOW,
+      );
+      expect(byId(watched, 'server')).toMatchObject({ level: 'warn' });
+      expect(byId(watched, 'server').message).toContain('2 board sessions running');
+      expect(byId(watched, 'server').hint).toContain('pnpm board');
+
+      const idle = await runDoctor(
+        config,
+        fakeDeps({ portFree: false, http: runningBoard({ watched: true, boardSessions: 0 }) }),
+        NOW,
+      );
+      expect(byId(idle, 'server').level).toBe('ok');
+    });
+
     it('fails when another program holds the port', async () => {
       const checks = await runDoctor(
         config,

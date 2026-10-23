@@ -203,6 +203,8 @@ const WaitingPermissionStatus = z.object({
 const WaitingInputStatus = z.object({ kind: z.literal('waiting_input') });
 const ErrorStatus = z.object({ kind: z.literal('error'), message: z.string().nullable() });
 const EndedStatus = z.object({ kind: z.literal('ended') });
+/** A board session whose query stopped with the server; `turnRunning`: mid-turn when it did. */
+const InterruptedStatus = z.object({ kind: z.literal('interrupted'), turnRunning: z.boolean() });
 /** No hook seen yet for a live process: "unknown, alive". */
 const UnknownStatus = z.object({ kind: z.literal('unknown'), alive: z.boolean() });
 
@@ -231,6 +233,7 @@ export const SessionStatus = z.discriminatedUnion('kind', [
   ErrorStatus,
   UnknownStatus,
   EndedStatus,
+  InterruptedStatus,
   CompactingStatus,
 ]);
 export type SessionStatus = z.infer<typeof SessionStatus>;
@@ -286,6 +289,8 @@ export const ClaudeSession = z.object({
   customTitle: z.string().max(512).nullable().optional(),
   /** "Claude 2": the session's number among its project's unnamed live sessions, kept for life. */
   ordinal: z.number().int().positive().nullable().optional(),
+  /** A fork: the session it branched off, and when; earlier messages are the parent's. */
+  forkedFrom: z.object({ sessionId: SessionId, at: Timestamp }).nullable().optional(),
   model: z.string().nullable(),
   permissionMode: PermissionMode.nullable(),
   tokens: TokenUsage,
