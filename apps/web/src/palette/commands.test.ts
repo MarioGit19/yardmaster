@@ -17,6 +17,7 @@ const context = (over: Partial<PaletteContext> = {}): PaletteContext => ({
   nextMotion: 'full',
   theme: 'dark',
   nextTheme: 'light',
+  layout: 'minimal',
   railToggle: true,
   ...over,
 });
@@ -195,6 +196,18 @@ describe('buildCommands', () => {
     expect(byId(commands, 'theme')?.run).toEqual({ kind: 'theme', next: 'light' });
     expect(byId(commands, 'rail')?.shortcut).toEqual(['[']);
     expect(byId(buildCommands(board(), context({ railToggle: false })), 'rail')).toBeUndefined();
+  });
+
+  it('offers every layout with its shortcut, the current one only when searched', () => {
+    const commands = buildCommands(board(), context({ layout: 'office' }));
+    expect(byId(commands, 'layout:grid')).toMatchObject({
+      label: 'Layout: Grid',
+      shortcut: ['⌥', '3'],
+      run: { kind: 'layout', next: 'grid' },
+    });
+    expect(byId(commands, 'layout:office')).toMatchObject({ hint: 'Current', searchOnly: true });
+    const found = searchCommands(commands, 'layout retro').flatMap((s) => s.results);
+    expect(found[0]?.command.id).toBe('layout:retro');
   });
 
   it('skips interactive and empty commands when re-running', () => {

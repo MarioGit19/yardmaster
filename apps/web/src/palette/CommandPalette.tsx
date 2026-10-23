@@ -8,6 +8,7 @@ import {
   CircleStop,
   CornerDownLeft,
   ExternalLink,
+  LayoutDashboard,
   LayoutGrid,
   type LucideIcon,
   MessageSquarePlus,
@@ -26,6 +27,7 @@ import { useLocation } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
 import { useBoard, useBoardClient } from '../data/index.js';
 import { useFocusRoute } from '../focus/FocusStage.js';
+import { layoutPreference } from '../layouts/registry.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
@@ -59,6 +61,7 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   editor: ExternalLink,
   motion: Sparkles,
   theme: SunMoon,
+  layout: LayoutDashboard,
   settings: Settings,
   attention: BellDot,
   rail: PanelLeft,
@@ -168,6 +171,7 @@ function PaletteBody({
   const focus = useFocusRoute();
   const motion = usePreference(motionPreference);
   const theme = usePreference(themePreference);
+  const layout = usePreference(layoutPreference);
   const narrow = useMediaQuery(NARROW_QUERY);
   const [page, setPage] = useState<Page>({ kind: 'root' });
   const [query, setQuery] = useState('');
@@ -182,9 +186,10 @@ function PaletteBody({
         nextMotion: nextMotion(motion),
         theme,
         nextTheme: NEXT_THEME[theme],
+        layout,
         railToggle: !narrow,
       }),
-    [board, focus?.projectId, motion, theme, narrow],
+    [board, focus?.projectId, motion, theme, layout, narrow],
   );
   const sections = useMemo(
     () => (page.kind === 'root' ? searchCommands(commands, query) : []),
@@ -242,6 +247,10 @@ function PaletteBody({
         return;
       case 'theme':
         themePreference.set(action.next);
+        close();
+        return;
+      case 'layout':
+        layoutPreference.set(action.next);
         close();
         return;
       case 'attention':

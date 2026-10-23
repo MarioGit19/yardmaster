@@ -44,7 +44,7 @@ import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
-import { useTerminalTarget } from '../terminal/target.js';
+import { terminalTarget, useTerminalTarget } from '../terminal/target.js';
 import { buttonClass } from '../ui/Button.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
@@ -71,12 +71,14 @@ const IDLE_CLOCK_MS = 15_000;
 export interface FocusViewProps {
   projectId: string;
   sessionId?: string;
+  /** Opens the terminal stack on this terminal (`/p/:projectId/t/:terminalId`). */
+  terminalId?: string;
   /** Morph out of (and back into) the project's pod. Off for a direct load of the route. */
   shared: boolean;
 }
 
 /** The project focus view, DESIGN.md §4.6, as a card over the dimmed overview. */
-export function FocusView({ projectId, sessionId, shared }: FocusViewProps) {
+export function FocusView({ projectId, sessionId, terminalId, shared }: FocusViewProps) {
   const hydrated = useBoard(selectHydrated);
   const project = useBoard(selectProject(projectId));
 
@@ -96,7 +98,9 @@ export function FocusView({ projectId, sessionId, shared }: FocusViewProps) {
       </div>
     );
   }
-  return <ProjectFocus project={project} sessionId={sessionId} shared={shared} />;
+  return (
+    <ProjectFocus project={project} sessionId={sessionId} terminalId={terminalId} shared={shared} />
+  );
 }
 
 /** The body fades out first on the way back; its columns settle in on their own. */
@@ -125,12 +129,18 @@ export function columnSettle(still: boolean, delay: number): HTMLMotionProps<'di
 function ProjectFocus({
   project,
   sessionId,
+  terminalId,
   shared,
 }: {
   project: Project;
   sessionId?: string;
+  terminalId?: string;
   shared: boolean;
 }) {
+  // A terminal deep link asks the stack for that tab, like a terminal picked in ⌘K.
+  useEffect(() => {
+    if (terminalId) terminalTarget.set({ projectId: project.id, terminalId });
+  }, [project.id, terminalId]);
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const selected = useBoard(selectSession(sessionId ?? ''));

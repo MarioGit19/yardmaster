@@ -141,7 +141,7 @@ test.describe('terminal lanes', () => {
         await page.waitForTimeout(4000);
         await page.screenshot({ path: new URL(`lanes-${theme}.png`, OUT_DIR).pathname });
         const lane = page.locator('[data-lane][data-streaming]').first();
-        await lane.locator('[aria-expanded]').hover();
+        await lane.locator('[aria-expanded]:not([data-inspect])').hover();
         await expect(page.locator('[data-peek]')).toBeVisible();
         await page.waitForTimeout(600);
         const pod = page.locator('[data-pod]:has([data-open])');
@@ -691,7 +691,7 @@ test.describe('worst case', () => {
           });
 
           const lane = page.locator('[data-lane]').first();
-          await lane.locator('[aria-expanded]').focus();
+          await lane.locator('[aria-expanded]:not([data-inspect])').focus();
           await page.keyboard.press('Enter');
           await expect(page.locator('[data-peek]')).toBeVisible();
           await page.waitForTimeout(400);
@@ -1099,5 +1099,69 @@ test.describe('background work', () => {
         });
       });
     }
+  }
+});
+
+// 11.1: the Actor inspector on Minimal (popover, and the bottom sheet on a phone), and a
+// placeholder layout listing the scene.
+test.describe('layouts', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+
+      test('inspector', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await openRoute(page, '/');
+        await page
+          .locator('[data-lane][data-terminal-name="next dev"] [data-inspect]')
+          .first()
+          .click();
+        await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
+        await page.waitForTimeout(600);
+        await page.screenshot({
+          path: new URL(`inspector-terminal-${theme}.png`, OUT_DIR).pathname,
+        });
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-actor-inspector]')).toHaveCount(0);
+        await page.locator('[data-session] [data-inspect]').first().click();
+        await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
+        await page.waitForTimeout(600);
+        await page.screenshot({
+          path: new URL(`inspector-session-${theme}.png`, OUT_DIR).pathname,
+        });
+      });
+
+      test('inspector sheet', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await openRoute(page, '/');
+        await page
+          .locator('[data-lane][data-terminal-name="next dev"] [data-inspect]')
+          .first()
+          .click();
+        await expect(page.locator('[data-actor-inspector][data-sheet]')).toBeVisible();
+        await page.waitForTimeout(800);
+        await page.screenshot({
+          path: new URL(`inspector-sheet-390-${theme}.png`, OUT_DIR).pathname,
+        });
+      });
+
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test(`placeholder ${viewport.width}`, async ({ page }) => {
+          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-layout-placeholder="office"]')).toBeVisible();
+          await page.waitForTimeout(800);
+          await page.screenshot({
+            path: new URL(`layout-office-placeholder-${viewport.width}-${theme}.png`, OUT_DIR)
+              .pathname,
+            fullPage: true,
+          });
+        });
+      }
+    });
   }
 });

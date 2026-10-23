@@ -12,13 +12,17 @@ import { FocusView } from './FocusView.js';
 export interface FocusRoute {
   projectId: string;
   sessionId?: string;
+  /** A terminal deep link: the stack opens with this terminal's tab active. */
+  terminalId?: string;
 }
 
-/** The project (and session) of a focus route, or null elsewhere. */
+/** The project (and session or terminal) of a focus route, or null elsewhere. */
 export function useFocusRoute(): FocusRoute | null {
   const [inSession, session] = useRoute(routes.session);
+  const [inTerminal, terminal] = useRoute(routes.terminal);
   const [inProject, project] = useRoute(routes.project);
   if (inSession) return { projectId: session.projectId, sessionId: session.sessionId };
+  if (inTerminal) return { projectId: terminal.projectId, terminalId: terminal.terminalId };
   if (inProject) return { projectId: project.projectId };
   return null;
 }
@@ -101,7 +105,12 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
             key={focus.projectId}
             className="focus-layer absolute inset-0 z-10 flex flex-col p-4 md:p-6"
           >
-            <FocusView projectId={focus.projectId} sessionId={focus.sessionId} shared={shared} />
+            <FocusView
+              projectId={focus.projectId}
+              sessionId={focus.sessionId}
+              terminalId={focus.terminalId}
+              shared={shared}
+            />
           </div>
         )}
       </AnimatePresence>

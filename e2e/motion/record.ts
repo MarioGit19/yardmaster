@@ -159,7 +159,7 @@ const SCENARIOS = {
       'transition',
       'hover a lane: the peek opens, then closes',
       async () => {
-        await lane.locator('[aria-expanded]').first().hover();
+        await lane.locator('[aria-expanded]:not([data-inspect])').first().hover();
         await page.locator('[data-peek]').waitFor({ timeout: 5000 });
         await page.waitForTimeout(900);
         await page.mouse.move(4, 4);
@@ -174,6 +174,33 @@ const SCENARIOS = {
       await page.locator('[data-pod]').first().waitFor();
       await page.waitForTimeout(600);
     });
+  },
+
+  /** 11.1: switching layouts cross-fades the overview; the Actor inspector opens and closes. */
+  async layouts(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(2200);
+    await r.moment('switch', 'transition', '⌥2 Minimal → Office, then ⌥1 back', async () => {
+      await page.keyboard.press('Alt+Digit2');
+      await page.locator('[data-layout-placeholder="office"]').waitFor();
+      await page.waitForTimeout(900);
+      await page.keyboard.press('Alt+Digit1');
+      await page.locator('[data-layout="minimal"] [data-pod]').first().waitFor();
+      await page.waitForTimeout(900);
+    });
+    await r.moment(
+      'inspector',
+      'transition',
+      'a session crew opens the inspector; Esc closes it',
+      async () => {
+        await page.locator('[data-session] [data-inspect]').first().click();
+        await page.locator('[data-actor-inspector] [data-actor]').waitFor();
+        await page.waitForTimeout(700);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+      },
+    );
   },
 
   /** A fresh board's first attention change reorders the pods within seconds. */
@@ -602,6 +629,27 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
       await page.waitForTimeout(900);
     });
+    await r.moment(
+      'inspector-sheet',
+      'transition',
+      'tap a crew: the sheet rises; pull it down',
+      async () => {
+        await page.locator('[data-session] [data-inspect]').first().tap();
+        const sheet = page.locator('[data-actor-inspector][data-sheet]');
+        await sheet.waitFor();
+        await page.waitForTimeout(800);
+        const box = await sheet.boundingBox();
+        if (box) {
+          const x = box.x + box.width / 2;
+          await page.mouse.move(x, box.y + 12);
+          await page.mouse.down();
+          await page.mouse.move(x, box.y + 220, { steps: 10 });
+          await page.mouse.up();
+        }
+        await sheet.waitFor({ state: 'detached' });
+        await page.waitForTimeout(500);
+      },
+    );
   },
 } satisfies Record<string, (r: Recorder) => Promise<void>>;
 

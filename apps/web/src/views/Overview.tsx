@@ -1,7 +1,8 @@
 import { selectHydrated, selectProjectCount, useBoard } from '../data/index.js';
+import { LayoutStage } from '../layouts/LayoutStage.js';
 import { OnboardingWizard } from '../onboarding/OnboardingWizard.js';
 import { useOnboarding } from '../onboarding/useOnboarding.js';
-import { PodGrid, PodGridSkeleton } from '../pod/PodGrid.js';
+import { PodGridSkeleton } from '../pod/PodGrid.js';
 import { EmptyState, Page, PageHeader } from './Page.js';
 
 export function Overview() {
@@ -30,7 +31,7 @@ export function Overview() {
           Open a folder in your editor or start Claude Code in a project, and it shows up here.
         </EmptyState>
       ) : (
-        <PodGrid />
+        <LayoutStage />
       )}
     </Page>
   );

@@ -9,6 +9,7 @@ import {
 import { isWaiting } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';
+import { LAYOUT_NAME, LAYOUTS, type LayoutId } from '../layouts/registry.js';
 import type { MotionSetting } from '../motion.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
@@ -28,6 +29,7 @@ export type PaletteRun =
   | { kind: 'newTerminal'; projectId: string }
   | { kind: 'motion'; next: MotionSetting }
   | { kind: 'theme'; next: ThemeSetting }
+  | { kind: 'layout'; next: LayoutId }
   | { kind: 'attention' }
   | { kind: 'rail' }
   | { kind: 'pulse' };
@@ -43,6 +45,7 @@ export type PaletteIcon =
   | 'editor'
   | 'motion'
   | 'theme'
+  | 'layout'
   | 'settings'
   | 'attention'
   | 'rail'
@@ -76,6 +79,7 @@ export interface PaletteContext {
   nextMotion: MotionSetting;
   theme: ThemeSetting;
   nextTheme: ThemeSetting;
+  layout: LayoutId;
   /** The rail can be toggled (it is pinned to icons on narrow screens). */
   railToggle: boolean;
 }
@@ -96,7 +100,7 @@ const isBusy = (session: ClaudeSession) =>
   session.status.kind === 'compacting';
 
 /** The editor app showing the project, for "Open in …". Never a logo, just its name. */
-function editorName(board: BoardState, projectId: string): string {
+export function editorName(board: Pick<BoardState, 'windows'>, projectId: string): string {
   const window = Object.values(board.windows).find((w) => w.projectIds.includes(projectId));
   return window?.appName || 'Cursor';
 }
@@ -379,6 +383,20 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       run: { kind: 'navigate', href: routes.welcome },
     },
   );
+  LAYOUTS.forEach((layout, i) => {
+    const current = layout === context.layout;
+    commands.push({
+      id: `layout:${layout}`,
+      group: 'Actions',
+      label: `Layout: ${LAYOUT_NAME[layout]}`,
+      ...(current ? { hint: 'Current' } : {}),
+      icon: 'layout',
+      shortcut: ['⌥', String(i + 1)],
+      // The current one is only listed when searched for.
+      searchOnly: current,
+      run: { kind: 'layout', next: layout },
+    });
+  });
   commands.push({
     id: 'pulse',
     group: 'Actions',

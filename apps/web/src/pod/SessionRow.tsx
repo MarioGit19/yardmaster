@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import { type ClaudeSession, sessionDisplayName } from '@c-board/protocol';
 import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { useInView } from '../anim/useFrame.js';
@@ -7,6 +7,8 @@ import { selectApproval, useBoard } from '../data/index.js';
 import { DraftMarker } from '../drafts/DraftMarker.js';
 import { draftKey } from '../drafts/drafts.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
+import { ActorInspector } from '../layouts/ActorInspector.js';
+import { actorId } from '../layouts/scene.js';
 import { spring } from '../motion.js';
 import { ToolChip } from '../orb/ToolChip.js';
 import { formatCount, totalTokens } from '../status.js';
@@ -58,15 +60,27 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
         transition={spring.smooth}
         className="flex w-7 shrink-0 justify-center"
       >
-        <span className="pod-dim flex">
-          <SessionCrew
-            session={session}
-            accent={accent}
-            crew={crew}
-            now={now}
-            countdown={countdown}
-          />
-        </span>
+        <ActorInspector
+          projectId={session.projectId ?? ''}
+          actorId={actorId.session(session.id)}
+          label={`${sessionDisplayName(session)}, details`}
+          trigger={
+            <button
+              type="button"
+              aria-label={`Details for ${sessionDisplayName(session)}: ${caption.text}`}
+              data-inspect={actorId.session(session.id)}
+              className="pod-dim relative flex rounded-full after:absolute after:-inset-2.5"
+            >
+              <SessionCrew
+                session={session}
+                accent={accent}
+                crew={crew}
+                now={now}
+                countdown={countdown}
+              />
+            </button>
+          }
+        />
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">

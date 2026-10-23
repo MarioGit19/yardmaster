@@ -8,13 +8,14 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | Scenario   | Moments                                                                      |
 | ---------- | ---------------------------------------------------------------------------- |
 | `overview` | `entrance`, `activity` (8 s), `pod-hover`, `lane-peek`, `route` (overview ↔ settings) |
+| `layouts`  | `switch` (⌥2 Minimal → Office → ⌥1 cross-fade), `inspector` (a crew opens the Actor inspector, Esc closes it) |
 | `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
 | `fx`       | `text` (decrypt, glitch, split-flap), `darkveil`, `softaurora`, `faultyterminal` (energy 0.1 → 1), `ripplegrid`, `lighttunnel` (dive and surge), `phone` (swipe and hold), cropped to the `/#/_tokens` fx sections |
-| `phone`    | `entrance`, `scroll`, `focus-open` (tap), `focus-close` (back)               |
+| `phone`    | `entrance`, `scroll`, `focus-open` (tap), `focus-close` (back), `inspector-sheet` (tap a crew, pull the sheet down) |
 | `all`      | every scenario above, each on a fresh demo board                             |
 
 `--reduced` records at motion Reduced instead and names everything `<scenario>-reduced-*`, so

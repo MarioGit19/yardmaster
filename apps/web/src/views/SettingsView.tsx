@@ -5,6 +5,7 @@ import { Link } from 'wouter';
 import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../ambient/style.js';
 import { notificationsPreference } from '../attention/attention.js';
 import { selectWindows, useBoardList } from '../data/index.js';
+import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { hooksInstalled } from '../onboarding/model.js';
 import { usePreference } from '../prefs.js';
@@ -41,6 +42,7 @@ const ON_OFF_LABEL = { off: 'Off', on: 'On' } as const;
 export function SettingsView() {
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
+  const layout = usePreference(layoutPreference);
   const ambient = usePreference(ambientStylePreference);
   const redact = usePreference(redactPreference);
   const status = useServerStatus(null);
@@ -51,6 +53,19 @@ export function SettingsView() {
       <PageHeader title="Settings" />
       <div className="flex flex-col gap-8">
         <SettingsSection title="Appearance">
+          <SettingRow
+            title="Layout"
+            data="layout"
+            description="How the overview draws your projects. Same data and actions in each. ⌥1 to ⌥5 switch from anywhere."
+          >
+            <Segmented
+              label="Layout"
+              options={LAYOUTS}
+              labels={LAYOUT_NAME}
+              value={layout}
+              onChange={layoutPreference.set}
+            />
+          </SettingRow>
           <SettingRow title="Theme" description="Dark, light, or follow your OS.">
             <Segmented
               label="Theme"

@@ -7,6 +7,7 @@ import { AttentionAlerts } from './attention/AttentionAlerts.js';
 import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
+import { useLayoutShortcuts } from './layouts/LayoutStage.js';
 import { MotionRoot } from './MotionRoot.js';
 import { dur, ease } from './motion.js';
 import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
@@ -119,6 +120,7 @@ function WelcomeView() {
 
 export function App({ locationHook = useHashLocation }: { locationHook?: BaseLocationHook }) {
   useTheme();
+  useLayoutShortcuts();
   return (
     <MotionRoot>
       <AmbientField />

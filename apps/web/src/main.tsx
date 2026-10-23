@@ -3,11 +3,14 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { BoardProvider, createBoard } from './data/index.js';
+import { layoutPreference, preloadLayout } from './layouts/registry.js';
 import { applyInitialMotion } from './motion.js';
 import { applyInitialTheme } from './theme/theme.js';
 
 applyInitialTheme();
 applyInitialMotion();
+// The overview's layout chunk loads while the board connects.
+void preloadLayout(layoutPreference.get());
 
 const board = createBoard();
 board.start();

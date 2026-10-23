@@ -18,6 +18,8 @@ import {
   useBoardList,
   useBoardShallow,
 } from '../data/index.js';
+import { ActorInspector } from '../layouts/ActorInspector.js';
+import { actorId } from '../layouts/scene.js';
 import { dur, ease, loop, move, slide, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
@@ -92,7 +94,9 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const [pinned, setPinned] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // A TUI's raw bytes make no sense as six lines: Claude lanes have no peek.
-  const open = !claude && (pinned || hovered || focused);
+  // The inspector shows the same lines: no peek under it.
+  const [inspecting, setInspecting] = useState(false);
+  const open = !claude && !inspecting && (pinned || hovered || focused);
   const peekId = useId();
 
   useEffect(
@@ -130,7 +134,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
       onPointerEnter={(e) => e.pointerType === 'mouse' && hover(true)}
       onPointerLeave={() => hover(false)}
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && open) {
+        // Keys from the inspector's portal bubble here too; they aren't the peek's to take.
+        if (e.key === 'Escape' && open && e.currentTarget.contains(e.target as Node)) {
           // Closing the peek is all Escape does here (the focus view would close otherwise).
           e.preventDefault();
           setPinned(false);
@@ -201,33 +206,51 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
           </>
         )}
 
-        <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-meta tabular text-text-2">
-          <AnimatePresence initial={false} mode="popLayout">
-            {view.exit ? (
-              <motion.span
-                key={view.exit.key}
-                className="inline-flex items-center gap-1.5"
-                exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
-              >
-                {crashed && (
-                  <span aria-hidden className="lane-crash-dot size-1.5 rounded-full bg-st-err" />
+        <ActorInspector
+          projectId={terminal.projectId ?? ''}
+          actorId={claude ? actorId.session(claude.session.id) : actorId.terminal(terminal.id)}
+          label={`${name}, details`}
+          onOpenChange={setInspecting}
+          trigger={
+            <button
+              type="button"
+              aria-label={`Details for ${name}`}
+              data-inspect={
+                claude ? actorId.session(claude.session.id) : actorId.terminal(terminal.id)
+              }
+              className="relative flex min-w-0 items-center justify-end gap-1.5 rounded-chip font-mono text-meta tabular text-text-2 after:absolute after:-inset-y-2 after:-inset-x-1 hover:text-text-1"
+            >
+              <AnimatePresence initial={false} mode="popLayout">
+                {view.exit ? (
+                  <motion.span
+                    key={view.exit.key}
+                    className="inline-flex items-center gap-1.5"
+                    exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+                  >
+                    {crashed && (
+                      <span
+                        aria-hidden
+                        className="lane-crash-dot size-1.5 rounded-full bg-st-err"
+                      />
+                    )}
+                    <ExitBadge code={view.exit.code} />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="state"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <LaneDot running={view.running} level={streaming ? level : 0} />
+                    {uptime && <span title={`Running for ${uptime}`}>{uptime}</span>}
+                  </motion.span>
                 )}
-                <ExitBadge code={view.exit.code} />
-              </motion.span>
-            ) : (
-              <motion.span
-                key="state"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
-                className="inline-flex items-center gap-1.5"
-              >
-                <LaneDot running={view.running} level={streaming ? level : 0} />
-                {uptime && <span title={`Running for ${uptime}`}>{uptime}</span>}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </span>
+              </AnimatePresence>
+            </button>
+          }
+        />
       </div>
 
       <AnimatePresence>

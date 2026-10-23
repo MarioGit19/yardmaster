@@ -7,6 +7,8 @@ import { Router } from 'wouter';
 import { memoryLocation } from 'wouter/memory-location';
 import { AppRoutes } from './App.js';
 import { BoardClient, BoardProvider, type BoardStore, createBoardStore } from './data/index.js';
+import { layoutPreference, preloadLayout } from './layouts/registry.js';
+import { terminalTarget } from './terminal/target.js';
 import { sampleBoard } from './test/board.js';
 import { TooltipProvider } from './ui/Tooltip.js';
 
@@ -49,7 +51,9 @@ vi.mock('./history/api.js', () => ({
 let container: HTMLDivElement;
 let root: Root;
 
-beforeAll(() => {
+beforeAll(async () => {
+  // The overview's layout is a lazy chunk; loaded up front it renders without suspending.
+  await Promise.all([preloadLayout('minimal'), preloadLayout('office')]);
   // happy-dom's WAAPI rejects Motion's cancelled animations; the pod grid only needs to mount.
   MotionGlobalConfig.skipAnimations = true;
 });
@@ -106,6 +110,30 @@ describe('routes', () => {
     const cards = container.querySelectorAll('main a[href="/p/p-acme"], main a[href="/p/p-zen"]');
     expect(cards).toHaveLength(2);
     expect(container.querySelector('main')?.textContent).toContain('Waiting for approval');
+  });
+
+  it('draws the overview in the chosen layout, with Minimal as the default', () => {
+    render('/');
+    expect(
+      container.querySelector('main [data-layout="minimal"] [data-pod="p-acme"]'),
+    ).not.toBeNull();
+    act(() => layoutPreference.set('office'));
+    try {
+      const office = container.querySelector('main [data-layout="office"]');
+      expect(office?.querySelector('[data-layout-placeholder="office"]')).not.toBeNull();
+      // The placeholder lists the scene: every actor is a button with its full name.
+      const actor = office?.querySelector('[data-scene-actor="s:s-1"]');
+      expect(actor?.getAttribute('aria-label')).toBe('acme-shop, Claude, waiting for approval');
+    } finally {
+      act(() => layoutPreference.set('minimal'));
+    }
+  });
+
+  it('opens a terminal deep link in its project, asking the stack for that tab', () => {
+    render('/p/p-acme/t/t-9');
+    expect(heading()).toBe('acme-shop');
+    expect(terminalTarget.get()).toEqual({ projectId: 'p-acme', terminalId: 't-9' });
+    act(() => terminalTarget.set(null));
   });
 
   it('shows skeletons until the first snapshot', () => {
@@ -191,9 +219,9 @@ describe('routes', () => {
   it('renders settings and unknown routes', () => {
     render('/settings');
     expect(heading()).toBe('Settings');
-    // Theme (3), motion (4), ambient (4), notifications (2), redact (2), away mode (2),
-    // retention (4) and terminal reply (2).
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(23);
+    // Layout (5), theme (3), motion (4), ambient (4), notifications (2), redact (2), away mode
+    // (2), retention (4) and terminal reply (2).
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(28);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');
