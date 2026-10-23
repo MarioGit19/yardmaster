@@ -19,7 +19,16 @@ export const dur = { fast: 0.12, base: 0.22, slow: 0.42 } as const;
  * the attention ripple, the turn-finished sweep, a quiet pod stepping back, an event's spark along
  * the pod's hairline (it shares the ripple's length) and the ambient field's energy cross-fade.
  */
-export const moment = { ripple: 0.9, sweep: 0.6, dim: 0.8, spark: 0.9, ambient: 1.2 } as const;
+export const moment = {
+  ripple: 0.9,
+  sweep: 0.6,
+  dim: 0.8,
+  spark: 0.9,
+  ambient: 1.2,
+  /** The Grid's dive down a pipeline into a node (and back out), and the cockpit's phase-in. */
+  dive: 0.9,
+  phase: 0.4,
+} as const;
 
 /**
  * Seconds. Loop periods (one cycle at rate 1), mirrored as `--dur-<name>`: the skeleton, progress

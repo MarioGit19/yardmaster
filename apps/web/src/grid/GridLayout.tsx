@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import {
   lazy,
+  type RefObject,
   Suspense,
   useCallback,
   useContext,
@@ -62,6 +63,8 @@ export default function GridLayout() {
   const narrow = width > 0 && width < TRUNK_BELOW;
   const deep = !narrow && level === 'full' && !webglLost;
   const entered = nodeId ? scene.projects.find((p) => p.id === nodeId) : undefined;
+  // The 3D view dives into the node and shows its cockpit on its own stage.
+  const flatCockpit = entered && !deep ? entered : undefined;
 
   // A node whose project left the board closes its cockpit.
   useEffect(() => {
@@ -108,16 +111,18 @@ export default function GridLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [nodeId, leave]);
 
-  // Entering moves focus into the cockpit (its region, so Back's tooltip doesn't pop up).
+  // Entering moves focus into the cockpit (its region, so Back's tooltip doesn't pop up); in 3D
+  // the cockpit arrives at the end of the dive.
+  const cockpitShown = useCockpitShown(ref, nodeId);
   useEffect(() => {
-    if (!nodeId) return;
+    if (!cockpitShown) return;
     const frame = requestAnimationFrame(() =>
       ref.current
         ?.querySelector<HTMLElement>('[data-grid-cockpit]')
         ?.focus({ preventScroll: true }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [nodeId]);
+  }, [cockpitShown]);
 
   return (
     <>
@@ -131,15 +136,15 @@ export default function GridLayout() {
         className="grid-world relative w-full"
       >
         <AnimatePresence initial={false} mode="popLayout">
-          {entered ? (
+          {flatCockpit ? (
             <motion.div
-              key={`cockpit:${entered.id}`}
+              key={`cockpit:${flatCockpit.id}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={fade}
             >
-              <FlatCockpit project={entered} now={now} narrow={narrow} onBack={leave} />
+              <FlatCockpit project={flatCockpit} now={now} narrow={narrow} onBack={leave} />
             </motion.div>
           ) : (
             width > 0 && (
@@ -158,7 +163,14 @@ export default function GridLayout() {
                   <GridTrunk projects={scene.projects} onEnter={enter} />
                 ) : deep ? (
                   <Suspense fallback={null}>
-                    <Grid3D projects={scene.projects} onEnter={enter} onLost={onWebglLost} />
+                    <Grid3D
+                      projects={scene.projects}
+                      entered={entered}
+                      now={now}
+                      onEnter={enter}
+                      onBack={leave}
+                      onLost={onWebglLost}
+                    />
                   </Suspense>
                 ) : (
                   <GridMap projects={scene.projects} width={width} onEnter={enter} />
@@ -170,6 +182,28 @@ export default function GridLayout() {
       </div>
     </>
   );
+}
+
+/**
+ * The cockpit that's on screen, by project id: at once for the flat cockpit, at the end of the
+ * dive for the 3D one (watched in the DOM, so the layout needn't know the dive's steps).
+ */
+function useCockpitShown(ref: RefObject<HTMLElement | null>, nodeId: string | null) {
+  const [shown, setShown] = useState<string | null>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || !nodeId) {
+      setShown(null);
+      return;
+    }
+    const check = () =>
+      setShown(root.querySelector(`[data-grid-cockpit="${CSS.escape(nodeId)}"]`) ? nodeId : null);
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [ref, nodeId]);
+  return shown;
 }
 
 /** Focus a node once the cross-fade has swapped the network back in. */

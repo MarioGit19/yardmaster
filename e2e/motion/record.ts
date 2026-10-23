@@ -409,6 +409,50 @@ const SCENARIOS = {
         await page.waitForTimeout(700);
       },
     );
+    // 11.7: the dive, the phase-in, a screen to the center and back, the reverse dive.
+    const nodeId = await page
+      .locator('[data-grid-label] [data-grid-node]', {
+        has: page.locator('[data-scene-actor^="t:"]'),
+      })
+      .first()
+      .getAttribute('data-grid-node');
+    const node = page.locator(`[data-grid-node="${nodeId}"]`);
+    await node.focus();
+    await r.moment(
+      'dive',
+      'transition',
+      'Enter: the camera flies down the pipeline into the node (900 ms, ease.inOut) as the fog closes in, then the scanline sweeps and the screens resolve from a chromatic split (400 ms)',
+      async () => {
+        await page.keyboard.press('Enter');
+        await page.locator('[data-grid-cockpit]').waitFor();
+        await page.waitForTimeout(700);
+      },
+    );
+    await r.moment(
+      'center',
+      'transition',
+      'a terminal screen flies from the arc to the center (spring.smooth) and the arc steps back',
+      async () => {
+        await page
+          .locator('[data-grid-cockpit] [data-grid-screen="terminal"] [data-screen-face]')
+          .first()
+          .click();
+        await page.waitForTimeout(700);
+      },
+    );
+    await r.moment('uncenter', 'transition', 'Esc: the screen goes back to the arc', async () => {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+    });
+    await r.moment(
+      'rise',
+      'transition',
+      'Esc again: the cockpit goes and the camera flies back out to its orbit',
+      async () => {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1200);
+      },
+    );
   },
 
   /** A fresh board's first attention change reorders the pods within seconds. */

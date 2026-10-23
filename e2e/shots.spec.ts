@@ -1313,6 +1313,29 @@ test.describe('layouts', () => {
             .hover({ position: { x: 100, y: 10 } });
           await page.waitForTimeout(500);
           await shot('hover');
+
+          // 11.7: the dive into a node with a terminal, mid-flight and at the cockpit, then a
+          // terminal screen brought to the center.
+          const nodeId = await page
+            .locator('[data-grid-label] [data-grid-node]', {
+              has: page.locator('[data-scene-actor^="t:"]'),
+            })
+            .first()
+            .getAttribute('data-grid-node');
+          await page.locator(`[data-grid-node="${nodeId}"]`).focus();
+          await page.keyboard.press('Enter');
+          await page.waitForTimeout(450);
+          await shot('dive');
+          const cockpit = page.locator(`[data-grid-cockpit="${nodeId}"]`);
+          await expect(cockpit).toBeVisible();
+          await page.waitForTimeout(120);
+          await shot('phase');
+          await page.waitForTimeout(900);
+          await shot('cockpit');
+          await cockpit.locator('[data-grid-screen="terminal"] [data-screen-face]').first().click();
+          await expect(page.locator('[data-grid-center] [data-xterm]')).toBeVisible();
+          await page.waitForTimeout(800);
+          await shot('center');
         });
       }
     });

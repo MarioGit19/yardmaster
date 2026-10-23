@@ -40,6 +40,7 @@ import {
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { activityKey, levelAt, levelStep, type Pulses, QUIET_LEVEL } from '../data/activity.js';
 import type { SceneProject } from '../layouts/scene.js';
+import { ease, moment } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
 import type { Tone } from '../status.js';
 import { boardEnergy, MAX_SATELLITES, projectTool } from './map.js';
@@ -48,7 +49,12 @@ import {
   CHILD_SPIN,
   CORE_SIZE,
   CORE_Y,
+  cubicBezier,
+  type DivePath,
   declutter,
+  diveAt,
+  diveFog,
+  divePath,
   dragOrbit,
   homeFraming,
   homeOrbit,
@@ -101,6 +107,20 @@ const LABEL_LIFT = 1.1;
 const LABEL_W = 200;
 /** A lifted label eases to its new height over about this long, ms. */
 const LIFT_TAU = 140;
+const DIVE_MS = moment.dive * 1000;
+const diveEase = cubicBezier(...ease.inOut);
+
+/** Where the camera is in a dive: out on the orbit, flying in, in the node, flying back out. */
+export type DiveState = 'out' | 'diving' | 'in' | 'rising';
+
+interface Flight {
+  id: string;
+  path: DivePath;
+  /** Linear progress in time, 0 at the orbit and 1 in the node; eased onto the path. */
+  progress: number;
+  dir: 1 | -1;
+  done: (() => void) | null;
+}
 
 export interface GridPalette {
   dark: boolean;
@@ -346,6 +366,10 @@ export class GridRenderer {
   private orbit: Orbit = homeOrbit(60);
   private home = 60;
   private reset: { from: Orbit; to: Orbit; start: number } | null = null;
+  private flight: Flight | null = null;
+  private shift = 0;
+  private homeFog = { near: 60, far: 200 };
+  private homeFloor = { near: 0, far: 0 };
   private hovering = false;
   private hotId: string | null = null;
   private hoverId: string | null = null;
@@ -465,7 +489,7 @@ export class GridRenderer {
     // For tests and debugging: the camera's orbit, read without touching the DOM.
     Object.defineProperty(options.stage, 'gridCamera', {
       configurable: true,
-      value: () => ({ ...this.orbit, home: this.home }),
+      value: () => ({ ...this.orbit, home: this.home, dive: this.diveState() }),
     });
     this.cleanups.push(() => Reflect.deleteProperty(options.stage, 'gridCamera'));
   }
@@ -505,6 +529,10 @@ export class GridRenderer {
     });
     if (reordered) {
       this.frameRing();
+      // A node that moved while the camera is in it (or on its way): the flight follows it.
+      const flight = this.flight;
+      const target = flight && this.nodes.get(flight.id);
+      if (flight && target) flight.path = this.pathTo(target);
     }
     this.energyTarget = boardEnergy(projects);
     this.spinning = projects.some((p) =>
@@ -531,6 +559,46 @@ export class GridRenderer {
     const next = projectId ? this.nodes.get(projectId) : undefined;
     if (next) this.paintNode(next);
     this.dirty = true;
+  }
+
+  /**
+   * The dive (§10.4): the camera flies from its orbit over the core and down the node's pipeline
+   * into the node (`moment.dive`, `ease.inOut`) while the fog closes in, so the other nodes fade
+   * away. `onDone` runs once it has arrived. False when there's no such node.
+   */
+  dive(projectId: string, onDone: () => void): boolean {
+    const entry = this.nodes.get(projectId);
+    if (!entry) return false;
+    this.reset = null;
+    this.drag = null;
+    this.pointers.clear();
+    this.pinch = null;
+    this.hover(null);
+    const progress = this.flight?.id === projectId ? this.flight.progress : 0;
+    this.flight = { id: projectId, path: this.pathTo(entry), progress, dir: 1, done: onDone };
+    this.markDive();
+    this.dirty = true;
+    return true;
+  }
+
+  /** The reverse dive, from wherever the camera is on the way back to its orbit. */
+  rise(onDone: () => void): void {
+    const flight = this.flight;
+    if (!flight) {
+      onDone();
+      return;
+    }
+    flight.dir = -1;
+    flight.done = onDone;
+    this.markDive();
+    this.dirty = true;
+  }
+
+  diveState(): DiveState {
+    const flight = this.flight;
+    if (!flight) return 'out';
+    if (flight.dir === -1) return 'rising';
+    return flight.progress >= 1 ? 'in' : 'diving';
   }
 
   /** Offstage (the focus view covers the overview): no frames at all. */
@@ -1020,22 +1088,54 @@ export class GridRenderer {
     const framing = homeFraming(this.order.length, this.width, this.height, FOV, this.target);
     this.orbit = { ...this.orbit, distance: (this.orbit.distance / this.home) * framing.distance };
     this.home = framing.distance;
+    this.shift = framing.shift;
     this.camera.aspect = this.width / this.height;
+    this.project3d(this.flightK());
+    this.fitFog();
+  }
+
+  /** The projection, with the home framing's shift fading out as the camera dives in. */
+  private project3d(k: number): void {
     this.camera.updateProjectionMatrix();
     // Row y, column z: moves every point `shift` up in NDC (w is -z).
-    this.camera.projectionMatrix.elements[9] -= framing.shift;
+    this.camera.projectionMatrix.elements[9] -= this.shift * (1 - k);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-    this.fitFog();
+  }
+
+  /** The eased dive progress: 0 on the orbit, 1 in the node. */
+  private flightK(): number {
+    return this.flight ? diveEase(this.flight.progress) : 0;
+  }
+
+  private pathTo(entry: NodeEntry): DivePath {
+    const eye = orbitPosition(this.orbit, this.target);
+    return divePath(eye, this.target, entry.position, entry.height);
+  }
+
+  /** The stage says where the dive is, so CSS fades the labels out while the camera is away. */
+  private markDive(): void {
+    const state = this.diveState();
+    if (state === 'out') delete this.options.stage.dataset.dive;
+    else this.options.stage.dataset.dive = state;
   }
 
   /** The fog and the floor's fade start past the ring and close in at the horizon. */
   private fitFog(): void {
-    const fog = this.scene.fog as Fog;
-    fog.near = this.home * 1.15;
-    fog.far = this.home * 3.2;
+    this.homeFog = { near: this.home * 1.15, far: this.home * 3.2 };
     const ring = ringRadius(this.order.length);
-    this.floorUniforms.uNear.value = ring + 12;
-    this.floorUniforms.uFar.value = ring * 3 + 70;
+    this.homeFloor = { near: ring + 12, far: ring * 3 + 70 };
+    this.applyFog(this.flightK());
+  }
+
+  /** Home fog at 0; at 1 a close wall just past the dived-into node. */
+  private applyFog(k: number): void {
+    const fog = this.scene.fog as Fog;
+    const air = diveFog(k, this.homeFog);
+    fog.near = air.near;
+    fog.far = air.far;
+    const floor = diveFog(k, this.homeFloor);
+    this.floorUniforms.uNear.value = floor.near;
+    this.floorUniforms.uFar.value = floor.far;
   }
 
   private listen(canvas: HTMLCanvasElement): void {
@@ -1058,6 +1158,7 @@ export class GridRenderer {
       this.hover(null);
     });
     on(canvas, 'pointerdown', (event) => {
+      if (this.flight) return;
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       canvas.setPointerCapture(event.pointerId);
       this.reset = null;
@@ -1072,6 +1173,7 @@ export class GridRenderer {
       const rect = canvas.getBoundingClientRect();
       this.pointerAt = new Vector2(event.clientX - rect.left, event.clientY - rect.top);
       const pointer = this.pointers.get(event.pointerId);
+      if (this.flight) return;
       if (!pointer) {
         this.hover(this.pick());
         return;
@@ -1117,6 +1219,7 @@ export class GridRenderer {
       'wheel',
       (event) => {
         event.preventDefault();
+        if (this.flight) return;
         this.reset = null;
         this.orbit = zoomOrbit(this.orbit, Math.exp(event.deltaY * 0.0012), this.home);
         this.dirty = true;
@@ -1124,6 +1227,7 @@ export class GridRenderer {
       { passive: false },
     );
     on(canvas, 'dblclick', () => {
+      if (this.flight) return;
       const from = { ...this.orbit, azimuth: wrapAngle(this.orbit.azimuth) };
       this.reset = { from, to: homeOrbit(this.home), start: performance.now() };
     });
@@ -1167,6 +1271,7 @@ export class GridRenderer {
   }
 
   private moveCamera(now: number, dt: number): boolean {
+    if (this.flight) return this.fly(dt);
     let moving = false;
     if (this.reset) {
       const t = Math.min(1, (now - this.reset.start) / RESET_MS);
@@ -1190,6 +1295,34 @@ export class GridRenderer {
     this.camera.position.set(p.x, p.y, p.z);
     this.camera.lookAt(this.target);
     return moving;
+  }
+
+  /** One frame of the dive or the rise; the camera holds still once it's in the node. */
+  private fly(dt: number): boolean {
+    const flight = this.flight;
+    if (!flight) return false;
+    const before = flight.progress;
+    flight.progress = Math.min(1, Math.max(0, before + (flight.dir * dt) / DIVE_MS));
+    const k = diveEase(flight.progress);
+    const { position, look } = diveAt(flight.path, k);
+    this.camera.position.set(position.x, position.y, position.z);
+    this.camera.lookAt(look.x, look.y, look.z);
+    this.project3d(k);
+    this.applyFog(k);
+    const arrived = flight.dir === 1 && flight.progress >= 1;
+    const home = flight.dir === -1 && flight.progress <= 0;
+    if (arrived || home) {
+      const done = flight.done;
+      flight.done = null;
+      if (home) {
+        this.flight = null;
+        this.moveCamera(0, 0);
+      }
+      this.markDive();
+      done?.();
+      return before !== flight.progress;
+    }
+    return true;
   }
 
   // --- The frame ----------------------------------------------------------------------------------

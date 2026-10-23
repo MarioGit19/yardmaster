@@ -459,3 +459,95 @@ export function orbitPosition(orbit: Orbit, target: Vec3): Vec3 {
     z: target.z + orbit.distance * s * Math.cos(orbit.azimuth),
   };
 }
+
+// --- The dive (§10.4 "Entering a project") --------------------------------------------------
+
+/**
+ * The dive ends this far short of the node's center, on its pipeline's line, and this high above
+ * its top: hovering over it, with its satellites in view below the cockpit, units.
+ */
+export const DIVE_STANDOFF = NODE_R + ORBIT_R + 5;
+export const DIVE_RISE = 6;
+/** How far the dive's fog reaches past the node: its satellites stay, the rest fades out. */
+export const DIVE_FOG_DEPTH = ORBIT_R + 3;
+
+export interface DivePath {
+  /** The camera's cubic Bézier: from where it is, over the core, along the pipe, to the node. */
+  points: readonly [Vec3, Vec3, Vec3, Vec3];
+  /** What the camera looks at, at the start and at the end. */
+  look: readonly [Vec3, Vec3];
+}
+
+/** The flight from the camera's orbit position down a node's pipeline into the node. */
+export function divePath(camera: Vec3, look: Vec3, node: Vec3, height: number): DivePath {
+  const { from, mid } = pipeControl(node);
+  const len = Math.hypot(node.x, node.z) || 1;
+  const ux = node.x / len;
+  const uz = node.z / len;
+  const eye = height + DIVE_RISE;
+  const end = { x: node.x - ux * DIVE_STANDOFF, y: eye, z: node.z - uz * DIVE_STANDOFF };
+  return {
+    points: [
+      camera,
+      { x: from.x * 0.5, y: from.y + 4, z: from.z * 0.5 },
+      // Along the pipe's line, short of the end: the last stretch glides straight in.
+      {
+        x: node.x - ux * (DIVE_STANDOFF + 1.5),
+        y: Math.max(eye, mid.y) + 1,
+        z: node.z - uz * (DIVE_STANDOFF + 1.5),
+      },
+      end,
+    ],
+    look: [look, { x: node.x, y: Math.max(1, height * 0.5), z: node.z }],
+  };
+}
+
+const bezier = (a: number, b: number, c: number, d: number, t: number) => {
+  const u = 1 - t;
+  return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+};
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * The camera at eased progress `k` (0 at the orbit, 1 in the node). The gaze turns to the node
+ * in the first 70 %, so the end of the flight looks straight down the pipe.
+ */
+export function diveAt(path: DivePath, k: number): { position: Vec3; look: Vec3 } {
+  const [p0, p1, p2, p3] = path.points;
+  const [l0, l1] = path.look;
+  const turn = Math.min(1, k / 0.7);
+  const g = turn * turn * (3 - 2 * turn);
+  return {
+    position: {
+      x: bezier(p0.x, p1.x, p2.x, p3.x, k),
+      y: bezier(p0.y, p1.y, p2.y, p3.y, k),
+      z: bezier(p0.z, p1.z, p2.z, p3.z, k),
+    },
+    look: { x: lerp(l0.x, l1.x, g), y: lerp(l0.y, l1.y, g), z: lerp(l0.z, l1.z, g) },
+  };
+}
+
+/** The fog at dive progress `k`: from the home framing's to a close wall just past the node. */
+export function diveFog(k: number, home: { near: number; far: number }) {
+  return {
+    near: lerp(home.near, DIVE_STANDOFF, k),
+    far: lerp(home.far, DIVE_STANDOFF + DIVE_FOG_DEPTH, k),
+  };
+}
+
+/** A CSS-style cubic-bezier easing (`ease.inOut` in motion.ts) as a function of progress. */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let lo = 0;
+    let hi = 1;
+    let s = t;
+    for (let i = 0; i < 24; i++) {
+      s = (lo + hi) / 2;
+      if (bezier(0, x1, x2, 1, s) < t) lo = s;
+      else hi = s;
+    }
+    return bezier(0, y1, y2, 1, s);
+  };
+}

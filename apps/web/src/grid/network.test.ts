@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { ease } from '../motion.js';
 import { MAX_SATELLITES, packetFlow } from './map.js';
 import {
   BECKON_PERIOD_S,
+  cubicBezier,
+  DIVE_FOG_DEPTH,
+  DIVE_STANDOFF,
   declutter,
+  diveAt,
+  diveFog,
+  divePath,
   dragOrbit,
   homeFraming,
   homeOrbit,
@@ -237,5 +244,89 @@ describe('labels', () => {
     expect(third).toBe(322 - 70 - 8);
     const [, high] = declutter([box(300, 100), box(310, 90)], 8);
     expect(high).toBe(8 + 70);
+  });
+});
+
+describe('the dive', () => {
+  const node = ringPositions(6)[1] ?? { x: 0, y: 0, z: 0 };
+  const eye = orbitPosition(homeOrbit(60), { x: 0, y: 1.4, z: 0 });
+  const look = { x: 0, y: 1.4, z: 0 };
+  const path = divePath(eye, look, node, 2.4);
+  const dist = (a: { x: number; y: number; z: number }, b: typeof a) =>
+    Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+  it('starts where the camera is and ends short of the node, on its pipeline', () => {
+    const start = diveAt(path, 0);
+    expect(start.position).toEqual(eye);
+    expect(start.look).toEqual(look);
+    const end = diveAt(path, 1);
+    expect(Math.hypot(end.position.x - node.x, end.position.z - node.z)).toBeCloseTo(
+      DIVE_STANDOFF,
+      6,
+    );
+    // On the line from the core to the node: inside the ring, facing out.
+    const along = (end.position.x * node.x + end.position.z * node.z) / Math.hypot(node.x, node.z);
+    expect(along).toBeCloseTo(Math.hypot(node.x, node.z) - DIVE_STANDOFF, 6);
+    expect(end.look.x).toBe(node.x);
+    expect(end.look.z).toBe(node.z);
+    // Above the monolith's top, looking down at it.
+    expect(end.position.y).toBeGreaterThan(2.4);
+    expect(end.look.y).toBeLessThan(end.position.y);
+  });
+
+  it('flies over the core, then closes in on the node without overshooting', () => {
+    const samples = Array.from({ length: 21 }, (_, i) => diveAt(path, i / 20).position);
+    const toNode = samples.map((p) => dist(p, { ...node, y: p.y }));
+    for (let i = 10; i < toNode.length; i++) {
+      expect(toNode[i]).toBeLessThanOrEqual((toNode[i - 1] ?? 0) + 1e-9);
+    }
+    // Every point stays above the floor.
+    for (const p of samples) expect(p.y).toBeGreaterThan(0.5);
+    // The gaze has settled on the node before the end of the flight.
+    expect(diveAt(path, 0.75).look).toEqual(diveAt(path, 1).look);
+  });
+
+  it('pulls the fog in to just past the node', () => {
+    const home = { near: 70, far: 190 };
+    expect(diveFog(0, home)).toEqual(home);
+    const fog = diveFog(1, home);
+    expect(fog.near).toBeCloseTo(DIVE_STANDOFF, 6);
+    expect(fog.far).toBeCloseTo(DIVE_STANDOFF + DIVE_FOG_DEPTH, 6);
+    // Every other node in front of the camera lies beyond the fog wall (the rest are out of view).
+    const end = diveAt(path, 1);
+    const ahead = { x: end.look.x - end.position.x, z: end.look.z - end.position.z };
+    const others = ringPositions(6).filter((_, i) => i !== 1);
+    for (const count of [6, 12]) {
+      const ring = ringPositions(count);
+      const target = ring[1] ?? node;
+      const far = divePath(eye, look, target, 2.4);
+      const there = diveAt(far, 1);
+      const forward = { x: there.look.x - there.position.x, z: there.look.z - there.position.z };
+      for (const other of ring.filter((_, i) => i !== 1)) {
+        const to = { x: other.x - there.position.x, z: other.z - there.position.z };
+        const cos =
+          (to.x * forward.x + to.z * forward.z) /
+          (Math.hypot(to.x, to.z) * Math.hypot(forward.x, forward.z));
+        if (cos < Math.cos((40 * Math.PI) / 180)) continue;
+        expect(Math.hypot(to.x, to.z)).toBeGreaterThan(fog.far);
+      }
+    }
+    expect(others.length).toBe(5);
+    expect(Math.hypot(ahead.x, ahead.z)).toBeGreaterThan(0);
+  });
+
+  it('eases like ease.inOut', () => {
+    const inOut = cubicBezier(...ease.inOut);
+    expect(inOut(0)).toBe(0);
+    expect(inOut(1)).toBe(1);
+    expect(inOut(0.5)).toBeCloseTo(0.5, 4);
+    expect(inOut(0.1)).toBeLessThan(0.05);
+    expect(inOut(0.9)).toBeGreaterThan(0.95);
+    let last = 0;
+    for (let i = 1; i <= 50; i++) {
+      const v = inOut(i / 50);
+      expect(v).toBeGreaterThanOrEqual(last);
+      last = v;
+    }
   });
 });

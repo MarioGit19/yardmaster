@@ -120,6 +120,9 @@
   --dur-dim: 800ms;
   --dur-spark: 900ms;
   --dur-ambient: 1200ms;
+  /* The Grid's dive into a node and its cockpit's phase-in. */
+  --dur-dive: 900ms;
+  --dur-phase: 400ms;
   /* Loop periods and rate ramps (`loop` in motion.ts). */
   --dur-skeleton: 1600ms;
   --dur-spin: 900ms;

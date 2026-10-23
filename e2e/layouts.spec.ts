@@ -722,6 +722,7 @@ interface GridCamera {
   polar: number;
   distance: number;
   home: number;
+  dive: 'out' | 'diving' | 'in' | 'rising';
 }
 
 /** The 3D Grid's camera orbit, from the renderer's test hook on its stage. */
@@ -860,21 +861,139 @@ test.describe('the Grid 3D network', () => {
       await expect(inspector).toHaveCount(0);
       await expect(satellite).toBeFocused();
 
-      // Keyboard: Esc back to the node, Enter opens the cockpit, Esc returns to the network.
+      // Keyboard: Esc back to the node, Enter dives into its cockpit, Esc rises back out.
       await page.keyboard.press('Escape');
       await expect(node).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
       await expect(page.locator(`[data-grid-cockpit="${nodeId}"]`)).toBeVisible();
-      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(0);
+      // The network stays behind the cockpit: still one canvas, one WebGL context.
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
       await page.keyboard.press('Escape');
       await expect(grid).toHaveAttribute('data-grid-view', '3d');
+      await expect(page.locator('[data-grid-3d]')).toHaveAttribute('data-grid-dive', 'out');
       await expect(page.locator(`[data-grid-node="${nodeId}"]`)).toBeFocused();
       await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
 
       // A click on the label opens it too.
       await page.locator(`[data-grid-node="${nodeId}"]`).click({ position: { x: 100, y: 10 } });
       await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+    } finally {
+      await stop();
+    }
+  });
+
+  test('dives into a node, runs a command on a centered terminal and backs out with Esc twice', async ({
+    browser,
+  }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      const lane = page.locator('[data-pod] [data-lane][data-terminal-name="zsh"]').first();
+      const terminalId = await lane.getAttribute('data-lane');
+      const projectId = await lane
+        .locator('xpath=ancestor::*[@data-pod][1]')
+        .getAttribute('data-pod');
+      if (!terminalId || !projectId) throw new Error('no zsh lane in the demo');
+      await page.keyboard.press('Alt+Digit3');
+      const grid = page.locator('[data-grid]');
+      const stage = page.locator('[data-grid-3d][data-ready]');
+      await expect(stage).toBeVisible();
+      const start = await camera(page);
+      expect(start.dive).toBe('out');
+
+      // Enter on the node: the camera flies down its pipeline, the labels step out of the way.
+      const node = page.locator(`[data-grid-node="${projectId}"]`);
+      await node.focus();
+      await page.keyboard.press('Enter');
+      await expect(grid).toHaveAttribute('data-grid-entered', projectId);
+      await expect(stage).toHaveAttribute('data-grid-dive', /diving|in/);
+      await expect(page.locator('.grid-labels')).toHaveCSS('visibility', 'hidden');
+      await expect(stage).toHaveAttribute('data-grid-dive', 'in');
+      const inside = await camera(page);
+      expect(inside.dive).toBe('in');
+
+      // The cockpit phases in over the network, its screens real DOM in a 3D arc.
+      const cockpit = page.locator(`[data-grid-cockpit="${projectId}"]`);
+      await expect(cockpit).toBeVisible();
+      await expect(cockpit).toHaveAttribute('data-deep', '');
+      await expect(cockpit).toBeFocused();
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
+      await expect(cockpit.locator('[data-grid-screen="claude"]').first()).toBeVisible();
+      for (const kind of ['git', 'ports', 'todo']) {
+        await expect(cockpit.locator(`[data-grid-screen="${kind}"]`)).toBeVisible();
+      }
+      await expect(page.locator('[data-xterm]')).toHaveCount(0);
+
+      // Bring the zsh screen to the center, by keyboard: it's the only xterm, with its input.
+      const actor = `t:${terminalId}`;
+      await cockpit.locator(`[data-screen-center="${actor}"]`).focus();
+      await page.keyboard.press('Enter');
+      const center = page.locator(`[data-grid-center="${actor}"]`);
+      await expect(center).toBeVisible();
+      await expect(cockpit).toHaveAttribute('data-centered', actor);
+      await expect(page.locator('[data-xterm]')).toHaveCount(1);
+      // No second WebGL context: the centered terminal draws with the DOM renderer.
+      await expect(center.locator('[data-xterm]')).toHaveAttribute('data-renderer', 'dom');
+      const input = center.locator('[data-command-line]');
+      await expect(input).toBeFocused();
+      const hello = `cockpit-${Math.random().toString(36).slice(2, 8)}`;
+      await input.fill(`echo ${hello}`);
+      await input.press('Enter');
+      await expect(input).toHaveValue('');
+      await expect(center.locator('.xterm-rows')).toContainText(hello);
+      // It sits in the middle of the cockpit.
+      const box = await center.boundingBox();
+      const deck = await cockpit.boundingBox();
+      if (!box || !deck) throw new Error('no boxes');
+      expect(Math.abs(box.x + box.width / 2 - (deck.x + deck.width / 2))).toBeLessThan(4);
+
+      // Esc once: the screen goes back to the arc, and focus with it.
+      await page.keyboard.press('Escape');
+      await expect(center).toHaveCount(0);
+      await expect(page.locator('[data-xterm]')).toHaveCount(0);
+      await expect(cockpit.locator(`[data-screen-actor="${actor}"]`)).toBeFocused();
+      await expect(grid).toHaveAttribute('data-grid-entered', projectId);
+
+      // Esc twice: the reverse dive, back on the network with the node focused.
+      await page.keyboard.press('Escape');
+      await expect(cockpit).toHaveCount(0);
+      await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
+      await expect(stage).toHaveAttribute('data-grid-dive', 'out');
+      await expect(node).toBeFocused();
+      const back = await camera(page);
+      expect(back.distance).toBeCloseTo(start.distance, 3);
+      await expect(page.locator('.grid-labels')).toHaveCSS('visibility', 'visible');
+    } finally {
+      await stop();
+    }
+  });
+
+  test('a screen clicked in the cockpit flies to the center', async ({ browser }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+      const node = page
+        .locator('[data-grid-label] [data-grid-node]', {
+          has: page.locator('[data-scene-actor^="s:"]'),
+        })
+        .first();
+      const nodeId = await node.getAttribute('data-grid-node');
+      // By id: the ring re-orders as attention changes.
+      await page.locator(`[data-grid-node="${nodeId}"]`).focus();
+      await page.keyboard.press('Enter');
+      const cockpit = page.locator(`[data-grid-cockpit="${nodeId}"]`);
+      await expect(cockpit).toBeVisible();
+      // A click on the Claude screen's face centers it as the whole conversation.
+      await cockpit.locator('[data-grid-screen="claude"] [data-screen-face]').first().click();
+      const center = page.locator('[data-grid-center^="s:"]');
+      await expect(center).toBeVisible();
+      await expect(center.locator('[data-composer]')).toBeVisible();
+      await center.locator('[data-center-close]').click();
+      await expect(center).toHaveCount(0);
+      await expect(cockpit).toBeVisible();
     } finally {
       await stop();
     }

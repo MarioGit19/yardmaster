@@ -27,6 +27,8 @@ export interface XtermViewProps {
   /** Mask secrets in the output (PRD §8.7). Changing it remounts the view and replays. */
   redact?: boolean;
   onController?: (controller: XtermController | null) => void;
+  /** `dom` keeps the page's one WebGL context free, e.g. under the Grid's 3D network. */
+  prefer?: 'webgl' | 'dom';
 }
 
 const FONT_FAMILY = '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace';
@@ -46,6 +48,7 @@ export default function XtermView({
   label,
   redact = false,
   onController,
+  prefer = 'webgl',
 }: XtermViewProps) {
   const client = useBoardClient();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -103,18 +106,20 @@ export default function XtermView({
     const start = () => {
       if (disposed) return;
       term.open(host);
-      try {
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => {
-          // Lost GPU context: drop to the DOM renderer for the rest of this pane's life.
-          webgl.dispose();
+      if (prefer === 'dom') setRenderer('dom');
+      else
+        try {
+          const webgl = new WebglAddon();
+          webgl.onContextLoss(() => {
+            // Lost GPU context: drop to the DOM renderer for the rest of this pane's life.
+            webgl.dispose();
+            setRenderer('dom');
+          });
+          term.loadAddon(webgl);
+          setRenderer('webgl');
+        } catch {
           setRenderer('dom');
-        });
-        term.loadAddon(webgl);
-        setRenderer('webgl');
-      } catch {
-        setRenderer('dom');
-      }
+        }
       refit();
 
       // The write filter: masked output goes in, the raw text never reaches the terminal.
@@ -211,7 +216,7 @@ export default function XtermView({
       onControllerRef.current?.(null);
       for (const cleanup of cleanups.reverse()) cleanup();
     };
-  }, [client, terminalId, redact]);
+  }, [client, terminalId, redact, prefer]);
 
   return (
     <div

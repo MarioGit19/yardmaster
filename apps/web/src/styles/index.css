@@ -2657,6 +2657,131 @@ main[data-office-zoom] {
   min-width: 0;
   scroll-snap-align: center;
 }
+
+/* The cockpit takes focus as a landing spot when it opens: no ring round the whole of it. */
+.grid-cockpit:focus-visible {
+  box-shadow: none;
+}
+/* A screen brought to the center (§10.4 step 4): the arc steps back behind it. */
+.grid-cockpit {
+  --center-h: min(36rem, calc(100dvh - 15rem));
+}
+.grid-cockpit-arc {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+.grid-cockpit-arc[data-dimmed] {
+  opacity: 0.16;
+  transform: scale(0.97);
+}
+.grid-cockpit[data-centered] {
+  position: relative;
+}
+.grid-cockpit[data-centered] .grid-cockpit-arc {
+  min-height: var(--center-h);
+}
+.grid-center {
+  top: 4.25rem;
+  height: max(22rem, var(--center-h));
+  box-shadow:
+    var(--highlight-inset),
+    0 0 0 1px color-mix(in srgb, var(--grid-neon) 8%, transparent),
+    0 24px 80px -24px color-mix(in srgb, var(--grid-neon) 30%, transparent);
+}
+
+/* The dive (§10.4): the labels fade as the camera leaves the orbit, and the cockpit's deck sits
+   over the network once it's in the node. */
+.grid-labels {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) step-start;
+}
+.grid-stage[data-dive] .grid-labels {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) step-end;
+}
+.grid-stage[data-dive] {
+  touch-action: auto;
+}
+.grid-deck {
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 45%,
+    transparent,
+    color-mix(in srgb, var(--grid-bg) 55%, transparent)
+  );
+  overscroll-behavior: contain;
+}
+/* The 3D arc: side columns swing their outer edges toward the viewer, the small screens tilt
+   down from above. Static transforms on real DOM, so the text stays sharp and selectable. */
+.grid-cockpit[data-deep] [data-cockpit-row] {
+  perspective: 1600px;
+}
+.grid-cockpit[data-deep] [data-cockpit-small] {
+  perspective: 1600px;
+  perspective-origin: 50% 160%;
+}
+.grid-cockpit[data-deep] [data-cockpit-small] > * {
+  transform: rotateX(-9deg);
+  transform-origin: 50% 100%;
+}
+.grid-cockpit[data-deep] [data-arc="left"] {
+  transform: rotateY(14deg);
+  transform-origin: 100% 50%;
+}
+.grid-cockpit[data-deep] [data-arc="right"] {
+  transform: rotateY(-14deg);
+  transform-origin: 0% 50%;
+}
+/* The phase-in: one scanline sweeps down while the screens resolve from a brief chromatic split
+   (a rose and a cyan ghost closing in). No flash: nothing gets brighter than the screen itself. */
+.grid-phase-scan {
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 48px),
+    color-mix(in srgb, var(--grid-neon) 10%, transparent) calc(50% - 2px),
+    color-mix(in srgb, var(--grid-neon) 45%, transparent) 50%,
+    transparent calc(50% + 1px)
+  );
+  transform: translateY(50%);
+  opacity: 0;
+  animation: grid-scan var(--dur-phase) var(--ease-in-out) backwards;
+}
+@keyframes grid-scan {
+  from {
+    transform: translateY(-50%);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+}
+.grid-cockpit[data-deep] .grid-screen:not(.grid-center) {
+  animation: grid-resolve var(--dur-phase) var(--ease-out) backwards;
+}
+@keyframes grid-resolve {
+  from {
+    opacity: 0;
+    filter: drop-shadow(4px 0 0 color-mix(in srgb, var(--st-err) 70%, transparent))
+      drop-shadow(-4px 0 0 color-mix(in srgb, var(--grid-neon) 70%, transparent));
+  }
+  55% {
+    opacity: 1;
+    filter: drop-shadow(1.5px 0 0 color-mix(in srgb, var(--st-err) 45%, transparent))
+      drop-shadow(-1.5px 0 0 color-mix(in srgb, var(--grid-neon) 45%, transparent));
+  }
+  to {
+    opacity: 1;
+    filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+  }
+}
 /* Hovering or focusing a node shows its counts above it (the map only; a phone reads the
    satellites). */
 .grid-tip {

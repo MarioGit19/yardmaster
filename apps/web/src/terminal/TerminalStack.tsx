@@ -416,7 +416,7 @@ function parseLinks(links: string): Map<string, string> {
 }
 
 /** The terminal's newest execution, its live Claude session (10.9) and what it's called. */
-function useTerminalView(terminal: Terminal) {
+export function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const session = useBoard(selectTerminalSession(terminal.id));
   const display = terminalDisplay(terminal, execution, session);
@@ -812,7 +812,7 @@ function useEditorName(terminal: Terminal): string {
   return useBoard((s) => selectWindow(terminal.windowId)(s)?.appName) || 'the editor';
 }
 
-function useTerminalAction() {
+export function useTerminalAction() {
   const client = useBoardClient();
   return async (action: UiAction): Promise<boolean> => {
     const result = await client.action(action);
@@ -1057,7 +1057,7 @@ const HISTORY_MAX = 50;
  * Sends a line to the terminal (`cmd.sendText`). At the prompt it runs as a command; while a
  * program runs, it is that program's input. ↑/↓ walk this view's history; ⌃C interrupts.
  */
-function CommandLine({
+export function CommandLine({
   terminal,
   running,
   onInterrupt,
