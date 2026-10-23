@@ -100,6 +100,16 @@ describe('CrewMascot', () => {
     expect(container.querySelector('[data-crew]')?.getAttribute('data-crew')).toBe('done');
   });
 
+  it('draws at the whiteboard, unless it needs you', () => {
+    let crew = render({ state: 'typing', pose: 'drawing' });
+    expect(crew?.dataset.crewPose).toBe('drawing');
+    expect(crew?.getAttribute('aria-label')).toBe('Drawing on the whiteboard');
+    expect(crew?.querySelector('.crew-arm-r-drawing')).not.toBeNull();
+    crew = render({ state: 'waiting', pose: 'drawing' });
+    expect(crew?.dataset.crewPose).toBeUndefined();
+    expect(crew?.getAttribute('aria-label')).toBe('Waiting for you');
+  });
+
   it('pops out mini crew members for subagents', () => {
     let crew = render({ state: 'delegating', size: 56 });
     expect(crew?.getAttribute('aria-label')).toBe('Delegating to a subagent, 1 subagent');

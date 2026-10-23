@@ -20,6 +20,7 @@ import { ACCENT_HUES } from '../theme/accents.js';
 import { THEME_SETTINGS, type Theme, useTheme } from '../theme/theme.js';
 import { CrewSheet } from './CrewSheet.js';
 import { BackgroundShowcase, PhoneShowcase, TextEffectsShowcase } from './FxShowcase.js';
+import { OfficeKitSheet } from './OfficeKitSheet.js';
 import { OrbShowcase } from './OrbShowcase.js';
 import { ToolShowcase } from './ToolShowcase.js';
 
@@ -400,6 +401,12 @@ export default function TokenPreview() {
         <div className="lg:col-span-2">
           <Section title="Crew mascot">
             <CrewSheet />
+          </Section>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Section title="Office kit">
+            <OfficeKitSheet />
           </Section>
         </div>
 

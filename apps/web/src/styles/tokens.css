@@ -66,6 +66,18 @@
   /* Crew mascot visor glass, DESIGN.md §4.11; dark in both themes so the eyes glow. */
   --crew-visor: #05070c;
 
+  /* Office layout (DESIGN.md §10.3): furniture one step above the walls, the night sky in the
+     window, the warm ceiling light, and the ops crew's idle visor (grey that still glows). */
+  --office-furniture: #161a24;
+  --office-top: #1d2230;
+  --office-sky: #0b1430;
+  --office-sky-low: #1b2550;
+  --office-lamp: #ffcf8a;
+  --office-lamp-strength: 1;
+  --office-board: #1a1e29;
+  --office-leaf: #3f6150;
+  --ops-idle: #8a90a3;
+
   /* Layout worlds (DESIGN.md §10), used by the fx effects: Grid's one structural neon, and Retro's
      phosphor (green, or amber as the option) on its screen. */
   --grid-neon: #4cc8ff;
@@ -162,6 +174,16 @@
   --orb-task: oklch(0.62 0.16 350);
 
   --crew-visor: #1b1f29;
+
+  --office-furniture: #e3e3dd;
+  --office-top: #d6d6cf;
+  --office-sky: #9fd0f2;
+  --office-sky-low: #dcefff;
+  --office-lamp: #ffd28f;
+  --office-lamp-strength: 0.4;
+  --office-board: #fbfbf9;
+  --office-leaf: #86ad94;
+  --ops-idle: #a3a9b8;
 
   /* Daylight: Grid's neon as ink, Retro as a line printer (dark ink on warm paper, no glow). */
   --grid-neon: #0b7fb3;

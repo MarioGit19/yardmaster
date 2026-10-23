@@ -5,7 +5,7 @@ import type { MascotState } from './model.js';
 // Poses in viewBox units (0–100); the body layer converts them to CSS px for its size.
 // Arms hang from the shoulder: positive rotation swings the left arm out, negative the right.
 
-interface Pose {
+export interface Pose {
   body: { y: number; rotate: number; scale: number; x?: number[] };
   armL: number;
   armR: number | number[];
@@ -13,7 +13,10 @@ interface Pose {
   eyes: { x: number; y: number; scale?: number };
 }
 
-export const POSES: Record<MascotState, Pose> = {
+/** The crew states plus `drawing`, a session standing at the Office whiteboard (§10.3). */
+export type CrewPose = MascotState | 'drawing';
+
+export const POSES: Record<CrewPose, Pose> = {
   sleeping: { body: { y: 3, rotate: 0, scale: 0.98 }, armL: 4, armR: -4, eyes: { x: 0, y: 2 } },
   idle: { body: { y: 0, rotate: 0, scale: 1 }, armL: 10, armR: -10, eyes: { x: 0, y: 0 } },
   watching: { body: { y: 1, rotate: -5, scale: 1 }, armL: 22, armR: -22, eyes: { x: -3, y: 2 } },
@@ -44,43 +47,54 @@ export const POSES: Record<MascotState, Pose> = {
     eyes: { x: 0, y: 1 },
   },
   done: { body: { y: -4, rotate: 0, scale: 1 }, armL: 155, armR: -155, eyes: { x: 0, y: -3 } },
+  // Turned toward a board on its right, marker hand raised to it.
+  drawing: { body: { y: 0, rotate: 4, scale: 1 }, armL: 12, armR: -118, eyes: { x: 5, y: -2 } },
 };
 
 const SHAKE: Transition = { duration: dur.base, ease: ease.out };
 const PRESS: Transition = { duration: dur.slow, times: [0, 0.35, 1], ease: ease.out };
 
-function variants<T>(pick: (pose: Pose, state: MascotState) => T): Variants {
-  const out: Variants = {};
-  for (const state of Object.keys(POSES) as MascotState[]) {
-    out[state] = pick(POSES[state], state) as Variants[string];
+/**
+ * Motion variants for a pose table: a body layer (HTML, so its offsets scale from viewBox units
+ * to the rendered size), the two arms turning about the shoulder, and the eyes (an HTML layer
+ * spanning the mascot, so viewBox units are percentages).
+ */
+export function poseVariants<S extends string>(poses: Record<S, Pose>) {
+  function variants<T>(pick: (pose: Pose) => T): Variants {
+    const out: Variants = {};
+    for (const state of Object.keys(poses) as S[])
+      out[state] = pick(poses[state]) as Variants[string];
+    return out;
   }
-  return out;
+  return {
+    body(size: number): Variants {
+      const unit = size / 100;
+      return variants(({ body }) => ({
+        y: body.y * unit,
+        rotate: body.rotate,
+        scale: body.scale,
+        x: body.x ? body.x.map((v) => v * unit) : 0,
+        transition: body.x ? { default: spring.smooth, x: SHAKE } : spring.smooth,
+      }));
+    },
+    armL: variants(({ armL }) => ({ rotate: armL, transition: spring.smooth })),
+    armR: variants(({ armR }) =>
+      Array.isArray(armR)
+        ? { rotate: [null, ...armR.slice(1)], transition: PRESS }
+        : { rotate: armR, transition: spring.smooth },
+    ),
+    eyes: variants(({ eyes }) => ({
+      x: `${eyes.x}%`,
+      y: `${eyes.y}%`,
+      scale: eyes.scale ?? 1,
+      transition: spring.smooth,
+    })),
+  };
 }
 
-/** The body layer is HTML, so its offsets scale from viewBox units to the rendered size. */
-export function bodyVariants(size: number): Variants {
-  const unit = size / 100;
-  return variants(({ body }) => ({
-    y: body.y * unit,
-    rotate: body.rotate,
-    scale: body.scale,
-    x: body.x ? body.x.map((v) => v * unit) : 0,
-    transition: body.x ? { default: spring.smooth, x: SHAKE } : spring.smooth,
-  }));
-}
+const crew = poseVariants(POSES);
 
-export const armLVariants = variants(({ armL }) => ({ rotate: armL, transition: spring.smooth }));
-
-export const armRVariants = variants(({ armR }) =>
-  Array.isArray(armR)
-    ? { rotate: [null, ...armR.slice(1)], transition: PRESS }
-    : { rotate: armR, transition: spring.smooth },
-);
-
-/** The eyes are an HTML layer spanning the mascot, so viewBox units are percentages. */
-export const eyeVariants = variants(({ eyes }) => ({
-  x: `${eyes.x}%`,
-  y: `${eyes.y}%`,
-  scale: eyes.scale ?? 1,
-  transition: spring.smooth,
-}));
+export const bodyVariants = crew.body;
+export const armLVariants = crew.armL;
+export const armRVariants = crew.armR;
+export const eyeVariants = crew.eyes;

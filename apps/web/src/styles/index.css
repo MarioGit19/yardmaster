@@ -446,7 +446,9 @@
 .crew-body-typing,
 .crew-body-reading,
 .crew-body-running,
-.crew-body-delegating {
+.crew-body-delegating,
+.crew-body-drawing,
+.crew-body-serving {
   transform-origin: 50% 88%;
   animation: crew-breathe 4s var(--ease-in-out) infinite;
   animation-delay: var(--crew-delay, 0s);
@@ -514,6 +516,22 @@
 }
 .crew-arm-r-waiting {
   animation: crew-wave 2s var(--ease-in-out) infinite;
+}
+/* Drawing at the whiteboard: small marker strokes, a few a second. */
+@keyframes crew-scribble {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(-6deg);
+  }
+  60% {
+    transform: rotate(3deg);
+  }
+}
+.crew-arm-r-drawing {
+  animation: crew-scribble 0.9s var(--ease-in-out) infinite;
 }
 .crew[data-crew-crowd] .crew-arm-l-typing {
   animation-duration: 0.5s; /* loop: the crowd's half rate */
@@ -657,11 +675,153 @@
 .crew[data-crew-hold] .crew-spark {
   animation: crew-spark-hold 1.6s var(--ease-out) infinite;
 }
+/* The ops crew's error: the bench or rack sparks once (DESIGN.md §10.3). */
+@keyframes crew-ops-spark {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes crew-ops-spark-hold {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  20%,
+  60% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.crew-ops-spark {
+  transform-origin: center;
+  opacity: 0;
+  animation: crew-ops-spark var(--dur-spark) var(--ease-out) both;
+}
+.crew[data-crew-hold] .crew-ops-spark {
+  animation: crew-ops-spark-hold 1.6s var(--ease-out) infinite;
+}
 :root[data-motion="reduced"] .crew-anim {
   animation: none;
 }
+:root[data-motion="reduced"] .crew-ops-spark {
+  opacity: 1;
+}
 :root[data-motion="reduced"] .crew-spark {
   opacity: 1;
+}
+
+/* Office kit, DESIGN.md §10.3: flat vector furniture, 1 px outlines, no accent but the door. */
+.kit :is(.kit-wood, .kit-top, .kit-screen, .kit-board, .kit-door, .kit-wall, .kit-floor) {
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.kit-wall {
+  fill: var(--bg-1);
+}
+.kit-floor {
+  fill: var(--bg-2);
+}
+.kit-wood {
+  fill: var(--office-furniture);
+  stroke: var(--line);
+}
+.kit-top {
+  fill: var(--office-top);
+  stroke: var(--line);
+}
+.kit-screen {
+  fill: var(--crew-visor);
+  stroke: var(--line-strong);
+}
+.kit-board {
+  fill: var(--office-board);
+  stroke: var(--line-strong);
+}
+.kit-door {
+  fill: color-mix(in srgb, var(--room-accent) 14%, var(--office-furniture));
+  stroke: color-mix(in srgb, var(--room-accent) 60%, transparent);
+}
+:is(.kit-line, .kit-line-strong, .kit-frame) {
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.kit-line {
+  stroke: var(--line);
+}
+.kit-line-strong {
+  stroke: var(--line-strong);
+}
+.kit-frame {
+  fill: none;
+  stroke: var(--line-strong);
+}
+.kit-day {
+  display: none;
+}
+[data-theme="light"] .kit-day {
+  display: inline;
+}
+[data-theme="light"] .kit-night {
+  display: none;
+}
+/* The warm ceiling light, Night's one indulgence; Daylight keeps a trace of it. */
+.kit-lamp {
+  background: radial-gradient(
+    50% 60% at 50% 8%,
+    color-mix(in srgb, var(--office-lamp) calc(var(--office-lamp-strength) * 22%), transparent),
+    transparent 70%
+  );
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.kit-door-light {
+  background: var(--line-strong);
+}
+[data-kit-door="wait"] .kit-door-light {
+  background: var(--st-wait);
+  box-shadow: 0 0 8px var(--st-wait-glow);
+}
+[data-kit-door="err"] .kit-door-light {
+  background: var(--st-err);
+  box-shadow: 0 0 10px var(--st-err-glow);
+}
+/* Waiting: the §3 rule 4 ripple, a ring that grows and fades from the light. */
+@keyframes kit-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+[data-kit-door="wait"] .kit-door-light::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid var(--st-wait);
+  opacity: 0;
+  animation: kit-ripple var(--dur-pulse) var(--ease-out) infinite;
+}
+.kit[data-kit-paused] .kit-door-light::after {
+  animation-play-state: paused;
+}
+:root[data-motion="reduced"] .kit-door-light::after {
+  animation: none;
 }
 
 /* Terminal lanes, DESIGN.md §4.3. Fixed tracks (name · command · sparkline · port · status) so

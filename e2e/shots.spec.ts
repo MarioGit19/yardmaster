@@ -130,6 +130,40 @@ test.describe('crew mascot', () => {
   });
 });
 
+// The Office art kit on /_tokens: every ops state at 120/56/24 px, every prop and the rooms.
+test.describe('office kit', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+  const sheet = (page: import('@playwright/test').Page) =>
+    page.locator('section', { has: page.getByRole('heading', { name: 'Office kit' }) });
+
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+      test('kit sheet', async ({ page }) => {
+        await page.goto('/#/_tokens');
+        const section = sheet(page);
+        await section.scrollIntoViewIfNeeded();
+        // 7 states × 3 sizes.
+        await expect(section.locator('[data-ops-sheet] [data-ops]')).toHaveCount(21);
+        await page.waitForTimeout(1200);
+        await section.screenshot({ path: new URL(`office-kit-${theme}.png`, OUT_DIR).pathname });
+        await section
+          .locator('[data-ops-sheet]')
+          .screenshot({ path: new URL(`office-ops-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+
+  test('reduced', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.goto('/#/_tokens');
+    const section = sheet(page);
+    await section.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await section.screenshot({ path: new URL('office-kit-reduced.png', OUT_DIR).pathname });
+  });
+});
+
 // Terminal lanes on the overview once the sparklines have a few live samples, plus a peek.
 test.describe('terminal lanes', () => {
   for (const theme of THEMES) {
