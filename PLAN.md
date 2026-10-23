@@ -698,6 +698,13 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - **Done when:** `grep` finds no literal loop durations outside `tokens.css`/`motion.ts` (fx internals excepted), and both seams read smoothly in a fresh `pnpm motion:record chrome`.
   - **Verify:** `pnpm check && pnpm motion:record chrome`
 
+- [ ] **10.10 Pointer cursor on everything clickable**
+  - Maintainer feedback: some clickable elements show the default arrow, so it isn't clear they can be clicked. Tailwind 4's preflight sets `cursor: default` on `button`, so every hand-rolled pressable that doesn't add `cursor-pointer` itself looks inert.
+  - Add one base rule in `styles/index.css` (`@layer base`): `cursor: pointer` for `button:not(:disabled)`, `[role="button"]`, `[role="tab"]`, `[role="menuitem"]`, `[role="option"]`, `[role="switch"]`, `[role="checkbox"]`, `[role="radio"]`, `summary`, `label[for]`, `a[href]` and `select`, and `cursor: not-allowed` for `:disabled` / `[aria-disabled="true"]`. Then sweep `apps/web/src` for clickable things the rule misses (a `div`/`span`/`li`/`svg`/`canvas` with `onClick`, lane and pod cards, Pulse dots, mascot/orb hit areas, chips, the HUD counters, tool-card headers, the scene's actors): give them the right role (and keyboard handling, if missing) so the base rule covers them, or `cursor-pointer` where a role doesn't fit. Keep the existing special cursors (`col-resize` on dividers, `default` where it is deliberate, `grab`/`grabbing` on draggables).
+  - Add a convention line to `docs/DESIGN.md` (and keep `buttonClass` and the shared primitives consistent), so new layouts in Phase 11 and 12 get it for free.
+  - **Done when:** an e2e check on `--demo` (focus view, overview, Pulse, palette, settings, approvals) finds no element with a click handler or an interactive role whose computed `cursor` is `auto`/`default` (allow-list the deliberate ones), and `pnpm check` passes.
+  - **Verify:** `pnpm check && pnpm e2e --grep cursor`
+
 ## Phase 11 — Layouts: Minimal, Office, Grid, Transit, Retro
 
 Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phase: run `pnpm shots` and **look at the screenshots** (Read the PNGs) before ticking; use `frontend-design` + `emil-design-eng` for the look, `animate` + `apple-design` for motion, and Context7 for `three` APIs. Reuse the Phase 10 motion work: `pnpm motion:record` gets a scenario per layout (and its enter view), and effects come from `apps/web/src/fx/` (10.7): `LightTunnel` and `DecryptedText` for the Grid dive and cockpit, `GlitchText` for Grid errors, `FaultyTerminal`/`CRTWarp`, `DecryptedText` and `SplitFlapText` for Retro, `SplitFlapText` for Transit station boards, `SwipeRow` and `HoldButton` on phones. Every layout must keep the same statuses, chrome and actions as Minimal, and every layout must be designed for phones too (DESIGN.md §10.1 "Phones (390 px) and touch"): take 390 px screenshots and use touch emulation in e2e for each one.
@@ -810,7 +817,7 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Verify:** `pnpm check`
 
 - [ ] **13.4 Visual polish sweep**
-  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Fix up to 10 issues per iteration; if more remain, add a follow-up task `13.4b` below this one.
+  - Run `pnpm shots` and review every screenshot against DESIGN.md §9, using `impeccable` polish and `web-design-guidelines`. Rerun the 10.10 pointer-cursor e2e check across every layout (Minimal, Office, Grid, Transit, Retro), the picker and the launch sheet, and fix anything clickable that still shows the arrow. Fix up to 10 issues per iteration; if more remain, add a follow-up task `13.4b` below this one.
   - **Verify:** `pnpm shots`
 
 - [ ] **13.5 README and docs**

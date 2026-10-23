@@ -18,6 +18,7 @@ c-board is a local dashboard that mirrors every Cursor/VS Code terminal and Clau
 - Server binds `127.0.0.1` only. Every new route goes through the auth guard (PRD §8).
 - Tests: Vitest for units, Playwright for e2e against `--demo`. Tests never call the real Claude API (mock `@anthropic-ai/claude-agent-sdk`).
 - UI: follow `docs/DESIGN.md` exactly (tokens, springs, performance rules). Animate only transform, opacity and filter. Respect the motion level.
+- Everything clickable shows the pointer cursor: use a real `button`/link or an interactive role (the base rule from 10.10 covers those), or add `cursor-pointer`. Never leave an `onClick` on an element that shows the arrow.
 - Keep comments sparse and useful. Match the style of the surrounding code.
 
 ## Skills & tools
