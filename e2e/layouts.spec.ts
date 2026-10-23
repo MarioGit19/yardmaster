@@ -251,8 +251,11 @@ test.describe('the Office building', () => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.keyboard.press('Alt+Digit2');
-      const character = page.locator('[data-room] [data-scene-actor]').first();
-      await expect(character).toBeVisible();
+      const any = page.locator('[data-room] [data-scene-actor]').first();
+      await expect(any).toBeVisible();
+      // Pinned by id: rooms reorder under a `.first()`.
+      const actorId = await any.getAttribute('data-scene-actor');
+      const character = page.locator(`[data-scene-actor="${actorId}"]`);
       const tag = character.locator('[data-office-tag]');
       await expect(tag).toHaveCSS('opacity', '0');
       // Rooms reorder and characters walk under a still pointer: point again until it shows.
@@ -297,6 +300,154 @@ test.describe('the Office building', () => {
       // Tap a character: the inspector is a bottom sheet.
       await first.locator('[data-scene-actor]').first().tap();
       await expect(page.locator('[data-actor-inspector][data-sheet]')).toBeVisible();
+    } finally {
+      await stop();
+    }
+  });
+});
+
+/** The building layer's scale, from its computed transform matrix. */
+const buildingScale = (page: Page) =>
+  page.locator('[data-office-building]').evaluate((el) => {
+    const t = getComputedStyle(el).transform;
+    return t === 'none' ? 1 : new DOMMatrixReadOnly(t).a;
+  });
+
+/**
+ * Enters a room with a terminal in it, opens that terminal's inspector from the room's list,
+ * opens the workspace and comes back with Esc to the same room view, then Esc to the building.
+ */
+async function roomViewRoundTrip(page: Page, touch: boolean) {
+  await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+  await page.reload();
+  const office = page.locator('[data-office]');
+  const room = page
+    .locator('[data-room]', { has: page.locator('[data-scene-actor^="t:"]') })
+    .first();
+  await expect(room).toBeVisible();
+  const roomId = await room.getAttribute('data-room');
+  if (!roomId) throw new Error('no room with a terminal in the demo');
+  const byId = page.locator(`[data-room="${roomId}"]`);
+  const box = await byId.boundingBox();
+  if (!box) throw new Error('the room has no box');
+  // The ceiling, clear of every character and sign.
+  const spot = { x: box.width / 2, y: 4 };
+  if (touch) await byId.tap({ position: spot });
+  else await byId.click({ position: spot });
+
+  await expect(office).toHaveAttribute('data-office-entered', roomId);
+  const panel = page.locator(`[data-office-room-panel="${roomId}"]`);
+  await expect(panel).toBeVisible();
+  if (touch) await expect(panel).toHaveAttribute('data-sheet', 'true');
+  await expect(office).not.toHaveAttribute('data-office-moving', '');
+  expect(await buildingScale(page)).toBeGreaterThan(touch ? 0.9 : 1.5);
+  // The room fills the stage: on screen, and on a phone edge to edge.
+  const zoomed = await byId.boundingBox();
+  const stage = await page.locator('main').boundingBox();
+  if (!zoomed || !stage) throw new Error('no box');
+  expect(zoomed.x).toBeGreaterThanOrEqual(stage.x);
+  expect(zoomed.x + zoomed.width).toBeLessThanOrEqual(stage.x + stage.width);
+  expect(zoomed.y).toBeGreaterThanOrEqual(stage.y);
+  if (touch) expect(zoomed.width).toBeGreaterThan(stage.width - 40);
+  // Every other room steps back and is out of reach.
+  await expect(page.locator('[data-office-cell][data-away]:not([inert])')).toHaveCount(0);
+
+  // A terminal's inspector, from the list.
+  const row = panel.locator('[data-room-actor-kind="terminal"]').first();
+  if (touch) await row.tap();
+  else await row.click();
+  const inspector = page.locator(
+    touch ? '[data-actor-inspector][data-sheet]' : '[data-actor-inspector]',
+  );
+  await expect(inspector.locator('[data-actor]')).toContainText('Terminal ·');
+  await page.keyboard.press('Escape');
+  await expect(inspector).toHaveCount(0);
+  // Esc closed the inspector, not the room.
+  await expect(office).toHaveAttribute('data-office-entered', roomId);
+
+  // Open workspace: the focus view, then Esc back into the same room view.
+  const open = panel.locator('[data-room-open]');
+  if (touch) await open.tap();
+  else await open.click();
+  await expect(page).toHaveURL(new RegExp(`#/p/${encodeURIComponent(roomId)}$`));
+  await expect(page.locator(`[data-focus="${roomId}"]`)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-focus]')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(office).toHaveAttribute('data-office-entered', roomId);
+  await expect(panel).toBeVisible();
+  await expect(open).toBeFocused();
+
+  // Esc again: back out to the building, keyboard focus on the room.
+  await page.keyboard.press('Escape');
+  await expect(office).not.toHaveAttribute('data-office-entered', /.+/);
+  await expect(panel).toHaveCount(0);
+  await expect(byId).toBeFocused();
+  await expect.poll(() => buildingScale(page)).toBe(1);
+  await expect(page.locator('[data-office-cell][data-away]')).toHaveCount(0);
+}
+
+test.describe('the Office room view', () => {
+  test('desktop: enter, inspect a terminal, open the workspace, Esc back to the room', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await roomViewRoundTrip(page, false);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('touch phone: the room fills the screen, the list is a bottom sheet', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser, {
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await roomViewRoundTrip(page, true);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('keyboard: Tab to a room, Enter, arrows to a character, Esc; Back leaves too', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit2');
+      const office = page.locator('[data-office]');
+      const first = page.locator('[data-room]').first();
+      await expect(first).toBeVisible();
+      // Characters aren't Tab stops; the room is.
+      await expect(first.locator('[data-scene-actor]').first()).toHaveAttribute('tabindex', '-1');
+      await first.focus();
+      const roomId = await first.getAttribute('data-room');
+      await page.keyboard.press('Tab');
+      const next = await page.evaluate(() => document.activeElement?.getAttribute('data-room'));
+      expect(next).toBeTruthy();
+      expect(next).not.toBe(roomId);
+      await page.keyboard.press('Shift+Tab');
+      await expect(page.locator(`[data-room="${roomId}"]`)).toBeFocused();
+
+      await page.keyboard.press('Enter');
+      await expect(office).toHaveAttribute('data-office-entered', roomId ?? '');
+      await page.keyboard.press('ArrowRight');
+      await expect(page.locator(`[data-room="${roomId}"] [data-scene-actor]:focus`)).toHaveCount(1);
+      await page.keyboard.press('Escape');
+      await expect(office).not.toHaveAttribute('data-office-entered', /.+/);
+      await expect(page.locator(`[data-room="${roomId}"]`)).toBeFocused();
+
+      // The browser's back leaves the room view like Esc.
+      await page.keyboard.press('Enter');
+      await expect(office).toHaveAttribute('data-office-entered', roomId ?? '');
+      await page.goBack();
+      await expect(office).not.toHaveAttribute('data-office-entered', /.+/);
+      await expect(page).toHaveURL(/#\/$/);
     } finally {
       await stop();
     }

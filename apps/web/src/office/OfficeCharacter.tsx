@@ -108,6 +108,8 @@ export function OfficeCharacter({ actor, placement, projectName, color }: Office
         trigger={
           <button
             type="button"
+            // The room is the Tab stop; arrow keys move between its characters (§10.1).
+            tabIndex={-1}
             aria-label={actor.name}
             data-scene-actor={actor.id}
             data-actor-state={actor.state}

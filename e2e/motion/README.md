@@ -10,6 +10,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `overview` | `entrance`, `activity` (8 s), `pod-hover`, `lane-peek`, `route` (overview ↔ settings) |
 | `layouts`  | `switch` (⌥2 Minimal → Office → ⌥1 cross-fade), `inspector` (a crew opens the Actor inspector, Esc closes it) |
 | `office`   | `activity` (8 s of the building), `walk` (a character crosses to its new station, when the demo gets there), `name-tag` (hover a character) |
+| `room`     | `enter` (click a room: the Office camera zooms in), `workspace` (Open workspace cross-fades to the focus view, Esc back), `leave` (Esc zooms out) |
 | `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |

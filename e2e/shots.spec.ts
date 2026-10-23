@@ -1137,7 +1137,7 @@ test.describe('background work', () => {
 });
 
 // 11.1: the Actor inspector on Minimal (popover, and the bottom sheet on a phone); 11.3: the
-// Office building.
+// Office building; 11.4: its room view.
 test.describe('layouts', () => {
   for (const theme of THEMES) {
     test.describe(theme, () => {
@@ -1206,6 +1206,34 @@ test.describe('layouts', () => {
           });
           await page.waitForTimeout(600);
           await shot('active');
+        });
+      }
+
+      // 11.4: the room view, mid-zoom and settled, with the actor panel (a sheet on a phone).
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test(`office room ${viewport.width}`, async ({ page }) => {
+          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          const room = page
+            .locator('[data-room]', { has: page.locator('[data-scene-actor^="t:"]') })
+            .first();
+          await expect(room).toBeVisible();
+          await page.waitForTimeout(600);
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-office-room-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+            });
+          await room.click({ position: { x: 40, y: 4 } });
+          await page.waitForTimeout(80);
+          await shot('zooming');
+          await expect(page.locator('[data-office]')).not.toHaveAttribute('data-office-moving', '');
+          await page.waitForTimeout(400);
+          await shot('rest');
         });
       }
     });

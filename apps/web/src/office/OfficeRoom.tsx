@@ -1,10 +1,18 @@
 import { toolFamily } from '@c-board/protocol';
 import { AnimatePresence, motion } from 'motion/react';
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { dur, ease, spring } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
 import { toneLabel } from '../status.js';
+import { cx } from '../ui/cx.js';
 import { Bookshelf, Couch, Desk, ServerRack, SideDesk, Workbench } from './kit/furniture.js';
 import { PortSign } from './kit/PortSign.js';
 import { type DoorLight, RoomShell } from './kit/RoomShell.js';
@@ -51,13 +59,17 @@ export interface OfficeRoomProps {
   /** Room width in px (= room units at scale 1). */
   width: number;
   now: number;
+  /** This room is the one the room view shows. */
+  entered?: boolean;
+  /** A click on the room (not on a character) or Enter on it: the room view. */
+  onEnter?(): void;
 }
 
 /**
  * One project's room in the building (DESIGN.md §10.3): the shell with door light, nameplate and
  * ceiling light, the whiteboard and port sign, a station per actor and everyone at theirs.
  */
-export function OfficeRoom({ project, width, now }: OfficeRoomProps) {
+export function OfficeRoom({ project, width, now, entered = false, onEnter }: OfficeRoomProps) {
   const work = useRef<ReadonlyMap<string, WorkStation>>(new Map());
   const plan = useMemo(
     () => planRoom(project.actors, { width, now, previous: work.current }),
@@ -75,27 +87,62 @@ export function OfficeRoom({ project, width, now }: OfficeRoomProps) {
   const accent = `var(--accent-${project.accent})`;
   const placements = [...plan.placements].sort((a, b) => Number(a.front) - Number(b.front));
 
-  // Arrow keys move between the room's characters (§10.1).
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  // The room is one Tab stop; arrow keys move into and between its characters, Enter on the
+  // room opens the room view, Esc on a character goes back to the room (§10.1).
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const room = event.currentTarget;
+    if (!room.contains(event.target as Node)) return;
+    if (event.target === room) {
+      if (event.key === 'Enter' && !entered && onEnter) {
+        event.preventDefault();
+        onEnter();
+        return;
+      }
+    } else if (event.key === 'Escape' && !entered && !event.defaultPrevented) {
+      event.preventDefault();
+      room.focus({ preventScroll: true });
+      return;
+    }
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     if (!step) return;
-    const buttons = [
-      ...event.currentTarget.querySelectorAll<HTMLElement>('[data-scene-actor]'),
-    ].sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    const buttons = [...room.querySelectorAll<HTMLElement>('[data-scene-actor]')].sort(
+      (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
+    );
+    if (buttons.length === 0) return;
     const index = buttons.indexOf(document.activeElement as HTMLElement);
-    if (index < 0) return;
     event.preventDefault();
-    buttons[(index + step + buttons.length) % buttons.length]?.focus();
+    const next = index < 0 ? (step > 0 ? 0 : buttons.length - 1) : index + step;
+    buttons[(next + buttons.length) % buttons.length]?.focus({ preventScroll: true });
+  };
+
+  // Anywhere in the room but a character or a control opens the room view. Clicks inside an
+  // inspector bubble here through its portal; those stay out.
+  const onClick = (event: MouseEvent<HTMLElement>) => {
+    if (entered || !onEnter) return;
+    const target = event.target as Element;
+    if (!event.currentTarget.contains(target)) return;
+    if (target.closest('button, a, [data-scene-actor]')) return;
+    onEnter();
   };
 
   return (
     <section
+      aria-roledescription="room"
       aria-label={`${project.name}, ${toneLabel(project.tone)}`}
+      aria-keyshortcuts={entered ? undefined : 'Enter'}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: each room is one Tab stop (§10.1).
+      tabIndex={0}
       data-room={project.id}
+      data-room-entered={entered || undefined}
+      data-focus-return={entered ? undefined : project.id}
       data-tone={project.tone}
       data-dim={project.dim || undefined}
       onKeyDown={onKeyDown}
-      className="office-room relative"
+      onClick={onClick}
+      className={cx(
+        'office-room relative outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-inset',
+        !entered && onEnter && 'cursor-pointer',
+      )}
       style={{ width, height: ROOM_HEIGHT }}
     >
       <RoomShell

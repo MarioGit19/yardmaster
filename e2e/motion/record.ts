@@ -231,6 +231,53 @@ const SCENARIOS = {
     );
   },
 
+  /** 11.4: the Office room view: zoom in, into the workspace and back, zoom out. */
+  async room(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+    await openOverview(page);
+    const room = page.locator('[data-room]', { has: page.locator('[data-scene-actor^="t:"]') });
+    await room.first().waitFor();
+    await page.waitForTimeout(1500);
+    const settled = () =>
+      page.locator('[data-office]:not([data-office-moving])').waitFor({ timeout: 5000 });
+    await r.moment(
+      'enter',
+      'transition',
+      'click a room: the camera zooms into it (~500 ms)',
+      async () => {
+        await room.first().click({ position: { x: 40, y: 4 } });
+        await page.locator('[data-office-room-panel]').waitFor();
+        await settled();
+        await page.waitForTimeout(300);
+      },
+    );
+    await r.moment(
+      'workspace',
+      'transition',
+      'Open workspace cross-fades to the focus view; Esc fades back to the room',
+      async () => {
+        await page.locator('[data-room-open]').click();
+        await page.locator('[data-focus]').waitFor();
+        await page.waitForTimeout(700);
+        await page.keyboard.press('Escape');
+        await page.locator('[data-focus]').waitFor({ state: 'detached' });
+        await page.waitForTimeout(500);
+      },
+    );
+    await r.moment(
+      'leave',
+      'transition',
+      'Esc: the camera zooms back out to the building',
+      async () => {
+        await page.keyboard.press('Escape');
+        await page.locator('[data-office-room-panel]').waitFor({ state: 'detached' });
+        await settled();
+        await page.waitForTimeout(300);
+      },
+    );
+  },
+
   /** A fresh board's first attention change reorders the pods within seconds. */
   async reorder(r: Recorder) {
     await openOverview(r.page);

@@ -2168,6 +2168,7 @@
 .office-cell {
   position: relative;
   min-width: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
 .office-cell::after {
   border-left: 1px solid var(--line-strong);
@@ -2221,4 +2222,12 @@
 }
 :root[data-motion="reduced"] .office-actor :is(.crew-leg-l, .crew-leg-r) {
   animation: none;
+}
+/* The room view (§10.3): the camera holds the scroll still, and the rest of the building steps
+   back while one room fills the stage. */
+main[data-office-zoom] {
+  overflow: hidden;
+}
+.office-cell[data-away] {
+  opacity: 0.22;
 }

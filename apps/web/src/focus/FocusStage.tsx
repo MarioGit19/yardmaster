@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
@@ -66,7 +66,16 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
   if (focus === null) direct.current = null;
   // Reduced and Off swap without the morph (Motion would still paint a frame at the pod's box).
   const level = useMotionLevel();
-  const shared = level === 'full' && focus !== null && focus.projectId !== direct.current;
+  const focusId = focus?.projectId ?? null;
+  const opened = focusId !== null && focusId !== direct.current;
+  // The morph needs a pod to come from; another layout's overview cross-fades into the view.
+  const fromPod = useMemo(
+    () =>
+      focusId !== null && document.querySelector(`[data-pod="${CSS.escape(focusId)}"]`) !== null,
+    [focusId],
+  );
+  const shared = level === 'full' && opened && fromPod;
+  const fade = level !== 'off' && opened && !shared;
 
   const open = focus !== null;
   useEffect(() => {
@@ -83,7 +92,8 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, navigate]);
 
-  // Back on the overview, keyboard focus returns to the pod the view came from.
+  // Back on the overview, keyboard focus returns to the pod (or the layout's room or node) the
+  // view came from.
   const last = useRef<string | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -92,8 +102,9 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
     if (focus || !previous) return;
     const active = document.activeElement;
     if (active && active !== document.body && !stageRef.current?.contains(active)) return;
+    const id = CSS.escape(previous);
     document
-      .querySelector<HTMLElement>(`[data-pod="${CSS.escape(previous)}"] header a`)
+      .querySelector<HTMLElement>(`[data-pod="${id}"] header a, [data-focus-return="${id}"]`)
       ?.focus({ preventScroll: true });
   }, [focus]);
 
@@ -110,6 +121,7 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
               sessionId={focus.sessionId}
               terminalId={focus.terminalId}
               shared={shared}
+              fade={fade}
             />
           </div>
         )}

@@ -75,10 +75,18 @@ export interface FocusViewProps {
   terminalId?: string;
   /** Morph out of (and back into) the project's pod. Off for a direct load of the route. */
   shared: boolean;
+  /** Cross-fade in and out instead (opened from a layout without pods, or at Reduced). */
+  fade?: boolean;
 }
 
 /** The project focus view, DESIGN.md §4.6, as a card over the dimmed overview. */
-export function FocusView({ projectId, sessionId, terminalId, shared }: FocusViewProps) {
+export function FocusView({
+  projectId,
+  sessionId,
+  terminalId,
+  shared,
+  fade = false,
+}: FocusViewProps) {
   const hydrated = useBoard(selectHydrated);
   const project = useBoard(selectProject(projectId));
 
@@ -99,9 +107,22 @@ export function FocusView({ projectId, sessionId, terminalId, shared }: FocusVie
     );
   }
   return (
-    <ProjectFocus project={project} sessionId={sessionId} terminalId={terminalId} shared={shared} />
+    <ProjectFocus
+      project={project}
+      sessionId={sessionId}
+      terminalId={terminalId}
+      shared={shared}
+      fade={fade}
+    />
   );
 }
+
+/** Opened from a layout without pods: the card cross-fades over the overview (§10.1). */
+const cardFade = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: dur.base, ease: ease.out } },
+  exit: { opacity: 0, transition: { duration: dur.fast, ease: ease.out } },
+};
 
 /** The body fades out first on the way back; its columns settle in on their own. */
 const body = { exit: { opacity: 0, transition: { duration: dur.fast, ease: ease.out } } };
@@ -131,11 +152,13 @@ function ProjectFocus({
   sessionId,
   terminalId,
   shared,
+  fade,
 }: {
   project: Project;
   sessionId?: string;
   terminalId?: string;
   shared: boolean;
+  fade: boolean;
 }) {
   // A terminal deep link asks the stack for that tab, like a terminal picked in ⌘K.
   useEffect(() => {
@@ -224,6 +247,7 @@ function ProjectFocus({
     <motion.div
       layoutId={shared ? sharedId.container(project.id) : undefined}
       transition={spring.smooth}
+      {...(fade && cardFade)}
       data-focus={project.id}
       style={{ borderRadius: 16, '--accent': accent } as never}
       className="focus-card relative flex h-full min-h-0 flex-col overflow-hidden border border-line bg-bg-1 shadow-raised"
