@@ -54,8 +54,22 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   claude -p "$(cat loop/PROMPT.md)" \
     --permission-mode "$MODE" \
     --output-format stream-json --verbose \
-    ${model_args[@]+"${model_args[@]}"} >"$log" 2>&1
-  code=$?
+    ${model_args[@]+"${model_args[@]}"} >"$log" 2>&1 &
+  pid=$!
+  # Background jobs ignore Ctrl+C in scripts, so pass it on.
+  trap 'kill "$pid" 2>/dev/null; exit 130' INT TERM
+  # claude -p sometimes stays alive after its final result line; give it a minute, then end it.
+  finished_at=0
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 5
+    if [ "$finished_at" -eq 0 ] && tail -n 1 "$log" | grep -q '"type":"result"'; then finished_at=$SECONDS; fi
+    if [ "$finished_at" -gt 0 ] && [ $((SECONDS - finished_at)) -ge 60 ]; then
+      echo "  claude finished but didn't exit; ending it."; kill "$pid" 2>/dev/null; break
+    fi
+  done
+  wait "$pid"; code=$?
+  trap - INT TERM
+  [ "$finished_at" -gt 0 ] && tail -n 1 "$log" | grep -q '"is_error":false' && code=0
 
   # Show the final result line, if any
   tail -n 1 "$log" | python3 -c 'import sys,json
