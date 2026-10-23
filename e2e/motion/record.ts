@@ -278,6 +278,52 @@ const SCENARIOS = {
     );
   },
 
+  /** 11.5: the Grid's 2D map: packets on the pipelines, a burst, and the flat cockpit. */
+  async grid(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+    await openOverview(page);
+    await page.locator('[data-grid-map]').waitFor();
+    await page.waitForTimeout(1500);
+    await r.moment('activity', 'activity', '8 s of the network at work', hold(page, 8000));
+    await r.moment(
+      'packets',
+      'transition',
+      '2 s at 12 fps: packets travel out along the lit pipelines, faster on busier ones',
+      hold(page, 2000),
+    );
+    await catchMoment(
+      r,
+      'burst',
+      'an event fires a three-packet burst in its tool family color',
+      '[data-grid-burst]',
+      { ms: 1100, leadMs: 100 },
+    );
+    const node = page.locator('[data-grid-node]', {
+      has: page.locator('[data-scene-actor^="t:"]'),
+    });
+    await r.moment(
+      'enter',
+      'transition',
+      'click a node: the map cross-fades to its flat cockpit (dur.slow)',
+      async () => {
+        await node.first().click({ position: { x: 100, y: 8 } });
+        await page.locator('[data-grid-cockpit]').waitFor();
+        await page.waitForTimeout(700);
+      },
+    );
+    await r.moment(
+      'leave',
+      'transition',
+      'Esc: the cockpit cross-fades back to the map',
+      async () => {
+        await page.keyboard.press('Escape');
+        await page.locator('[data-grid-map]').waitFor();
+        await page.waitForTimeout(700);
+      },
+    );
+  },
+
   /** A fresh board's first attention change reorders the pods within seconds. */
   async reorder(r: Recorder) {
     await openOverview(r.page);

@@ -2231,3 +2231,375 @@ main[data-office-zoom] {
 .office-cell[data-away] {
   opacity: 0.22;
 }
+
+/* Grid, the flat network (DESIGN.md §10.4 "2D map"). One neon for structure; status colors keep
+   their meaning. Packets travel, nothing blinks: every loop here is slower than 1 Hz. */
+.grid-floor {
+  background:
+    radial-gradient(90% 60% at 50% 45%, transparent 30%, var(--grid-fog) 100%), var(--grid-bg);
+}
+.grid-floor-lines {
+  --grid-line: color-mix(in srgb, var(--grid-neon) 7%, transparent);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 56px 56px;
+  mask-image: radial-gradient(80% 70% at 50% 45%, #000 30%, transparent 85%);
+}
+.grid-floor-scan {
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--grid-neon) 3%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+}
+[data-theme="light"] .grid-floor-scan {
+  opacity: 0.5;
+}
+
+/* The core: you. Its light follows the whole board's activity. */
+.grid-core {
+  transform: translate(-50%, -50%);
+}
+.grid-core-glow {
+  position: absolute;
+  inset: -22px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--grid-neon) 32%, transparent),
+    transparent
+  );
+  transition: opacity var(--dur-ambient) var(--ease-out);
+}
+.grid-core-body {
+  fill: var(--grid-bg);
+  stroke: var(--grid-neon);
+  stroke-width: 1.25;
+}
+.grid-core-facets {
+  fill: none;
+  stroke: color-mix(in srgb, var(--grid-neon) 45%, transparent);
+  stroke-width: 1;
+}
+.grid-core-light {
+  fill: var(--grid-neon);
+  transition: opacity var(--dur-ambient) var(--ease-out);
+}
+
+/* Pipelines: dim at rest, lit while the project works, amber toward a waiting node, rose on an
+   error. The glow is a wider, fainter copy of the line (no filters on a hot path). */
+.grid-pipe {
+  --pipe: var(--grid-neon);
+  --pipe-alpha: 22%;
+}
+.grid-pipe:not([data-step="0"]) {
+  --pipe-alpha: 60%;
+}
+.grid-pipe[data-hot] {
+  --pipe-alpha: 85%;
+}
+.grid-pipe[data-tone="wait"] {
+  --pipe: var(--st-wait);
+  --pipe-alpha: 70%;
+}
+.grid-pipe[data-tone="err"] {
+  --pipe: var(--st-err);
+  --pipe-alpha: 70%;
+}
+.grid-pipe-line,
+.grid-pipe-glow {
+  stroke: color-mix(in srgb, var(--pipe) var(--pipe-alpha), transparent);
+  stroke-linecap: round;
+  transition: stroke var(--dur-base) var(--ease-out);
+}
+.grid-pipe-line {
+  stroke-width: 1.25;
+}
+.grid-pipe-glow {
+  stroke-width: 6;
+  opacity: 0.18;
+}
+.grid-pipe[data-step="0"]:not([data-hot], [data-tone="wait"], [data-tone="err"]) .grid-pipe-glow {
+  opacity: 0;
+}
+/* An error glitches its pipeline once (§3 rule 6: two frames, ±2 px), then stays rose. */
+@keyframes grid-glitch {
+  0% {
+    transform: translateX(2px);
+  }
+  50% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.grid-pipe[data-tone="err"] .grid-pipe-line {
+  animation: grid-glitch var(--dur-fast) steps(2, end) 1;
+}
+:root[data-motion="reduced"] .grid-pipe-line {
+  animation: none;
+}
+
+/* Packets ride a group already turned along the pipeline: they only move along x. */
+@keyframes grid-packet {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(var(--len));
+    opacity: 0;
+  }
+}
+.grid-packet {
+  fill: color-mix(in srgb, var(--grid-neon) 70%, var(--text-1));
+  animation: grid-packet var(--packet-period) linear infinite;
+}
+.grid-burst {
+  animation: grid-packet var(--dur-spark) var(--ease-out) 1 both;
+}
+.grid-done {
+  fill: var(--st-ok);
+  stroke: var(--st-ok-glow);
+  stroke-width: 4;
+  animation: grid-packet var(--dur-spark) var(--ease-in-out) 1 both;
+}
+/* A waiting node: one amber pulse toward it every 2.4 s (§3 rule 4's breathing period). */
+.grid-beckon {
+  fill: var(--st-wait);
+  stroke: var(--st-wait-glow);
+  stroke-width: 4;
+  animation: grid-packet var(--dur-breathe) var(--ease-in-out) infinite;
+}
+.grid-world[data-paused] :is(.grid-packet, .grid-beckon) {
+  animation-play-state: paused;
+}
+
+/* Nodes: glass cards with a hexagon whose edge is the status and whose core is the activity. */
+.grid-node {
+  --edge: color-mix(in srgb, var(--grid-neon) 55%, transparent);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--grid-neon) 18%, transparent);
+  border-radius: var(--radius-panel);
+  background: var(--grid-panel);
+  box-shadow: var(--highlight-inset);
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    opacity var(--dur-dim) var(--ease-out);
+}
+.grid-node:hover,
+.grid-node:focus-within {
+  border-color: color-mix(in srgb, var(--grid-neon) 45%, transparent);
+}
+.grid-node:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.grid-node[data-tone="work"] {
+  --edge: var(--st-work);
+}
+.grid-node[data-tone="tool"] {
+  --edge: var(--st-tool);
+}
+.grid-node[data-tone="ok"] {
+  --edge: var(--st-ok);
+}
+.grid-node[data-tone="wait"] {
+  --edge: var(--st-wait);
+  border-color: color-mix(in srgb, var(--st-wait) 55%, transparent);
+  box-shadow:
+    var(--highlight-inset),
+    0 0 0 1px color-mix(in srgb, var(--st-wait) 30%, transparent),
+    0 8px 40px -8px var(--st-wait-glow);
+}
+.grid-node[data-tone="err"] {
+  --edge: var(--st-err);
+  border-color: color-mix(in srgb, var(--st-err) 55%, transparent);
+  box-shadow:
+    var(--highlight-inset),
+    0 0 0 1px color-mix(in srgb, var(--st-err) 30%, transparent),
+    0 8px 40px -8px var(--st-err-glow);
+}
+.grid-node[data-dim]:not(:hover, :focus-within) {
+  opacity: 0.7;
+}
+.grid-hex-edge {
+  fill: var(--grid-bg);
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+.grid-hex-core {
+  fill: var(--edge);
+  transition: opacity var(--dur-ambient) var(--ease-out);
+}
+/* A waiting node raises a soft amber beam above its hexagon. Still: the pipeline carries the
+   pulse. */
+.grid-beacon {
+  position: absolute;
+  left: 22px;
+  bottom: calc(100% - 16px);
+  width: 16px;
+  height: 64px;
+  border-radius: 8px;
+  background: linear-gradient(to top, var(--st-wait-glow), transparent);
+  pointer-events: none;
+}
+
+/* Satellites: one per actor on a short sub-pipe (dashed for subagents and background work). */
+.grid-satellites {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+  margin-top: auto;
+  padding-left: 9px;
+}
+.grid-satellite-slot {
+  display: flex;
+  align-items: center;
+}
+.grid-satellite-slot::before {
+  content: "";
+  width: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--grid-neon) 35%, transparent);
+}
+.grid-satellite-slot:first-child::before {
+  width: 0;
+}
+.grid-satellite-slot:is([data-kind="subagent"], [data-kind="background"])::before {
+  border-top-style: dashed;
+}
+.grid-satellite {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  outline: none;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.grid-satellite:hover,
+.grid-satellite[data-state="open"] {
+  background: color-mix(in srgb, var(--grid-neon) 12%, transparent);
+}
+.grid-satellite:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.grid-satellite-mark {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+}
+.grid-satellite-mark > * {
+  fill: var(--st-idle);
+  stroke: var(--grid-bg);
+  stroke-width: 1;
+}
+.grid-satellite[data-tone="work"] .grid-satellite-mark > * {
+  fill: var(--st-work);
+}
+.grid-satellite[data-tone="tool"] .grid-satellite-mark > * {
+  fill: var(--st-tool);
+}
+.grid-satellite[data-tone="ok"] .grid-satellite-mark > * {
+  fill: var(--st-ok);
+}
+.grid-satellite[data-tone="wait"] .grid-satellite-mark > * {
+  fill: none;
+  stroke: var(--st-wait);
+  stroke-width: 2;
+}
+.grid-satellite[data-tone="err"] .grid-satellite-mark > * {
+  fill: var(--st-err);
+}
+.grid-satellite[data-active] .grid-satellite-mark {
+  filter: drop-shadow(0 0 3px var(--grid-neon));
+}
+.grid-more {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  padding: 0 4px;
+}
+/* The phone's trunk: full-width rows with 44 px satellites (§10.1). */
+.grid-node[data-variant="trunk"] .grid-satellites {
+  margin-top: 8px;
+  padding-left: 0;
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .grid-satellite,
+  .grid-more {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* The flat cockpit: glass screens with a neon hairline. */
+.grid-screen {
+  border: 1px solid color-mix(in srgb, var(--grid-neon) 22%, transparent);
+  border-radius: var(--radius-panel);
+  background: var(--grid-panel);
+  box-shadow:
+    var(--highlight-inset),
+    0 0 0 1px color-mix(in srgb, var(--grid-neon) 4%, transparent),
+    0 12px 40px -16px color-mix(in srgb, var(--grid-neon) 18%, transparent);
+}
+.grid-screen[data-tone="wait"] {
+  border-color: color-mix(in srgb, var(--st-wait) 55%, transparent);
+}
+.grid-screen[data-tone="err"] {
+  border-color: color-mix(in srgb, var(--st-err) 55%, transparent);
+}
+.grid-cockpit-stack {
+  display: flex;
+  gap: 12px;
+  margin: 0 -16px;
+  padding: 0 16px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.grid-cockpit-card {
+  flex: 0 0 calc(100% - 24px);
+  min-width: 0;
+  scroll-snap-align: center;
+}
+/* Hovering or focusing a node shows its counts above it (the map only; a phone reads the
+   satellites). */
+.grid-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  translate: -50% 0;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--grid-neon) 30%, transparent);
+  border-radius: var(--radius-chip);
+  background: var(--grid-panel);
+  color: var(--text-2);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.grid-node:is(:hover, :focus-visible) .grid-tip {
+  opacity: 1;
+}
+.grid-node[data-variant="trunk"] .grid-satellite-slot::before {
+  width: 0;
+  margin-right: 4px;
+}
+/* The trunk runs behind the phone's rows: they're solid so it only shows between them. */
+.grid-node[data-variant="trunk"] {
+  background: var(--bg-1);
+}

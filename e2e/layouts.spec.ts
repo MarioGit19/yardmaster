@@ -453,3 +453,260 @@ test.describe('the Office room view', () => {
     }
   });
 });
+
+/** Projects showing each attention cue on the Grid: nodes, and the pipelines feeding them. */
+async function gridCues(page: Page) {
+  const count = (selector: string) => page.locator(selector).count();
+  return {
+    wait: await count('[data-grid-node][data-tone="wait"]'),
+    err: await count('[data-grid-node][data-tone="err"]'),
+    pipes: {
+      wait: await count('[data-grid-pipe][data-tone="wait"]'),
+      err: await count('[data-grid-pipe][data-tone="err"]'),
+    },
+  };
+}
+
+/** Packets in flight per activity step, as `packetFlow` in grid/map.ts. */
+const PACKETS = ['0', '1', '2', '3'];
+
+test.describe('the Grid map', () => {
+  test('shows the same amber and rose cues as Minimal, on its own floor', async ({ browser }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect
+        .poll(
+          async () => {
+            await page.keyboard.press('Alt+Digit1');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'minimal');
+            await expect(page.locator('main [data-layout="grid"]')).toHaveCount(0);
+            const minimal = await cues(page, false);
+            await page.keyboard.press('Alt+Digit3');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'grid');
+            await expect(page.locator('main [data-layout="minimal"]')).toHaveCount(0);
+            const grid = await gridCues(page);
+            const same =
+              minimal.wait === grid.wait &&
+              minimal.err === grid.err &&
+              grid.pipes.wait === grid.wait &&
+              grid.pipes.err === grid.err;
+            return same && minimal.wait > 0;
+          },
+          { timeout: 40_000, intervals: [500] },
+        )
+        .toBe(true);
+      // A waiting node raises its beacon; its waiting session is a satellite.
+      await expect(
+        page.locator('[data-grid-node][data-tone="wait"] [data-grid-beacon]').first(),
+      ).toBeAttached();
+      await expect(
+        page.locator('[data-grid-node] [data-scene-actor][data-actor-state="waiting"]').first(),
+      ).toBeVisible();
+      await expect(page.locator('[data-grid-floor]')).toHaveCount(1);
+      await expect(page.locator('[data-ambient]')).toHaveCount(0);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('packets follow activity, and nothing flashes faster than 3 Hz', async ({ browser }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      await expect(page.locator('[data-grid-map]')).toBeVisible();
+      // Each pipeline carries as many packets as its project's activity step asks for.
+      const flowsMatch = () =>
+        page
+          .locator('[data-grid-pipe]')
+          .evaluateAll(
+            (pipes, wanted) =>
+              pipes.every(
+                (pipe) =>
+                  String(pipe.querySelectorAll('[data-grid-packet]').length) ===
+                  wanted[Number(pipe.getAttribute('data-step'))],
+              ),
+            PACKETS,
+          );
+      await expect.poll(flowsMatch).toBe(true);
+      // Some project is busy: its pipeline is lit and packets travel on it.
+      await expect(
+        page.locator('[data-grid-pipe]:not([data-step="0"]) [data-grid-packet]').first(),
+      ).toBeAttached({
+        timeout: 20_000,
+      });
+      // An event fires a burst along its pipeline.
+      await expect(page.locator('[data-grid-burst]').first()).toBeAttached({ timeout: 20_000 });
+
+      // WCAG 2.3.1: every repeating animation in the Grid has a period of at least 1/3 s.
+      const loops = await page.evaluate(() =>
+        document.getAnimations().flatMap((animation) => {
+          const target = (animation.effect as KeyframeEffect | null)?.target;
+          if (!target?.closest('[data-grid]')) return [];
+          const timing = animation.effect?.getComputedTiming();
+          if (!timing || timing.iterations !== Number.POSITIVE_INFINITY) return [];
+          return [{ duration: Number(timing.duration), rate: animation.playbackRate }];
+        }),
+      );
+      expect(loops.length).toBeGreaterThan(0);
+      for (const loop of loops)
+        expect(loop.duration / Math.abs(loop.rate)).toBeGreaterThanOrEqual(1000 / 3);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('a satellite opens the inspector; a node opens its cockpit and Esc steps back', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      const grid = page.locator('[data-grid]');
+      const any = page
+        .locator('[data-grid-node]', { has: page.locator('[data-scene-actor^="t:"]') })
+        .first();
+      await expect(any).toBeVisible();
+      // Pinned by id: nodes reorder by attention under a `.first()`.
+      const nodeId = await any.getAttribute('data-grid-node');
+      const node = page.locator(`[data-grid-node="${nodeId}"]`);
+
+      // A satellite: the inspector, and Esc gives focus back to it.
+      const satellite = node.locator('[data-scene-actor^="t:"]').first();
+      await expect(satellite).toHaveAttribute('tabindex', '-1');
+      await satellite.click();
+      const inspector = page.locator('[data-actor-inspector]');
+      await expect(inspector.locator('[data-actor]')).toContainText('Terminal ·');
+      await page.keyboard.press('Escape');
+      await expect(inspector).toHaveCount(0);
+      await expect(satellite).toBeFocused();
+      await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
+
+      // Keyboard: Tab moves node to node, Enter opens the cockpit.
+      await node.focus();
+      await page.keyboard.press('Tab');
+      const next = await page.evaluate(() =>
+        document.activeElement?.getAttribute('data-grid-node'),
+      );
+      expect(next).toBeTruthy();
+      expect(next).not.toBe(nodeId);
+      await page.keyboard.press('Shift+Tab');
+      await expect(node).toBeFocused();
+      await page.keyboard.press('ArrowRight');
+      await expect(node.locator('[data-scene-actor]:focus')).toHaveCount(1);
+      await page.keyboard.press('Escape');
+      await expect(node).toBeFocused();
+      await page.keyboard.press('Enter');
+
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+      const cockpit = page.locator(`[data-grid-cockpit="${nodeId}"]`);
+      await expect(cockpit).toBeVisible();
+      await expect(page.locator('[data-grid-map]')).toHaveCount(0);
+      // The Claude screen in the middle, terminal screens with their live tails, small screens.
+      await expect(
+        cockpit.locator('[data-grid-screen="terminal"] [data-peek]').first(),
+      ).toBeVisible();
+      for (const kind of ['git', 'ports', 'todo'])
+        await expect(cockpit.locator(`[data-grid-screen="${kind}"]`)).toBeVisible();
+
+      // Open workspace, then Esc back into the same cockpit.
+      await cockpit.locator('[data-cockpit-open]').click();
+      await expect(page.locator(`[data-focus="${nodeId}"]`)).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-focus]')).toHaveCount(0);
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+      await expect(cockpit.locator('[data-cockpit-open]')).toBeFocused();
+
+      // Esc again: back on the network, focus on the node.
+      await page.keyboard.press('Escape');
+      await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
+      await expect(node).toBeFocused();
+
+      // The browser's back leaves the cockpit like Esc.
+      await page.keyboard.press('Enter');
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+      await page.goBack();
+      await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
+      await expect(page).toHaveURL(/#\/$/);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('at Reduced nothing travels: pipelines just light up', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.evaluate(() => {
+        localStorage.setItem('cboard.layout', 'grid');
+        localStorage.setItem('cboard.motion', 'reduced');
+      });
+      await page.reload();
+      await expect(page.locator('[data-grid-map]')).toBeVisible();
+      await expect(page.locator('[data-grid-pipe]:not([data-step="0"])').first()).toBeAttached({
+        timeout: 20_000,
+      });
+      await expect(
+        page.locator('[data-grid-packet], [data-grid-burst], [data-grid-beckon], [data-grid-done]'),
+      ).toHaveCount(0);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('on a touch phone: one trunk, 44 px satellites, the cockpit as a swipeable row', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser, {
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await page.evaluate(() => localStorage.setItem('cboard.layout', 'grid'));
+      await page.reload();
+      const grid = page.locator('[data-grid]');
+      await expect(grid).toHaveAttribute('data-grid-view', 'trunk');
+      await expect(page.locator('[data-grid-trunk] [data-grid-pipe]').first()).toBeAttached();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      const node = page
+        .locator('[data-grid-node]', { has: page.locator('[data-scene-actor^="t:"]') })
+        .first();
+      const nodeId = await node.getAttribute('data-grid-node');
+      const satellite = page.locator(`[data-grid-node="${nodeId}"] [data-scene-actor]`).first();
+      const box = await satellite.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      await satellite.tap();
+      const sheet = page.locator('[data-actor-inspector][data-sheet]');
+      await expect(sheet).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+
+      await page.locator(`[data-grid-node="${nodeId}"]`).tap({ position: { x: 100, y: 10 } });
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+      const stack = page.locator(`[data-grid-cockpit="${nodeId}"] .grid-cockpit-stack`);
+      await expect(stack).toBeVisible();
+      // More screens than fit: the row scrolls sideways, one screen at a time.
+      const scroll = await stack.evaluate((el) => ({
+        width: el.scrollWidth,
+        client: el.clientWidth,
+        snap: getComputedStyle(el).scrollSnapType,
+      }));
+      expect(scroll.width).toBeGreaterThan(scroll.client);
+      expect(scroll.snap).toContain('mandatory');
+      await page.locator('[data-cockpit-back]').tap();
+      await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
+      await expect(grid).toHaveAttribute('data-grid-view', 'trunk');
+    } finally {
+      await stop();
+    }
+  });
+});

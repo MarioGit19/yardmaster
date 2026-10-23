@@ -21,7 +21,7 @@ type Loader = () => Promise<{ default: ComponentType }>;
 const LOADERS: Record<LayoutId, Loader> = {
   minimal: () => import('./minimal/MinimalLayout.js'),
   office: () => import('../office/OfficeLayout.js'),
-  grid: () => import('./placeholder/GridLayout.js'),
+  grid: () => import('../grid/GridLayout.js'),
   transit: () => import('./placeholder/TransitLayout.js'),
   retro: () => import('./placeholder/RetroLayout.js'),
 };

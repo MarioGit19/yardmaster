@@ -1236,6 +1236,59 @@ test.describe('layouts', () => {
           await shot('rest');
         });
       }
+
+      // 11.5: the Grid's 2D map (a trunk on a phone), at rest and under demo activity, and the
+      // flat cockpit of a node.
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
+        { width: 390, height: 844 },
+      ]) {
+        test(`grid ${viewport.width}`, async ({ page }) => {
+          test.slow();
+          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-grid-node]').first()).toBeVisible();
+          await page.waitForTimeout(800);
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-grid-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+              fullPage: true,
+            });
+          await shot('rest');
+          await expect(page.locator('[data-grid-node][data-tone="wait"]').first()).toBeVisible({
+            timeout: 30_000,
+          });
+          await page.waitForTimeout(600);
+          await shot('active');
+          const node = page
+            .locator('[data-grid-node]', { has: page.locator('[data-scene-actor^="t:"]') })
+            .first();
+          await node.click({ position: { x: 60, y: 8 } });
+          await expect(page.locator('[data-grid-cockpit]')).toBeVisible();
+          await page.waitForTimeout(900);
+          await shot('cockpit');
+        });
+      }
     });
   }
+});
+
+test.describe('grid reduced', () => {
+  test('map', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('cboard.layout', 'grid');
+      localStorage.setItem('cboard.motion', 'reduced');
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openRoute(page, '/');
+    await expect(page.locator('[data-grid-node]').first()).toBeVisible();
+    await page.waitForTimeout(3000);
+    await page.screenshot({
+      path: new URL('layout-grid-reduced-1440-dark.png', OUT_DIR).pathname,
+      fullPage: true,
+    });
+  });
 });

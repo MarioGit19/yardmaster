@@ -42,6 +42,10 @@ export const loop = {
   ramp: 0.5,
   fly: 0.3,
   expand: 0.3,
+  /** Grid packets crossing a pipeline (grid/map.ts `packetFlow`): calm, busy, peak. */
+  packetCalm: 2.4,
+  packetBusy: 1.8,
+  packetPeak: 1.1,
 } as const;
 
 export const ease = {

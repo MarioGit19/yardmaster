@@ -53,7 +53,12 @@ let root: Root;
 
 beforeAll(async () => {
   // The overview's layout is a lazy chunk; loaded up front it renders without suspending.
-  await Promise.all([preloadLayout('minimal'), preloadLayout('office'), preloadLayout('grid')]);
+  await Promise.all([
+    preloadLayout('minimal'),
+    preloadLayout('office'),
+    preloadLayout('grid'),
+    preloadLayout('transit'),
+  ]);
   // happy-dom's WAAPI rejects Motion's cancelled animations; the pod grid only needs to mount.
   MotionGlobalConfig.skipAnimations = true;
 });
@@ -121,10 +126,12 @@ describe('routes', () => {
     try {
       expect(container.querySelector('main [data-layout="office"] [data-office]')).not.toBeNull();
       act(() => layoutPreference.set('grid'));
-      const grid = container.querySelector('main [data-layout="grid"]');
-      expect(grid?.querySelector('[data-layout-placeholder="grid"]')).not.toBeNull();
+      expect(container.querySelector('main [data-layout="grid"] [data-grid]')).not.toBeNull();
+      act(() => layoutPreference.set('transit'));
+      const transit = container.querySelector('main [data-layout="transit"]');
+      expect(transit?.querySelector('[data-layout-placeholder="transit"]')).not.toBeNull();
       // The placeholder lists the scene: every actor is a button with its full name.
-      const actor = grid?.querySelector('[data-scene-actor="s:s-1"]');
+      const actor = transit?.querySelector('[data-scene-actor="s:s-1"]');
       expect(actor?.getAttribute('aria-label')).toBe('acme-shop, Claude, waiting for approval');
     } finally {
       act(() => layoutPreference.set('minimal'));
