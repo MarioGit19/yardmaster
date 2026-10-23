@@ -183,7 +183,7 @@ const SCENARIOS = {
     await page.waitForTimeout(2200);
     await r.moment('switch', 'transition', '⌥2 Minimal → Office, then ⌥1 back', async () => {
       await page.keyboard.press('Alt+Digit2');
-      await page.locator('[data-layout-placeholder="office"]').waitFor();
+      await page.locator('[data-office-building]').waitFor();
       await page.waitForTimeout(900);
       await page.keyboard.press('Alt+Digit1');
       await page.locator('[data-layout="minimal"] [data-pod]').first().waitFor();
@@ -199,6 +199,34 @@ const SCENARIOS = {
         await page.waitForTimeout(700);
         await page.keyboard.press('Escape');
         await page.waitForTimeout(500);
+      },
+    );
+  },
+
+  /** 11.3: the Office building: live activity, a character walking to a new station, a name tag. */
+  async office(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+    await openOverview(page);
+    await page.locator('[data-office-building]').waitFor();
+    await page.waitForTimeout(1500);
+    await r.moment('activity', 'activity', '8 s of the building at work', hold(page, 8000));
+    await catchMoment(
+      r,
+      'walk',
+      'a character walks to its new station (600–900 ms, legs swinging)',
+      '[data-office-actor][data-walking]',
+      { ms: 1100, leadMs: 200 },
+    );
+    await r.moment(
+      'name-tag',
+      'transition',
+      'hover a character: its name tag fades in',
+      async () => {
+        await page.locator('[data-office-actor] [data-scene-actor]').first().hover();
+        await page.waitForTimeout(500);
+        await page.mouse.move(4, DESKTOP.height - 4);
+        await page.waitForTimeout(400);
       },
     );
   },

@@ -5,6 +5,7 @@ import {
   type Project,
   sessionDisplayName,
   type Terminal,
+  toolFamily,
 } from '@c-board/protocol';
 import { backgroundItems } from '../background/model.js';
 import {
@@ -19,9 +20,11 @@ import { activityKey, levelAt, type Pulses, QUIET_LEVEL } from '../data/activity
 import { isCrashExit, terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';
+import { isDimmed } from '../pod/activity.js';
 import {
   attentionRank,
   type Caption,
+  lastLine,
   orderPods,
   podSessions,
   sessionCaption,
@@ -75,6 +78,22 @@ export interface SceneActor {
   links: ActorLinks;
   /** When it started (session, task) or opened (terminal). */
   since: number;
+  /** The tool a session is running, and since when (the Office's monitor and bookshelf trip). */
+  tool: string | null;
+  toolSince: number | null;
+  /** A session in plan mode or writing its todo list: it stands at the whiteboard (§10.3). */
+  planning: boolean;
+  /** A terminal's listening ports, ascending. */
+  ports: number[];
+  /** When a terminal's running command started, or null. */
+  runningSince: number | null;
+  /** A failed command's exit code. */
+  exit: number | null;
+}
+
+export interface SceneTodo {
+  text: string;
+  done: boolean;
 }
 
 export interface SceneProject {
@@ -83,6 +102,18 @@ export interface SceneProject {
   accent: Project['accent'];
   tone: Tone;
   actors: SceneActor[];
+  branch: string | null;
+  /** Uncommitted files. */
+  dirty: number;
+  /** Every port the project's processes listen on, ascending. */
+  ports: number[];
+  /** The main session's todo list, or else its last assistant line (the Office whiteboard). */
+  todos: SceneTodo[];
+  summary: string | null;
+  /** 0..1, the project's activity level (§4.10). */
+  activity: number;
+  /** Nothing for five minutes: the pod dims, the Office's ceiling light goes down. */
+  dim: boolean;
 }
 
 export interface SceneModel {
@@ -208,6 +239,39 @@ function terminalCaption(state: OpsState, command: string | null, exit: number |
   }
 }
 
+const NO_EXTRAS = {
+  tool: null,
+  toolSince: null,
+  planning: false,
+  ports: [] as number[],
+  runningSince: null,
+  exit: null,
+} satisfies Partial<SceneActor>;
+
+function sessionExtras(session: ClaudeSession) {
+  const current = session.currentTool?.status === 'running' ? session.currentTool : null;
+  const tool = current?.tool ?? (session.status.kind === 'tool' ? session.status.tool : null);
+  return {
+    ...NO_EXTRAS,
+    tool,
+    toolSince: current?.startedAt ?? null,
+    planning: session.permissionMode === 'plan' || (tool !== null && toolFamily(tool) === 'todo'),
+  };
+}
+
+/** Listening ports by terminal, ascending. */
+function terminalPorts(board: BoardState): Map<string, number[]> {
+  const ports = new Map<string, number[]>();
+  for (const binding of Object.values(board.ports)) {
+    if (!binding.terminalId) continue;
+    const list = ports.get(binding.terminalId) ?? [];
+    if (!list.includes(binding.port)) list.push(binding.port);
+    ports.set(binding.terminalId, list);
+  }
+  for (const list of ports.values()) list.sort((a, b) => a - b);
+  return ports;
+}
+
 interface Group {
   sessions: ClaudeSession[];
   terminals: Terminal[];
@@ -282,6 +346,7 @@ function projectActors(
         name: actorName(project.name, item.label, kind, childCaption),
         links: { ...links, approvalId: null },
         since: item.startedAt,
+        ...NO_EXTRAS,
       });
     }
     tops.push({
@@ -298,14 +363,13 @@ function projectActors(
         name: actorName(project.name, label, 'claude', caption),
         links,
         since: session.startedAt,
+        ...sessionExtras(session),
       },
       children,
     });
   }
 
-  const listening = new Set<string>();
-  for (const port of Object.values(board.ports))
-    if (port.terminalId) listening.add(port.terminalId);
+  const ports = terminalPorts(board);
 
   for (const terminal of group.terminals) {
     if (terminal.state !== 'open' || claudeTerminals.has(terminal.id)) continue;
@@ -319,13 +383,18 @@ function projectActors(
     const pulse = pulses[activityKey.terminal(terminal.id)];
     const state = opsStateFor(terminal, executions, {
       now,
-      listening: listening.has(terminal.id),
+      listening: ports.has(terminal.id),
       lastOutputAt: pulse?.lastAt ?? null,
     });
     const last = laneExecution(board, terminal);
     const label = terminalDisplay(terminal, last).name;
     const command = last.commandLine?.trim() || null;
     const caption = terminalCaption(state, command, last.exitCode);
+    let running: Execution | null = null;
+    for (const execution of executions) {
+      if (execution.endedAt === null && (!running || execution.startedAt > running.startedAt))
+        running = execution;
+    }
     tops.push({
       actor: {
         id: actorId.terminal(terminal.id),
@@ -345,6 +414,10 @@ function projectActors(
           approvalId: null,
         },
         since: terminal.createdAt,
+        ...NO_EXTRAS,
+        ports: ports.get(terminal.id) ?? [],
+        runningSince: running?.startedAt ?? null,
+        exit: state === 'error' ? last.exitCode : null,
       },
       children: [],
     });
@@ -386,18 +459,64 @@ const EMPTY: Group = { sessions: [], terminals: [] };
  * The scene model for the board at `now`. Projects come in the overview's order (waiting, then
  * errors, then by name); actors inside a project attention first.
  */
+/** The terminal's newest command failed (`selectCrashedCount`'s rule). */
+function crashedTerminal(board: BoardState, terminal: Terminal): boolean {
+  for (let i = terminal.executionIds.length - 1; i >= 0; i--) {
+    const execution = board.executions[terminal.executionIds[i] ?? ''];
+    if (execution) return execution.endedAt !== null && isCrashExit(execution.exitCode);
+  }
+  return false;
+}
+
+/** One project's scene: its actors and what its room shows. */
+function sceneProject(
+  board: BoardState,
+  pulses: Pulses,
+  project: Project,
+  group: Group,
+  now: number,
+): SceneProject {
+  const tone = projectTone(group.sessions, group.terminals);
+  const live = podSessions(group.sessions);
+  const main = live.find((s) => s.todos.length > 0) ?? live[0] ?? null;
+  const ports = new Set<number>();
+  for (const binding of Object.values(board.ports))
+    if (binding.projectId === project.id) ports.add(binding.port);
+  const pulse = pulses[activityKey.project(project.id)];
+  const crashed = group.terminals.some((t) => t.state === 'open' && crashedTerminal(board, t));
+  const lastActivity = Math.max(pulse?.lastAt ?? 0, project.lastActivityAt ?? 0) || null;
+  const git = project.git;
+  return {
+    id: project.id,
+    name: project.name,
+    accent: project.accent,
+    tone,
+    actors: projectActors(board, pulses, project, group, now),
+    branch: git ? (git.branch ?? (git.head ? git.head.slice(0, 7) : null)) : null,
+    dirty: git?.dirty ?? 0,
+    ports: [...ports].sort((a, b) => a - b),
+    todos: (main?.todos ?? []).map((t) => ({
+      text: t.status === 'in_progress' ? (t.activeForm ?? t.content) : t.content,
+      done: t.status === 'completed',
+    })),
+    summary: lastLine(main?.lastAssistantText ?? null),
+    activity: levelAt(pulse, now),
+    dim: isDimmed(tone, crashed, lastActivity, now),
+  };
+}
+
+/**
+ * The scene model for the board at `now`. Projects come in the overview's order (waiting, then
+ * errors, then by name); actors inside a project attention first.
+ */
 export function buildSceneModel(board: BoardState, pulses: Pulses, now: number): SceneModel {
   const groups = groupByProject(board);
   const projects = new Map<string, SceneProject>();
   for (const project of Object.values(board.projects)) {
-    const group = groups.get(project.id) ?? EMPTY;
-    projects.set(project.id, {
-      id: project.id,
-      name: project.name,
-      accent: project.accent,
-      tone: projectTone(group.sessions, group.terminals),
-      actors: projectActors(board, pulses, project, group, now),
-    });
+    projects.set(
+      project.id,
+      sceneProject(board, pulses, project, groups.get(project.id) ?? EMPTY, now),
+    );
   }
   const order = orderPods(
     [...projects.values()].map((p) => ({ id: p.id, name: p.name, rank: attentionRank(p.tone) })),
@@ -421,13 +540,7 @@ export function buildSceneProject(
     sessions: Object.values(board.sessions).filter((s) => s.projectId === projectId),
     terminals: Object.values(board.terminals).filter((t) => t.projectId === projectId),
   };
-  return {
-    id: project.id,
-    name: project.name,
-    accent: project.accent,
-    tone: projectTone(group.sessions, group.terminals),
-    actors: projectActors(board, pulses, project, group, now),
-  };
+  return sceneProject(board, pulses, project, group, now);
 }
 
 /** `buildSceneModel` as a store selector. Pair it with a clock: it changes on every tick. */

@@ -13,11 +13,11 @@ test('the layout switches from shortcuts, ⌘K and Settings, and survives a relo
   await expect(layout(page)).toHaveAttribute('data-layout', 'minimal');
   await expect(page.locator('[data-pod]').first()).toBeVisible();
 
-  // ⌥2: Office, a placeholder that lists the scene, every actor a button.
+  // ⌥2: Office, the building, every character a button.
   await page.keyboard.press('Alt+Digit2');
   await expect(layout(page)).toHaveAttribute('data-layout', 'office');
-  await expect(page.locator('[data-layout-placeholder="office"]')).toBeVisible();
-  await expect(page.locator('[data-scene-actor]').first()).toBeVisible();
+  await expect(page.locator('[data-office-building]')).toBeVisible();
+  await expect(page.locator('[data-room] [data-scene-actor]').first()).toBeVisible();
   await expect(page.locator('[data-pod]')).toHaveCount(0);
 
   await page.reload();
@@ -181,6 +181,122 @@ test.describe('the actor inspector on Minimal', () => {
       for (let i = 1; i <= 8; i++) await page.mouse.move(x, y + i * 25);
       await page.mouse.up();
       await expect(sheet).toHaveCount(0);
+    } finally {
+      await stop();
+    }
+  });
+});
+
+/** Projects showing each attention cue: pods in Minimal, rooms (and their door lights) in Office. */
+async function cues(page: Page, office: boolean) {
+  const item = office ? '[data-room]' : '[data-pod]';
+  const count = (selector: string) => page.locator(selector).count();
+  return {
+    wait: await count(`${item}[data-tone="wait"]`),
+    err: await count(`${item}[data-tone="err"]`),
+    ...(office && {
+      doors: {
+        wait: await count('[data-room] [data-kit-door="wait"]'),
+        err: await count('[data-room] [data-kit-door="err"]'),
+      },
+    }),
+  };
+}
+
+test.describe('the Office building', () => {
+  test('shows the same amber and rose cues as Minimal', async ({ browser }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      // The demo's first permission request arrives 8–14 s in.
+      await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      // The board keeps moving: compare a Minimal snapshot with the Office one right after,
+      // until both describe the same moment.
+      await expect
+        .poll(
+          async () => {
+            await page.keyboard.press('Alt+Digit1');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'minimal');
+            await expect(page.locator('main [data-layout="office"]')).toHaveCount(0);
+            const minimal = await cues(page, false);
+            await page.keyboard.press('Alt+Digit2');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'office');
+            await expect(page.locator('main [data-layout="minimal"]')).toHaveCount(0);
+            const office = await cues(page, true);
+            const same =
+              minimal.wait === office.wait &&
+              minimal.err === office.err &&
+              office.doors?.wait === office.wait &&
+              office.doors?.err === office.err;
+            return same && minimal.wait > 0;
+          },
+          { timeout: 40_000, intervals: [500] },
+        )
+        .toBe(true);
+      // The waiting session is a character with its hand up.
+      await expect(
+        page.locator('[data-room] [data-scene-actor][data-actor-state="waiting"]').first(),
+      ).toBeVisible();
+      // The ambient field steps out: the building draws its own sky.
+      await expect(page.locator('[data-office-sky]')).toHaveCount(1);
+      await expect(page.locator('[data-ambient]')).toHaveCount(0);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('a character opens the inspector and shows its name tag on hover', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit2');
+      const character = page.locator('[data-room] [data-scene-actor]').first();
+      await expect(character).toBeVisible();
+      const tag = character.locator('[data-office-tag]');
+      await expect(tag).toHaveCSS('opacity', '0');
+      // Rooms reorder and characters walk under a still pointer: point again until it shows.
+      await expect
+        .poll(async () => {
+          await character.hover();
+          await page.waitForTimeout(200);
+          return tag.evaluate((el) => getComputedStyle(el).opacity);
+        })
+        .toBe('1');
+      await character.click();
+      const inspector = page.locator('[data-actor-inspector]');
+      await expect(inspector.locator('[data-actor]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(inspector).toHaveCount(0);
+      await expect(character).toBeFocused();
+    } finally {
+      await stop();
+    }
+  });
+
+  test('on a phone: one room per floor, characters pause off screen', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser, {
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    try {
+      await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+      await page.reload();
+      await expect(page.locator('[data-office-building]')).toHaveAttribute('data-columns', '1');
+      // No horizontal overflow: the building keeps its gutter.
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      const first = page.locator('[data-room]').first();
+      const last = page.locator('[data-room]').last();
+      await expect(first.locator('.crew:not([data-crew-paused])').first()).toBeAttached();
+      await expect(last.locator('.crew').first()).toBeAttached();
+      await expect(last.locator('.crew:not([data-crew-paused])')).toHaveCount(0);
+      // Tap a character: the inspector is a bottom sheet.
+      await first.locator('[data-scene-actor]').first().tap();
+      await expect(page.locator('[data-actor-inspector][data-sheet]')).toBeVisible();
     } finally {
       await stop();
     }

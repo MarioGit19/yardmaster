@@ -164,6 +164,67 @@ describe('buildSceneModel', () => {
     expect(scene.actors.has(actorId.terminal('t-1'))).toBe(false);
   });
 
+  it("gives a room what it shows: ports, git, the main session's todos, its tools", () => {
+    const board = sampleBoard();
+    const running = exec('e1', 't-dev', { commandLine: 'pnpm dev', startedAt: T0 + 5 });
+    addTerminal(board, 't-dev', 'p-acme', [running]);
+    board.ports['127.0.0.1:5173'] = port('t-dev');
+    board.ports['127.0.0.1:3000'] = port('t-dev', 3000);
+    const project = board.projects['p-acme'];
+    const session = board.sessions['s-1'];
+    if (!project || !session) throw new Error('fixture');
+    project.git = {
+      branch: 'feat/cart',
+      head: 'abc1234',
+      detached: false,
+      dirty: 3,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      commits: [],
+      updatedAt: T0,
+    };
+    session.permissionMode = 'plan';
+    session.todos = [
+      { content: 'Split totals', status: 'completed', activeForm: 'Splitting totals' },
+      { content: 'Round prices', status: 'in_progress', activeForm: 'Rounding prices' },
+    ];
+    session.status = { kind: 'tool', tool: 'Read', toolUseId: 'tu-1', startedAt: T0 } as never;
+    session.currentTool = {
+      tool: 'Read',
+      family: 'read',
+      summary: 'src/cart.ts',
+      startedAt: T0 + 7,
+      endedAt: null,
+      status: 'running',
+    } as never;
+    const scene = buildSceneProject(board, {}, 'p-acme', NOW);
+    expect(scene).toMatchObject({ branch: 'feat/cart', dirty: 3, ports: [3000, 5173] });
+    expect(scene?.todos).toEqual([
+      { text: 'Split totals', done: true },
+      { text: 'Rounding prices', done: false },
+    ]);
+    const dev = scene?.actors.find((a) => a.id === actorId.terminal('t-dev'));
+    expect(dev).toMatchObject({ ports: [3000, 5173], runningSince: T0 + 5 });
+    const claude = scene?.actors.find((a) => a.id === actorId.session('s-1'));
+    expect(claude).toMatchObject({ tool: 'Read', toolSince: T0 + 7, planning: true });
+  });
+
+  it('dims a quiet project after five minutes, like its pod', () => {
+    const board = sampleBoard();
+    board.projects['p-alpha'] = makeProject('p-alpha', 'alpha-site');
+    expect(buildSceneModel(board, {}, NOW).projects.find((p) => p.id === 'p-alpha')?.dim).toBe(
+      true,
+    );
+    const quiet = buildSceneModel(board, {}, NOW + SLEEP_AFTER_MS * 2);
+    const alpha = quiet.projects.find((p) => p.id === 'p-alpha');
+    expect(alpha?.tone).toBe('idle');
+    expect(alpha?.dim).toBe(true);
+    // Something waiting never dims.
+    expect(quiet.projects.find((p) => p.tone === 'wait')?.dim).toBe(false);
+  });
+
   it('draws a terminal running Claude Code as its session, linked to the terminal', () => {
     const board = sampleBoard();
     addTerminal(board, 't-claude', 'p-orbit', [

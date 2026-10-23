@@ -5,8 +5,7 @@ import { LAYOUT_NAME, type LayoutId } from '../registry.js';
 import { actorKindName, actorStateLabel, type SceneActor, type SceneProject } from '../scene.js';
 import { useSceneModel } from '../useScene.js';
 
-const PITCH: Record<Exclude<LayoutId, 'minimal'>, string> = {
-  office: 'Each project becomes a room in a cut-away building, with your crew at their stations.',
+const PITCH: Record<Exclude<LayoutId, 'minimal' | 'office'>, string> = {
   grid: 'Projects become nodes in a neon network, fed by pipelines carrying data packets.',
   transit: 'Each project becomes a metro line, and every session and terminal a train on it.',
   retro: 'The whole board as a green-phosphor text console, in box drawing.',
@@ -16,7 +15,7 @@ const PITCH: Record<Exclude<LayoutId, 'minimal'>, string> = {
  * A layout that isn't drawn yet: what it will be, and the scene it will draw, so switching works
  * end to end and every actor already opens the inspector.
  */
-export function PlaceholderLayout({ layout }: { layout: Exclude<LayoutId, 'minimal'> }) {
+export function PlaceholderLayout({ layout }: { layout: Exclude<LayoutId, 'minimal' | 'office'> }) {
   const scene = useSceneModel();
   return (
     <div data-layout-placeholder={layout} className="flex flex-col gap-4">

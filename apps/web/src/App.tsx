@@ -3,6 +3,7 @@ import { lazy, type ReactNode, type Ref, Suspense } from 'react';
 import { type BaseLocationHook, Route, Router, Switch, useLocation, useRoute } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
+import { useBackdropTaken } from './ambient/backdrop.js';
 import { AttentionAlerts } from './attention/AttentionAlerts.js';
 import { AttentionCenter } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
@@ -118,12 +119,17 @@ function WelcomeView() {
   );
 }
 
+/** The ambient field, unless a layout draws its own backdrop (Office, Grid). */
+function AmbientGate() {
+  return useBackdropTaken() ? null : <AmbientField />;
+}
+
 export function App({ locationHook = useHashLocation }: { locationHook?: BaseLocationHook }) {
   useTheme();
   useLayoutShortcuts();
   return (
     <MotionRoot>
-      <AmbientField />
+      <AmbientGate />
       <TooltipProvider>
         <Router hook={locationHook}>
           <AppRoutes />

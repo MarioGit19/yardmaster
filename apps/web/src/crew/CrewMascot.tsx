@@ -144,8 +144,8 @@ export function CrewMascot({
     >
       <svg aria-hidden viewBox="0 0 100 100" className="absolute inset-0 overflow-visible">
         <ellipse cx="50" cy="95" rx="22" ry="3" fill="var(--text-1)" opacity="0.08" />
-        <rect x="37" y="78" width="10" height="16" rx="5" className="crew-limb" />
-        <rect x="53" y="78" width="10" height="16" rx="5" className="crew-limb" />
+        <rect x="37" y="78" width="10" height="16" rx="5" className="crew-limb crew-leg-l" />
+        <rect x="53" y="78" width="10" height="16" rx="5" className="crew-limb crew-leg-r" />
       </svg>
 
       <motion.div

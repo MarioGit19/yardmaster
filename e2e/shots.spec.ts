@@ -1136,8 +1136,8 @@ test.describe('background work', () => {
   }
 });
 
-// 11.1: the Actor inspector on Minimal (popover, and the bottom sheet on a phone), and a
-// placeholder layout listing the scene.
+// 11.1: the Actor inspector on Minimal (popover, and the bottom sheet on a phone); 11.3: the
+// Office building.
 test.describe('layouts', () => {
   for (const theme of THEMES) {
     test.describe(theme, () => {
@@ -1179,21 +1179,33 @@ test.describe('layouts', () => {
         });
       });
 
+      // The Office building (DESIGN.md §10.3): at rest (just loaded) and under demo activity.
       for (const viewport of [
         { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
         { width: 390, height: 844 },
       ]) {
-        test(`placeholder ${viewport.width}`, async ({ page }) => {
+        test(`office ${viewport.width}`, async ({ page }) => {
+          test.slow();
           await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
-          await expect(page.locator('[data-layout-placeholder="office"]')).toBeVisible();
+          await expect(page.locator('[data-room]').first()).toBeVisible();
           await page.waitForTimeout(800);
-          await page.screenshot({
-            path: new URL(`layout-office-placeholder-${viewport.width}-${theme}.png`, OUT_DIR)
-              .pathname,
-            fullPage: true,
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-office-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+              fullPage: true,
+              animations: 'disabled',
+            });
+          await shot('rest');
+          // The demo's first permission request arrives 8–14 s in.
+          await expect(page.locator('[data-room][data-tone="wait"]').first()).toBeVisible({
+            timeout: 30_000,
           });
+          await page.waitForTimeout(600);
+          await shot('active');
         });
       }
     });
