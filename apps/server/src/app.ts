@@ -40,6 +40,7 @@ import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js
 import { createLaunchActions, createProjectActions } from './project-actions.js';
 import { loadNodePty } from './pty.js';
 import { PtyManager, type PtyManagerOptions } from './pty-manager.js';
+import { DEVICES_KEY, RemoteDevices, registerRemoteRoutes, remoteHosts } from './remote.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
@@ -212,7 +213,19 @@ export async function buildServer(
   // Before the security layer and any route: it claims upgrade requests, and its onRequest
   // hook must run first so sockets rejected by security are cleaned up.
   await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
-  registerSecurity(app, { config, token: currentToken });
+  const remoteDevices = new RemoteDevices({
+    load: () => settings[DEVICES_KEY],
+    save: (devices) => {
+      settings[DEVICES_KEY] = devices;
+      persistence.setSetting(DEVICES_KEY, devices);
+    },
+  });
+  const allowedRemoteHosts = () => remoteHosts(settings);
+  registerSecurity(app, {
+    config,
+    token: currentToken,
+    remote: { hosts: allowedRemoteHosts, devices: remoteDevices },
+  });
 
   // Stored for history and pushed live to the Pulse rail. Nothing emits before the app is ready.
   const recordActivity = (event: ActivityEvent) => {
@@ -408,7 +421,10 @@ export async function buildServer(
         logger: logger.child({ component: 'ui-ws-worst' }),
       })
     : undefined;
-  registerUiGateway(app, gateway, worstGateway);
+  registerUiGateway(app, gateway, worstGateway, (request, socket) => {
+    const device = request.remoteDevice();
+    if (device !== null) remoteDevices.track(device, socket);
+  });
   const gitOptions = options.demo ? false : (options.git ?? {});
   const gitScanner =
     gitOptions === false
@@ -491,6 +507,8 @@ export async function buildServer(
           return token;
         },
   });
+
+  registerRemoteRoutes(app, { devices: remoteDevices, hosts: allowedRemoteHosts });
 
   app.get('/api/library', async (): Promise<LibraryResponse> => {
     const { libraryRoots } = librarySettings(settings);

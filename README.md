@@ -31,6 +31,7 @@ Use `pnpm board` for the board you work with day to day. `pnpm dev` restarts the
 
 - [Product requirements](docs/PRD.md)
 - [Design and motion spec](docs/DESIGN.md)
+- [Use it from your phone](docs/phone.md) (Tailscale)
 - [Build plan](PLAN.md)
 
 ## Building with the loop

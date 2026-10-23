@@ -96,6 +96,24 @@ export const EditorCliPath = z
   .refine((path) => !path.includes('\0'), 'no NUL bytes')
   .refine((path) => path.startsWith('/'), { message: 'an absolute path' });
 
+export const REMOTE_MAX_HOSTS = 4;
+
+/**
+ * A remote host the board answers on (F27): an exact Tailscale `*.ts.net` name such as
+ * `my-mac.tailnet-name.ts.net`, lowercased, no port or scheme.
+ */
+export const RemoteHost = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(253)
+  .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/, {
+    message: 'a Tailscale name ending in .ts.net',
+  })
+  .refine((host) => host.split('.').length >= 4, {
+    message: 'the full name, machine and tailnet, like my-mac.tailnet-name.ts.net',
+  });
+
 /** `GET /api/settings` (authenticated): settings the server owns. */
 export const BoardSettings = z.object({
   retentionDays: RetentionDays,
@@ -112,6 +130,8 @@ export const BoardSettings = z.object({
   pinnedProjects: z.array(ProjectId).max(MAX_PINNED_PROJECTS),
   /** `editor.cli`: null finds `cursor`, then `code`, on PATH or in the app bundle. */
   editorCli: EditorCliPath.nullable(),
+  /** `remote.allowedHosts`: Tailscale names the board answers on over HTTPS (F27), none by default. */
+  remoteAllowedHosts: z.array(RemoteHost).max(REMOTE_MAX_HOSTS),
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 
@@ -218,3 +238,34 @@ export const ApiError = z.object({
   message: z.string().optional(),
 });
 export type ApiError = z.infer<typeof ApiError>;
+
+/** How long a pairing code stays valid (PRD §8 item 12). */
+export const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
+
+/** `POST /api/remote/pair` body: which allowed host the phone opens (the first by default). */
+export const PairingRequest = z.object({ host: RemoteHost.optional() }).strict();
+export type PairingRequest = z.infer<typeof PairingRequest>;
+
+/** A one-time pairing code, as the QR code's link. Only the board on this machine can make one. */
+export const PairingResponse = z.object({
+  /** `https://<host>/pair?c=<code>`: opening it on the phone signs that browser in. */
+  url: z.string(),
+  host: RemoteHost,
+  expiresAt: z.number().int(),
+});
+export type PairingResponse = z.infer<typeof PairingResponse>;
+
+export const PairedDevice = z.object({
+  id: z.string().min(1).max(64),
+  /** From the browser's user agent, such as "iPhone · Safari". */
+  name: z.string().max(80),
+  pairedAt: z.number().int(),
+  lastSeenAt: z.number().int(),
+  /** The device making the request. */
+  current: z.boolean(),
+});
+export type PairedDevice = z.infer<typeof PairedDevice>;
+
+/** `GET /api/remote/devices`: paired devices, newest first. */
+export const PairedDevicesResponse = z.object({ devices: z.array(PairedDevice) });
+export type PairedDevicesResponse = z.infer<typeof PairedDevicesResponse>;

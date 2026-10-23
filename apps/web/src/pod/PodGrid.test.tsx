@@ -39,6 +39,7 @@ beforeEach(() => {
     terminalReply: true,
     libraryRoots: [],
     editorCli: null,
+    remoteAllowedHosts: [],
     libraryIdleHideMin: 30,
     pinnedProjects: [],
   };

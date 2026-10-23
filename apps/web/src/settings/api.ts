@@ -7,6 +7,8 @@ import {
   HooksStatusResponse,
   LibraryResponse,
   OkResponse,
+  PairedDevicesResponse,
+  PairingResponse,
   ServerStatus,
 } from '@c-board/protocol';
 
@@ -23,7 +25,7 @@ export class ApiRequestError extends Error {
 
 async function request<T>(
   schema: { parse(value: unknown): T },
-  method: 'GET' | 'PUT' | 'POST',
+  method: 'GET' | 'PUT' | 'POST' | 'DELETE',
   url: string,
   body?: unknown,
   signal?: AbortSignal,
@@ -66,4 +68,10 @@ export const api = {
   rotateToken: () => request(OkResponse, 'POST', '/api/token/rotate', {}),
   library: (signal?: AbortSignal) =>
     request(LibraryResponse, 'GET', '/api/library', undefined, signal),
+  pair: (host?: string) =>
+    request(PairingResponse, 'POST', '/api/remote/pair', host === undefined ? {} : { host }),
+  devices: (signal?: AbortSignal) =>
+    request(PairedDevicesResponse, 'GET', '/api/remote/devices', undefined, signal),
+  revokeDevice: (id: string) =>
+    request(OkResponse, 'DELETE', `/api/remote/devices/${encodeURIComponent(id)}`),
 };

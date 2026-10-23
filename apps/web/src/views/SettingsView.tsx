@@ -28,6 +28,7 @@ import {
   useBoardSettings,
 } from '../settings/boardSettings.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
+import { PhoneSettings } from '../settings/PhoneSettings.js';
 import { redactPreference } from '../settings/prefs.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
@@ -168,6 +169,10 @@ export function SettingsView() {
               Open guide
             </Link>
           </SettingRow>
+        </SettingsSection>
+
+        <SettingsSection title="Phone">
+          <PhoneSettings server={server} />
         </SettingsSection>
 
         <SettingsSection title="Data and security">

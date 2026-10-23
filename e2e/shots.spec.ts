@@ -1,4 +1,4 @@
-import type { WebSocketRoute } from '@playwright/test';
+import { devices, type WebSocketRoute } from '@playwright/test';
 import { startBoard } from './board.js';
 import {
   disableWebgl,
@@ -1737,3 +1737,170 @@ test.describe('board terminal', () => {
     });
   }
 });
+
+// 12.5: the phone pass on an iPhone profile (touch, 390 px) in Chromium: the overview in every
+// layout, the picker and launch sheet, the focus view's tabs and composer, the Attention Center,
+// and Settings → Phone with a host, a live pairing code and paired devices (faked for this page).
+const { defaultBrowserType: _webkit, ...iPhone } = devices['iPhone 13'];
+const PHONE_LAYOUTS = ['minimal', 'office', 'grid', 'transit', 'retro'] as const;
+
+for (const theme of THEMES) {
+  test.describe(`phone ${theme}`, () => {
+    test.use({ ...iPhone, theme });
+    const shot = (page: import('@playwright/test').Page, name: string, fullPage = false) =>
+      page.screenshot({
+        path: new URL(`phone-${name}-${theme}.png`, OUT_DIR).pathname,
+        animations: 'disabled',
+        fullPage,
+      });
+
+    for (const layout of PHONE_LAYOUTS) {
+      test(`overview ${layout}`, async ({ page }) => {
+        await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+        await openRoute(page, '/');
+        await expect(page.locator('main [data-layout]').first()).toBeVisible();
+        await page.waitForTimeout(1_200);
+        await shot(page, `overview-${layout}`);
+      });
+    }
+
+    test('picker and launch sheet', async ({ page }) => {
+      await openRoute(page, '/');
+      await page.locator('[data-hud="open-project"]').tap();
+      const dialog = page.locator('[data-open-project]');
+      await expect(dialog.locator('[data-library-entry="weather-bot"]')).toBeVisible();
+      await page.waitForTimeout(500);
+      await shot(page, 'picker');
+      await dialog.locator('[data-library-entry="weather-bot"]').tap();
+      const sheet = dialog.locator('[data-launch-sheet="weather-bot"]');
+      await sheet.locator('[data-launch-option="claude"] label').tap();
+      await sheet.locator('[data-launch-option="terminal"] label').tap();
+      await page.waitForTimeout(500);
+      await shot(page, 'launch-sheet');
+    });
+
+    test('focus tabs and composer', async ({ page }) => {
+      test.slow();
+      await openRoute(page, '/');
+      await openRoute(page, await firstProjectRoute(page));
+      for (const tab of ['Sessions', 'Claude', 'Terminals'] as const) {
+        await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).tap();
+        await page.waitForTimeout(700);
+        await shot(page, `focus-${tab.toLowerCase()}`);
+      }
+      await page.getByRole('tab', { name: /^Sessions/ }).tap();
+      await page.locator('[data-new-session]').tap();
+      const input = page.getByRole('textbox', { name: 'First message for a new session' });
+      await input.fill('Tidy up the cart totals and keep the public API the same.');
+      await page.waitForTimeout(400);
+      await shot(page, 'composer');
+    });
+
+    test('attention center', async ({ page }) => {
+      test.slow();
+      await openRoute(page, '/');
+      const waiting = page.locator('[data-hud="waiting"]');
+      await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
+        timeout: 30_000,
+      });
+      await waiting.tap();
+      await page.waitForTimeout(800);
+      await shot(page, 'attention');
+    });
+
+    test('settings phone', async ({ page }) => {
+      const host = 'dev-mac.tailnet-acme.ts.net';
+      const now = Date.now();
+      await page.route('**/api/settings', async (route) => {
+        if (route.request().method() !== 'GET') return route.fallback();
+        const response = await route.fetch();
+        await route.fulfill({
+          response,
+          json: { ...(await response.json()), remoteAllowedHosts: [host] },
+        });
+      });
+      await page.route('**/api/remote/devices', (route) =>
+        route.fulfill({
+          json: {
+            devices: [
+              {
+                id: 'dev-0a1b2c3d4e5f',
+                name: 'iPhone · Safari',
+                pairedAt: now - 3 * 86_400_000,
+                lastSeenAt: now - 120_000,
+                current: true,
+              },
+              {
+                id: 'dev-6a7b8c9d0e1f',
+                name: 'iPad · Safari',
+                pairedAt: now - 20 * 86_400_000,
+                lastSeenAt: now - 5 * 86_400_000,
+                current: false,
+              },
+            ],
+          },
+        }),
+      );
+      await page.route('**/api/remote/pair', (route) =>
+        route.fulfill({
+          json: {
+            url: `https://${host}/pair?c=Zm9vYmFyLWRlbW8tcGFpcmluZw`,
+            host,
+            expiresAt: now + 5 * 60_000,
+          },
+        }),
+      );
+      await openRoute(page, '/settings');
+      const section = page.getByRole('region', { name: 'Phone' });
+      await expect(section.locator(`[data-remote-host="${host}"]`)).toBeVisible();
+      await section.getByRole('button', { name: 'Show pairing code' }).tap();
+      await expect(section.locator('[data-pairing="live"] svg[data-qr]')).toBeVisible();
+      await section.locator('[data-pairing]').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(400);
+      await shot(page, 'settings');
+      await section.locator('[data-setting="devices"]').scrollIntoViewIfNeeded();
+      await page.waitForTimeout(300);
+      await shot(page, 'settings-devices');
+    });
+  });
+}
+
+// Settings → Phone on the desktop: the QR code next to its countdown.
+for (const theme of THEMES) {
+  test.describe(`settings phone ${theme} 1440`, () => {
+    test.use({ theme, viewport: { width: 1440, height: 900 } });
+    test('pairing', async ({ page }) => {
+      const host = 'dev-mac.tailnet-acme.ts.net';
+      await page.route('**/api/settings', async (route) => {
+        if (route.request().method() !== 'GET') return route.fallback();
+        const response = await route.fetch();
+        await route.fulfill({
+          response,
+          json: { ...(await response.json()), remoteAllowedHosts: [host] },
+        });
+      });
+      await page.route('**/api/remote/devices', (route) =>
+        route.fulfill({ json: { devices: [] } }),
+      );
+      await page.route('**/api/remote/pair', (route) =>
+        route.fulfill({
+          json: {
+            url: `https://${host}/pair?c=Zm9vYmFyLWRlbW8tcGFpcmluZw`,
+            host,
+            expiresAt: Date.now() + 5 * 60_000,
+          },
+        }),
+      );
+      await openRoute(page, '/settings');
+      const section = page.getByRole('region', { name: 'Phone' });
+      await section.getByRole('button', { name: 'Show pairing code' }).click();
+      await expect(section.locator('svg[data-qr]')).toBeVisible();
+      await section.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(400);
+      await section.screenshot({
+        path: new URL(`settings-phone-1440-${theme}.png`, OUT_DIR).pathname,
+        animations: 'disabled',
+      });
+    });
+  });
+}

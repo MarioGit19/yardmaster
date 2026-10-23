@@ -34,6 +34,7 @@ const LIBRARY_DEFAULTS = {
   libraryIdleHideMin: 30,
   pinnedProjects: [],
   editorCli: null,
+  remoteAllowedHosts: [],
 };
 const HOOK = '/opt/c-board/bin/c-board-hook';
 

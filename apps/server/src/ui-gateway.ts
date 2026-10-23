@@ -11,7 +11,7 @@ import {
   TRANSCRIPT_STREAM_PREFIX,
   type UiToServer,
 } from '@c-board/protocol';
-import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
 import { z } from 'zod';
 import { type ActionDispatcher, type ActionResult, NOT_IMPLEMENTED } from './actions.js';
@@ -348,6 +348,8 @@ export function registerUiGateway(
   gateway: UiGateway,
   /** Demo mode's worst-case board, for sockets opened with `?worst=1` (PLAN 7.14). */
   worst?: UiGateway,
+  /** Sees every accepted socket, e.g. to close a paired phone's when it is revoked. */
+  onSocket?: (request: FastifyRequest, socket: WebSocket) => void,
 ): void {
   app.get(
     UI_WS_PATH,
@@ -361,6 +363,7 @@ export function registerUiGateway(
       },
     },
     (socket, request) => {
+      onSocket?.(request, socket);
       const wantsWorst = WorstQuery.safeParse(request.query).data?.worst === '1';
       (worst && wantsWorst ? worst : gateway).connect(socket);
     },

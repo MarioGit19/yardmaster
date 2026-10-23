@@ -601,7 +601,7 @@ function ActorLine({
   const key = fit(`[${index}]`, columns.num);
   const label = `${actor.parentId ? '└ ' : ''}${actor.label}`;
   // Stacked, the label takes the whole first line up to the tag: ␠[n]␠»␠label␠[TAG]␠.
-  const labelWidth = stacked ? inner - columns.num - 9 : columns.label;
+  const labelWidth = stacked ? inner - columns.num - 10 : columns.label;
   const tag = (
     <span className="retro-tag" data-tone={actor.tone}>
       {actorTag(actor.state)}

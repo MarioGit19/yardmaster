@@ -33,6 +33,7 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
 import type { Persistence } from './persistence.js';
+import { REMOTE_HOSTS_KEY, remoteHosts } from './remote.js';
 import { setSessionCookie } from './security.js';
 import { LEGACY_TERMINAL_REPLY_KEY, TERMINAL_REPLY_KEY } from './terminal-reply.js';
 import { generateToken, writeToken } from './token.js';
@@ -198,6 +199,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     terminalReply: terminalReplyEnabled(settings),
     ...librarySettings(settings),
     editorCli: editorCliSetting(settings),
+    remoteAllowedHosts: remoteHosts(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -229,6 +231,10 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
       save(PINNED_KEY, [...new Set(patch.data.pinnedProjects)]);
     }
     if (patch.data.editorCli !== undefined) save(EDITOR_CLI_KEY, patch.data.editorCli);
+    if (patch.data.remoteAllowedHosts !== undefined) {
+      save(REMOTE_HOSTS_KEY, [...new Set(patch.data.remoteAllowedHosts)]);
+      app.log.info({ hosts: patch.data.remoteAllowedHosts.length }, 'remote hosts changed');
+    }
     return current();
   });
 

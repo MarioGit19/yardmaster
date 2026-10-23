@@ -1,5 +1,5 @@
 import { toolInputDetail } from '@c-board/protocol';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useBoardClient, useBoardStore } from '../data/index.js';
 import {
@@ -20,12 +20,26 @@ export function AttentionAlerts() {
   const client = useBoardClient();
   const store = useBoardStore();
   const [announcement, setAnnouncement] = useState('');
+  // Approval toasts on screen. Opening the Attention Center puts them away: it lists the same
+  // approvals, and on a phone its sheet would sit under them.
+  const shown = useRef(new Set<string>());
+
+  useEffect(
+    () =>
+      attentionOpen.subscribe(() => {
+        if (attentionOpen.get() !== 'open') return;
+        for (const id of shown.current) toast.dismiss(id);
+        shown.current.clear();
+      }),
+    [],
+  );
 
   useEffect(
     () =>
       client.onMessage((message) => {
         if (message.type === 'approval.resolved') {
           toast.dismiss(message.payload.approvalId);
+          shown.current.delete(message.payload.approvalId);
           return;
         }
         if (message.type !== 'approval.new') return;
@@ -43,7 +57,10 @@ export function AttentionAlerts() {
             id: approval.id,
             description: detail,
             action: { label: 'Review', onClick: open },
+            onDismiss: () => shown.current.delete(approval.id),
+            onAutoClose: () => shown.current.delete(approval.id),
           });
+          shown.current.add(approval.id);
         }
         notify(approval.id, headline, detail);
       }),

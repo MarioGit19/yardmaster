@@ -9,6 +9,7 @@ const BASE: BoardSettings = {
   terminalReply: false,
   libraryRoots: [],
   editorCli: null,
+  remoteAllowedHosts: [],
   libraryIdleHideMin: 30,
   pinnedProjects: [],
 };

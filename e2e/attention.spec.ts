@@ -96,6 +96,8 @@ test('a new request shows a toast that opens the Attention Center', async ({ bro
     await toast.getByRole('button', { name: 'Review' }).click();
     const sheet = page.getByRole('complementary', { name: /Needs you/ });
     await expect(sheet.locator('article[data-approval]').first()).toBeVisible();
+    // The Center lists the same approvals, so their toasts are put away.
+    await expect(toast).toHaveCount(0);
   } finally {
     await stop();
   }
