@@ -1,4 +1,4 @@
-import { type ActivityEvent, PULSE_WINDOW_MS } from '@c-board/protocol';
+import { type ActivityEvent, type BoardState, PULSE_WINDOW_MS } from '@c-board/protocol';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cubicBezier } from 'motion';
 import { AnimatePresence, motion } from 'motion/react';
@@ -32,6 +32,8 @@ import {
   laneCenter,
   PULSE_FILTERS,
   type PulseDot,
+  type PulseFilter,
+  type PulseLane,
   type PulseLayout,
   placeDots,
   pulseHeight,
@@ -103,6 +105,21 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): str
   return `${text.slice(0, end)}…`;
 }
 
+/** Truncated lane names by width, so only a new name or label width measures text. */
+const labelCache = new Map<string, string>();
+
+function laneLabel(ctx: CanvasRenderingContext2D, name: string, max: number): string {
+  const key = `${max}|${name}`;
+  let label = labelCache.get(key);
+  if (label === undefined) {
+    if (labelCache.size > 256) labelCache.clear();
+    ctx.font = LABEL_FONT;
+    label = truncate(ctx, name, max);
+    labelCache.set(key, label);
+  }
+  return label;
+}
+
 /** Errors are diamonds and waits are rings, so the type reads without color (DESIGN.md §8). */
 function drawMark(ctx: CanvasRenderingContext2D, dot: PulseDot, x: number, scale: number) {
   const { y, tone } = dot;
@@ -125,9 +142,24 @@ function drawMark(ctx: CanvasRenderingContext2D, dot: PulseDot, x: number, scale
   }
 }
 
-interface Frame {
+/**
+ * Everything the plot draws that only changes with the data, the filter, the width or the
+ * once-a-second drift. Frames during a fly-in reuse it and only ease the flying dots.
+ */
+interface Scene {
+  activity: readonly ActivityEvent[];
+  projects: BoardState['projects'];
+  filter: PulseFilter;
+  width: number;
+  now: number;
   layout: PulseLayout;
+  lanes: PulseLane[];
+  labels: string[];
+  ticks: { minutes: number; x: number }[];
+  /** Oldest first, so new dots draw on top. */
   dots: PulseDot[];
+  /** Each lane's newest dot: only these glow, so bursts don't pile up into a blob. */
+  newest: Set<PulseDot>;
 }
 
 /**
@@ -294,7 +326,7 @@ function PulsePlot() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [dpr] = useState(() => Math.min(2, window.devicePixelRatio || 1));
-  const frame = useRef<Frame | null>(null);
+  const scene = useRef<Scene | null>(null);
   const arrivals = useRef(new Map<string, number>());
   const handle = useRef<FrameHandle | null>(null);
 
@@ -302,23 +334,65 @@ function PulsePlot() {
   const height = pulseHeight(laneCount);
 
   // Everything the draw reads that React owns; the frame loop reads it through a ref.
-  const inputs = useRef({ width, height, filter, level, active, dpr });
-  inputs.current = { width, height, filter, level, active, dpr };
+  const inputs = useRef({ width, filter, level, active, dpr });
+  inputs.current = { width, filter, level, active, dpr };
 
-  /** Draws one frame. Returns whether a dot is still flying in. */
+  /**
+   * Lays out lanes, labels and dots for the current data. Skipped when nothing it reads has
+   * changed, unless `drift` asks for a new "now". Never runs from the frame loop.
+   */
+  const rebuild = useCallback(
+    (drift: boolean) => {
+      const ctx = canvasRef.current?.getContext('2d');
+      const { width, filter } = inputs.current;
+      if (!ctx || width === 0) return;
+      const { board, activity } = store.getState();
+      const prev = scene.current;
+      if (
+        !drift &&
+        prev &&
+        prev.activity === activity &&
+        prev.projects === board.projects &&
+        prev.filter === filter &&
+        prev.width === width
+      ) {
+        return;
+      }
+      const now = Date.now();
+      const lanes = buildLanes(activity, board.projects, filter, now - PULSE_WINDOW_MS);
+      const layout = pulseLayout(width, lanes.length);
+      const dots = placeDots(lanes, now, layout).sort((a, b) => a.event.ts - b.event.ts);
+      const newestByLane = new Map(dots.map((dot) => [dot.lane, dot]));
+      scene.current = {
+        activity,
+        projects: board.projects,
+        filter,
+        width,
+        now,
+        layout,
+        lanes,
+        labels: lanes.map((lane) => laneLabel(ctx, lane.name, layout.labelWidth - 24)),
+        ticks: [15, 10, 5].map((minutes) => ({
+          minutes,
+          x: Math.round(timeToX(now - minutes * 60_000, now, layout)),
+        })),
+        dots,
+        newest: new Set(newestByLane.values()),
+      };
+      setLaneCount(lanes.length);
+      setDotCount(dots.length);
+    },
+    [store],
+  );
+
+  /** Paints one frame from the scene. Returns whether a dot is still flying in. */
   const draw = useCallback((): boolean => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    const { width, filter, level, active, dpr } = inputs.current;
-    if (!canvas || !ctx || width === 0) return false;
-    const { board, activity } = store.getState();
-    const now = Date.now();
-    const lanes = buildLanes(activity, board.projects, filter, now - PULSE_WINDOW_MS);
-    if (lanes.length !== laneCount) setLaneCount(lanes.length);
-    const layout = pulseLayout(width, lanes.length);
-    const dots = placeDots(lanes, now, layout);
-    if (dots.length !== dotCount) setDotCount(dots.length);
-    frame.current = { layout, dots };
+    const current = scene.current;
+    const { level, active, dpr } = inputs.current;
+    if (!canvas || !ctx || !current) return false;
+    const { layout, lanes, labels, ticks, dots, newest, now } = current;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, layout.width, layout.height);
@@ -328,10 +402,6 @@ function PulsePlot() {
     // Five-minute gridlines, the "now" line, and their labels.
     const axisY = layout.top + lanes.length * layout.laneHeight;
     const labelY = axisY + layout.axisHeight / 2;
-    const ticks = [15, 10, 5].map((minutes) => ({
-      minutes,
-      x: Math.round(timeToX(now - minutes * 60_000, now, layout)),
-    }));
     ctx.fillStyle = line;
     for (const { x } of ticks) ctx.fillRect(x, layout.top, 1, axisY - layout.top);
     ctx.fillStyle = token('--line-strong');
@@ -347,6 +417,7 @@ function PulsePlot() {
     ctx.fillText('now', layout.plotRight + 4, labelY);
 
     // Lanes: accent dot, name, and a hairline track.
+    ctx.textAlign = 'left';
     lanes.forEach((lane, index) => {
       const y = laneCenter(index, layout);
       ctx.fillStyle =
@@ -355,19 +426,15 @@ function PulsePlot() {
       ctx.arc(14, y, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = rgba(activeDot?.lane === index ? 'var(--text-1)' : 'var(--text-2)', 1);
-      ctx.textAlign = 'left';
-      ctx.fillText(truncate(ctx, lane.name, layout.labelWidth - 24), 24, y);
+      ctx.fillText(labels[index] ?? '', 24, y);
       ctx.fillStyle = line;
       ctx.fillRect(layout.plotLeft, Math.round(y), layout.plotRight - layout.plotLeft, 1);
     });
 
-    // Dots, oldest first so new ones sit on top.
+    // Dots sit where the scene placed them; only the flying ones are eased each frame.
     const clock = performance.now();
     let flying = false;
-    const ordered = [...dots].sort((a, b) => a.event.ts - b.event.ts);
-    // Only each lane's newest dot glows, so bursts don't pile up into a blob.
-    const newest = new Map(ordered.map((dot) => [dot.lane, dot]));
-    for (const dot of ordered) {
+    for (const dot of dots) {
       const color = TONE_VAR[dot.tone];
       const started = arrivals.current.get(dot.event.id);
       let t = 1;
@@ -376,12 +443,12 @@ function PulsePlot() {
         if (t >= 1 || level === 'off') arrivals.current.delete(dot.event.id);
         else flying = true;
       }
-      const e = level === 'off' ? 1 : easeOut(t);
+      const e = t >= 1 || level === 'off' ? 1 : easeOut(t);
       // Full flies in from the gutter; Reduced only fades in.
-      const x = level === 'full' ? dot.x + (layout.width + 4 - dot.x) * (1 - e) : dot.x;
+      const x = level === 'full' && e < 1 ? dot.x + (layout.width + 4 - dot.x) * (1 - e) : dot.x;
       const alpha = level === 'full' ? Math.min(1, t * 3) : e;
       const age = now - dot.event.ts;
-      if (age < HALO_MS && newest.get(dot.lane) === dot) {
+      if (age < HALO_MS && newest.has(dot)) {
         const glow = 0.35 * (1 - age / HALO_MS) * alpha;
         const halo = ctx.createRadialGradient(x, dot.y, 0, x, dot.y, 9);
         halo.addColorStop(0, rgba(color, glow));
@@ -412,7 +479,7 @@ function PulsePlot() {
       ctx.stroke();
     }
     return flying;
-  }, [store, laneCount, dotCount]);
+  }, []);
 
   const drawRef = useRef(draw);
   drawRef.current = draw;
@@ -446,15 +513,24 @@ function PulsePlot() {
       }
       known.clear();
       for (const id of next) known.add(id);
+      rebuild(false);
       invalidate();
     });
-    const timer = setInterval(invalidate, DRIFT_MS);
-    void document.fonts?.ready.then(invalidate);
+    const redo = () => {
+      rebuild(true);
+      invalidate();
+    };
+    const timer = setInterval(redo, DRIFT_MS);
+    void document.fonts?.ready.then(() => {
+      // Labels measured with the fallback font are now the wrong length.
+      labelCache.clear();
+      redo();
+    });
     return () => {
       off();
       clearInterval(timer);
     };
-  }, [store, invalidate]);
+  }, [store, rebuild, invalidate]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
@@ -478,11 +554,12 @@ function PulsePlot() {
     canvas.style.height = `${height}px`;
     // useTheme applies a new theme in an effect, after this one; the tokens must match it now.
     applyTheme(document.documentElement, theme);
+    rebuild(false);
     draw();
-  }, [width, height, dpr, filter, level, active, theme, draw]);
+  }, [width, height, dpr, filter, level, active, theme, rebuild, draw]);
 
   const dotAt = (event: MouseEvent<HTMLCanvasElement>) => {
-    const current = frame.current;
+    const current = scene.current;
     if (!current) return null;
     const rect = event.currentTarget.getBoundingClientRect();
     return hitTest(
@@ -494,7 +571,7 @@ function PulsePlot() {
   };
 
   const open = (id: string | null) => {
-    const dot = frame.current?.dots.find((d) => d.event.id === id);
+    const dot = scene.current?.dots.find((d) => d.event.id === id);
     if (!dot) return;
     const target = pulseTarget(dot.event, store.getState().board);
     if (!target) return;
@@ -516,13 +593,13 @@ function PulsePlot() {
       setSelected(null);
       return;
     }
-    const next = stepDot(frame.current?.dots ?? [], selected, event.key);
+    const next = stepDot(scene.current?.dots ?? [], selected, event.key);
     if (next === undefined) return;
     event.preventDefault();
     setSelected(next);
   };
 
-  const activeDot = frame.current?.dots.find((d) => d.event.id === active) ?? null;
+  const activeDot = scene.current?.dots.find((d) => d.event.id === active) ?? null;
   const visibleHeight = pulseHeight(Math.min(Math.max(1, laneCount), MAX_VISIBLE_LANES));
   const empty = width > 0 && dotCount === 0;
 

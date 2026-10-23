@@ -151,3 +151,43 @@ test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ pag
   expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
   expect(stats.longTasks).toEqual([]);
 });
+
+test('the expanded Pulse rail measures no text in its steady frames under the stress load', async ({
+  page,
+}) => {
+  test.slow();
+  await fullMotion(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('cboard.pulse', 'expanded');
+    // Counts the Pulse canvas's frames (one clear each) and its text measurements.
+    const counts = { frames: 0, measures: 0 };
+    Object.assign(window, { __pulseCounts: counts });
+    const proto = CanvasRenderingContext2D.prototype;
+    const isPulse = (ctx: CanvasRenderingContext2D) => ctx.canvas.hasAttribute('data-pulse-canvas');
+    const { clearRect, measureText } = proto;
+    proto.clearRect = function (...args) {
+      if (isPulse(this)) counts.frames++;
+      return clearRect.apply(this, args);
+    };
+    proto.measureText = function (...args) {
+      if (isPulse(this)) counts.measures++;
+      return measureText.apply(this, args);
+    };
+  });
+  await page.goto('/#/');
+  await warmUp(page);
+  const canvas = page.locator('canvas[data-pulse-canvas]');
+  await expect(canvas).toHaveAttribute('data-lanes', /^[1-9]/);
+
+  const read = () =>
+    page.evaluate(() => ({ ...(window as unknown as { __pulseCounts: object }).__pulseCounts }));
+  const before = (await read()) as { frames: number; measures: number };
+  await page.waitForTimeout(5_000);
+  const after = (await read()) as { frames: number; measures: number };
+  const frames = after.frames - before.frames;
+  const measures = after.measures - before.measures;
+  console.log(`stress pulse: ${frames} frames, ${measures} measureText calls in 5 s`);
+  // Events keep flying in, so the rail paints well beyond its once-a-second drift.
+  expect(frames).toBeGreaterThan(10);
+  expect(measures).toBe(0);
+});
