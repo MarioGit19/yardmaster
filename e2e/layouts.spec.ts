@@ -1160,6 +1160,15 @@ test.describe('the Transit map', () => {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(0);
+      // The line names read whole: two lines at most, nothing clipped (the demo's names fit).
+      const clipped = await page
+        .locator('[data-transit-name] .transit-name-text')
+        .evaluateAll((names) =>
+          names
+            .filter((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1)
+            .map((n) => n.textContent),
+        );
+      expect(clipped).toEqual([]);
       // "Now" on top: the first line's trains sit above its newest station.
       const line = page.locator('[data-transit-line]').first();
       const train = line.locator('[data-scene-actor]').first();

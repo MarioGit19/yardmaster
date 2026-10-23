@@ -1515,6 +1515,17 @@ test.describe('layouts worst case', () => {
             await expect(page.locator('[data-grid-cockpit]')).toBeVisible();
             await page.waitForTimeout(900);
             await shot('enter', false);
+            if (viewport.width >= 720) {
+              // 11.10b: one screen beside the middle one shows as a centered pair, not an arc
+              // with an empty side.
+              await page.keyboard.press('Escape');
+              await expect(page.locator('[data-grid-cockpit]')).toHaveCount(0);
+              await page.locator('[data-grid-node]', { hasText: '💻 portfolio' }).focus();
+              await page.keyboard.press('Enter');
+              await expect(page.locator('[data-cockpit-row="pair"]')).toBeVisible();
+              await page.waitForTimeout(900);
+              await shot('pair', false);
+            }
           }
         });
       });

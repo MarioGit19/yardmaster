@@ -2946,6 +2946,16 @@ main[data-office-zoom] {
   text-align: center;
   gap: 4px;
 }
+/* A phone column is 44–60 px: the name takes two lines, breaking after a hyphen where it can, so
+   "ledger-sync" reads whole instead of "led…". */
+.transit-name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 14px;
+}
 .transit-name:focus-visible {
   box-shadow: var(--focus-ring);
 }

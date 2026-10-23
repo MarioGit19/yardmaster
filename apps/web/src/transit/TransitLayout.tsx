@@ -406,15 +406,15 @@ function TransitLine({
         aria-label={`${project.name} line, ${toneLabel(project.tone)}, ${counts}. Arrow keys move through its trains and stations.`}
         className={cx(
           'transit-name group flex min-w-0 items-center gap-2 outline-none',
-          horizontal ? 'sticky left-0 h-full pr-4 pl-1' : 'h-14 flex-col justify-center px-1',
+          horizontal ? 'sticky left-0 h-full pr-4 pl-1' : 'h-14 flex-col justify-center px-0.5',
         )}
         style={horizontal ? { width: LABEL_W } : undefined}
       >
         <span aria-hidden className="transit-swatch shrink-0" />
         <span
           className={cx(
-            'min-w-0 truncate font-medium text-text-1',
-            horizontal ? 'text-body-sm' : 'max-w-full text-label',
+            'min-w-0 font-medium text-text-1',
+            horizontal ? 'truncate text-body-sm' : 'transit-name-text max-w-full text-label',
           )}
           title={project.name}
         >

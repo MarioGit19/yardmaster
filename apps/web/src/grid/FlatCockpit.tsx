@@ -74,6 +74,9 @@ export interface FlatCockpitProps {
  */
 export function FlatCockpit({ project, now, narrow, deep = false, onBack }: FlatCockpitProps) {
   const plan = planCockpit(project.actors);
+  // One screen beside the middle one: the two sit side by side, centered as a pair, instead of
+  // leaving the arc's left side empty.
+  const pair = plan.left.length === 0 && plan.right.length > 0;
   const [centered, setCentered] = useState<Centered | null>(null);
   const centerActor = centered
     ? project.actors.find((a) => a.id === centered.actorId && !a.parentId)
@@ -218,10 +221,15 @@ export function FlatCockpit({ project, now, narrow, deep = false, onBack }: Flat
               {small}
             </div>
             <div
-              data-cockpit-row
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)] items-start gap-4"
+              data-cockpit-row={pair ? 'pair' : 'arc'}
+              className={cx(
+                'grid items-start gap-4',
+                pair
+                  ? 'mx-auto w-[calc((100%-2rem)*2.35/3.35+1rem)] grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]'
+                  : 'grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)]',
+              )}
             >
-              <ArcColumn side="left" actors={plan.left} render={screen} />
+              {!pair && <ArcColumn side="left" actors={plan.left} render={screen} />}
               <div className="min-w-0">
                 {plan.center ? (
                   screen(plan.center)
