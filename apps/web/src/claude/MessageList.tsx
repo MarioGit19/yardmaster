@@ -13,6 +13,8 @@ import {
   useState,
 } from 'react';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { LiveCaption } from '../pod/LiveCaption.js';
+import type { Caption } from '../pod/model.js';
 import { redact, redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
@@ -33,7 +35,10 @@ const TAIL_ID = '__tail';
 /** Frames a jump to the end keeps re-aiming while rows measure. */
 const SETTLE_FRAMES = 30;
 
-type Item = TranscriptRow | { kind: 'tail'; id: typeof TAIL_ID; text: string };
+type Item =
+  | TranscriptRow
+  | { kind: 'tail'; id: typeof TAIL_ID; text: string }
+  | { kind: 'caption'; id: typeof TAIL_ID; caption: Caption };
 
 function estimate(item: Item | undefined): number {
   if (!item) return 40;
@@ -41,6 +46,7 @@ function estimate(item: Item | undefined): number {
     case 'tool':
       return estimateTool(item);
     case 'thinking':
+    case 'caption':
       return 40;
     case 'user':
       return 56 + Math.min(10, Math.floor(item.text.length / 80)) * 20;
@@ -96,6 +102,8 @@ export interface MessageListProps {
   rows: readonly TranscriptRow[];
   /** Text Claude is still writing, shown after the last row with a caret. */
   tail: string | null;
+  /** What Claude is doing, shown after the last row when there is no `tail` to show. */
+  caption?: Caption | null;
   /** Session cwd, so tool paths show relative. */
   cwd?: string;
 }
@@ -104,11 +112,15 @@ export interface MessageListProps {
  * The virtualized transcript. It follows new messages while it is scrolled to the bottom, and
  * offers a "Jump to latest" pill once the reader scrolls away.
  */
-export function MessageList({ rows, tail, cwd }: MessageListProps) {
+export function MessageList({ rows, tail, caption = null, cwd }: MessageListProps) {
   const still = useMotionLevel() !== 'full';
   const scrollRef = useRef<HTMLDivElement>(null);
   const items: Item[] =
-    tail === null ? [...rows] : [...rows, { kind: 'tail', id: TAIL_ID, text: tail }];
+    tail !== null
+      ? [...rows, { kind: 'tail', id: TAIL_ID, text: tail }]
+      : caption !== null
+        ? [...rows, { kind: 'caption', id: TAIL_ID, caption }]
+        : [...rows];
   const [atEnd, setAtEnd] = useState(true);
   const atEndRef = useRef(true);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -218,7 +230,7 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
               if (!item) return null;
               const prev = items[v.index - 1];
               const turnStart = item.kind === 'user' && v.index > 0;
-              const enter = item.kind !== 'tail' && entering(item.id);
+              const enter = item.id !== TAIL_ID && entering(item.id);
               return (
                 <div
                   key={v.key}
@@ -295,6 +307,10 @@ export function MessageList({ rows, tail, cwd }: MessageListProps) {
 
 /** The row with its secrets masked; the same object when it has none. */
 export function redactItem(item: Item): Item {
+  if (item.kind === 'caption') {
+    const text = redact(item.caption.text);
+    return text === item.caption.text ? item : { ...item, caption: { ...item.caption, text } };
+  }
   if (item.kind !== 'tool') {
     const text = redact(item.text);
     return text === item.text ? item : { ...item, text };
@@ -362,6 +378,12 @@ function RowBody({ item, cwd, expanded, onToggle, entering, previousTodos }: Row
       );
     case 'tail':
       return <Markdown text={item.text} streaming />;
+    case 'caption':
+      return (
+        <div data-live-caption className="flex min-w-0 text-label">
+          <LiveCaption caption={item.caption} />
+        </div>
+      );
     case 'thinking':
       return <Thinking row={item} expanded={expanded} onToggle={onToggle} />;
     case 'tool':

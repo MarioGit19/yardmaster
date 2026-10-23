@@ -237,6 +237,21 @@ describe('BoardStore mutators', () => {
     expect(store.output.has(execStreamId('e-1'))).toBe(false);
   });
 
+  it('stamps assistant text with the time it was set', () => {
+    const { store, tick } = seeded();
+    store.upsertSession({ id: 's-1' });
+    tick(5);
+    store.updateSession('s-1', { lastAssistantText: 'Done.' });
+    expect(store.state.sessions['s-1']?.lastAssistantAt).toBe(T0 + 5);
+    store.updateSession('s-1', { lastAssistantText: 'Old.', lastAssistantAt: T0 });
+    expect(store.state.sessions['s-1']?.lastAssistantAt).toBe(T0);
+    store.updateSession('s-1', { lastAssistantText: null });
+    expect(store.state.sessions['s-1']).toMatchObject({
+      lastAssistantText: null,
+      lastAssistantAt: null,
+    });
+  });
+
   it('creates sessions with defaults and tracks status', () => {
     const { store, tick } = seeded();
     const session = store.upsertSession({

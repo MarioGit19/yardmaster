@@ -93,20 +93,27 @@ export class TranscriptModel {
   }
 }
 
-/** The live text to show after the last row while Claude is still writing it, or null. */
+/**
+ * The live text to show after the last row while Claude is still writing it, or null. Text set
+ * before the last user message belongs to an earlier turn, so it never shows under a new one.
+ */
 export function streamingTail(
   rows: readonly TranscriptRow[],
-  lastAssistantText: string | null,
+  last: { text: string | null; at: number | null },
   working: boolean,
 ): string | null {
-  if (!working || !lastAssistantText?.trim()) return null;
+  const { text, at } = last;
+  if (!working || !text?.trim()) return null;
   for (let i = rows.length - 1; i >= 0; i--) {
     const row = rows[i] as TranscriptRow;
-    if (row.kind === 'user') break;
+    if (row.kind === 'user') {
+      if (at !== null && row.ts !== null && at < row.ts) return null;
+      break;
+    }
     // Already written to the transcript: nothing left to stream.
-    if (row.kind === 'assistant' && row.text === lastAssistantText) return null;
+    if (row.kind === 'assistant' && row.text === text) return null;
   }
-  return lastAssistantText;
+  return text;
 }
 
 const str = (value: unknown): string | null =>

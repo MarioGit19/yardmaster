@@ -129,7 +129,7 @@ test.describe('Claude terminals', () => {
   test.describe('phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('the tab shows the chat; a reply from its composer lands in the terminal', async ({
+    test('the tab shows the chat; a reply from its composer lands in the terminal, under the last answer', async ({
       page,
     }) => {
       // The reply waits for the demo session to finish its turn, or a permission request to expire
@@ -156,11 +156,37 @@ test.describe('Claude terminals', () => {
         })
         .toBe('Reply to Claude…');
 
+      // The finished turn's answer: where it sits, and its first line.
+      const answer = chat.locator('[data-row="assistant"]').last();
+      const index = Number(await answer.getAttribute('data-index'));
+      const previous = ((await answer.innerText()).split('\n')[0] ?? '').trim();
+      expect(previous).not.toBe('');
+
       const reply = marker('reply');
       await input.fill(`Also cover ${reply}`);
       await chat.getByRole('button', { name: 'Send' }).click();
       await expect(input).toHaveValue('');
-      await expect(chat.locator('[data-row="user"]', { hasText: reply })).toBeVisible();
+      const sent = chat.locator('[data-row="user"]', { hasText: reply });
+      await expect(sent).toBeVisible();
+
+      // The previous answer stays once, above the new message, never as the new turn's tail.
+      await expect(chat.locator(`[data-index="${index}"]`)).toContainText(previous);
+      expect(Number(await sent.getAttribute('data-index'))).toBeGreaterThan(index);
+      const laterCopies = () =>
+        chat
+          .locator('[data-row]')
+          .evaluateAll(
+            (rows, [from, text]) =>
+              rows.filter((r) => Number(r.dataset.index) > from && r.textContent?.includes(text))
+                .length,
+            [index, previous] as const,
+          );
+      expect(await laterCopies()).toBe(0);
+      // While Claude works on the new turn the transcript ends on its live caption or new text.
+      await expect(
+        chat.locator('[data-row="caption"], [data-row="tail"], [data-row="tool"]').last(),
+      ).toBeVisible();
+      expect(await laterCopies()).toBe(0);
 
       await stack.getByRole('button', { name: 'Raw terminal' }).click();
       await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(reply);

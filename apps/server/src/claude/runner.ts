@@ -318,7 +318,9 @@ export class SessionRunner {
       if (!resumed.ok) return resumed;
     }
     this.pushPrompt(sessionId, text);
-    this.store.setSessionStatus(sessionId, { kind: 'working' }, this.now());
+    const ts = this.now();
+    this.store.updateSession(sessionId, { lastAssistantText: null }, ts);
+    this.store.setSessionStatus(sessionId, { kind: 'working' }, ts);
     return { ok: true };
   }
 

@@ -265,7 +265,12 @@ export class BoardStore {
 
   updateSession(id: string, fields: Partial<Omit<ClaudeSession, 'id'>>, ts = this.now()): void {
     if (!this.state.sessions[id]) return;
-    this.merge('sessions', id, { ...defined(fields), updatedAt: fields.updatedAt ?? ts });
+    const patch = { ...defined(fields), updatedAt: fields.updatedAt ?? ts };
+    // New assistant text is stamped, so the board never shows it under a later prompt.
+    if (fields.lastAssistantText !== undefined && fields.lastAssistantAt === undefined) {
+      patch.lastAssistantAt = fields.lastAssistantText === null ? null : ts;
+    }
+    this.merge('sessions', id, patch);
   }
 
   setSessionStatus(id: string, status: SessionStatus, ts = this.now()): void {

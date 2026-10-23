@@ -71,15 +71,43 @@ describe('TranscriptModel', () => {
 describe('streamingTail', () => {
   const model = new TranscriptModel();
   model.push([user('u1', 'Go'), said('a1', 'Done with the first part.')]);
+  const text = (t: string | null, at: number | null = null) => ({ text: t, at });
 
   it('shows text that is not in the transcript yet, only while working', () => {
-    expect(streamingTail(model.rows, 'Now the second', true)).toBe('Now the second');
-    expect(streamingTail(model.rows, 'Now the second', false)).toBeNull();
-    expect(streamingTail(model.rows, '', true)).toBeNull();
+    expect(streamingTail(model.rows, text('Now the second'), true)).toBe('Now the second');
+    expect(streamingTail(model.rows, text('Now the second'), false)).toBeNull();
+    expect(streamingTail(model.rows, text(''), true)).toBeNull();
+    expect(streamingTail(model.rows, text(null), true)).toBeNull();
   });
 
   it('hides the tail once the block is in the transcript', () => {
-    expect(streamingTail(model.rows, 'Done with the first part.', true)).toBeNull();
+    expect(streamingTail(model.rows, text('Done with the first part.'), true)).toBeNull();
+  });
+
+  it('never shows the previous turn’s answer under a new message', () => {
+    const turns = new TranscriptModel();
+    turns.push([
+      { ...user('u1', 'Fix the cart'), ts: 1_000 },
+      { ...said('a1', 'Partial notes'), ts: 2_000 },
+      { ...user('u2', 'Now add tests'), ts: 5_000 },
+      {
+        ...base,
+        ...assistant,
+        id: 'tu',
+        ts: 5_500,
+        kind: 'tool_use',
+        toolUseId: 'tu',
+        name: 'Bash',
+        input: {},
+      },
+    ]);
+    // The first turn's Stop set its final answer, then the second prompt went in.
+    expect(streamingTail(turns.rows, text('Cart fixed.', 3_000), true)).toBeNull();
+    expect(streamingTail(turns.rows, text('Writing the tests', 6_000), true)).toBe(
+      'Writing the tests',
+    );
+    // Unstamped text from an older server still falls back to matching the transcript.
+    expect(streamingTail(turns.rows, text('Writing the tests'), true)).toBe('Writing the tests');
   });
 });
 

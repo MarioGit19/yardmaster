@@ -313,6 +313,26 @@ describe('sessionReducer fields', () => {
     expect(later.lastAssistantText).toBe('Cart totals are now computed in one place.');
   });
 
+  it('stamps the last assistant message and drops it when the next turn starts', () => {
+    const done = sessionReducer(inStatus(working), event('stop', {}, { ts: T0 + 2_000 }));
+    expect(done.lastAssistantAt).toBe(T0 + 2_000);
+    const next = sessionReducer(
+      done,
+      event('user-prompt-submit', { prompt: 'Now add tests' }, { ts: T0 + 5_000 }),
+    );
+    expect(next.status).toEqual(working);
+    expect(next.lastAssistantText).toBeNull();
+    expect(next.lastAssistantAt).toBeNull();
+    const second = sessionReducer(
+      next,
+      event('stop', { last_assistant_message: 'Tests added.' }, { ts: T0 + 9_000 }),
+    );
+    expect(second).toMatchObject({
+      lastAssistantText: 'Tests added.',
+      lastAssistantAt: T0 + 9_000,
+    });
+  });
+
   it('clips very long assistant messages', () => {
     const long = 'x'.repeat(10_000);
     const session = sessionReducer(

@@ -1022,14 +1022,13 @@ export class DemoSimulator {
       });
       return;
     }
+    // Like a Stop hook's `last_assistant_message`: the turn's final block, as written.
+    const answer = demoAssistantText(turn.scenario, this.textRng, true);
     this.store.updateSession(session.id, {
       todos: this.todos(turn.scenario, 1),
-      lastAssistantText: turn.scenario.texts.at(-1) ?? null,
+      lastAssistantText: answer,
     });
-    this.transcript(session, {
-      kind: 'assistant',
-      text: demoAssistantText(turn.scenario, this.textRng, true),
-    });
+    this.transcript(session, { kind: 'assistant', text: answer });
     this.store.setSessionStatus(session.id, { kind: 'idle' });
     this.activity('stop', session, turn.scenario.title);
     if (this.rng.chance(0.06)) {

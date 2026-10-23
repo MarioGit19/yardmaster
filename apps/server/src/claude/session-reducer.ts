@@ -87,6 +87,8 @@ export function sessionReducer(
     case 'UserPromptSubmit':
       if (ended) return next;
       if (next.title === null) next = { ...next, title: clipLine(hook.prompt, TITLE_MAX) };
+      // The previous turn's answer is not this turn's.
+      next = { ...next, lastAssistantText: null, lastAssistantAt: null };
       return to({ kind: 'working' });
 
     case 'PreToolUse': {
@@ -131,17 +133,11 @@ export function sessionReducer(
       return to({ kind: 'waiting_permission', approvalId: null });
 
     case 'Stop':
-      next = {
-        ...next,
-        lastAssistantText: clipText(hook.last_assistant_message) ?? next.lastAssistantText,
-      };
+      next = withAssistantText(next, hook.last_assistant_message, ts);
       return ended ? next : to({ kind: 'idle' });
 
     case 'StopFailure':
-      next = {
-        ...next,
-        lastAssistantText: clipText(hook.last_assistant_message) ?? next.lastAssistantText,
-      };
+      next = withAssistantText(next, hook.last_assistant_message, ts);
       return ended
         ? next
         : to({ kind: 'error', message: errorMessage(hook.error_details, hook.error) });
@@ -165,6 +161,15 @@ export function sessionReducer(
         subagents: stopSubagent(next.subagents, hook.agent_id, hook.agent_type, ts),
       };
   }
+}
+
+function withAssistantText(
+  session: ClaudeSession,
+  message: string | undefined,
+  ts: number,
+): ClaudeSession {
+  const text = clipText(message);
+  return text === null ? session : { ...session, lastAssistantText: text, lastAssistantAt: ts };
 }
 
 function withStatus(session: ClaudeSession, status: SessionStatus, ts: number): ClaudeSession {

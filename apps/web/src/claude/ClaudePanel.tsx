@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { dur, ease } from '../motion.js';
+import { sessionCaption } from '../pod/model.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { Chip } from '../ui/Chip.js';
 import { Skeleton } from '../ui/Skeleton.js';
@@ -46,7 +47,14 @@ export function ClaudePanel({
       ? writing && session.draft
         ? session.draft
         : null
-      : streamingTail(rows, session.lastAssistantText, writing);
+      : streamingTail(
+          rows,
+          { text: session.lastAssistantText, at: session.lastAssistantAt ?? null },
+          writing,
+        );
+  // Terminal sessions don't stream text: until Claude writes, the transcript ends on what it does.
+  const caption =
+    session.origin === 'terminal' && writing && tail === null ? sessionCaption(session) : null;
 
   return (
     <div className="claude-panel flex h-full min-h-0 flex-col" data-session-panel={session.id}>
@@ -99,7 +107,12 @@ export function ClaudePanel({
               </div>
             ) : (
               <Suspense fallback={<TranscriptSkeleton />}>
-                <MessageList rows={rows} tail={tail} cwd={session.cwd ?? undefined} />
+                <MessageList
+                  rows={rows}
+                  tail={tail}
+                  caption={caption}
+                  cwd={session.cwd ?? undefined}
+                />
               </Suspense>
             )}
           </motion.div>
