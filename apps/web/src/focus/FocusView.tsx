@@ -32,6 +32,7 @@ import { useMediaQuery } from '../prefs.js';
 import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
 import { useTerminalTarget } from '../terminal/target.js';
 import { buttonClass } from '../ui/Button.js';
@@ -127,7 +128,10 @@ function ProjectFocus({
   const session = selected?.projectId === project.id ? selected : sessionId ? undefined : live[0];
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
-  const terminalRequested = useTerminalTarget(project.id) !== null;
+  // A terminal picked in ⌘K, or a new one asked for there or in the pod's menu.
+  const terminalTargeted = useTerminalTarget(project.id) !== null;
+  const newTerminalRequested = useNewTerminalRequest(project.id);
+  const terminalRequested = terminalTargeted || newTerminalRequested;
   // "New session" swaps the Claude panel for a blank composer until the session exists.
   const [composing, setComposing] = useState(false);
   useEffect(() => {
@@ -144,8 +148,11 @@ function ProjectFocus({
     headingRef.current?.focus({ preventScroll: true });
   }, []);
 
+  // A session row picked again (already in the route) still selects its Claude terminal's tab.
+  const [sessionPick, setSessionPick] = useState(0);
   const sessionsColumn = (
     <SessionsColumn
+      onPick={() => setSessionPick((n) => n + 1)}
       project={project}
       sessions={sessions}
       activeId={composing ? undefined : session?.id}
@@ -171,6 +178,10 @@ function ProjectFocus({
       projectId={project.id}
       terminals={terminals}
       deferRenderers={shared}
+      sessionId={sessionId}
+      sessionPick={sessionPick}
+      // Beside the stack only when the Claude column is on screen next to it.
+      besideSessionId={tabs || maximized || composing ? undefined : session?.id}
       {...(tabs ? {} : { maximized, onMaximizedChange: setMaximized })}
     />
   );
@@ -370,6 +381,7 @@ function SessionsColumn({
   sharedOrbs,
   composing,
   onNewSession,
+  onPick,
 }: {
   project: Project;
   sessions: readonly ClaudeSession[];
@@ -381,6 +393,7 @@ function SessionsColumn({
   sharedOrbs: boolean;
   composing: boolean;
   onNewSession: () => void;
+  onPick: () => void;
 }) {
   const live = podSessions(sessions);
   const ended = sessions.filter((s) => s.status.kind === 'ended');
@@ -433,7 +446,10 @@ function SessionsColumn({
                     now={now}
                     shared={sharedOrbs}
                     pillGlide={byKeyboard ? tabGlide(true) : spring.smooth}
-                    onPick={setByKeyboard}
+                    onPick={(viaKeyboard) => {
+                      setByKeyboard(viaKeyboard);
+                      onPick();
+                    }}
                   />
                 </motion.li>
               ))}

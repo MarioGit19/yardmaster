@@ -129,6 +129,15 @@ describe('SessionLinker', () => {
     expect(store.state.sessions['sess-1']?.terminalId).toBeNull();
   });
 
+  it('never links a board session, even when it descends from a terminal', () => {
+    const { store, linker } = setup();
+    store.upsertSession({ id: 'sess-board', origin: 'board', claudePid: 4510 });
+    store.upsertSession({ id: 'sess-1', origin: 'board' });
+    linker.link();
+    expect(store.state.sessions['sess-board']?.terminalId).toBeNull();
+    expect(store.state.sessions['sess-1']?.terminalId).toBeNull();
+  });
+
   it('moves the link when the session gets a new pid', () => {
     const { store, linker } = setup([...Object.values(ROWS)]);
     store.upsertTerminal({ id: 't-2', windowId: 'w-1', name: 'bash', shellPid: 4500 });

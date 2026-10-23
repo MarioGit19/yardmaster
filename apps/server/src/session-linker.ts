@@ -44,9 +44,14 @@ export class SessionLinker {
     const { sessions, terminals } = this.store.state;
     const shells = tree ? shellIndex(tree, terminals) : new Map<number, string>();
     for (const session of Object.values(sessions)) {
-      const next = tree
-        ? resolveLink(session, tree, shells, terminals)
-        : dangling(session, terminals);
+      // A board session's `claude` descends from the board server, which may itself run in an
+      // editor terminal; it never belongs to that terminal.
+      const next =
+        session.origin === 'board'
+          ? null
+          : tree
+            ? resolveLink(session, tree, shells, terminals)
+            : dangling(session, terminals);
       if (next !== session.terminalId) {
         // Linking isn't session activity, so `updatedAt` stays.
         this.store.updateSession(session.id, { terminalId: next, updatedAt: session.updatedAt });

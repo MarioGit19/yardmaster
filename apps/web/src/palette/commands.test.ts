@@ -113,6 +113,18 @@ describe('buildCommands', () => {
       href: '/p/p-acme',
       terminal: { projectId: 'p-acme', terminalId: 't-acme' },
     });
+    // A Claude terminal goes by its session's title and opens the session.
+    expect(byId(commands, 'terminal:t-orbit')).toMatchObject({
+      label: 'Rate limiter',
+      hint: 'orbit-api · Claude in claude',
+      icon: 'session',
+      tone: 'work',
+      run: {
+        kind: 'navigate',
+        href: '/p/p-orbit/s/s-2',
+        terminal: { projectId: 'p-orbit', terminalId: 't-orbit' },
+      },
+    });
   });
 
   it('scopes project actions to the focused project', () => {
@@ -120,6 +132,11 @@ describe('buildCommands', () => {
     const actions = commands.filter((c) => c.group === 'Actions').map((c) => c.id);
     expect(actions).toContain('new-session:p-acme');
     expect(actions).not.toContain('new-session:p-orbit');
+    expect(byId(commands, 'new-terminal:p-acme')).toMatchObject({
+      label: 'New terminal in acme-shop…',
+      run: { kind: 'newTerminal', projectId: 'p-acme' },
+    });
+    expect(actions).not.toContain('new-terminal:p-orbit');
     expect(byId(commands, 'approve-all:p-acme')).toMatchObject({
       label: 'Approve all waiting in acme-shop',
       hint: '2 requests',
@@ -140,6 +157,7 @@ describe('buildCommands', () => {
   it('offers every project its actions from the overview, but only when searched', () => {
     const commands = buildCommands(board(), context());
     expect(byId(commands, 'new-session:p-orbit')?.searchOnly).toBe(true);
+    expect(byId(commands, 'new-terminal:p-orbit')?.searchOnly).toBe(true);
     expect(byId(commands, 'open-editor:p-zen')?.searchOnly).toBe(true);
     expect(byId(commands, 'rerun-last')).toMatchObject({
       label: 'Re-run last command in orbit-api',

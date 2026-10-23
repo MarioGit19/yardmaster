@@ -1,4 +1,4 @@
-import type { StreamId, Terminal, UiAction } from '@c-board/protocol';
+import type { ClaudeSession, StreamId, Terminal, UiAction } from '@c-board/protocol';
 import {
   AppWindow,
   ChevronDown,
@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Maximize2,
   Minimize2,
+  Plus,
   RotateCcw,
   Search,
   Square,
@@ -18,15 +19,30 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useLocation } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
-import { selectWindow, useBoard, useBoardClient, useBoardShallow } from '../data/index.js';
+import { ClaudePanel } from '../claude/ClaudePanel.js';
+import {
+  selectApproval,
+  selectProject,
+  selectTerminalSession,
+  selectWindow,
+  useBoard,
+  useBoardClient,
+  useBoardShallow,
+} from '../data/index.js';
 import type { BoardStoreState } from '../data/store.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalName } from '../lanes/lane.js';
-import { tabGlide } from '../motion.js';
+import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
+import { ClaudeOrb } from '../orb/ClaudeOrb.js';
+import { orbStateFor } from '../orb/model.js';
+import { LiveCaption } from '../pod/LiveCaption.js';
+import { sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
+import { sessionHref } from '../routes.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
@@ -35,6 +51,20 @@ import { IconButton } from '../ui/IconButton.js';
 import { Kbd } from '../ui/Kbd.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
+import {
+  type ClaudeTerminalView,
+  claudeTerminalLabel,
+  claudeTerminalTitle,
+  claudeTerminalView,
+  useClaudeTerminalView,
+} from './claudeTerminal.js';
+import { NewTerminalPopover } from './NewTerminalPopover.js';
+import {
+  arrivedTerminal,
+  CLAUDE_COMMAND,
+  newTerminalRequest,
+  useNewTerminalRequest,
+} from './newTerminal.js';
 import {
   actionErrorText,
   gridTerminals,
@@ -59,7 +89,19 @@ export interface TerminalStackProps {
   onMaximizedChange?: (maximized: boolean) => void;
   /** Hold the renderers back until the pod-to-focus morph has settled, so it keeps its frames. */
   deferRenderers?: boolean;
+  /** The session in the route: the tab of the terminal it runs in becomes the active one. */
+  sessionId?: string;
+  /** Counts picks of a session row, so picking the routed session again selects its tab too. */
+  sessionPick?: number;
+  /**
+   * The session the Claude column shows beside the stack, if it is on screen. A Claude terminal
+   * running it points there instead of showing the same chat twice.
+   */
+  besideSessionId?: string;
 }
+
+/** How long a new terminal may take to show up before the stack stops waiting to select it. */
+const ARRIVAL_TIMEOUT_MS = 20_000;
 
 /**
  * The focus view's terminal stack, DESIGN.md §4.6: every terminal of the project mirrored in
@@ -72,6 +114,9 @@ export function TerminalStack({
   maximized,
   onMaximizedChange,
   deferRenderers = false,
+  sessionId,
+  sessionPick = 0,
+  besideSessionId,
 }: TerminalStackProps) {
   const [renderersReady, setRenderersReady] = useState(!deferRenderers);
   useEffect(() => {
@@ -91,6 +136,82 @@ export function TerminalStack({
   }, [target, ordered]);
   const interactiveIds = useBoard(selectInteractiveIds(ordered));
   const interactive = useMemo(() => new Set(interactiveIds.split('\n')), [interactiveIds]);
+  // Claude terminals: terminal id → its live session. The tab and the session's row select the
+  // same thing, so picking one moves the route, and the route picks the tab.
+  const links = useBoard(selectClaudeLinks(ordered));
+  const sessionOf = useMemo(() => parseLinks(links), [links]);
+  const [, navigate] = useLocation();
+  const routed = useRef<string | null>(null);
+  useEffect(() => {
+    const pick = `${sessionId}#${sessionPick}`;
+    if (!sessionId || routed.current === pick) return;
+    const linked = [...sessionOf].find(([, id]) => id === sessionId)?.[0] ?? null;
+    routed.current = linked === null ? null : pick;
+    if (linked !== null) setChosen(linked);
+    // Another session (a board one): a Claude tab would show a second chat, so let it go.
+    else setChosen((current) => (current !== null && sessionOf.has(current) ? null : current));
+  }, [sessionId, sessionPick, sessionOf]);
+  const select = (terminalId: string, viaKeyboard: boolean) => {
+    setByKeyboard(viaKeyboard);
+    setChosen(terminalId);
+    const linked = sessionOf.get(terminalId);
+    if (linked === undefined || linked === sessionId) return;
+    routed.current = `${linked}#${sessionPick}`;
+    navigate(sessionHref(projectId, linked));
+  };
+
+  // New terminals: the popover (also opened from ⌘K and the pod's menu), then the new tab is
+  // selected once the editor reports it; one started with `claude` opens its session once linked.
+  const [creating, setCreating] = useState(false);
+  const requested = useNewTerminalRequest(projectId);
+  useEffect(() => {
+    if (!requested || !renderersReady) return;
+    newTerminalRequest.set(null);
+    setCreating(true);
+  }, [requested, renderersReady]);
+  const [awaiting, setAwaiting] = useState<{ known: Set<string>; claude: boolean } | null>(null);
+  const [claudeTab, setClaudeTab] = useState<string | null>(null);
+  useEffect(() => {
+    if (!awaiting) return;
+    const arrived = arrivedTerminal(awaiting.known, terminals);
+    if (arrived === null) {
+      const timer = setTimeout(() => setAwaiting(null), ARRIVAL_TIMEOUT_MS);
+      return () => clearTimeout(timer);
+    }
+    setAwaiting(null);
+    setByKeyboard(false);
+    setChosen(arrived);
+    if (awaiting.claude) setClaudeTab(arrived);
+    // The popover left focus nowhere; unless something took it since, it lands on the new tab.
+    if (document.activeElement === document.body || document.activeElement === null) {
+      tabRefs.current.get(arrived)?.focus({ preventScroll: true });
+    }
+  }, [awaiting, terminals]);
+  useEffect(() => {
+    const linked = claudeTab === null ? undefined : sessionOf.get(claudeTab);
+    if (claudeTab === null || linked === undefined) return;
+    setClaudeTab(null);
+    if (chosen !== claudeTab) return;
+    routed.current = `${linked}#${sessionPick}`;
+    navigate(sessionHref(projectId, linked));
+  }, [claudeTab, sessionOf, chosen, navigate, projectId, sessionPick]);
+  const onCreated = (command: string | null) =>
+    setAwaiting({ known: new Set(terminals.map((t) => t.id)), claude: command === CLAUDE_COMMAND });
+  const project = useBoard(selectProject(projectId));
+  const accent = `var(--accent-${project?.accent ?? 0})`;
+  const newTerminal = (trigger: React.ReactElement) => (
+    <NewTerminalPopover
+      projectId={projectId}
+      projectName={project?.name ?? 'this project'}
+      open={creating}
+      onOpenChange={setCreating}
+      onCreated={onCreated}
+      trigger={trigger}
+    />
+  );
+
+  // Claude terminals count as interactive here: without a choice (or a session in the route) the
+  // stack opens on output it mirrors, not on the chat the Claude column already shows.
   const activeId = resolveActive(ordered, chosen, (id) => !interactive.has(id));
   const active = ordered.find((t) => t.id === activeId) ?? null;
   const layout = usePreference(stackLayoutPreference);
@@ -98,6 +219,22 @@ export function TerminalStack({
   const panes = grid ? gridTerminals(ordered, activeId) : active ? [active] : [];
   const controllers = useRef(new Map<string, XtermController>());
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  // The tab bar scrolls sideways: keep a newly active tab in it (a new terminal lands at the end).
+  // Only the bar scrolls (`scrollIntoView` would scroll the clipped focus card too), and not on
+  // mount, while the view may still be morphing in.
+  const tabList = useRef<HTMLDivElement>(null);
+  const shownTab = useRef(activeId);
+  useEffect(() => {
+    if (activeId === shownTab.current) return;
+    shownTab.current = activeId;
+    const list = tabList.current;
+    const tab = activeId === null ? undefined : tabRefs.current.get(activeId);
+    if (!list || !tab) return;
+    const bar = list.getBoundingClientRect();
+    const box = tab.getBoundingClientRect();
+    if (box.left < bar.left) list.scrollLeft -= bar.left - box.left;
+    else if (box.right > bar.right) list.scrollLeft += box.right - bar.right;
+  }, [activeId]);
   const activeController = useCallback(
     () => (activeId === null ? null : (controllers.current.get(activeId) ?? null)),
     [activeId],
@@ -124,8 +261,7 @@ export function TerminalStack({
     e.preventDefault();
     const next = stepTab(ordered, activeId, step);
     if (next === null) return;
-    setByKeyboard(true);
-    setChosen(next);
+    select(next, true);
     tabRefs.current.get(next)?.focus();
   };
 
@@ -162,32 +298,56 @@ export function TerminalStack({
         <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-control border border-line border-dashed px-6 text-center">
           <p className="text-body-sm text-text-2">No terminals</p>
           <p className="text-meta text-text-2">Terminals opened in the editor show up here.</p>
+          {newTerminal(
+            <button
+              type="button"
+              data-new-terminal
+              aria-expanded={creating}
+              className={cx(buttonClass('secondary', 'sm'), 'mt-3')}
+            >
+              <Plus aria-hidden className="size-3.5" strokeWidth={1.5} />
+              New terminal
+            </button>,
+          )}
         </div>
       ) : (
         <>
-          <div
-            role="tablist"
-            aria-label="Terminals"
-            onKeyDown={onTabKey}
-            className="-mx-1 flex min-w-0 shrink-0 gap-1 overflow-x-auto px-1 pb-0.5"
-          >
-            {ordered.map((terminal) => (
-              <StackTab
-                key={terminal.id}
-                terminal={terminal}
-                projectId={projectId}
-                selected={terminal.id === activeId}
-                byKeyboard={byKeyboard}
-                tabRef={(el) => {
-                  if (el) tabRefs.current.set(terminal.id, el);
-                  else tabRefs.current.delete(terminal.id);
-                }}
-                onSelect={(viaKeyboard) => {
-                  setByKeyboard(viaKeyboard);
-                  setChosen(terminal.id);
-                }}
-              />
-            ))}
+          <div className="flex min-w-0 shrink-0 items-center gap-1">
+            <div
+              ref={tabList}
+              role="tablist"
+              aria-label="Terminals"
+              onKeyDown={onTabKey}
+              className="-ml-1 flex min-w-0 flex-1 gap-1 overflow-x-auto pb-0.5 pl-1"
+            >
+              <AnimatePresence initial={false}>
+                {ordered.map((terminal) => (
+                  <StackTab
+                    key={terminal.id}
+                    terminal={terminal}
+                    projectId={projectId}
+                    accent={accent}
+                    selected={terminal.id === activeId}
+                    byKeyboard={byKeyboard}
+                    tabRef={(el) => {
+                      if (el) tabRefs.current.set(terminal.id, el);
+                      else tabRefs.current.delete(terminal.id);
+                    }}
+                    onSelect={(viaKeyboard) => select(terminal.id, viaKeyboard)}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+            {newTerminal(
+              <IconButton
+                size="sm"
+                label="New terminal"
+                data-new-terminal
+                aria-expanded={creating}
+                className="-mt-0.5"
+                icon={<Plus className="size-4" strokeWidth={1.5} />}
+              />,
+            )}
           </div>
 
           <div
@@ -203,6 +363,8 @@ export function TerminalStack({
               <Pane
                 key={terminal.id}
                 terminal={terminal}
+                accent={accent}
+                besideSessionId={besideSessionId}
                 inGrid={grid}
                 active={terminal.id === activeId}
                 wide={panes.length === 3 && i === 2}
@@ -217,7 +379,12 @@ export function TerminalStack({
           </div>
 
           {active && (
-            <ActiveControls key={active.id} terminal={active} controller={activeController} />
+            <ActiveControls
+              key={active.id}
+              terminal={active}
+              claude={sessionOf.has(active.id)}
+              controller={activeController}
+            />
           )}
         </>
       )}
@@ -252,6 +419,27 @@ const selectInteractiveIds =
       .map((t) => t.id)
       .join('\n');
 
+/** `terminalId sessionId` per Claude terminal, one per line, so it compares by value. */
+const selectClaudeLinks =
+  (terminals: readonly Terminal[]) =>
+  (s: BoardStoreState): string =>
+    terminals
+      .map((t) => {
+        const session = selectTerminalSession(t.id)(s);
+        return session ? `${t.id} ${session.id}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+
+function parseLinks(links: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of links.split('\n')) {
+    const [terminalId, sessionId] = line.split(' ');
+    if (terminalId && sessionId) map.set(terminalId, sessionId);
+  }
+  return map;
+}
+
 function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   return { execution, view: laneView(terminal, execution) };
@@ -279,6 +467,7 @@ function LayoutToggle({ layout }: { layout: StackLayout }) {
 function StackTab({
   terminal,
   projectId,
+  accent,
   selected,
   byKeyboard,
   tabRef,
@@ -286,6 +475,7 @@ function StackTab({
 }: {
   terminal: Terminal;
   projectId: string;
+  accent: string;
   selected: boolean;
   /** The selection came from the keyboard: the indicator snaps instead of gliding. */
   byKeyboard: boolean;
@@ -293,17 +483,32 @@ function StackTab({
   onSelect: (byKeyboard: boolean) => void;
 }) {
   const { view } = useTerminalView(terminal);
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const caption = useSessionCaption(session);
   const closed = terminal.state === 'closed';
+  const name = terminalName(terminal);
+  const title = session ? claudeTerminalTitle(session) : name;
   return (
-    <button
+    // New tabs enter with a fade and a 4 px rise (DESIGN.md §3 rule 1); `y` stays still at Reduced.
+    <motion.button
       ref={tabRef}
       type="button"
       role="tab"
       aria-selected={selected}
-      aria-label={view.label}
-      title={view.command ? `${terminalName(terminal)}: ${view.command}` : terminalName(terminal)}
+      aria-label={session && caption ? claudeTerminalLabel(name, caption.text) : view.label}
+      title={
+        session && caption
+          ? `${title}: ${caption.text}`
+          : view.command
+            ? `${name}: ${view.command}`
+            : name
+      }
       tabIndex={selected ? 0 : -1}
       data-tab={terminal.id}
+      data-claude-tab={session?.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0, transition: spring.smooth }}
+      exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
       // detail 0: Enter or Space, not a pointer.
       onClick={(e) => onSelect(e.detail === 0)}
       className={cx(
@@ -320,19 +525,67 @@ function StackTab({
           className="absolute inset-0 rounded-control border border-line bg-bg-2 shadow-raised"
         />
       )}
-      <StatusDot tone={view.tone} label={view.label} className="relative" />
-      <span className="relative truncate">{terminalName(terminal)}</span>
+      <span aria-hidden className="relative flex size-3.5 shrink-0 items-center justify-center">
+        {session ? (
+          <ClaudeOrb
+            state={orbStateFor(session.status)}
+            size={14}
+            accent={accent}
+            tool={session.status.kind === 'tool' ? session.status.tool : null}
+            showToolLabel={false}
+          />
+        ) : (
+          <StatusDot tone={view.tone} label={view.label} />
+        )}
+      </span>
+      <TabTitle text={title} />
       <AnimatePresence initial={false}>
-        {view.exit && view.exit.code !== 0 && (
+        {!session && view.exit && view.exit.code !== 0 && (
           <ExitBadge key={view.exit.key} code={view.exit.code} className="relative -mr-1" />
         )}
       </AnimatePresence>
-    </button>
+    </motion.button>
   );
 }
 
+/** A tab's name; a new one (Claude's session title, or back to the process) slides in like a caption. */
+function TabTitle({ text }: { text: string }) {
+  const still = useMotionLevel() !== 'full';
+  return (
+    <span className="relative flex min-w-0 overflow-hidden">
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={text}
+          initial={{ opacity: 0, transform: slide(still, '80%') }}
+          animate={{ opacity: 1, transform: slide(still, '0%'), transition: spring.snappy }}
+          exit={{
+            opacity: 0,
+            transform: slide(still, '-80%'),
+            transition: { duration: dur.fast, ease: ease.out },
+          }}
+          className="block min-w-0 truncate"
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+function useSessionCaption(session: ClaudeSession | undefined) {
+  const approvalId =
+    session?.status.kind === 'waiting_permission' ? session.status.approvalId : null;
+  const approval = useBoard(selectApproval(approvalId ?? ''));
+  return session ? sessionCaption(session, approval) : null;
+}
+
+/** What a pane shows: Claude's chat, the mirrored output, or the pointer to an alt-screen app. */
+type PaneContent = 'chat' | 'xterm' | 'interactive';
+
 function Pane({
   terminal,
+  accent,
+  besideSessionId,
   inGrid,
   active,
   wide,
@@ -341,6 +594,8 @@ function Pane({
   onController,
 }: {
   terminal: Terminal;
+  accent: string;
+  besideSessionId: string | undefined;
   inGrid: boolean;
   active: boolean;
   wide: boolean;
@@ -351,10 +606,16 @@ function Pane({
   const { execution, view } = useTerminalView(terminal);
   const kind = paneKind(execution.id === null ? null : execution, terminal);
   const masked = useMasked(`term:${terminal.id}`);
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const chosenView = useClaudeTerminalView(terminal.id);
+  // A Claude terminal shows its chat unless asked for the raw TUI; when the session ends it is a
+  // plain terminal again, and the content cross-fades either way.
+  const content: PaneContent = session ? (chosenView === 'chat' ? 'chat' : 'xterm') : kind;
   return (
     <section
-      aria-label={terminalName(terminal)}
+      aria-label={session ? `${terminalName(terminal)}, Claude` : terminalName(terminal)}
       data-pane={terminal.id}
+      data-pane-content={content}
       data-active={(inGrid && active) || undefined}
       onPointerDown={inGrid ? onActivate : undefined}
       onFocusCapture={inGrid ? onActivate : undefined}
@@ -364,44 +625,180 @@ function Pane({
         wide && 'col-span-2',
       )}
     >
-      {inGrid && (
-        <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-3 text-label">
-          <StatusDot tone={view.tone} label={view.label} />
-          <span
-            title={terminalName(terminal)}
-            className={cx('max-w-[60%] shrink-0 truncate', active ? 'text-text-1' : 'text-text-2')}
-          >
-            {terminalName(terminal)}
-          </span>
-          {view.command && (
-            <span className="min-w-0 truncate font-mono text-meta text-text-2" title={view.command}>
-              {view.command}
-            </span>
-          )}
-          <span className="ml-auto flex">
-            <AnimatePresence initial={false}>
-              {view.exit && <ExitBadge key={view.exit.key} code={view.exit.code} />}
-            </AnimatePresence>
-          </span>
-        </header>
-      )}
-      {kind === 'interactive' ? (
-        <InteractiveCard terminal={terminal} command={view.command} compact={inGrid} />
+      {session ? (
+        <ClaudePaneHeader
+          terminal={terminal}
+          session={session}
+          accent={accent}
+          view={chosenView}
+          inGrid={inGrid}
+          active={active}
+        />
       ) : (
-        <div className="min-h-0 flex-1 py-2 pl-3 pr-1">
-          {renderer && (
-            <Suspense fallback={null}>
-              <XtermView
-                terminalId={terminal.id}
-                label={`Output of ${terminalName(terminal)}`}
-                redact={masked}
-                onController={onController}
-              />
-            </Suspense>
-          )}
-        </div>
+        inGrid && (
+          <header className="flex h-7 shrink-0 items-center gap-1.5 border-line border-b px-3 text-label">
+            <StatusDot tone={view.tone} label={view.label} />
+            <span
+              title={terminalName(terminal)}
+              className={cx(
+                'max-w-[60%] shrink-0 truncate',
+                active ? 'text-text-1' : 'text-text-2',
+              )}
+            >
+              {terminalName(terminal)}
+            </span>
+            {view.command && (
+              <span
+                className="min-w-0 truncate font-mono text-meta text-text-2"
+                title={view.command}
+              >
+                {view.command}
+              </span>
+            )}
+            <span className="ml-auto flex">
+              <AnimatePresence initial={false}>
+                {view.exit && <ExitBadge key={view.exit.key} code={view.exit.code} />}
+              </AnimatePresence>
+            </span>
+          </header>
+        )
       )}
+      {/* One grid cell, so the outgoing content fades out under the incoming one (dur.base in,
+          dur.fast out). */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={content}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: dur.base, ease: ease.out } }}
+            exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
+            className="col-start-1 row-start-1 flex min-h-0 min-w-0 flex-col"
+          >
+            {content === 'chat' && session ? (
+              session.id === besideSessionId ? (
+                <ChatBeside session={session} accent={accent} compact={inGrid} />
+              ) : (
+                <ClaudePanel session={session} defer={!renderer} />
+              )
+            ) : content === 'interactive' ? (
+              <InteractiveCard terminal={terminal} command={view.command} compact={inGrid} />
+            ) : (
+              <div className="min-h-0 flex-1 py-2 pl-3 pr-1">
+                {renderer && (
+                  <Suspense fallback={null}>
+                    <XtermView
+                      terminalId={terminal.id}
+                      label={`Output of ${terminalName(terminal)}`}
+                      redact={masked}
+                      onController={onController}
+                    />
+                  </Suspense>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </section>
+  );
+}
+
+const VIEW_LABEL: Record<ClaudeTerminalView, string> = { chat: 'Chat', raw: 'Raw terminal' };
+
+/** A Claude terminal's pane header: Claude's live caption and the chat / raw toggle. */
+function ClaudePaneHeader({
+  terminal,
+  session,
+  accent,
+  view,
+  inGrid,
+  active,
+}: {
+  terminal: Terminal;
+  session: ClaudeSession;
+  accent: string;
+  view: ClaudeTerminalView;
+  inGrid: boolean;
+  active: boolean;
+}) {
+  const caption = useSessionCaption(session);
+  return (
+    <header
+      data-claude-pane={session.id}
+      className="flex h-9 shrink-0 items-center gap-2 border-line border-b pr-1 pl-3 text-label"
+    >
+      {inGrid && (
+        <>
+          <span aria-hidden className="flex shrink-0">
+            <ClaudeOrb state={orbStateFor(session.status)} size={14} accent={accent} />
+          </span>
+          <span
+            title={claudeTerminalTitle(session)}
+            className={cx('max-w-[40%] shrink-0 truncate', active ? 'text-text-1' : 'text-text-2')}
+          >
+            {claudeTerminalTitle(session)}
+          </span>
+        </>
+      )}
+      {caption && <LiveCaption caption={caption} className="min-w-0 flex-1 text-label" />}
+      <fieldset className="ml-auto flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5">
+        <legend className="sr-only">Show {claudeTerminalTitle(session)} as</legend>
+        {(['chat', 'raw'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={option === view}
+            data-view={option}
+            onClick={() => claudeTerminalView.set(terminal.id, option)}
+            className={cx(
+              'h-6 rounded-chip px-2.5 text-label transition-colors duration-fast',
+              option === view
+                ? 'bg-bg-2 text-text-1 shadow-raised'
+                : 'text-text-2 hover:text-text-1',
+            )}
+          >
+            {VIEW_LABEL[option]}
+          </button>
+        ))}
+      </fieldset>
+    </header>
+  );
+}
+
+/** The chat is already open in the Claude column beside the stack: say so instead of repeating it. */
+function ChatBeside({
+  session,
+  accent,
+  compact,
+}: {
+  session: ClaudeSession;
+  accent: string;
+  compact: boolean;
+}) {
+  return (
+    <div
+      data-chat-beside={session.id}
+      className={cx(
+        'flex min-h-0 flex-1 flex-col items-center justify-center-safe overflow-y-auto text-center',
+        compact ? 'gap-2 px-3 py-2' : 'gap-3 px-6 py-4',
+      )}
+    >
+      <ClaudeOrb
+        state={orbStateFor(session.status)}
+        size={compact ? 20 : 28}
+        accent={accent}
+        tool={session.status.kind === 'tool' ? session.status.tool : null}
+        showToolLabel={false}
+      />
+      <div className="flex max-w-72 flex-col gap-1">
+        <p className="font-medium text-body-sm text-text-1">The chat is in the Claude column</p>
+        {!compact && (
+          <p className="text-meta text-text-2">
+            Reply there, or switch to the raw terminal to see Claude Code's own screen.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -471,9 +868,12 @@ function InteractiveCard({
 /** Toolbar, search and command line for the active terminal. */
 function ActiveControls({
   terminal,
+  claude,
   controller,
 }: {
   terminal: Terminal;
+  /** A Claude terminal: its composer is the input while the chat shows. */
+  claude: boolean;
   controller: () => XtermController | null;
 }) {
   const { execution, view } = useTerminalView(terminal);
@@ -483,8 +883,12 @@ function ActiveControls({
   const [searching, setSearching] = useState(false);
   const redactOn = useRedactOn();
   const masked = useMasked(`term:${terminal.id}`);
+  const shown = useClaudeTerminalView(terminal.id);
+  const chat = claude && shown === 'chat';
+  // No mirror on screen: an alt-screen app's pointer card, or Claude's chat.
   const interactive =
-    paneKind(execution.id === null ? null : execution, terminal) === 'interactive';
+    chat ||
+    (!claude && paneKind(execution.id === null ? null : execution, terminal) === 'interactive');
 
   const interrupt = () => act({ kind: 'terminal.interrupt', terminalId: terminal.id });
   const rerunnable = open && !view.running && execution.id !== null && Boolean(view.command);
@@ -556,11 +960,13 @@ function ActiveControls({
       {searching && !interactive && (
         <SearchBar controller={controller} onClose={() => setSearching(false)} />
       )}
-      <CommandLine
-        terminal={terminal}
-        running={view.running ? view.command : null}
-        onInterrupt={interrupt}
-      />
+      {!chat && (
+        <CommandLine
+          terminal={terminal}
+          running={view.running ? view.command : null}
+          onInterrupt={interrupt}
+        />
+      )}
     </div>
   );
 }

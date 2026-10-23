@@ -1,7 +1,9 @@
 import { type BoardState, terminalReplyBlock } from '@c-board/protocol';
 import type { ActionHandler, ActionHandlers } from './actions.js';
 
-export const TERMINAL_REPLY_KEY = 'experimental.terminalReply';
+export const TERMINAL_REPLY_KEY = 'claude.terminalReply';
+/** Where 8.x stored the flag, while it was experimental and off by default. */
+export const LEGACY_TERMINAL_REPLY_KEY = 'experimental.terminalReply';
 export const TERMINAL_REPLY_DISABLED = 'terminal_reply_disabled';
 export const EMPTY_REPLY = 'empty_reply';
 
@@ -15,7 +17,7 @@ export function replyLine(text: string): string {
 }
 
 /**
- * F14 (experimental): a reply to a terminal session is typed into its linked terminal and
+ * F14: a reply to a terminal session is typed into its linked terminal and
  * submitted, through the same `terminal.sendText` route as the board's terminal input.
  */
 export function createTerminalReply(options: {

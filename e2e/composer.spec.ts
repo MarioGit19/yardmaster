@@ -65,66 +65,68 @@ test.describe('composer', () => {
     await expect(session.locator('header')).toContainText('Idle');
   });
 
-  test('a terminal session offers Resume here (fork)', async ({ page }) => {
+  test("a terminal session's composer types into its terminal; the fork is in its menu", async ({
+    page,
+  }) => {
+    test.setTimeout(200_000);
     await openFirstProject(page);
-    const terminalSession = page
-      .locator('[data-focus] a[data-session]')
-      .filter({ hasNot: page.locator('[data-origin="board"]') })
-      .first();
-    await terminalSession.click();
-    const bar = page.locator('[data-fork-bar]');
-    await expect(bar).toBeVisible();
-    await expect(page.locator('form[data-composer]')).toHaveCount(0);
-    const parentId = await terminalSession.getAttribute('data-session');
+    const tab = page.locator('[data-terminal-stack] [data-claude-tab]').first();
+    await expect(tab).toBeVisible({ timeout: 30_000 });
+    const parentId = await tab.getAttribute('data-claude-tab');
+    await page.locator(`[data-focus] a[data-session="${parentId}"]`).click();
+    const panel = page.locator(`[data-session-panel="${parentId}"]`);
+    // The TUI owns model and mode; no fork bar while the board can type into the terminal.
+    await expect(panel.locator('[data-fork-bar]')).toHaveCount(0);
+    await expect(panel.getByRole('combobox', { name: 'Model' })).toHaveCount(0);
 
-    await bar.getByRole('button', { name: 'Resume here (fork)' }).click();
+    // While Claude asks for permission the approval takes the composer's place; the composer
+    // comes back once it is answered or expires (not answered here: the attention tests use it).
+    const more = panel.getByRole('button', { name: 'More actions' });
+    await expect(more).toBeVisible({ timeout: 150_000 });
+    await more.click();
+    await page
+      .locator('[data-composer-menu]')
+      .getByRole('button', { name: /Resume here \(fork\)/ })
+      .click();
     await expect(page).toHaveURL(/#\/p\/[^/]+\/s\/[^/]+$/);
     await expect(page).not.toHaveURL(new RegExp(`/s/${parentId}$`));
     const fork = page.locator('[data-session-panel]');
     await expect(fork.locator('header [data-origin="board"]')).toBeVisible();
     await expect(fork.locator('form[data-composer]')).toBeVisible();
   });
-  test('Reply in terminal is offered only while its setting is on', async ({ page }) => {
-    // Four route changes through Settings.
-    test.slow();
-    const setReply = async (value: 'On' | 'Off') => {
-      await openRoute(page, '/settings');
-      const row = page.locator('[data-setting="terminal-reply"]');
-      await expect(row.getByRole('button', { name: 'Off' })).toBeEnabled();
-      await row.getByRole('button', { name: value }).click();
-      await expect(row.getByRole('button', { name: value })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-    };
 
-    try {
-      await setReply('Off');
-      await openFirstProject(page);
-      const terminalSession = page
-        .locator('[data-focus] a[data-session]')
-        .filter({ hasNot: page.locator('[data-origin="board"]') })
-        .first();
-      const route = (await terminalSession.getAttribute('href'))?.slice(1);
-      if (!route) throw new Error('no terminal session');
-      await terminalSession.click();
-      await expect(page.locator('[data-fork-bar]')).toBeVisible();
-      await expect(page.locator('[data-terminal-reply]')).toHaveCount(0);
+  test('with replies turned off in Settings, a terminal session offers the fork bar', async ({
+    page,
+  }) => {
+    // The setting lives on the shared demo server: keep it in this page, so parallel tests
+    // still see it on.
+    let terminalReply = true;
+    await page.route('**/api/settings', async (route) => {
+      const response = await route.fetch({ method: 'GET' });
+      const current = await response.json();
+      if (route.request().method() === 'PUT') {
+        const patch = route.request().postDataJSON() as { terminalReply?: boolean };
+        if (patch.terminalReply !== undefined) terminalReply = patch.terminalReply;
+      }
+      await route.fulfill({ response, json: { ...current, terminalReply } });
+    });
 
-      await setReply('On');
-      await openRoute(page, route);
-      const reply = page.locator('[data-terminal-reply]');
-      await expect(reply).toBeVisible();
-      // Sending waits on the demo's turn timing, so the routing is covered by the server tests.
-      await expect(reply.getByRole('textbox', { name: 'Reply in the terminal' })).toBeVisible();
-      await expect(reply.getByRole('button', { name: 'Send to terminal' })).toBeDisabled();
+    await openRoute(page, '/settings');
+    const row = page.locator('[data-setting="terminal-reply"]');
+    await expect(row).toContainText('Reply to terminal sessions from the board');
+    // On by default.
+    await expect(row.getByRole('button', { name: 'On' })).toHaveAttribute('aria-pressed', 'true');
+    await row.getByRole('button', { name: 'Off' }).click();
+    await expect(row.getByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'true');
 
-      await setReply('Off');
-      await openRoute(page, route);
-      await expect(page.locator('[data-fork-bar]')).toBeVisible();
-      await expect(page.locator('[data-terminal-reply]')).toHaveCount(0);
-    } finally {
-      await setReply('Off');
-    }
+    await openFirstProject(page);
+    const tab = page.locator('[data-terminal-stack] [data-claude-tab]').first();
+    await expect(tab).toBeVisible({ timeout: 30_000 });
+    const sessionId = await tab.getAttribute('data-claude-tab');
+    await page.locator(`[data-focus] a[data-session="${sessionId}"]`).click();
+    const panel = page.locator(`[data-session-panel="${sessionId}"]`);
+    await expect(panel.locator('[data-fork-bar]')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Resume here (fork)' })).toBeVisible();
+    await expect(panel.locator('form[data-composer]')).toHaveCount(0);
   });
 });

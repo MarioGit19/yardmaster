@@ -1,6 +1,6 @@
 import { type ActivityEvent, type ActivityKind, PULSE_WINDOW_MS } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
-import { sampleBoard } from '../test/board.js';
+import { makeTerminal, sampleBoard } from '../test/board.js';
 import {
   buildLanes,
   eventLabel,
@@ -10,6 +10,7 @@ import {
   matchesFilter,
   placeDots,
   pulseLayout,
+  pulseSession,
   pulseTarget,
   stepDot,
   timeToX,
@@ -169,6 +170,20 @@ describe('navigation targets', () => {
       href: '/p/p-acme',
     });
     expect(pulseTarget(event('d', 'prompt', { projectId: 'gone' }), board)).toBeNull();
+  });
+
+  it("opens a Claude terminal's session for its terminal events", () => {
+    const linked = sampleBoard();
+    linked.terminals['t-claude'] = makeTerminal('t-claude', 'p-acme');
+    const session = linked.sessions['s-1'];
+    if (!session) throw new Error('missing session');
+    linked.sessions['s-1'] = { ...session, terminalId: 't-claude' };
+    const exec = event('e', 'exec.start', { projectId: 'p-acme', terminalId: 't-claude' });
+    expect(pulseSession(exec, linked)?.id).toBe('s-1');
+    expect(pulseTarget(exec, linked)).toEqual({ href: '/p/p-acme/s/s-1' });
+    expect(
+      pulseSession(event('f', 'exec.end', { projectId: 'p-zen', terminalId: 't-1' }), linked),
+    ).toBeUndefined();
   });
 });
 

@@ -102,6 +102,10 @@ export function SettingsView() {
           <AwayRow server={server} />
         </SettingsSection>
 
+        <SettingsSection title="Claude">
+          <TerminalReplyRow server={server} />
+        </SettingsSection>
+
         <SettingsSection title="Connections">
           <HooksRow />
           <EditorsRow />
@@ -118,10 +122,6 @@ export function SettingsView() {
         <SettingsSection title="Data and security">
           <RetentionRow server={server} />
           <TokenRow demo={demo} />
-        </SettingsSection>
-
-        <SettingsSection title="Experimental">
-          <TerminalReplyRow server={server} />
         </SettingsSection>
       </div>
     </Page>
@@ -288,22 +288,22 @@ function AwayRow({ server: { settings, update } }: { server: ServerSettings }) {
   );
 }
 
-/** F14: a terminal session's bar can type a reply into its terminal (`experimental.terminalReply`). */
+/** F14: a terminal session's composer types into its terminal (`claude.terminalReply`). */
 function TerminalReplyRow({ server: { settings, update } }: { server: ServerSettings }) {
   return (
     <SettingRow
-      title="Reply in terminal"
-      description="Type a reply into a terminal session's terminal from the board, when Claude is idle or waiting for you. The line is sent as if typed at its prompt."
+      title="Reply to terminal sessions from the board"
+      description="A Claude session running in a terminal takes your messages from the board when Claude is idle or waiting for you. Each one is typed at its prompt. Off: the board offers a fork instead."
       data="terminal-reply"
     >
       <Segmented
-        label="Reply in terminal"
+        label="Reply to terminal sessions from the board"
         options={ON_OFF}
         labels={ON_OFF_LABEL}
-        value={settings?.experimentalTerminalReply ? 'on' : 'off'}
+        value={settings?.terminalReply === false ? 'off' : 'on'}
         onChange={(value) =>
           void update(
-            { experimentalTerminalReply: value === 'on' },
+            { terminalReply: value === 'on' },
             'Could not save the terminal reply setting',
           )
         }

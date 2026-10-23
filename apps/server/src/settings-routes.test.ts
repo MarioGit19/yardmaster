@@ -16,7 +16,13 @@ import { hookFixture } from './claude/fixtures.test-helpers.js';
 import { HOOK_ROUTE } from './claude/hook-ingest.js';
 import type { ServerConfig } from './config.js';
 import { SESSION_COOKIE } from './security.js';
-import { diskHookSettings, type HookSettingsFile, memoryHookSettings } from './settings-routes.js';
+import {
+  diskHookSettings,
+  type HookSettingsFile,
+  memoryHookSettings,
+  migrateTerminalReply,
+  terminalReplyEnabled,
+} from './settings-routes.js';
 import { generateToken } from './token.js';
 
 const host = '127.0.0.1:4317';
@@ -75,6 +81,40 @@ function call(
   });
 }
 
+describe('claude.terminalReply', () => {
+  it('is on by default and reads the old experimental key', () => {
+    expect(terminalReplyEnabled({})).toBe(true);
+    expect(terminalReplyEnabled({ 'experimental.terminalReply': false })).toBe(false);
+    expect(terminalReplyEnabled({ 'experimental.terminalReply': true })).toBe(true);
+    expect(
+      terminalReplyEnabled({ 'experimental.terminalReply': false, 'claude.terminalReply': true }),
+    ).toBe(true);
+    expect(terminalReplyEnabled({ 'claude.terminalReply': 'yes' })).toBe(true);
+  });
+
+  it('migrates a stored false to the new key once, keeping the old key', () => {
+    const saved: [string, unknown][] = [];
+    const save = (key: string, value: unknown) => saved.push([key, value]);
+    const settings: Record<string, unknown> = { 'experimental.terminalReply': false };
+    migrateTerminalReply(settings, save);
+    migrateTerminalReply(settings, save);
+    expect(saved).toEqual([['claude.terminalReply', false]]);
+    expect(settings).toEqual({
+      'experimental.terminalReply': false,
+      'claude.terminalReply': false,
+    });
+
+    for (const other of [{}, { 'experimental.terminalReply': true }]) {
+      migrateTerminalReply({ ...other }, save);
+    }
+    migrateTerminalReply(
+      { 'experimental.terminalReply': false, 'claude.terminalReply': true },
+      save,
+    );
+    expect(saved).toHaveLength(1);
+  });
+});
+
 describe('settings routes', () => {
   it('every route needs auth', async () => {
     await boot();
@@ -96,7 +136,7 @@ describe('settings routes', () => {
       retentionDays: 7,
       awayMode: false,
       awayTimeoutSec: 120,
-      experimentalTerminalReply: false,
+      terminalReply: true,
     });
     expect((await call('PUT', '/api/settings', token, { retentionDays: 5 })).statusCode).toBe(400);
     expect((await call('PUT', '/api/settings', token, { nope: true })).statusCode).toBe(400);
@@ -106,14 +146,14 @@ describe('settings routes', () => {
       retentionDays: 30,
       awayMode: false,
       awayTimeoutSec: 120,
-      experimentalTerminalReply: false,
+      terminalReply: true,
     });
     await call('PUT', '/api/settings', token, {
       awayMode: true,
       awayTimeoutSec: 45,
-      experimentalTerminalReply: true,
+      terminalReply: false,
     });
-    expect(app?.settings['experimental.terminalReply']).toBe(true);
+    expect(app?.settings['claude.terminalReply']).toBe(false);
     expect(app?.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
 
     await app?.close();
@@ -128,7 +168,7 @@ describe('settings routes', () => {
       retentionDays: 30,
       awayMode: true,
       awayTimeoutSec: 45,
-      experimentalTerminalReply: true,
+      terminalReply: false,
     });
     expect(app.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
   });

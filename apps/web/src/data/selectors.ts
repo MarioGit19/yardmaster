@@ -1,5 +1,6 @@
 import type {
   Approval,
+  BoardState,
   ClaudeSession,
   EditorWindow,
   Execution,
@@ -51,6 +52,31 @@ export const selectSessionsByProject =
   (projectId: string | null) =>
   (s: S): ClaudeSession[] =>
     Object.values(s.board.sessions).filter((session) => session.projectId === projectId);
+
+/**
+ * The live terminal session running in an open terminal: what makes it a Claude terminal. The
+ * newest one if the terminal ran `claude` more than once; the stored object, so it keeps its
+ * identity.
+ */
+export const selectTerminalSession =
+  (terminalId: string) =>
+  (s: S): ClaudeSession | undefined =>
+    terminalSession(s.board, terminalId);
+
+/** `selectTerminalSession` over a plain board. */
+export function terminalSession(
+  board: Pick<BoardState, 'terminals' | 'sessions'>,
+  terminalId: string,
+): ClaudeSession | undefined {
+  if (board.terminals[terminalId]?.state !== 'open') return undefined;
+  let found: ClaudeSession | undefined;
+  for (const session of Object.values(board.sessions)) {
+    if (session.terminalId !== terminalId || session.origin !== 'terminal') continue;
+    if (session.status.kind === 'ended') continue;
+    if (!found || newestFirst(session, found) < 0) found = session;
+  }
+  return found;
+}
 
 export const selectExecutionsByTerminal =
   (terminalId: string) =>

@@ -387,7 +387,86 @@ describe('DemoSimulator', () => {
       sim.stop();
     });
 
-    it('rejects unknown terminals and leaves creation to a real editor', async () => {
+    it('opens a new terminal that runs its command, and claude in it links a session', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(500);
+      const actions = sim.terminalActions();
+      const project = Object.values(store.state.projects).find((p) => p.name === 'acme-shop');
+      const projectId = project?.id ?? '';
+      const before = new Set(Object.keys(store.state.terminals));
+      const created = () => Object.values(store.state.terminals).filter((t) => !before.has(t.id));
+
+      expect(
+        await actions['terminal.create']({ kind: 'terminal.create', projectId, command: 'ls' }),
+      ).toEqual({ ok: true });
+      expect(created()).toEqual([]);
+      advance(1_500);
+      const [shell] = created();
+      expect(shell).toMatchObject({ projectId, name: 'acme-shop', state: 'open', active: true });
+      expect(execsOf(store, shell?.id ?? '').at(-1)).toMatchObject({ commandLine: 'ls' });
+      const windowTerminals = Object.values(store.state.terminals).filter(
+        (t) => t.windowId === shell?.windowId,
+      );
+      expect(windowTerminals.filter((t) => t.active).map((t) => t.id)).toEqual([shell?.id]);
+
+      await actions['terminal.create']({ kind: 'terminal.create', projectId, command: 'claude' });
+      advance(1_000);
+      const claude = created().find((t) => t.id !== shell?.id);
+      const session = Object.values(store.state.sessions).find((s) => s.terminalId === claude?.id);
+      expect(session).toMatchObject({ origin: 'terminal', projectId });
+
+      expect(
+        await actions['terminal.create']({ kind: 'terminal.create', projectId: 'nope' }),
+      ).toEqual({ ok: false, error: 'unknown_project' });
+      sim.stop();
+    });
+
+    it('runs htop full screen until Ctrl+C', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(500);
+      const actions = sim.terminalActions();
+      const shell = 'demo-term-acme-shop-3';
+      await actions['terminal.sendText']({
+        kind: 'terminal.sendText',
+        terminalId: shell,
+        text: 'htop',
+        execute: true,
+      });
+      advance(500);
+      const tui = execsOf(store, shell).at(-1);
+      expect(tui).toMatchObject({ commandLine: 'htop', interactive: true, endedAt: null });
+      await actions['terminal.interrupt']({ kind: 'terminal.interrupt', terminalId: shell });
+      expect(store.state.executions[tui?.id ?? '']?.exitCode).toBe(130);
+      sim.stop();
+    });
+
+    it('takes a line typed into an idle Claude terminal as its next prompt', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(3_000);
+      const session = Object.values(store.state.sessions).find(
+        (s) => s.terminalId !== null && s.status.kind === 'idle',
+      );
+      expect(session).toBeDefined();
+      const terminalId = session?.terminalId ?? '';
+      await sim.terminalActions()['terminal.sendText']({
+        kind: 'terminal.sendText',
+        terminalId,
+        text: 'add a test for the cart total',
+        execute: true,
+      });
+      const claude = execsOf(store, terminalId).at(-1);
+      expect(outputOf(store, claude?.id)).toContain('add a test for the cart total\r\n');
+      expect(store.state.sessions[session?.id ?? '']?.status.kind).toBe('working');
+      expect(JSON.stringify(sim.transcripts.read(`transcript:${session?.id}`))).toContain(
+        'add a test for the cart total',
+      );
+      sim.stop();
+    });
+
+    it('rejects unknown terminals and leaves closing to a real editor', async () => {
       const { sim } = run();
       sim.start();
       const actions = sim.terminalActions();
@@ -400,7 +479,10 @@ describe('DemoSimulator', () => {
         }),
       ).toEqual({ ok: false, error: 'unknown_terminal' });
       expect(
-        await actions['terminal.create']({ kind: 'terminal.create', projectId: 'a1b2c3d4e5f6' }),
+        await actions['terminal.close']({
+          kind: 'terminal.close',
+          terminalId: 'demo-term-acme-shop-3',
+        }),
       ).toEqual({ ok: false, error: 'editor_offline' });
       sim.stop();
     });

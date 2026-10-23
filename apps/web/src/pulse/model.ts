@@ -1,4 +1,10 @@
-import { type ActivityEvent, type BoardState, PULSE_WINDOW_MS } from '@c-board/protocol';
+import {
+  type ActivityEvent,
+  type BoardState,
+  type ClaudeSession,
+  PULSE_WINDOW_MS,
+} from '@c-board/protocol';
+import { terminalSession } from '../data/selectors.js';
 import { projectHref, sessionHref } from '../routes.js';
 import type { Tone } from '../status.js';
 
@@ -290,11 +296,21 @@ export interface PulseTarget {
   terminal?: { projectId: string; terminalId: string };
 }
 
-/** Where clicking an event goes: its session, else its terminal, else its project. */
+/** The Claude session behind an event: its own, or the one running in its terminal. */
+export function pulseSession(event: ActivityEvent, board: BoardState): ClaudeSession | undefined {
+  const own = event.sessionId !== null ? board.sessions[event.sessionId] : undefined;
+  if (own) return own;
+  return event.terminalId !== null ? terminalSession(board, event.terminalId) : undefined;
+}
+
+/**
+ * Where clicking an event goes: its session (a Claude terminal's included), else its terminal,
+ * else its project.
+ */
 export function pulseTarget(event: ActivityEvent, board: BoardState): PulseTarget | null {
   const projectId = event.projectId;
   if (projectId === null || !board.projects[projectId]) return null;
-  const session = event.sessionId !== null ? board.sessions[event.sessionId] : undefined;
+  const session = pulseSession(event, board);
   if (session && session.projectId === projectId) {
     return { href: sessionHref(projectId, session.id) };
   }

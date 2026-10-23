@@ -248,6 +248,49 @@ const SCENARIOS = {
       `[data-focus="${id}"] header [data-done-sweep]`,
       { ms: 1200, leadMs: 300 },
     );
+    const stack = page.locator(`[data-focus="${id}"] [data-terminal-stack]`);
+    const stackBox = await stack.boundingBox();
+    const stackClip = stackBox ? visible(stackBox, DESKTOP) : undefined;
+    const claudeTab = stack.locator('[data-claude-tab]').first();
+    if ((await claudeTab.count()) > 0) {
+      await r.moment(
+        'claude-tab',
+        'transition',
+        "pick the Claude terminal's tab: the tab pill glides, the pane points to the chat",
+        async () => {
+          await claudeTab.click();
+          await page.waitForTimeout(900);
+        },
+        stackClip,
+      );
+      await r.moment(
+        'claude-raw',
+        'transition',
+        'chat → raw terminal → chat: the pane cross-fades (dur.base in, dur.fast out)',
+        async () => {
+          await stack.getByRole('button', { name: 'Raw terminal' }).click();
+          await page.waitForTimeout(700);
+          await stack.getByRole('button', { name: 'Chat' }).click();
+          await page.waitForTimeout(700);
+        },
+        stackClip,
+      );
+    } else {
+      console.warn('motion:record: no Claude terminal in the focused pod; skipping claude-tab');
+    }
+    await r.moment(
+      'new-terminal',
+      'transition',
+      'New terminal: the popover scales in, a chip opens one, its tab rises in and is selected',
+      async () => {
+        await stack.getByRole('button', { name: 'New terminal' }).click();
+        await page.locator('[data-new-terminal-popover]').waitFor();
+        await page.waitForTimeout(500);
+        await page.locator('[data-new-terminal-popover] [data-command-chip]').last().click();
+        await page.waitForTimeout(1400);
+      },
+      stackClip,
+    );
     await r.moment('close', 'transition', 'Esc morphs it back into the pod', async () => {
       await page.keyboard.press('Escape');
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });

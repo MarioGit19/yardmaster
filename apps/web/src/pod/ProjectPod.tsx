@@ -28,6 +28,7 @@ import { Skeleton } from '../ui/Skeleton.js';
 import { isDimmed } from './activity.js';
 import { MAX_SESSION_ROWS, podSessions } from './model.js';
 import { ActivityBorder, DoneSweep, EventSparks } from './PodActivity.js';
+import { PodMenu } from './PodMenu.js';
 import { SessionRow } from './SessionRow.js';
 import { useMascotState } from './useMascotState.js';
 
@@ -124,124 +125,132 @@ export function ProjectPod({ project }: { project: Project }) {
   // usable. No overflow clipping on the pod itself: lane peeks hang below their lane.
   // The pod, its header and its orbs morph into the focus view (`focus/shared.ts`).
   return (
-    <motion.article
-      layoutId={sharedId.container(project.id)}
-      layoutDependency={POD_LAYOUT_DEPENDENCY}
-      transition={spring.smooth}
-      onPointerEnter={(e) => {
-        spotBox.current = e.currentTarget.getBoundingClientRect();
-        setEngaged(true);
-      }}
-      onPointerLeave={() => setEngaged(false)}
-      onFocus={() => setEngaged(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEngaged(false);
-      }}
-      onLayoutAnimationStart={() => {
-        spotBox.current = null;
-        raise(true);
-      }}
-      onLayoutAnimationComplete={() => {
-        spotBox.current = null;
-        raise(false);
-      }}
-      ref={podRef}
-      data-pod={project.id}
-      data-tone={tone}
-      data-crashed={crashed || undefined}
-      data-dim={dim || undefined}
-      data-faded={faded || undefined}
-      data-offscreen={!onScreen || undefined}
-      aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
-      onPointerMove={onPointerMove}
-      style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
-      className={cx(
-        'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
-        'transition-[border-color] duration-fast ease-out hover:border-line-strong',
-        crashed && tone !== 'wait' ? BORDER.err : BORDER[tone],
-      )}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden rounded-panel"
-      >
-        <div
-          ref={spotRef}
-          className="pod-spotlight"
-          style={{ width: SPOTLIGHT_PX, height: SPOTLIGHT_PX }}
-        />
-      </div>
-      <ActivityBorder pulseKey={pulseKey} working={working} />
-      <EventSparks pulseKey={pulseKey} />
-      <DoneSweep
-        pulseKey={pulseKey}
-        onPlay={() => {
-          // Counted on the element for the e2e check that each turn sweeps once.
-          sweeps.current += 1;
-          if (podRef.current) podRef.current.dataset.sweeps = String(sweeps.current);
-        }}
-      />
-
-      <motion.header
-        layoutId={sharedId.header(project.id)}
+    <PodMenu project={project}>
+      <motion.article
+        layoutId={sharedId.container(project.id)}
         layoutDependency={POD_LAYOUT_DEPENDENCY}
         transition={spring.smooth}
-        className="flex min-w-0 items-center gap-3"
+        onPointerEnter={(e) => {
+          spotBox.current = e.currentTarget.getBoundingClientRect();
+          setEngaged(true);
+        }}
+        onPointerLeave={() => setEngaged(false)}
+        onFocus={() => setEngaged(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEngaged(false);
+        }}
+        onLayoutAnimationStart={() => {
+          spotBox.current = null;
+          raise(true);
+        }}
+        onLayoutAnimationComplete={() => {
+          spotBox.current = null;
+          raise(false);
+        }}
+        ref={podRef}
+        data-pod={project.id}
+        data-tone={tone}
+        data-crashed={crashed || undefined}
+        data-dim={dim || undefined}
+        data-faded={faded || undefined}
+        data-offscreen={!onScreen || undefined}
+        aria-label={`${project.name}, ${toneLabel(tone).toLowerCase()}`}
+        onPointerMove={onPointerMove}
+        style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
+        className={cx(
+          'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
+          'transition-[border-color] duration-fast ease-out hover:border-line-strong',
+          crashed && tone !== 'wait' ? BORDER.err : BORDER[tone],
+        )}
       >
-        <span className="pod-dim flex shrink-0">
-          <ProjectAvatar project={project} />
-        </span>
-        <div className="pod-title flex min-w-0 flex-1 flex-col">
-          <Link
-            href={projectHref(project.id)}
-            title={project.name}
-            className="truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
-          >
-            {project.name}
-          </Link>
-          <GitLine git={project.git} />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-panel"
+        >
+          <div
+            ref={spotRef}
+            className="pod-spotlight"
+            style={{ width: SPOTLIGHT_PX, height: SPOTLIGHT_PX }}
+          />
         </div>
-        <PodCrew
-          sessions={live.slice(0, MAX_CREW)}
-          terminals={crew.terminals}
-          activity={crew.activity}
-          accent={accent}
-          now={now}
+        <ActivityBorder pulseKey={pulseKey} working={working} />
+        <EventSparks pulseKey={pulseKey} />
+        <DoneSweep
+          pulseKey={pulseKey}
+          onPlay={() => {
+            // Counted on the element for the e2e check that each turn sweeps once.
+            sweeps.current += 1;
+            if (podRef.current) podRef.current.dataset.sweeps = String(sweeps.current);
+          }}
         />
-      </motion.header>
 
-      {live.length > 0 ? (
-        <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
-          {live.slice(0, MAX_SESSION_ROWS).map((session) => (
-            <SessionRow key={session.id} session={session} accent={accent} crew={crew} now={now} />
-          ))}
-          {hiddenSessions > 0 && (
-            <li className="pl-10 text-meta text-text-2 tabular">
-              {hiddenSessions} more {hiddenSessions === 1 ? 'session' : 'sessions'}
-            </li>
-          )}
-        </ul>
-      ) : (
-        <p className="text-body-sm text-text-2">No Claude sessions</p>
-      )}
+        <motion.header
+          layoutId={sharedId.header(project.id)}
+          layoutDependency={POD_LAYOUT_DEPENDENCY}
+          transition={spring.smooth}
+          className="flex min-w-0 items-center gap-3"
+        >
+          <span className="pod-dim flex shrink-0">
+            <ProjectAvatar project={project} />
+          </span>
+          <div className="pod-title flex min-w-0 flex-1 flex-col">
+            <Link
+              href={projectHref(project.id)}
+              title={project.name}
+              className="truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
+            >
+              {project.name}
+            </Link>
+            <GitLine git={project.git} />
+          </div>
+          <PodCrew
+            sessions={live.slice(0, MAX_CREW)}
+            terminals={crew.terminals}
+            activity={crew.activity}
+            accent={accent}
+            now={now}
+          />
+        </motion.header>
 
-      {openTerminals.length > 0 ? (
-        <div className="lanes relative z-[1]">
-          <ul aria-label="Terminals" className="flex flex-col">
-            {openTerminals.slice(0, MAX_LANES).map((terminal) => (
-              <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
+        {live.length > 0 ? (
+          <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
+            {live.slice(0, MAX_SESSION_ROWS).map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                accent={accent}
+                crew={crew}
+                now={now}
+              />
             ))}
+            {hiddenSessions > 0 && (
+              <li className="pl-10 text-meta text-text-2 tabular">
+                {hiddenSessions} more {hiddenSessions === 1 ? 'session' : 'sessions'}
+              </li>
+            )}
           </ul>
-          {hiddenLanes > 0 && (
-            <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
-              {hiddenLanes} more {hiddenLanes === 1 ? 'terminal' : 'terminals'}
-            </p>
-          )}
-        </div>
-      ) : (
-        <p className="text-meta text-text-2">No open terminals</p>
-      )}
-    </motion.article>
+        ) : (
+          <p className="text-body-sm text-text-2">No Claude sessions</p>
+        )}
+
+        {openTerminals.length > 0 ? (
+          <div className="lanes relative z-[1]">
+            <ul aria-label="Terminals" className="flex flex-col">
+              {openTerminals.slice(0, MAX_LANES).map((terminal) => (
+                <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
+              ))}
+            </ul>
+            {hiddenLanes > 0 && (
+              <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
+                {hiddenLanes} more {hiddenLanes === 1 ? 'terminal' : 'terminals'}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-meta text-text-2">No open terminals</p>
+        )}
+      </motion.article>
+    </PodMenu>
   );
 }
 

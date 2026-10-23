@@ -33,6 +33,7 @@ import {
   type DemoScenario,
   type DemoTerminal,
   type DemoTool,
+  type TerminalKind,
 } from './content.js';
 import {
   claudeBanner,
@@ -106,6 +107,20 @@ const STRESS_PACE: Pace = {
   tokenScale: 0.05,
 };
 const STRESS_APPROVAL_TIMEOUT_MS = 3_000;
+/** How long a new terminal takes to appear, and then to start its command. */
+const CREATE_DELAY_MS = 300;
+const DEV_KINDS: ReadonlySet<TerminalKind> = new Set(['next', 'vite', 'rails']);
+
+/** What a terminal created with this command plays out as. */
+function createdKind(commandLine: string): TerminalKind {
+  if (commandLine === 'claude' || commandLine.startsWith('claude ')) return 'claude';
+  if (commandLine === 'pnpm jest') return 'jest';
+  for (const kind of ['next', 'vite', 'rails'] as const) {
+    if (DEV_SERVERS[kind].command === commandLine) return kind;
+  }
+  return 'shell';
+}
+
 /** SIGINT: what a shell reports for a command stopped with Ctrl+C. */
 const INTERRUPTED_EXIT = 130;
 /**
@@ -262,7 +277,8 @@ export class DemoSimulator {
   /**
    * Terminal actions from the board, played out on the demo terminals as a shell would: typed
    * commands run and echo, Ctrl+C stops what is running, and a rerun runs the command again.
-   * Creating and closing terminals still needs a real editor.
+   * A new terminal opens as an editor would open one; closing terminals still needs a real
+   * editor.
    */
   terminalActions(): Pick<ActionHandlers, TerminalActionKind> {
     const offline = (): ActionResult => ({ ok: false, error: 'editor_offline' });
@@ -292,7 +308,8 @@ export class DemoSimulator {
         const terminal = this.openTerminal(terminalId);
         return terminal.ok ? { ok: true } : terminal;
       },
-      'terminal.create': offline,
+      'terminal.create': ({ projectId, name, command }) =>
+        this.createTerminal(projectId, name, command),
       'terminal.close': offline,
     };
   }
@@ -620,6 +637,72 @@ export class DemoSimulator {
 
   // Board input
 
+  /** A terminal opened from the board: it shows up shortly after, then runs `command`, if any. */
+  private createTerminal(projectId: string, name?: string, command?: string): ActionResult {
+    const project = this.running ? this.projects.find((p) => p.id === projectId) : undefined;
+    if (!project) return { ok: false, error: 'unknown_project' };
+    const commandLine = command?.trim() ?? '';
+    const kind = createdKind(commandLine);
+    const def: DemoTerminal = { kind, name: name ?? project.def.name, quiet: true };
+    const port = DEV_KINDS.has(kind) ? this.freePort() : undefined;
+    if (port !== undefined) def.port = port;
+    const terminal: TerminalCtx = {
+      id: `demo-term-${project.def.name}-new-${++this.seq}`,
+      project,
+      def,
+      shellPid: this.rng.int(20_000, 89_999),
+      execId: null,
+      childPid: null,
+      session: null,
+      busyUntil: 0,
+      ticks: 0,
+    };
+    this.after(CREATE_DELAY_MS, () => {
+      for (const other of this.terminals) {
+        if (other.project.windowId === project.windowId && other.id !== terminal.id) {
+          this.store.upsertTerminal({
+            id: other.id,
+            windowId: project.windowId,
+            name: other.def.name,
+            active: false,
+          });
+        }
+      }
+      this.terminals.push(terminal);
+      this.store.upsertTerminal({
+        id: terminal.id,
+        windowId: project.windowId,
+        name: def.name,
+        projectId: project.id,
+        shellPid: terminal.shellPid,
+        cwd: project.def.path,
+        shellIntegration: true,
+        active: true,
+        createdAt: this.now(),
+      });
+      if (commandLine === '') return;
+      this.after(CREATE_DELAY_MS, () => {
+        if (kind === 'claude') this.launchClaude(terminal);
+        else if (kind === 'jest') this.runTests(terminal);
+        else if (kind === 'next' || kind === 'vite' || kind === 'rails') {
+          this.bootDevServer(terminal, kind);
+        } else this.runTyped(terminal, commandLine);
+      });
+    });
+    return { ok: true };
+  }
+
+  /** A port no demo dev server is bound to, from 3001 up. */
+  private freePort(): number {
+    const taken = new Set([
+      ...[...this.ports.values()].map((p) => p.port),
+      ...this.terminals.map((t) => t.def.port),
+    ]);
+    let port = 3001;
+    while (taken.has(port)) port++;
+    return port;
+  }
+
   private openTerminal(
     terminalId: string,
   ): { ok: true; ctx: TerminalCtx } | { ok: false; error: string } {
@@ -635,6 +718,13 @@ export class DemoSimulator {
     // A running program gets the input, and the pty echoes it into its output.
     if (terminal.execId) {
       this.write(terminal, terminal.execId, execute ? `${text}\r\n` : text);
+      // Claude at its prompt takes a submitted line as the next turn's prompt.
+      const session = terminal.session;
+      const status = session && this.store.state.sessions[session.id]?.status.kind;
+      if (session && execute && (status === 'idle' || status === 'waiting_input')) {
+        this.cancel(session.timer);
+        this.beginTurn(session, text.trim());
+      }
       return;
     }
     // At the prompt, only a submitted line does anything visible.
@@ -643,12 +733,29 @@ export class DemoSimulator {
   }
 
   private runTyped(terminal: TerminalCtx, commandLine: string): void {
+    if (commandLine.trim() === 'htop') {
+      this.runTui(terminal, commandLine);
+      return;
+    }
     const { output, exitCode } = typedCommand(commandLine, this.rng, terminal.project.def);
     const execId = this.startExec(terminal, commandLine);
     this.after(this.rng.int(80, 240), () => {
       if (output !== '') this.write(terminal, execId, output);
       this.endExec(terminal, execId, exitCode);
     });
+  }
+
+  /** A full-screen app (alternate screen) that runs until Ctrl+C. */
+  private runTui(terminal: TerminalCtx, commandLine: string): void {
+    const execId = this.startExec(terminal, commandLine);
+    this.store.markExecInteractive(execId);
+    terminal.execId = execId;
+    terminal.childPid = this.rng.int(20_000, 89_999);
+    this.write(
+      terminal,
+      execId,
+      '\x1b[?1049h\x1b[H  CPU [||||      12.4%]   Tasks: 214, 1 running\r\n',
+    );
   }
 
   private interrupt(terminal: TerminalCtx): void {
@@ -738,7 +845,7 @@ export class DemoSimulator {
     }
   }
 
-  private beginTurn(session: SessionCtx): void {
+  private beginTurn(session: SessionCtx, typed?: string): void {
     this.cancel(session.nudge);
     const { project } = session;
     const scenario = project.def.scenarios[project.scenarioCursor++ % project.def.scenarios.length];
@@ -751,8 +858,9 @@ export class DemoSimulator {
     });
     this.store.setSessionStatus(session.id, { kind: 'working' });
     this.addTokens(session, this.rng.int(800, 3_000), 0);
-    this.activity('prompt', session, scenario.prompt);
-    this.transcript(session, { kind: 'user', text: scenario.prompt });
+    const prompt = typed || scenario.prompt;
+    this.activity('prompt', session, prompt);
+    this.transcript(session, { kind: 'user', text: prompt });
     if (this.textRng.chance(0.6)) {
       this.transcript(session, {
         kind: 'thinking',

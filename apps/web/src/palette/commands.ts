@@ -1,9 +1,11 @@
 import type { BoardState, ClaudeSession, Project, UiAction } from '@c-board/protocol';
 import { isWaiting } from '../attention/attention.js';
+import { terminalSession } from '../data/selectors.js';
 import { terminalName } from '../lanes/lane.js';
 import type { MotionSetting } from '../motion.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
+import { claudeTerminalTitle, ESC } from '../terminal/claudeTerminal.js';
 import type { ThemeSetting } from '../theme/theme.js';
 import { type FuzzyMatch, fuzzyMatch } from './fuzzy.js';
 
@@ -16,6 +18,7 @@ export type PaletteRun =
   | { kind: 'action'; action: UiAction; done: string }
   | { kind: 'approveAll'; approvalIds: string[] }
   | { kind: 'newSession'; projectId: string; projectName: string }
+  | { kind: 'newTerminal'; projectId: string }
   | { kind: 'motion'; next: MotionSetting }
   | { kind: 'theme'; next: ThemeSetting }
   | { kind: 'attention' }
@@ -77,8 +80,6 @@ const MOTION_NAME: Record<MotionSetting, string> = {
   off: 'Off',
 };
 const THEME_NAME: Record<ThemeSetting, string> = { dark: 'Dark', light: 'Light', system: 'System' };
-
-const ESC = '\u001b';
 
 const byName = (a: Project, b: Project) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 
@@ -165,6 +166,25 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
   for (const terminal of terminals) {
     const project = projectById.get(terminal.projectId ?? '');
     if (!project) continue;
+    // A Claude terminal goes by its session and opens the session's chat.
+    const session = terminalSession(board, terminal.id);
+    if (session) {
+      const status = sessionStatusView(session.status);
+      commands.push({
+        id: `terminal:${terminal.id}`,
+        group: 'Terminals',
+        label: claudeTerminalTitle(session),
+        hint: `${project.name} · Claude in ${terminalName(terminal)}`,
+        icon: 'session',
+        tone: status.tone,
+        run: {
+          kind: 'navigate',
+          href: sessionHref(project.id, session.id),
+          terminal: { projectId: project.id, terminalId: terminal.id },
+        },
+      });
+      continue;
+    }
     commands.push({
       id: `terminal:${terminal.id}`,
       group: 'Terminals',
@@ -203,6 +223,14 @@ function projectActions(
       icon: 'new',
       searchOnly,
       run: { kind: 'newSession', projectId: project.id, projectName: project.name },
+    });
+    commands.push({
+      id: `new-terminal:${project.id}`,
+      group: 'Actions',
+      label: `New terminal in ${project.name}…`,
+      icon: 'terminal',
+      searchOnly,
+      run: { kind: 'newTerminal', projectId: project.id },
     });
   }
 

@@ -73,7 +73,7 @@ describe('session.replyInTerminal', () => {
     ]);
   });
 
-  it('is refused while the experimental flag is off', async () => {
+  it('is refused while the setting is off', async () => {
     const { send, sent, setEnabled } = setup({ enabled: false });
     expect(await send('hi')).toEqual({ ok: false, error: TERMINAL_REPLY_DISABLED });
     setEnabled(true);

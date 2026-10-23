@@ -266,7 +266,7 @@ export const UiAction = z.discriminatedUnion('kind', [
   action('session.close', { sessionId: SessionId }),
   action('session.setModel', { sessionId: SessionId, model: z.string().min(1).max(128) }),
   action('session.setPermissionMode', { sessionId: SessionId, permissionMode: PermissionMode }),
-  /** Types a line into a terminal session's linked terminal (F14, `experimental.terminalReply`). */
+  /** Types a line into a terminal session's linked terminal (F14, `claude.terminalReply`). */
   action('session.replyInTerminal', { sessionId: SessionId, text: Text.min(1) }),
   action('project.add', { path: Path }),
   action('project.remove', { projectId: ProjectId }),

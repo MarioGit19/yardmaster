@@ -39,6 +39,7 @@ import {
   HOOK_SEEN_KEY,
   type HookSettingsFile,
   memoryHookSettings,
+  migrateTerminalReply,
   RETENTION_KEY,
   registerSettingsRoutes,
   retentionDays,
@@ -152,6 +153,7 @@ export async function buildServer(
   app.decorate('store', store);
   app.decorate('persistence', persistence);
   const settings = persistence.loadSettings();
+  migrateTerminalReply(settings, (key, value) => persistence.setSetting(key, value));
   app.decorate('settings', settings);
   if (settings[RETENTION_KEY] !== undefined) {
     persistence.setRetention(retentionMs(retentionDays(settings[RETENTION_KEY])));

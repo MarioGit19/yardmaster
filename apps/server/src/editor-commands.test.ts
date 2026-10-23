@@ -219,7 +219,7 @@ describe('editor commands', () => {
     });
   });
 
-  it("types a terminal session's reply into its terminal once the flag is on", async () => {
+  it("types a terminal session's reply into its terminal while the setting is on", async () => {
     const { app, port } = await boot();
     const ed = await editor(port);
     await ready(app);
@@ -232,7 +232,15 @@ describe('editor commands', () => {
       status: { kind: 'waiting_input' },
     });
     const reply = { kind: 'session.replyInTerminal', sessionId, text: 'run the tests' };
+    const setReply = (terminalReply: boolean) =>
+      app.inject({
+        method: 'PUT',
+        url: '/api/settings',
+        headers: { host: `127.0.0.1:${port}`, [TOKEN_HEADER]: token },
+        payload: { terminalReply },
+      });
 
+    expect((await setReply(false)).json()).toMatchObject({ terminalReply: false });
     client.send('action', reply, 'reply-1');
     expect((await client.next()).payload).toEqual({
       id: 'reply-1',
@@ -240,13 +248,7 @@ describe('editor commands', () => {
       error: TERMINAL_REPLY_DISABLED,
     });
 
-    const put = await app.inject({
-      method: 'PUT',
-      url: '/api/settings',
-      headers: { host: `127.0.0.1:${port}`, [TOKEN_HEADER]: token },
-      payload: { experimentalTerminalReply: true },
-    });
-    expect(put.json()).toMatchObject({ experimentalTerminalReply: true });
+    expect((await setReply(true)).json()).toMatchObject({ terminalReply: true });
     client.send('action', reply, 'reply-2');
     const command = await ed.next();
     expect(command).toMatchObject({

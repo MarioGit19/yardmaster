@@ -1,7 +1,8 @@
-import type { Terminal } from '@c-board/protocol';
+import type { ClaudeSession, Terminal } from '@c-board/protocol';
 import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { DOT_PULSE } from '../anim/dotPulse.js';
 import { useInView } from '../anim/useFrame.js';
@@ -9,12 +10,21 @@ import { type RateLoopSpec, useRateLoop } from '../anim/useRateLoop.js';
 import {
   activityKey,
   isCrashExit,
+  selectApproval,
   selectPortsByTerminal,
+  selectTerminalSession,
   useActivityStep,
+  useBoard,
   useBoardList,
   useBoardShallow,
 } from '../data/index.js';
 import { dur, ease, move, slide, spring, useMotionLevel } from '../motion.js';
+import { ClaudeOrb } from '../orb/ClaudeOrb.js';
+import { orbStateFor } from '../orb/model.js';
+import { LiveCaption } from '../pod/LiveCaption.js';
+import { type Caption, sessionCaption } from '../pod/model.js';
+import { sessionHref } from '../routes.js';
+import { claudeTerminalLabel, claudeTerminalTitle } from '../terminal/claudeTerminal.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
 import { formatUptime, laneView, selectLaneExecution, terminalName, uptimePeriod } from './lane.js';
@@ -59,6 +69,12 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const level = useActivityStep(activityKey.terminal(terminal.id));
   const crashed = isCrashExit(view.exit?.code);
   const errorLine = useErrorLine(crashed ? (view.exit?.key ?? null) : null);
+  // A Claude terminal: its session's orb, title and caption, and it opens the session's chat.
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const approvalId =
+    session?.status.kind === 'waiting_permission' ? session.status.approvalId : null;
+  const approval = useBoard(selectApproval(approvalId ?? ''));
+  const claude = session && terminal.projectId ? { session, projectId: terminal.projectId } : null;
 
   const now = useNow(view.startedAt === null ? null : uptimePeriod(Date.now() - view.startedAt));
   const uptime = view.startedAt === null ? null : formatUptime(now - view.startedAt);
@@ -67,7 +83,8 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const [focused, setFocused] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const open = pinned || hovered || focused;
+  // A TUI's raw bytes make no sense as six lines: Claude lanes have no peek.
+  const open = !claude && (pinned || hovered || focused);
   const peekId = useId();
 
   useEffect(
@@ -113,41 +130,51 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
       }}
     >
       <div ref={rowRef} className="lane-row">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={open ? peekId : undefined}
-          aria-label={`${view.label}. ${pinned ? 'Hide' : 'Pin'} output preview`}
-          onClick={() => setPinned((p) => !p)}
-          onFocus={(e) => setFocused(e.currentTarget.matches(':focus-visible'))}
-          onBlur={() => {
-            setFocused(false);
-            setPinned(false);
-          }}
-          className={cx(
-            'grid min-w-0 grid-cols-subgrid items-center rounded-chip text-left',
-            // A crash's error line takes the sparkline and port tracks too: it needs the room.
-            errorLine ? 'col-span-4' : 'col-span-2',
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-1 text-body-sm text-text-1">
-            <ChevronRight
-              aria-hidden
-              strokeWidth={1.75}
-              className={cx(
-                'size-3.5 shrink-0 text-text-3 moving:transition-transform duration-base ease-out',
-                open && 'rotate-90',
-              )}
-            />
-            <span
-              className={cx('truncate', !terminal.name.trim() && 'text-text-3')}
-              title={terminalName(terminal)}
-            >
-              {terminalName(terminal)}
+        {claude ? (
+          <ClaudeLaneHead
+            session={claude.session}
+            caption={sessionCaption(claude.session, approval)}
+            name={terminalName(terminal)}
+            href={sessionHref(claude.projectId, claude.session.id)}
+            accent={accent}
+          />
+        ) : (
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={open ? peekId : undefined}
+            aria-label={`${view.label}. ${pinned ? 'Hide' : 'Pin'} output preview`}
+            onClick={() => setPinned((p) => !p)}
+            onFocus={(e) => setFocused(e.currentTarget.matches(':focus-visible'))}
+            onBlur={() => {
+              setFocused(false);
+              setPinned(false);
+            }}
+            className={cx(
+              'grid min-w-0 grid-cols-subgrid items-center rounded-chip text-left',
+              // A crash's error line takes the sparkline and port tracks too: it needs the room.
+              errorLine ? 'col-span-4' : 'col-span-2',
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-1 text-body-sm text-text-1">
+              <ChevronRight
+                aria-hidden
+                strokeWidth={1.75}
+                className={cx(
+                  'size-3.5 shrink-0 text-text-3 moving:transition-transform duration-base ease-out',
+                  open && 'rotate-90',
+                )}
+              />
+              <span
+                className={cx('truncate', !terminal.name.trim() && 'text-text-3')}
+                title={terminalName(terminal)}
+              >
+                {terminalName(terminal)}
+              </span>
             </span>
-          </span>
-          <LaneCaption command={view.command} running={view.running} error={errorLine} />
-        </button>
+            <LaneCaption command={view.command} running={view.running} error={errorLine} />
+          </button>
+        )}
 
         {!errorLine && (
           <>
@@ -216,6 +243,47 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
         )}
       </AnimatePresence>
     </li>
+  );
+}
+
+/** A Claude terminal's name and caption tracks: a link to the session's chat. */
+function ClaudeLaneHead({
+  session,
+  caption,
+  name,
+  href,
+  accent,
+}: {
+  session: ClaudeSession;
+  caption: Caption;
+  name: string;
+  href: string;
+  accent: string;
+}) {
+  const title = claudeTerminalTitle(session);
+  return (
+    <Link
+      href={href}
+      aria-label={claudeTerminalLabel(name, caption.text)}
+      data-claude-lane={session.id}
+      className="col-span-2 grid min-w-0 grid-cols-subgrid items-center rounded-chip text-left"
+    >
+      <span className="flex min-w-0 items-center gap-1 text-body-sm text-text-1">
+        <span aria-hidden className="pod-dim flex size-3.5 shrink-0 items-center justify-center">
+          <ClaudeOrb
+            state={orbStateFor(session.status)}
+            size={12}
+            accent={accent}
+            tool={session.status.kind === 'tool' ? session.status.tool : null}
+            showToolLabel={false}
+          />
+        </span>
+        <span className="truncate" title={title}>
+          {title}
+        </span>
+      </span>
+      <LiveCaption caption={caption} className="text-meta" />
+    </Link>
   );
 }
 

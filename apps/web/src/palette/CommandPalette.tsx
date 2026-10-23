@@ -29,8 +29,10 @@ import { useFocusRoute } from '../focus/FocusStage.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
+import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY, railPreference } from '../shell/prefs.js';
+import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { terminalTarget } from '../terminal/target.js';
 import { NEXT_THEME, themePreference } from '../theme/theme.js';
@@ -162,7 +164,7 @@ function PaletteBody({
 }) {
   const board = useBoard((s) => s.board);
   const client = useBoardClient();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const focus = useFocusRoute();
   const motion = usePreference(motionPreference);
   const theme = usePreference(themePreference);
@@ -222,6 +224,16 @@ function PaletteBody({
         return;
       case 'newSession':
         toPage({ kind: 'prompt', projectId: action.projectId, projectName: action.projectName });
+        return;
+      case 'newTerminal':
+        // The project's focus view opens the popover by its "New terminal" button.
+        keepFocus();
+        close();
+        newTerminalRequest.set(action.projectId);
+        {
+          const href = projectHref(action.projectId);
+          if (location !== href && !location.startsWith(`${href}/`)) navigate(href);
+        }
         return;
       case 'motion':
         motionPreference.set(action.next);

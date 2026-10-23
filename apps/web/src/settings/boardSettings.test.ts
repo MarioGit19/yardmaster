@@ -6,7 +6,7 @@ const BASE: BoardSettings = {
   retentionDays: 7,
   awayMode: false,
   awayTimeoutSec: 120,
-  experimentalTerminalReply: false,
+  terminalReply: false,
 };
 
 describe('createBoardSettingsStore', () => {
@@ -27,10 +27,10 @@ describe('createBoardSettingsStore', () => {
       save: async (patch) => ({ ...BASE, ...patch }),
     });
     await store.load();
-    const saving = store.update({ experimentalTerminalReply: true });
-    expect(store.get()?.experimentalTerminalReply).toBe(true);
+    const saving = store.update({ terminalReply: true });
+    expect(store.get()?.terminalReply).toBe(true);
     expect(await saving).toBe(true);
-    expect(store.get()?.experimentalTerminalReply).toBe(true);
+    expect(store.get()?.terminalReply).toBe(true);
   });
 
   it('rolls a failed save back', async () => {
@@ -41,7 +41,7 @@ describe('createBoardSettingsStore', () => {
       },
     });
     await store.load();
-    expect(await store.update({ experimentalTerminalReply: true })).toBe(false);
+    expect(await store.update({ terminalReply: true })).toBe(false);
     expect(store.get()).toEqual(BASE);
   });
 

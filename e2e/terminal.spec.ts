@@ -79,11 +79,18 @@ test.describe('terminal stack', () => {
 
   test('a running interactive app shows the open-in-editor card', async ({ page }) => {
     const stack = await openStack(page);
-    await stack.getByRole('tab', { name: /^claude\b/ }).click();
+    await stack.getByRole('tab', { name: /^zsh\b/ }).click();
+    const input = stack.getByRole('textbox', { name: 'Send to zsh' });
+    await input.fill('htop');
+    await input.press('Enter');
     const card = stack.locator('[data-interactive]');
     await expect(card).toBeVisible({ timeout: 10_000 });
     await expect(card).toContainText('Interactive app, open in');
     await expect(stack.locator('[data-xterm]')).toHaveCount(0);
+    // Ctrl+C ends it, and the mirror comes back.
+    await stack.getByRole('button', { name: 'Send Ctrl+C' }).click();
+    await expect(card).toHaveCount(0);
+    await expect(stack.locator('[data-xterm]')).toHaveCount(1);
   });
 
   test('without a choice the stack opens on a terminal it can mirror', async ({ page }) => {

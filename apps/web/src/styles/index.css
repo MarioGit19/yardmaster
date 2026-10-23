@@ -219,6 +219,14 @@
 [data-motion="reduced"] .tooltip {
   animation-name: fade-in;
 }
+/* Context menus open like tooltips, from where they were asked for. */
+.context-menu {
+  transform-origin: var(--radix-context-menu-content-transform-origin);
+  animation: tooltip-in var(--dur-fast) var(--ease-out);
+}
+[data-motion="reduced"] .context-menu {
+  animation-name: fade-in;
+}
 /* Moving between triggers while tooltips are warm opens the next one instantly: no entrance. */
 .tooltip[data-state="instant-open"] {
   animation: none;

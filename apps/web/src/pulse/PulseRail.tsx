@@ -1,4 +1,10 @@
-import { type ActivityEvent, type BoardState, PULSE_WINDOW_MS } from '@c-board/protocol';
+import {
+  type ActivityEvent,
+  type BoardState,
+  type ClaudeSession,
+  type Project,
+  PULSE_WINDOW_MS,
+} from '@c-board/protocol';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cubicBezier } from 'motion';
 import { AnimatePresence, motion } from 'motion/react';
@@ -15,9 +21,12 @@ import { useLocation } from 'wouter';
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
 import { dur, ease, moment, move, useMotionLevel } from '../motion.js';
+import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { resolveColor } from '../orb/colors.js';
+import { orbStateFor } from '../orb/model.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
+import { claudeTerminalTitle } from '../terminal/claudeTerminal.js';
 import { terminalTarget } from '../terminal/target.js';
 import { applyTheme, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
@@ -38,6 +47,7 @@ import {
   placeDots,
   pulseHeight,
   pulseLayout,
+  pulseSession,
   pulseTarget,
   stepDot,
   timeToX,
@@ -637,7 +647,8 @@ function PulsePlot() {
       {activeDot && (
         <PulseTooltip
           dot={activeDot}
-          projectName={store.getState().board.projects[activeDot.event.projectId ?? '']?.name}
+          project={store.getState().board.projects[activeDot.event.projectId ?? '']}
+          session={pulseSession(activeDot.event, store.getState().board)}
           scrollTop={scrollerRef.current?.scrollTop ?? 0}
           width={width}
         />
@@ -656,12 +667,15 @@ function describe(event: ActivityEvent): string {
 
 function PulseTooltip({
   dot,
-  projectName,
+  project,
+  session,
   scrollTop,
   width,
 }: {
   dot: PulseDot;
-  projectName: string | undefined;
+  project: Project | undefined;
+  /** Its session, or the one in its terminal: shown by orb and title, not process name. */
+  session: ClaudeSession | undefined;
   scrollTop: number;
   width: number;
 }) {
@@ -692,7 +706,22 @@ function PulseTooltip({
           {event.summary}
         </p>
       )}
-      {projectName && <p className="mt-0.5 text-meta text-text-2">{projectName}</p>}
+      {session && (
+        <p
+          data-pulse-session
+          className="mt-1 flex min-w-0 items-center gap-1.5 text-meta text-text-1"
+        >
+          <span aria-hidden className="flex shrink-0">
+            <ClaudeOrb
+              state={orbStateFor(session.status)}
+              size={12}
+              accent={`var(--accent-${project?.accent ?? 0})`}
+            />
+          </span>
+          <span className="truncate">{claudeTerminalTitle(session)}</span>
+        </p>
+      )}
+      {project && <p className="mt-0.5 text-meta text-text-2">{project.name}</p>}
     </div>
   );
 }

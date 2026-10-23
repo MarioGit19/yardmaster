@@ -1,26 +1,37 @@
-import { type ClaudeSession, type PermissionMode, terminalReplyBlock } from '@c-board/protocol';
+import {
+  type Approval,
+  type ClaudeSession,
+  type PermissionMode,
+  terminalReplyBlock,
+} from '@c-board/protocol';
 import {
   ArrowUp,
   ChevronDown,
   Cpu,
+  Ellipsis,
+  ExternalLink,
   GitFork,
   LoaderCircle,
   ShieldCheck,
   Square,
-  SquareTerminal,
   TriangleAlert,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
-import { useBoardClient } from '../data/index.js';
+import { ApprovalCard } from '../attention/ApprovalCard.js';
+import { type AttentionDecision, canAlwaysAllow } from '../attention/attention.js';
+import { selectApproval, useBoard, useBoardClient } from '../data/index.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { sessionHref } from '../routes.js';
 import { useBoardSettings } from '../settings/boardSettings.js';
+import { ESC } from '../terminal/claudeTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
+import { IconButton } from '../ui/IconButton.js';
+import { Popover } from '../ui/Popover.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import {
   composerKey,
@@ -48,9 +59,12 @@ const ERRORS: Record<string, string> = {
 const errorText = (code: string, fallback: string) =>
   ERRORS[code] ?? actionErrorText(code, fallback);
 
-/** The Claude panel's input for a session: a board session's composer, or a terminal's fork bar. */
+/**
+ * The Claude panel's input for a session: a board session's composer, or for a terminal session
+ * the same composer typing into its terminal (F14), or the fork bar where it can't.
+ */
 export function SessionComposer({ session }: { session: ClaudeSession }) {
-  if (session.origin === 'terminal') return <ForkBar session={session} />;
+  if (session.origin === 'terminal') return <TerminalSessionComposer session={session} />;
   return <BoardComposer session={session} />;
 }
 
@@ -146,6 +160,12 @@ interface ComposerProps {
   /** Resolves with whether the message went out; the text is kept when it didn't. */
   onSend: (text: string) => Promise<boolean>;
   onInterrupt: () => void;
+  /** Terminal sessions: the TUI owns model and mode, so the pills give way to this menu. */
+  menu?: ReactNode;
+  /** Send is off (the text stays editable): a busy TUI takes no queued input. */
+  sendBlocked?: boolean;
+  /** Replaces the keyboard hint beside the send button. */
+  hint?: string;
 }
 
 function Composer({
@@ -160,6 +180,9 @@ function Composer({
   onPermissionMode,
   onSend,
   onInterrupt,
+  menu,
+  sendBlocked = false,
+  hint,
 }: ComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -168,7 +191,7 @@ function Composer({
 
   const send = async () => {
     const prompt = text.trim();
-    if (!prompt || sending) return;
+    if (!prompt || sending || sendBlocked) return;
     setSending(true);
     const ok = await onSend(prompt);
     setSending(false);
@@ -218,28 +241,35 @@ function Composer({
           className="field-sizing-content max-h-48 min-h-6 w-full resize-none bg-transparent text-body text-text-1 leading-6 outline-none placeholder:text-text-3 focus-visible:shadow-none"
         />
         <div className="flex min-w-0 items-center gap-1.5">
-          <Pill
-            name="Model"
-            icon={<Cpu />}
-            label={modelLabel(model)}
-            value={modelValue(model)}
-            options={modelOptions}
-            disabled={controlsDisabled}
-            onChange={onModel}
-          />
-          <Pill
-            name="Permission mode"
-            icon={<ShieldCheck />}
-            label={permissionLabel(permissionMode)}
-            value={permissionMode ?? 'default'}
-            options={PERMISSION_OPTIONS}
-            disabled={controlsDisabled}
-            onChange={(value) => onPermissionMode(value as PermissionMode)}
-          />
+          {menu ?? (
+            <>
+              <Pill
+                name="Model"
+                icon={<Cpu />}
+                label={modelLabel(model)}
+                value={modelValue(model)}
+                options={modelOptions}
+                disabled={controlsDisabled}
+                onChange={onModel}
+              />
+              <Pill
+                name="Permission mode"
+                icon={<ShieldCheck />}
+                label={permissionLabel(permissionMode)}
+                value={permissionMode ?? 'default'}
+                options={PERMISSION_OPTIONS}
+                disabled={controlsDisabled}
+                onChange={(value) => onPermissionMode(value as PermissionMode)}
+              />
+            </>
+          )}
           <span className="ml-auto hidden truncate text-meta text-text-3 xl:block">
-            {running ? 'Esc to stop' : 'Shift+Enter for a new line'}
+            {hint ?? (running ? 'Esc to stop' : 'Shift+Enter for a new line')}
           </span>
-          <SendButton mode={mode} disabled={mode === 'send' && text.trim() === ''} />
+          <SendButton
+            mode={mode}
+            disabled={mode === 'send' && (text.trim() === '' || sendBlocked)}
+          />
         </div>
       </div>
     </form>
@@ -350,18 +380,77 @@ function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolea
   );
 }
 
+/** Statuses in which Claude's TUI is mid-turn: input would land half-typed, Esc stops it. */
+const TERMINAL_BUSY = new Set<ClaudeSession['status']['kind']>(['working', 'tool', 'compacting']);
+
 /**
- * Terminal sessions are driven from their terminal; the board continues them as a fork
- * (`forkSession`), a new session that starts from this conversation.
+ * A terminal session at the board (F14): the normal composer, sending each message as a line typed
+ * at Claude's prompt in its terminal. While Claude works it can only be stopped (Esc, as in the
+ * TUI); while it asks for permission, only the approval is offered. Without a linked terminal, or
+ * with the setting off, the board can still continue it as a fork.
  */
-function ForkBar({ session }: { session: ClaudeSession }) {
+function TerminalSessionComposer({ session }: { session: ClaudeSession }) {
+  const client = useBoardClient();
+  const settings = useBoardSettings().settings;
+  // On by default: until the settings load, assume it is.
+  const replyEnabled = settings?.terminalReply ?? true;
+  const fork = useFork(session);
+  if (!replyEnabled || session.terminalId === null || !isSessionLive(session.status)) {
+    return <ForkBar session={session} fork={fork} />;
+  }
+  const terminalId = session.terminalId;
+  if (session.status.kind === 'waiting_permission') {
+    return <TerminalApproval session={session} terminalId={terminalId} />;
+  }
+  const busy = TERMINAL_BUSY.has(session.status.kind);
+  const ready = terminalReplyBlock(session) === null;
+
+  return (
+    <Composer
+      key={session.id}
+      label={`Message ${session.title ?? 'Claude'}`}
+      placeholder={ready ? 'Reply to Claude…' : 'Claude is working, reply when it’s idle'}
+      running={busy}
+      sendBlocked={!ready}
+      model={session.model}
+      permissionMode={session.permissionMode}
+      hint={busy ? 'Esc to stop' : 'Sent to the terminal'}
+      menu={<ComposerMenu fork={fork} />}
+      onModel={() => {}}
+      onPermissionMode={() => {}}
+      onSend={async (text) => {
+        const result = await client.action({
+          kind: 'session.replyInTerminal',
+          sessionId: session.id,
+          text,
+        });
+        if (!result.ok) toast.error(errorText(result.error, 'Could not send to the terminal'));
+        return result.ok;
+      }}
+      onInterrupt={async () => {
+        const result = await client.action({
+          kind: 'terminal.sendText',
+          terminalId,
+          text: ESC,
+          execute: false,
+        });
+        if (!result.ok) toast.error(errorText(result.error, 'Could not interrupt Claude'));
+      }}
+    />
+  );
+}
+
+interface Fork {
+  forking: boolean;
+  start: () => Promise<void>;
+}
+
+/** Continues a terminal session as a board session that starts from its conversation. */
+function useFork(session: ClaudeSession): Fork {
   const client = useBoardClient();
   const [, navigate] = useLocation();
   const [forking, setForking] = useState(false);
-  const live = isSessionLive(session.status);
-  const replyEnabled = useBoardSettings().settings?.experimentalTerminalReply === true;
-
-  const fork = async () => {
+  const start = async () => {
     setForking(true);
     const result = await client.action({
       kind: 'session.resume',
@@ -378,11 +467,70 @@ function ForkBar({ session }: { session: ClaudeSession }) {
       navigate(sessionHref(session.projectId, result.sessionId));
     }
   };
+  return { forking, start };
+}
 
+function ForkIcon({ forking }: { forking: boolean }) {
+  return forking ? (
+    <LoaderCircle className="hud-spin size-3.5" strokeWidth={1.5} />
+  ) : (
+    <GitFork className="size-3.5" strokeWidth={1.5} />
+  );
+}
+
+/** The terminal composer's secondary actions: for now, the fork. */
+function ComposerMenu({ fork }: { fork: Fork }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      label="More actions"
+      side="top"
+      align="start"
+      className="flex w-72 max-w-[calc(100vw-32px)] flex-col gap-2"
+      data-composer-menu
+      trigger={
+        <IconButton
+          size="sm"
+          label="More actions"
+          aria-expanded={open}
+          icon={<Ellipsis className="size-4" strokeWidth={1.5} />}
+          tooltipSide="top"
+        />
+      }
+    >
+      <button
+        type="button"
+        disabled={fork.forking}
+        aria-busy={fork.forking}
+        onClick={() => void fork.start().then(() => setOpen(false))}
+        className="flex min-w-0 items-start gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors duration-fast hover:bg-bg-2 disabled:opacity-50"
+      >
+        <span className="mt-0.5 flex shrink-0 text-text-2">
+          <ForkIcon forking={fork.forking} />
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-medium text-body-sm text-text-1">Resume here (fork)</span>
+          <span className="text-meta text-text-2">
+            A board session that starts from this conversation. It won't see what happens in the
+            terminal next.
+          </span>
+        </span>
+      </button>
+    </Popover>
+  );
+}
+
+/**
+ * Where the board can't type into the terminal (no linked terminal, the session ended, or the
+ * setting is off), it continues the session as a fork.
+ */
+function ForkBar({ session, fork }: { session: ClaudeSession; fork: Fork }) {
+  const live = isSessionLive(session.status);
   return (
     <div data-fork-bar className="shrink-0 px-5 pt-2 pb-4">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 py-2.5 shadow-raised">
-        {replyEnabled && session.terminalId !== null && <TerminalReply session={session} />}
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <p className="min-w-0 flex-1 basis-56 text-body-sm text-text-2">
             This session runs in a terminal. Continue it here as a board session that starts from
@@ -390,16 +538,12 @@ function ForkBar({ session }: { session: ClaudeSession }) {
           </p>
           <button
             type="button"
-            onClick={() => void fork()}
-            disabled={forking}
-            aria-busy={forking}
+            onClick={() => void fork.start()}
+            disabled={fork.forking}
+            aria-busy={fork.forking}
             className={buttonClass('primary', 'sm')}
           >
-            {forking ? (
-              <LoaderCircle className="hud-spin size-3.5" strokeWidth={1.5} />
-            ) : (
-              <GitFork className="size-3.5" strokeWidth={1.5} />
-            )}
+            <ForkIcon forking={fork.forking} />
             Resume here (fork)
           </button>
         </div>
@@ -420,73 +564,87 @@ function ForkBar({ session }: { session: ClaudeSession }) {
 }
 
 /**
- * F14 (experimental): types a line into the session's terminal and submits it, as if typed at
- * Claude's prompt. Only while Claude is idle or waiting, so it never lands mid-turn.
+ * A permission prompt is open in the terminal: free text would answer it, so none is sent. With
+ * the request routed to the board (away mode) it is decided here; otherwise in the terminal.
  */
-function TerminalReply({ session }: { session: ClaudeSession }) {
-  const client = useBoardClient();
-  const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const ready = terminalReplyBlock(session) === null;
-  const canSend = ready && !sending && text.trim() !== '';
-
-  const send = async () => {
-    if (!canSend) return;
-    setSending(true);
-    const result = await client.action({
-      kind: 'session.replyInTerminal',
-      sessionId: session.id,
-      text: text.trim(),
-    });
-    setSending(false);
-    if (result.ok) setText('');
-    else toast.error(errorText(result.error, 'Could not send to the terminal'));
-    inputRef.current?.focus();
-  };
-
+function TerminalApproval({ session, terminalId }: { session: ClaudeSession; terminalId: string }) {
+  const approvalId =
+    session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
+  const approval = useBoard(selectApproval(approvalId ?? ''));
   return (
-    <form
-      data-terminal-reply
-      data-ready={ready}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void send();
-      }}
-      className="flex min-w-0 flex-col gap-1.5 border-line border-b pb-2.5"
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <input
-          ref={inputRef}
-          type="text"
-          aria-label="Reply in the terminal"
-          aria-describedby={`terminal-reply-hint-${session.id}`}
-          placeholder="Reply in the terminal…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          autoComplete="off"
-          spellCheck
-          className="h-8 min-w-0 flex-1 bg-transparent text-body text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none"
-        />
-        <button
-          type="submit"
-          disabled={!canSend}
-          aria-busy={sending}
-          className={cx(buttonClass('secondary', 'sm'), 'shrink-0 disabled:opacity-40')}
-        >
-          {sending ? (
-            <LoaderCircle className="hud-spin size-3.5" strokeWidth={1.5} />
-          ) : (
-            <SquareTerminal className="size-3.5" strokeWidth={1.5} />
-          )}
-          <span className="max-sm:sr-only">Send to terminal</span>
-        </button>
+    <div data-terminal-approval className="shrink-0 px-5 pt-2 pb-4">
+      <div className="mx-auto w-full max-w-3xl">
+        {approval?.state === 'pending' ? (
+          <InlineApproval approval={approval} />
+        ) : (
+          <AnswerInTerminal session={session} terminalId={terminalId} />
+        )}
       </div>
-      <p id={`terminal-reply-hint-${session.id}`} className="text-meta text-text-3">
-        {ready
-          ? 'Enter types it at Claude’s prompt in the terminal. Experimental.'
-          : 'Claude is busy. You can send once it is idle or waiting for you.'}
+    </div>
+  );
+}
+
+function InlineApproval({ approval }: { approval: Approval }) {
+  const client = useBoardClient();
+  const [denying, setDenying] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const decide = async (decision: AttentionDecision, reason?: string) => {
+    if (busy) return;
+    if (decision === 'allowAlways' && !canAlwaysAllow(approval)) return;
+    setBusy(true);
+    const result = await client.request(
+      'approval.decide',
+      decision === 'deny'
+        ? { approvalId: approval.id, decision, ...(reason ? { reason } : {}) }
+        : { approvalId: approval.id, decision },
+    );
+    setBusy(false);
+    if (!result.ok) toast.error(actionErrorText(result.error, 'The decision did not go through'));
+  };
+  return (
+    <ApprovalCard
+      approval={approval}
+      resolved={null}
+      selected
+      denying={denying}
+      busy={busy}
+      onSelect={() => {}}
+      onDecide={(decision, reason) => void decide(decision, reason)}
+      onDenyStart={() => setDenying(true)}
+      onDenyCancel={() => setDenying(false)}
+    />
+  );
+}
+
+function AnswerInTerminal({ session, terminalId }: { session: ClaudeSession; terminalId: string }) {
+  const client = useBoardClient();
+  const editor = useBoard((s) => {
+    const windowId = s.board.terminals[terminalId]?.windowId;
+    return (windowId && s.board.windows[windowId]?.appName) || 'Cursor';
+  });
+  const tool = session.currentTool?.tool ?? null;
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-st-wait/40 bg-bg-2 px-3 py-2.5 shadow-raised">
+      <p className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
+        <span className="font-medium text-body-sm text-st-wait-ink">
+          Answer in the terminal{tool ? `: ${tool}` : ''}
+        </span>
+        <span className="text-meta text-text-2">
+          Claude is asking for permission at its prompt. Turn on away mode in Settings to decide
+          requests here.
+        </span>
       </p>
-    </form>
+      <button
+        type="button"
+        className={buttonClass('primary', 'sm')}
+        onClick={async () => {
+          const result = await client.action({ kind: 'terminal.focus', terminalId });
+          if (!result.ok) toast.error(actionErrorText(result.error));
+        }}
+      >
+        <ExternalLink className="size-3.5" strokeWidth={1.5} />
+        Focus in {editor}
+      </button>
+    </div>
   );
 }

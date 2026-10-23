@@ -665,7 +665,7 @@ test.describe('worst case', () => {
   }
 });
 
-// The composer: a new session, a board session mid-stream, and a terminal session's fork bar.
+// The composer: a terminal session's composer, a new session, and a board session mid-stream.
 test.describe('composer', () => {
   for (const theme of THEMES) {
     for (const viewport of [
@@ -691,9 +691,14 @@ test.describe('composer', () => {
             .first();
           await forkable.click();
           if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
-          await expect(page.locator('[data-fork-bar]')).toBeVisible();
+          // Typing into the terminal, or (mid-request) the approval in its place.
+          await expect(
+            page
+              .locator('[data-session-panel] form[data-composer], [data-terminal-approval]')
+              .first(),
+          ).toBeVisible();
           await page.waitForTimeout(600);
-          await shot('composer-fork');
+          await shot('composer-terminal');
 
           if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
           await page.locator('[data-new-session]').click();
@@ -708,14 +713,14 @@ test.describe('composer', () => {
           await shot('composer-streaming');
         });
 
-        test('terminal reply', async ({ page }) => {
-          // Only this page sees the flag on, so parallel shots keep the plain fork bar.
+        test('fork bar', async ({ page }) => {
+          // Only this page sees replies off, so parallel shots keep the terminal composer.
           await page.route('**/api/settings', async (route) => {
             if (route.request().method() !== 'GET') return route.fallback();
             const response = await route.fetch();
             await route.fulfill({
               response,
-              json: { ...(await response.json()), experimentalTerminalReply: true },
+              json: { ...(await response.json()), terminalReply: false },
             });
           });
           await openRoute(page, '/');
@@ -728,13 +733,11 @@ test.describe('composer', () => {
             .first()
             .click();
           if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
-          const reply = page.locator('[data-terminal-reply]');
-          await expect(reply).toBeVisible();
-          await reply.getByRole('textbox').fill('Yes, use the second option');
+          // On phones the Terminals tab holds the same chat, hidden.
+          await expect(page.locator('[data-fork-bar]').filter({ visible: true })).toBeVisible();
           await page.waitForTimeout(600);
           await page.screenshot({
-            path: new URL(`composer-terminal-reply-${viewport.width}-${theme}.png`, OUT_DIR)
-              .pathname,
+            path: new URL(`composer-fork-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
             animations: 'disabled',
           });
         });
@@ -868,5 +871,48 @@ test.describe('ambient styles', () => {
       await page.waitForTimeout(2500);
       await page.screenshot({ path: new URL(`ambient-${style}.png`, OUT_DIR).pathname });
     });
+  }
+});
+
+// A terminal running claude (10.9): its tab, its chat (beside, or in the pane on phones), the raw
+// TUI, and the new-terminal popover.
+test.describe('claude terminals', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      test.describe(`${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('claude terminal', async ({ page }) => {
+          const shot = (name: string) =>
+            page.screenshot({
+              path: new URL(`${name}-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          await openRoute(page, '/');
+          await openRoute(page, await firstProjectRoute(page));
+          if (viewport.width < 1024) await page.getByRole('tab', { name: 'Terminals' }).click();
+          const stack = page.locator('[data-terminal-stack]');
+          const tab = stack.locator('[data-claude-tab]').first();
+          await expect(tab).toBeVisible({ timeout: 30_000 });
+          await tab.click();
+          await expect(stack.locator('[data-claude-pane]')).toBeVisible();
+          await page.mouse.move(viewport.width / 2, viewport.height - 4);
+          await page.waitForTimeout(1200);
+          await shot('claude-terminal');
+
+          await stack.getByRole('button', { name: 'Raw terminal' }).click();
+          await page.waitForTimeout(800);
+          await shot('claude-terminal-raw');
+          await stack.getByRole('button', { name: 'Chat' }).click();
+
+          await stack.getByRole('button', { name: 'New terminal' }).click();
+          await expect(page.locator('[data-new-terminal-popover]')).toBeVisible();
+          await page.waitForTimeout(600);
+          await shot('new-terminal');
+        });
+      });
+    }
   }
 });
