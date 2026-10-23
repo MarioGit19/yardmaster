@@ -18,12 +18,13 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { ApprovalCard } from '../attention/ApprovalCard.js';
 import { type AttentionDecision, canAlwaysAllow } from '../attention/attention.js';
 import { selectApproval, useBoard, useBoardClient } from '../data/index.js';
+import { draftKey, drafts, useDraftText } from '../drafts/drafts.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { sessionHref } from '../routes.js';
 import { useBoardSettings } from '../settings/boardSettings.js';
@@ -88,6 +89,7 @@ function BoardComposer({ session }: { session: ClaudeSession }) {
   return (
     <Composer
       key={session.id}
+      draft={draftKey.session(session.id)}
       label={`Message ${sessionDisplayName(session)}`}
       placeholder={running ? 'Queue a follow-up…' : 'Reply to Claude…'}
       running={running}
@@ -121,6 +123,8 @@ export function NewSessionComposer({ projectId }: { projectId: string }) {
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
   return (
     <Composer
+      key={projectId}
+      draft={draftKey.newSession(projectId)}
       label="First message for a new session"
       placeholder="Ask Claude to…"
       autoFocus
@@ -150,6 +154,8 @@ export function NewSessionComposer({ projectId }: { projectId: string }) {
 }
 
 interface ComposerProps {
+  /** Where unsent text is kept (`draftKey`), so it survives switching away and reloads. */
+  draft: string;
   label: string;
   placeholder: string;
   autoFocus?: boolean;
@@ -171,6 +177,7 @@ interface ComposerProps {
 }
 
 function Composer({
+  draft,
   label,
   placeholder,
   autoFocus = false,
@@ -186,9 +193,15 @@ function Composer({
   sendBlocked = false,
   hint,
 }: ComposerProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => drafts.get(draft));
   const [sending, setSending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // A restored draft continues where it ends.
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (input && input.value !== '')
+      input.setSelectionRange(input.value.length, input.value.length);
+  }, []);
   const mode = sendButtonMode({ sending, running, text });
   const column = chatColumn(useCompactChat());
 
@@ -198,7 +211,11 @@ function Composer({
     setSending(true);
     const ok = await onSend(prompt);
     setSending(false);
-    if (ok) setText('');
+    // A failed send keeps the text, and its draft.
+    if (ok) {
+      setText('');
+      drafts.clear(draft);
+    }
     inputRef.current?.focus();
   };
 
@@ -226,7 +243,10 @@ function Composer({
           autoFocus={autoFocus}
           rows={1}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            drafts.set(draft, e.target.value);
+          }}
           onKeyDown={(e) => {
             const key = composerKey(
               { key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing },
@@ -411,6 +431,7 @@ function TerminalSessionComposer({ session }: { session: ClaudeSession }) {
   return (
     <Composer
       key={session.id}
+      draft={draftKey.session(session.id)}
       label={`Message ${sessionDisplayName(session)}`}
       placeholder={ready ? 'Reply to Claude…' : 'Claude is working, reply when it’s idle'}
       running={busy}
@@ -466,8 +487,10 @@ function useFork(session: ClaudeSession): Fork {
       toast.error(errorText(result.error, 'Could not fork the session'));
       return;
     }
-    if (result.sessionId && session.projectId) {
-      navigate(sessionHref(session.projectId, result.sessionId));
+    if (result.sessionId) {
+      // The fork's composer picks up what was typed for the original.
+      drafts.move(draftKey.session(session.id), draftKey.session(result.sessionId));
+      if (session.projectId) navigate(sessionHref(session.projectId, result.sessionId));
     }
   };
   return { forking, start };
@@ -551,6 +574,7 @@ function ForkBar({ session, fork }: { session: ClaudeSession; fork: Fork }) {
             Resume here (fork)
           </button>
         </div>
+        <ForkDraft sessionId={session.id} />
         {live && (
           <p role="note" className="flex min-w-0 items-start gap-1.5 text-meta text-text-2">
             <TriangleAlert
@@ -563,6 +587,27 @@ function ForkBar({ session, fork }: { session: ClaudeSession; fork: Fork }) {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A draft typed before the session ended: kept for the fork, or discarded here. */
+function ForkDraft({ sessionId }: { sessionId: string }) {
+  const key = draftKey.session(sessionId);
+  const text = useDraftText(key);
+  if (text === '') return null;
+  return (
+    <div data-fork-draft className="flex min-w-0 items-center gap-2 text-meta text-text-2">
+      <p className="min-w-0 flex-1 truncate" title={text}>
+        Your draft goes to the fork: <span className="text-text-1">{text}</span>
+      </p>
+      <button
+        type="button"
+        onClick={() => drafts.clear(key)}
+        className={buttonClass('ghost', 'sm')}
+      >
+        Discard draft
+      </button>
     </div>
   );
 }

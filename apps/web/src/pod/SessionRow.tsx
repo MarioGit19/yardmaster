@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { useInView } from '../anim/useFrame.js';
 import { selectApproval, useBoard } from '../data/index.js';
+import { DraftMarker } from '../drafts/DraftMarker.js';
+import { draftKey } from '../drafts/drafts.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
 import { spring } from '../motion.js';
 import { ToolChip } from '../orb/ToolChip.js';
@@ -68,6 +70,7 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
           <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
+          <DraftMarker draft={draftKey.session(session.id)} className="self-center" />
           <ToolChip tool={tool} className="hidden self-center @min-[360px]:inline-block" />
           {tokens > 0 && (
             <span

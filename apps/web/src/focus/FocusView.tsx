@@ -26,6 +26,8 @@ import {
   useBoard,
   useBoardList,
 } from '../data/index.js';
+import { DraftMarker } from '../drafts/DraftMarker.js';
+import { draftKey } from '../drafts/drafts.js';
 import { GitPanel } from '../git/GitPanel.js';
 import { SessionHistory } from '../history/SessionHistory.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
@@ -553,6 +555,7 @@ function SessionLink({
           >
             {sessionDisplayName(session)}
           </span>
+          <DraftMarker draft={draftKey.session(session.id)} />
           {session.origin === 'board' && <OriginBadge origin="board" compact />}
         </span>
         <span className="flex min-w-0 items-center justify-between gap-2">

@@ -2,6 +2,7 @@ import { LoaderCircle, Sparkle, SquareTerminal } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useBoardClient, useBoardStore } from '../data/index.js';
+import { draftKey, drafts } from '../drafts/drafts.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { Popover } from '../ui/Popover.js';
@@ -36,7 +37,9 @@ export function NewTerminalPopover({
 }: NewTerminalPopoverProps) {
   const client = useBoardClient();
   const store = useBoardStore();
-  const [command, setCommand] = useState('');
+  const draft = draftKey.newTerminal(projectId);
+  // Kept when the popover closes unsent; cleared once a terminal opens.
+  const [command, setCommand] = useState(() => drafts.get(draft));
   const [busy, setBusy] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   // Closed by a successful create: focus goes to the new tab once it shows up, not the trigger.
@@ -45,8 +48,10 @@ export function NewTerminalPopover({
   const [recent, setRecent] = useState<string[]>([]);
 
   const change = (next: boolean) => {
-    if (next) setRecent(recentCommands(store.getState().board, projectId));
-    else setCommand('');
+    if (next) {
+      setRecent(recentCommands(store.getState().board, projectId));
+      setCommand(drafts.get(draft));
+    }
     onOpenChange(next);
   };
 
@@ -69,6 +74,8 @@ export function NewTerminalPopover({
       return;
     }
     created.current = true;
+    setCommand('');
+    drafts.clear(draft);
     change(false);
     onCreated(trimmed === '' ? null : trimmed);
   };
@@ -84,7 +91,9 @@ export function NewTerminalPopover({
       data-new-terminal-popover
       onOpenAutoFocus={(e) => {
         e.preventDefault();
-        input.current?.focus();
+        const el = input.current;
+        el?.focus();
+        el?.setSelectionRange(el.value.length, el.value.length);
       }}
       onCloseAutoFocus={(e) => {
         if (!created.current) return;
@@ -115,7 +124,10 @@ export function NewTerminalPopover({
             spellCheck={false}
             autoComplete="off"
             autoCapitalize="off"
-            onChange={(e) => setCommand(e.target.value)}
+            onChange={(e) => {
+              setCommand(e.target.value);
+              drafts.set(draft, e.target.value);
+            }}
             className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none"
           />
         </label>

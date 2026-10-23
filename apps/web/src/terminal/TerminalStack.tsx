@@ -39,6 +39,8 @@ import {
   useBoardShallow,
 } from '../data/index.js';
 import type { BoardStoreState } from '../data/store.js';
+import { DraftMarker } from '../drafts/DraftMarker.js';
+import { draftKey, useHasDraft } from '../drafts/drafts.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalDisplay } from '../lanes/lane.js';
@@ -462,6 +464,8 @@ function StackTab({
   const caption = useSessionCaption(session);
   const closed = terminal.state === 'closed';
   const title = display.name;
+  const draft = session ? draftKey.session(session.id) : null;
+  const drafted = useHasDraft(draft) ? ', unsent draft' : '';
   // The editor's own name (`zsh`, `claude`) stays in the tooltip when the board replaced it.
   const raw = display.raw ? ` (${display.raw})` : '';
   return (
@@ -471,7 +475,7 @@ function StackTab({
       type="button"
       role="tab"
       aria-selected={selected}
-      aria-label={session && caption ? claudeTerminalLabel(title, caption.text) : view.label}
+      aria-label={`${session && caption ? claudeTerminalLabel(title, caption.text) : view.label}${drafted}`}
       title={
         session && caption
           ? `${title}${raw}: ${caption.text}`
@@ -516,6 +520,7 @@ function StackTab({
         )}
       </span>
       <TabTitle text={title} />
+      <DraftMarker draft={draft} className="relative" />
       <AnimatePresence initial={false}>
         {!session && view.exit && view.exit.code !== 0 && (
           <ExitBadge key={view.exit.key} code={view.exit.code} className="relative -mr-1" />
