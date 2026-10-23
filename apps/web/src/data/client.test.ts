@@ -13,6 +13,7 @@ import {
   BoardClient,
   backoffDelay,
   type ChunkInfo,
+  MAX_TERMINAL_INPUT,
   type SocketLike,
   STREAM_HISTORY_CHARS,
 } from './client.js';
@@ -552,6 +553,27 @@ describe('BoardClient requests', () => {
       'dropped invalid outgoing message',
       expect.any(String),
     );
+  });
+});
+
+describe('BoardClient board terminals', () => {
+  it('sends keystrokes and sizes, splitting a big paste between surrogate pairs', () => {
+    const { client, connect, last } = setup();
+    client.start();
+    client.terminalInput('b1', 'lost');
+    connect();
+    client.terminalInput('b1', 'ls\r');
+    client.terminalResize('b1', 100, 30);
+    const paste = `${'x'.repeat(MAX_TERMINAL_INPUT - 1)}😀tail`;
+    client.terminalInput('b1', paste);
+    const sent = last().sent.filter((m) => m.type.startsWith('terminal.'));
+    expect(sent.map((m) => [m.type, m.payload])).toEqual([
+      ['terminal.input', { terminalId: 'b1', data: 'ls\r' }],
+      ['terminal.resize', { terminalId: 'b1', cols: 100, rows: 30 }],
+      ['terminal.input', { terminalId: 'b1', data: 'x'.repeat(MAX_TERMINAL_INPUT - 1) }],
+      ['terminal.input', { terminalId: 'b1', data: '😀tail' }],
+    ]);
+    expect(sent.every((m) => m.id === undefined)).toBe(true);
   });
 });
 

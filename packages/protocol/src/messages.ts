@@ -304,6 +304,26 @@ export const SessionSend = envelope(
   z.object({ sessionId: SessionId, text: Text.min(1) }),
 );
 export const ApprovalDecide = envelope('approval.decide', ApprovalDecision);
+/** Keystrokes for a board terminal (F19), straight to its pty. No reply. */
+export const TerminalInput = envelope(
+  'terminal.input',
+  z.object({
+    terminalId: TerminalId,
+    data: z
+      .string()
+      .min(1)
+      .max(64 * 1024),
+  }),
+);
+/** The size of the xterm showing a board terminal. No reply. */
+export const TerminalResize = envelope(
+  'terminal.resize',
+  z.object({
+    terminalId: TerminalId,
+    cols: z.number().int().min(2).max(1_000),
+    rows: z.number().int().min(1).max(500),
+  }),
+);
 
 export const UiToServer = z.discriminatedUnion('type', [
   Subscribe,
@@ -311,6 +331,8 @@ export const UiToServer = z.discriminatedUnion('type', [
   Action,
   SessionSend,
   ApprovalDecide,
+  TerminalInput,
+  TerminalResize,
 ]);
 export type UiToServer = z.infer<typeof UiToServer>;
 

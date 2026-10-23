@@ -1686,3 +1686,54 @@ for (const theme of THEMES) {
     });
   }
 }
+
+// Board terminals (12.4): a folder opened with only a terminal runs it on the board, with the
+// origin mark on its tab and the note in place of the command line. Its own board: it adds a project.
+test.describe('board terminal', () => {
+  for (const theme of THEMES) {
+    test(theme, async ({ browser }) => {
+      test.slow();
+      const board = await startBoard({ demo: true });
+      try {
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 390, height: 844 },
+        ]) {
+          const context = await browser.newContext({
+            viewport,
+            colorScheme: theme,
+            baseURL: board.url,
+            storageState: signedInState(board.url, board.cookie),
+          });
+          const page = await context.newPage();
+          await page.addInitScript((t) => localStorage.setItem('cboard.theme', t), theme);
+          await page.goto('/#/');
+          await page.locator('[data-hud="open-project"]').click();
+          const dialog = page.locator('[data-open-project]');
+          const entry = viewport.width < 768 ? 'tax-notes' : 'recipe-box';
+          await dialog.locator(`[data-library-entry="${entry}"]`).click();
+          const sheet = dialog.locator(`[data-launch-sheet="${entry}"]`);
+          await sheet.locator('[data-launch-option="editor"] label').click();
+          await sheet.locator('[data-launch-option="terminal"] label').click();
+          await sheet.getByRole('textbox', { name: 'Command to run (optional)' }).fill('pnpm dev');
+          await sheet.getByRole('button', { name: 'Open project' }).click();
+          await expect(dialog).toHaveCount(0);
+          const tabs = page.getByRole('tab', { name: /^Terminals/ });
+          if (await tabs.isVisible()) await tabs.click();
+          const stack = page.locator('[data-terminal-stack]');
+          await expect(stack.locator('[role="tab"][data-origin="board"]')).toBeVisible({
+            timeout: 10_000,
+          });
+          await page.waitForTimeout(900);
+          await page.screenshot({
+            path: new URL(`board-terminal-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+          await context.close();
+        }
+      } finally {
+        await board.stop();
+      }
+    });
+  }
+});

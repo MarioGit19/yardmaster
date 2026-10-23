@@ -1,12 +1,18 @@
 import { LoaderCircle, Sparkle, SquareTerminal } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useBoardClient, useBoardStore } from '../data/index.js';
+import { useBoard, useBoardClient, useBoardStore } from '../data/index.js';
 import { draftKey, drafts } from '../drafts/drafts.js';
+import { useServerStatus } from '../settings/useServerStatus.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { Popover } from '../ui/Popover.js';
-import { CLAUDE_COMMAND, recentCommands } from './newTerminal.js';
+import {
+  BOARD_TERMINALS_OFF,
+  CLAUDE_COMMAND,
+  recentCommands,
+  terminalHost,
+} from './newTerminal.js';
 import { actionErrorText } from './stack.js';
 
 /** Errors that mean no editor window can open a terminal for the project. */
@@ -23,9 +29,16 @@ export interface NewTerminalPopoverProps {
   onCreated: (command: string | null) => void;
 }
 
+const HOST_NOTE = {
+  editor: 'Opens in the editor window.',
+  board: 'Runs on the board, in the project folder.',
+  none: BOARD_TERMINALS_OFF,
+} as const;
+
 /**
- * Opens a terminal in the project's editor window (`terminal.create`), optionally running a
- * command: typed, or one tap on a recent command or on `claude`. The launch sheet (12.2) reuses it.
+ * Opens a terminal (`terminal.create`) in the project's editor window, or as a board terminal
+ * (F19) when no window has the project, optionally running a command: typed, or one tap on a
+ * recent command or on `claude`.
  */
 export function NewTerminalPopover({
   projectId,
@@ -46,6 +59,12 @@ export function NewTerminalPopover({
   const created = useRef(false);
   // Read once per opening: the chips shouldn't reshuffle while someone aims at one.
   const [recent, setRecent] = useState<string[]>([]);
+  const editorOpen = useBoard((s) =>
+    Object.values(s.board.windows).some((w) => w.projectIds.includes(projectId)),
+  );
+  const status = useServerStatus(null, open && !editorOpen);
+  const host = terminalHost(editorOpen, status);
+  const off = host === 'none';
 
   const change = (next: boolean) => {
     if (next) {
@@ -56,7 +75,7 @@ export function NewTerminalPopover({
   };
 
   const create = async (line: string) => {
-    if (busy !== null) return;
+    if (busy !== null || off) return;
     const trimmed = line.trim();
     setBusy(trimmed);
     const result = await client.action({
@@ -140,7 +159,7 @@ export function NewTerminalPopover({
                 type="button"
                 data-command-chip={chip}
                 title={chip}
-                disabled={busy !== null}
+                disabled={busy !== null || off}
                 onClick={() => void create(chip)}
                 className={cx(
                   'inline-flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2.5 font-mono text-label text-text-1',
@@ -166,10 +185,16 @@ export function NewTerminalPopover({
           </div>
         </fieldset>
         <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 text-meta text-text-3">Opens in the editor window.</p>
+          <p
+            data-terminal-host={host}
+            className={cx('min-w-0 text-meta', off ? 'text-text-2' : 'text-text-3')}
+          >
+            {HOST_NOTE[host]}
+            {off && ` Open ${projectName} in Cursor first.`}
+          </p>
           <button
             type="submit"
-            disabled={busy !== null}
+            disabled={busy !== null || off}
             aria-busy={busy === command.trim()}
             className={buttonClass('primary', 'sm')}
           >

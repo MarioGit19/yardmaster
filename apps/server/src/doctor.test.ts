@@ -43,6 +43,7 @@ interface FakeWorld {
   http?: Record<string, JsonResponse>;
   executables?: string[];
   commands?: Record<string, string | undefined>;
+  pty?: { ok: true } | { ok: false; reason: string };
 }
 
 function fakeDeps(world: FakeWorld = {}): DoctorDeps & { requests: [string, unknown][] } {
@@ -69,6 +70,7 @@ function fakeDeps(world: FakeWorld = {}): DoctorDeps & { requests: [string, unkn
     isExecutable: async (path) => (world.executables ?? ['/usr/local/bin/claude']).includes(path),
     run: async (file, args) =>
       world.commands ? world.commands[`${file} ${args.join(' ')}`] : '2.1.0 (Claude Code)\n',
+    loadPty: async () => world.pty ?? { ok: true },
   };
 }
 
@@ -105,6 +107,7 @@ describe('runDoctor', () => {
       'hooks',
       'extensions',
       'editor-cli',
+      'pty',
       'claude',
       'api-key',
     ]);
@@ -390,6 +393,32 @@ describe('runDoctor', () => {
       const deps = fakeDeps({ portFree: false, http, executables: ['/usr/local/bin/cursor'] });
       const checks = await runDoctor(config, deps, NOW);
       expect(byId(checks, 'editor-cli')).toMatchObject({ level: 'warn' });
+    });
+  });
+
+  describe('board terminals', () => {
+    it('is ok when node-pty loads', async () => {
+      const checks = await runDoctor(config, fakeDeps(), NOW);
+      expect(byId(checks, 'pty')).toMatchObject({ level: 'ok', message: 'node-pty loads' });
+    });
+
+    it('warns with the reason when it does not', async () => {
+      const deps = fakeDeps({ pty: { ok: false, reason: 'node-pty did not load: no binary' } });
+      const checks = await runDoctor(config, deps, NOW);
+      expect(byId(checks, 'pty')).toMatchObject({
+        level: 'warn',
+        message: 'node-pty did not load: no binary',
+      });
+      expect(byId(checks, 'pty').hint).toContain('editor window');
+    });
+
+    it('reports what a running server has', async () => {
+      const http = runningBoard({
+        boardTerminals: { available: true, reason: null, live: 3, max: 16 },
+      });
+      const deps = fakeDeps({ portFree: false, http, pty: { ok: false, reason: 'x' } });
+      const checks = await runDoctor(config, deps, NOW);
+      expect(byId(checks, 'pty').message).toBe('node-pty loads; 3 of 16 running');
     });
   });
 

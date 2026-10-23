@@ -46,6 +46,8 @@ export const MAX_DELAY_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 15_000;
 /** Per open stream, how much recent output a late listener gets replayed (UTF-16 units). */
 export const STREAM_HISTORY_CHARS = 2_000_000;
+/** Longest `terminal.input` message; a bigger paste goes in several. */
+export const MAX_TERMINAL_INPUT = 64 * 1024;
 
 /**
  * Delay before retry number `attempt` (1-based): exponential from `base`, capped at
@@ -203,6 +205,27 @@ export class BoardClient {
     const result = await this.request('action', action);
     for (const listener of this.actionListeners) listener(action, result);
     return result;
+  }
+
+  /** Keystrokes for a board terminal (F19). Dropped while offline, like an unplugged keyboard. */
+  terminalInput(terminalId: string, data: string): void {
+    if (!this.synced) return;
+    let from = 0;
+    while (from < data.length) {
+      let to = Math.min(data.length, from + MAX_TERMINAL_INPUT);
+      // Never split a surrogate pair across two messages.
+      if (to < data.length && /[\uD800-\uDBFF]/.test(data.charAt(to - 1))) to--;
+      this.send(
+        makeMessage<UiToServer>('terminal.input', { terminalId, data: data.slice(from, to) }),
+      );
+      from = to;
+    }
+  }
+
+  /** The size of the xterm showing a board terminal. */
+  terminalResize(terminalId: string, cols: number, rows: number): void {
+    if (!this.synced) return;
+    this.send(makeMessage<UiToServer>('terminal.resize', { terminalId, cols, rows }));
   }
 
   request<T extends RequestMessage['type']>(

@@ -381,6 +381,12 @@ export class DemoSimulator {
     });
   }
 
+  /** Whether a demo editor window has the project; without one, new terminals are board terminals. */
+  hasWindow(projectId: string): boolean {
+    const project = this.running ? this.projects.find((p) => p.id === projectId) : undefined;
+    return project !== undefined && this.store.state.windows[project.windowId] !== undefined;
+  }
+
   /** "Open in Cursor" plays out as a Cursor window for the project connecting a moment later. */
   editorActions(): Pick<ActionHandlers, 'project.openInEditor'> {
     return {

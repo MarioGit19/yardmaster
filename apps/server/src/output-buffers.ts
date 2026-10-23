@@ -72,6 +72,14 @@ export class OutputBuffers {
     this.atLineStart.set(terminalId, true);
   }
 
+  /** Appends raw pty output to a board terminal's stream (it has no executions). */
+  appendTerminal(terminalId: string, chunk: string): void {
+    if (chunk.length === 0) return;
+    const streamId = terminalStreamId(terminalId);
+    this.emit(streamId, this.ring(streamId, this.terminalBytes).append(chunk), chunk);
+    this.atLineStart.set(terminalId, chunk.endsWith('\n'));
+  }
+
   read(streamId: OutputStreamId, fromSeq?: number): ReadResult | undefined {
     return this.rings.get(streamId)?.read(fromSeq);
   }

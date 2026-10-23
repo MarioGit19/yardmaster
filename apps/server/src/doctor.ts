@@ -6,13 +6,23 @@ import { claudeSettingsPath, HOOK_MARKER } from '@c-board/hook';
 import { HealthResponse, ServerStatus } from '@c-board/protocol';
 import type { ServerConfig } from './config.js';
 import { findEditorCli, findOnPath } from './editor-cli.js';
+import { loadNodePty } from './pty.js';
 import { TOKEN_HEADER } from './security.js';
 import { isValidToken, tokenPath } from './token.js';
 
 export type CheckLevel = 'ok' | 'warn' | 'fail' | 'skip';
 
 export interface DoctorCheck {
-  id: 'node' | 'server' | 'token' | 'hooks' | 'extensions' | 'editor-cli' | 'claude' | 'api-key';
+  id:
+    | 'node'
+    | 'server'
+    | 'token'
+    | 'hooks'
+    | 'extensions'
+    | 'editor-cli'
+    | 'pty'
+    | 'claude'
+    | 'api-key';
   label: string;
   level: CheckLevel;
   message: string;
@@ -46,6 +56,8 @@ export interface DoctorDeps {
   isExecutable(path: string): Promise<boolean>;
   /** Runs `file args…` and returns stdout, or undefined on failure. */
   run(file: string, args: string[]): Promise<string | undefined>;
+  /** Whether node-pty (board terminals) loads here, and why not. */
+  loadPty(): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
 export const MIN_NODE = [22, 5] as const;
@@ -100,6 +112,7 @@ export function defaultDoctorDeps(home: string, env: NodeJS.ProcessEnv = process
           done(err ? undefined : stdout),
         );
       }),
+    loadPty: loadNodePty,
   };
 }
 
@@ -383,6 +396,27 @@ async function checkEditorCli(
   };
 }
 
+/** node-pty, behind board terminals (F19): the running server's answer, else a load here. */
+async function checkPty(deps: DoctorDeps, status: ServerStatus | undefined): Promise<DoctorCheck> {
+  const base = { id: 'pty', label: 'Board terminals' } as const;
+  const board = status?.boardTerminals;
+  const loaded = board
+    ? board.available
+      ? { ok: true as const }
+      : { ok: false as const, reason: board.reason ?? 'node-pty did not load' }
+    : await deps.loadPty();
+  if (!loaded.ok) {
+    return {
+      ...base,
+      level: 'warn',
+      message: loaded.reason,
+      hint: 'New terminals need an editor window until node-pty loads. Reinstall c-board (node-pty ships prebuilt binaries; other platforms build it with node-gyp).',
+    };
+  }
+  const live = board ? `; ${board.live} of ${board.max} running` : '';
+  return { ...base, level: 'ok', message: `node-pty loads${live}` };
+}
+
 async function checkClaude(deps: DoctorDeps): Promise<DoctorCheck> {
   const base = { id: 'claude', label: 'Claude Code' } as const;
   const bin = await findOnPath(deps, 'claude');
@@ -431,9 +465,10 @@ export async function runDoctor(
   const status =
     probe.state === 'board' ? await fetchStatus(config, deps, tokenResult.token) : undefined;
   const liveStatus = typeof status === 'object' ? status : undefined;
-  const [hooks, editorCli, claude] = await Promise.all([
+  const [hooks, editorCli, pty, claude] = await Promise.all([
     checkHooks(deps, liveStatus, now),
     checkEditorCli(deps, liveStatus),
+    checkPty(deps, liveStatus),
     checkClaude(deps),
   ]);
   return [
@@ -443,6 +478,7 @@ export async function runDoctor(
     hooks,
     checkExtensions(probe, status),
     editorCli,
+    pty,
     claude,
     checkApiKey(deps),
   ];

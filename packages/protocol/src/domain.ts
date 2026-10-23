@@ -129,6 +129,15 @@ export type ProcessStats = z.infer<typeof ProcessStats>;
 export const TerminalState = z.enum(['open', 'closed']);
 export type TerminalState = z.infer<typeof TerminalState>;
 
+/** Where a terminal runs: mirrored from an editor window, or a pty the board owns (F19). */
+export const TerminalOrigin = z.enum(['editor', 'board']);
+export type TerminalOrigin = z.infer<typeof TerminalOrigin>;
+
+/** The `windowId` of board-owned terminals: no editor window has them. */
+export const BOARD_WINDOW_ID = 'board';
+/** Most board terminals running at once (PRD F19). */
+export const MAX_BOARD_TERMINALS = 16;
+
 export const Terminal = z.object({
   id: TerminalId,
   windowId: WindowId,
@@ -144,8 +153,13 @@ export const Terminal = z.object({
   stats: ProcessStats.nullable(),
   createdAt: Timestamp,
   closedAt: Timestamp.nullable(),
+  /** Absent for editor terminals. */
+  origin: TerminalOrigin.optional(),
 });
 export type Terminal = z.infer<typeof Terminal>;
+
+export const isBoardTerminal = (terminal: Pick<Terminal, 'origin'>): boolean =>
+  terminal.origin === 'board';
 
 export const CommandConfidence = z.enum(['low', 'medium', 'high']);
 export type CommandConfidence = z.infer<typeof CommandConfidence>;

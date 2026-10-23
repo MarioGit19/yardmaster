@@ -1,6 +1,7 @@
 import {
   CLAUDE_NAME,
   type ClaudeSession,
+  isBoardTerminal,
   type StreamId,
   sessionSubtitle,
   type Terminal,
@@ -15,10 +16,12 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  LayoutDashboard,
   LayoutGrid,
   Maximize2,
   Minimize2,
   Plus,
+  Power,
   RotateCcw,
   Search,
   Square,
@@ -468,6 +471,8 @@ function StackTab({
   const drafted = useHasDraft(draft) ? ', unsent draft' : '';
   // The editor's own name (`zsh`, `claude`) stays in the tooltip when the board replaced it.
   const raw = display.raw ? ` (${display.raw})` : '';
+  const onBoard = isBoardTerminal(terminal);
+  const board = onBoard ? `, ${BOARD_LABEL.toLowerCase()}` : '';
   return (
     // New tabs enter with a fade and a 4 px rise (DESIGN.md §3 rule 1); `y` stays still at Reduced.
     <motion.button
@@ -475,7 +480,7 @@ function StackTab({
       type="button"
       role="tab"
       aria-selected={selected}
-      aria-label={`${session && caption ? claudeTerminalLabel(title, caption.text) : view.label}${drafted}`}
+      aria-label={`${session && caption ? claudeTerminalLabel(title, caption.text) : view.label}${board}${drafted}`}
       title={
         session && caption
           ? `${title}${raw}: ${caption.text}`
@@ -486,6 +491,7 @@ function StackTab({
       tabIndex={selected ? 0 : -1}
       data-tab={terminal.id}
       data-terminal-name={terminal.name}
+      data-origin={terminal.origin}
       data-claude-tab={session?.id}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0, transition: spring.smooth }}
@@ -520,6 +526,7 @@ function StackTab({
         )}
       </span>
       <TabTitle text={title} />
+      {onBoard && <BoardMark />}
       <DraftMarker draft={draft} className="relative" />
       <AnimatePresence initial={false}>
         {!session && view.exit && view.exit.code !== 0 && (
@@ -527,6 +534,21 @@ function StackTab({
         )}
       </AnimatePresence>
     </motion.button>
+  );
+}
+
+const BOARD_LABEL = 'Board terminal';
+const BOARD_HINT = 'Runs in c-board, not in an editor. It ends when the c-board server stops.';
+
+/** The "board" origin mark: this terminal is a pty c-board owns (F19), not an editor's. */
+function BoardMark({ className }: { className?: string }) {
+  return (
+    <span
+      title={`${BOARD_LABEL}. ${BOARD_HINT}`}
+      className={cx('relative flex shrink-0', className)}
+    >
+      <LayoutDashboard aria-hidden className="size-3 text-text-3" strokeWidth={1.5} />
+    </span>
   );
 }
 
@@ -597,11 +619,13 @@ function Pane({
   // A Claude terminal shows its chat unless asked for the raw TUI; when the session ends it is a
   // plain terminal again, and the content cross-fades either way.
   const content: PaneContent = session ? (chosenView === 'chat' ? 'chat' : 'xterm') : kind;
+  const board = isBoardTerminal(terminal);
   return (
     <section
       aria-label={session && !name.startsWith(CLAUDE_NAME) ? `${name}, ${CLAUDE_NAME}` : name}
       data-pane={terminal.id}
       data-pane-content={content}
+      data-origin={terminal.origin}
       data-active={(inGrid && active) || undefined}
       onPointerDown={inGrid ? onActivate : undefined}
       onFocusCapture={inGrid ? onActivate : undefined}
@@ -634,6 +658,7 @@ function Pane({
             >
               {name}
             </span>
+            {board && <BoardMark />}
             {view.command && view.command !== name && (
               <span
                 className="min-w-0 truncate font-mono text-meta text-text-2"
@@ -680,9 +705,10 @@ function Pane({
                   <Suspense fallback={null}>
                     <XtermView
                       terminalId={terminal.id}
-                      label={`Output of ${name}`}
+                      label={board ? `${BOARD_LABEL} ${name}` : `Output of ${name}`}
                       redact={masked}
                       onController={onController}
+                      input={board && terminal.state === 'open'}
                     />
                   </Suspense>
                 )}
@@ -898,6 +924,7 @@ function ActiveControls({
 
   const interrupt = () => act({ kind: 'terminal.interrupt', terminalId: terminal.id });
   const rerunnable = open && !view.running && execution.id !== null && Boolean(view.command);
+  const board = isBoardTerminal(terminal);
 
   return (
     <div className="flex shrink-0 flex-col gap-2">
@@ -913,20 +940,38 @@ function ActiveControls({
             ⌃C
           </button>
         </Tooltip>
-        <IconButton
-          size="sm"
-          label={view.command ? `Re-run ${view.command}` : 'Re-run'}
-          disabled={!rerunnable}
-          icon={<RotateCcw className="size-4" strokeWidth={1.5} />}
-          onClick={() => execution.id && act({ kind: 'terminal.rerun', execId: execution.id })}
-        />
-        <IconButton
-          size="sm"
-          label={`Show in ${editor}`}
-          disabled={!open}
-          icon={<ExternalLink className="size-4" strokeWidth={1.5} />}
-          onClick={() => act({ kind: 'terminal.focus', terminalId: terminal.id })}
-        />
+        {board ? (
+          <IconButton
+            size="sm"
+            label={open ? 'End terminal' : 'Remove terminal'}
+            data-end-terminal
+            icon={
+              open ? (
+                <Power className="size-4" strokeWidth={1.5} />
+              ) : (
+                <X className="size-4" strokeWidth={1.5} />
+              )
+            }
+            onClick={() => act({ kind: 'terminal.close', terminalId: terminal.id })}
+          />
+        ) : (
+          <>
+            <IconButton
+              size="sm"
+              label={view.command ? `Re-run ${view.command}` : 'Re-run'}
+              disabled={!rerunnable}
+              icon={<RotateCcw className="size-4" strokeWidth={1.5} />}
+              onClick={() => execution.id && act({ kind: 'terminal.rerun', execId: execution.id })}
+            />
+            <IconButton
+              size="sm"
+              label={`Show in ${editor}`}
+              disabled={!open}
+              icon={<ExternalLink className="size-4" strokeWidth={1.5} />}
+              onClick={() => act({ kind: 'terminal.focus', terminalId: terminal.id })}
+            />
+          </>
+        )}
         <span aria-hidden className="mx-1 h-4 w-px bg-line" />
         <IconButton
           size="sm"
@@ -960,19 +1005,71 @@ function ActiveControls({
           />
         )}
         <span className="ml-auto min-w-0 truncate pl-2 font-mono text-meta text-text-2">
-          {view.running ? 'running' : view.exit ? `exit ${view.exit.code}` : null}
+          {view.running
+            ? 'running'
+            : view.exit
+              ? `exit ${view.exit.code}`
+              : board && terminal.exitCode !== null
+                ? `exit ${terminal.exitCode}`
+                : null}
         </span>
       </div>
       {searching && !interactive && (
         <SearchBar controller={controller} onClose={() => setSearching(false)} />
       )}
-      {!chat && (
-        <CommandLine
-          terminal={terminal}
-          running={view.running ? view.command : null}
-          onInterrupt={interrupt}
-        />
+      {board ? (
+        <BoardTerminalNote terminal={terminal} controller={controller} />
+      ) : (
+        !chat && (
+          <CommandLine
+            terminal={terminal}
+            running={view.running ? view.command : null}
+            onInterrupt={interrupt}
+          />
+        )
       )}
+    </div>
+  );
+}
+
+/**
+ * Where a board terminal's command line would be: keystrokes go straight to it, so this only
+ * says so, and that it ends with the server.
+ */
+function BoardTerminalNote({
+  terminal,
+  controller,
+}: {
+  terminal: Terminal;
+  controller: () => XtermController | null;
+}) {
+  const open = terminal.state === 'open';
+  return (
+    <div
+      data-board-note={terminal.id}
+      className="flex min-h-9 min-w-0 items-start gap-2 rounded-control border border-line border-dashed px-3 py-2 text-meta text-text-2"
+    >
+      <LayoutDashboard
+        aria-hidden
+        className="mt-0.5 size-3.5 shrink-0 text-text-3"
+        strokeWidth={1.5}
+      />
+      <p className="min-w-0 flex-1 text-pretty">
+        {open ? (
+          <>
+            <button
+              type="button"
+              onClick={() => controller()?.focus()}
+              className="text-text-1 underline decoration-line-strong underline-offset-2 transition-colors duration-fast hover:decoration-text-2"
+            >
+              Type in the terminal
+            </button>
+            : keys go straight to it. It ends when the c-board server stops.
+          </>
+        ) : (
+          'This board terminal has ended. Its output stays until you remove it.'
+        )}
+      </p>
     </div>
   );
 }

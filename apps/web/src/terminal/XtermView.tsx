@@ -29,6 +29,11 @@ export interface XtermViewProps {
   onController?: (controller: XtermController | null) => void;
   /** `dom` keeps the page's one WebGL context free, e.g. under the Grid's 3D network. */
   prefer?: 'webgl' | 'dom';
+  /**
+   * A board terminal (F19): keystrokes go straight to its pty and the pty follows this view's
+   * size, so TUIs work. Otherwise the view is a read-only mirror.
+   */
+  input?: boolean;
 }
 
 const FONT_FAMILY = '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace';
@@ -49,6 +54,7 @@ export default function XtermView({
   redact = false,
   onController,
   prefer = 'webgl',
+  input = false,
 }: XtermViewProps) {
   const client = useBoardClient();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -69,10 +75,10 @@ export default function XtermView({
       fontSize: FONT_SIZE,
       lineHeight: 1.25,
       scrollback: SCROLLBACK,
-      // A mirror: input goes through the stack's command line, not raw keystrokes.
-      disableStdin: true,
+      // A mirror takes input through the stack's command line; a board terminal takes keystrokes.
+      disableStdin: !input,
       cursorBlink: false,
-      cursorInactiveStyle: 'none',
+      cursorInactiveStyle: input ? 'outline' : 'none',
       allowProposedApi: true,
       theme: xtermTheme(colors.resolve),
     });
@@ -121,6 +127,18 @@ export default function XtermView({
           setRenderer('dom');
         }
       refit();
+
+      if (input) {
+        const keys = term.onData((data) => client.terminalInput(terminalId, data));
+        const sized = term.onResize(({ cols, rows }) =>
+          client.terminalResize(terminalId, cols, rows),
+        );
+        client.terminalResize(terminalId, term.cols, term.rows);
+        cleanups.push(() => {
+          keys.dispose();
+          sized.dispose();
+        });
+      }
 
       // The write filter: masked output goes in, the raw text never reaches the terminal.
       const redactor = redact ? new StreamRedactor() : null;
@@ -216,7 +234,7 @@ export default function XtermView({
       onControllerRef.current?.(null);
       for (const cleanup of cleanups.reverse()) cleanup();
     };
-  }, [client, terminalId, redact, prefer]);
+  }, [client, terminalId, redact, prefer, input]);
 
   return (
     <div
@@ -224,6 +242,7 @@ export default function XtermView({
       role="log"
       aria-label={label}
       data-xterm={terminalId}
+      data-input={input || undefined}
       data-renderer={renderer ?? undefined}
       className="xterm-host h-full min-h-0 w-full"
     />

@@ -38,9 +38,10 @@ import { highlightRuns } from '../palette/fuzzy.js';
 import { createPreference, type KeyValueStorage, useMediaQuery, usePreference } from '../prefs.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { api } from '../settings/api.js';
+import { useServerStatus } from '../settings/useServerStatus.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
-import { recentCommands } from '../terminal/newTerminal.js';
+import { BOARD_TERMINALS_OFF, recentCommands, terminalHost } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { buttonClass } from '../ui/Button.js';
@@ -498,7 +499,9 @@ function LaunchSheet({
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const commandRef = useRef<HTMLInputElement>(null);
   const update = (patch: Partial<LaunchChoice>) => setChoice((c) => ({ ...c, ...patch }));
-  const blocker = launchBlocker(choice, prompt);
+  const status = useServerStatus(null, !editorOpen);
+  const host = terminalHost(editorOpen, status);
+  const blocker = launchBlocker(choice, prompt, host === 'none');
   const avatar = { name: entry.name, accent: accentIndexForProject(projectId) };
 
   const launch = async () => {
@@ -627,9 +630,11 @@ function LaunchSheet({
           icon={<SquareTerminal />}
           title="New terminal"
           description={
-            editorOpen || choice.editor
+            host === 'editor'
               ? 'Opens in the editor window'
-              : 'Opens in the project folder'
+              : host === 'board'
+                ? 'Runs on the board, in the project folder'
+                : BOARD_TERMINALS_OFF
           }
           checked={choice.terminal}
           onChange={(terminal) => {

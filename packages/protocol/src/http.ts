@@ -37,6 +37,15 @@ export const ServerStatus = z.object({
     .object({ path: z.string(), app: EditorApp, configured: z.boolean() })
     .nullable()
     .optional(),
+  /** Board-owned terminals (F19): `available` is false when node-pty didn't load (`reason`). */
+  boardTerminals: z
+    .object({
+      available: z.boolean(),
+      reason: z.string().nullable(),
+      live: z.number().int().nonnegative(),
+      max: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type ServerStatus = z.infer<typeof ServerStatus>;
 

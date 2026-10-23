@@ -104,6 +104,11 @@ describe('launch plan', () => {
     expect(launchBlocker({ ...none, claude: true }, ' ')).toBe('Tell Claude what to do');
     expect(launchBlocker({ ...none, claude: true }, 'Go')).toBeNull();
     expect(launchBlocker(DEFAULT_CHOICE, '')).toBeNull();
+    // Board terminals are off and no editor window has the folder.
+    expect(launchBlocker({ ...none, terminal: true }, '', true)).toBe(
+      'A terminal needs an editor window here',
+    );
+    expect(launchBlocker({ ...none, terminal: true }, '', false)).toBeNull();
   });
 
   it('summarizes the choice', () => {

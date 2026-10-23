@@ -15,6 +15,12 @@ function handleSignals(app: FastifyInstance): void {
           'They show as interrupted on the next start, with Resume.\n',
       );
     }
+    const terminals = app.ptyManager.liveCount;
+    if (terminals > 0) {
+      process.stderr.write(
+        `c-board: closing ${terminals} board terminal${terminals === 1 ? '' : 's'} and what runs in them.\n`,
+      );
+    }
     app.close().then(
       () => process.exit(0),
       (err: unknown) => {

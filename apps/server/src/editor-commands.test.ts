@@ -328,7 +328,29 @@ describe('editor commands', () => {
 
   it('opens a library project with the editor CLI, and refuses one outside the roots', async () => {
     const spawned: [string, string[]][] = [];
+    const ptys: { cwd: string; writes: string[]; sizes: [number, number][] }[] = [];
     app = await startServer(config, {
+      pty: {
+        load: async () => ({
+          ok: true,
+          spawn: (_file, _args, options) => {
+            const pty = {
+              cwd: options.cwd,
+              writes: [] as string[],
+              sizes: [] as [number, number][],
+            };
+            ptys.push(pty);
+            return {
+              pid: 4242,
+              onData: () => ({ dispose() {} }),
+              onExit: () => ({ dispose() {} }),
+              write: (data: string) => pty.writes.push(data),
+              resize: (cols: number, rows: number) => pty.sizes.push([cols, rows]),
+              kill: () => {},
+            };
+          },
+        }),
+      },
       token,
       dbPath: ':memory:',
       processes: false,
@@ -362,13 +384,17 @@ describe('editor commands', () => {
     expect((await client.next()).payload).toEqual({ id: 'o-2', ok: true, editor: 'Cursor' });
     expect(spawned).toEqual([['/usr/local/bin/cursor', ['/home/dev/recipe-box']]]);
 
-    // No window has it open yet, and board terminals (12.4) don't exist yet.
-    client.send('action', { kind: 'terminal.create', projectId }, 'o-3');
-    expect((await client.next()).payload).toEqual({
-      id: 'o-3',
-      ok: false,
-      error: ROUTE_ERRORS.noEditor,
-    });
+    // No window has it open yet: a board terminal (12.4) runs it, and takes raw keystrokes.
+    client.send('action', { kind: 'terminal.create', projectId, command: 'pnpm dev' }, 'o-3');
+    expect((await client.next()).payload).toEqual({ id: 'o-3', ok: true });
+    const board = Object.values(app.store.state.terminals).find((t) => t.origin === 'board');
+    expect(board).toMatchObject({ projectId, cwd: '/home/dev/recipe-box', shellPid: 4242 });
+    client.send('terminal.input', { terminalId: board?.id, data: '\x03' });
+    client.send('terminal.resize', { terminalId: board?.id, cols: 90, rows: 20 });
+    await waitFor(() => (ptys[0]?.sizes.length ?? 0) > 0);
+    expect(ptys).toEqual([
+      { cwd: '/home/dev/recipe-box', writes: ['pnpm dev\r', '\x03'], sizes: [[90, 20]] },
+    ]);
 
     app.settings['library.roots'] = [];
     client.send('action', { kind: 'project.openInEditor', projectId }, 'o-4');
@@ -378,6 +404,13 @@ describe('editor commands', () => {
       error: OUTSIDE_LIBRARY,
     });
     expect(spawned).toHaveLength(1);
+    client.send('action', { kind: 'terminal.create', projectId }, 'o-5');
+    expect((await client.next()).payload).toEqual({
+      id: 'o-5',
+      ok: false,
+      error: OUTSIDE_LIBRARY,
+    });
+    expect(ptys).toHaveLength(1);
   });
 
   it('answers routing errors without contacting an editor', async () => {

@@ -104,6 +104,9 @@ const ERRORS: Record<string, string> = {
   editor_not_found:
     'No Cursor or VS Code command line found. Install its shell command, or set its path in Settings',
   editor_launch_failed: 'The editor could not be started',
+  pty_unavailable: 'Board terminals are off: node-pty did not load (see c-board doctor)',
+  too_many_terminals: 'Already 16 board terminals running. End one first',
+  pty_spawn_failed: 'The shell could not be started',
 };
 
 /** A server error code as a sentence for a toast. */

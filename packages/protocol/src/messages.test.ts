@@ -134,6 +134,8 @@ const uiToServer: UiToServer[] = [
   env('approval.decide', { approvalId: approval.id, decision: 'allow' }),
   env('approval.decide', { approvalId: approval.id, decision: 'allowAlways' }),
   env('approval.decide', { approvalId: approval.id, decision: 'deny', reason: 'use pnpm' }),
+  env('terminal.input', { terminalId: 'board-1', data: 'ls\r' }),
+  env('terminal.resize', { terminalId: 'board-1', cols: 120, rows: 30 }),
 ] as UiToServer[];
 
 function unionTypes(schema: z.ZodDiscriminatedUnion): string[] {
@@ -174,6 +176,18 @@ describe('UI actions', () => {
     );
     const sampled = uiToServer.flatMap((m) => (m.type === 'action' ? [m.payload.kind] : []));
     expect(new Set(sampled)).toEqual(new Set(kinds));
+  });
+});
+
+describe('board terminal input', () => {
+  it('refuses empty input, oversized input and impossible sizes', () => {
+    const bad = [
+      env('terminal.input', { terminalId: 'board-1', data: '' }),
+      env('terminal.input', { terminalId: 'board-1', data: 'x'.repeat(64 * 1024 + 1) }),
+      env('terminal.resize', { terminalId: 'board-1', cols: 0, rows: 30 }),
+      env('terminal.resize', { terminalId: 'board-1', cols: 80, rows: 1.5 }),
+    ];
+    for (const message of bad) expect(decode(UiToServer, message).ok).toBe(false);
   });
 });
 

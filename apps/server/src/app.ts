@@ -22,6 +22,7 @@ import { TranscriptService, type TranscriptServiceOptions } from './claude/trans
 import type { ServerConfig } from './config.js';
 import { createDemoQuery } from './demo/demo-query.js';
 import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library.js';
+import { demoPty } from './demo/pty.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
@@ -37,6 +38,8 @@ import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import { createLaunchActions, createProjectActions } from './project-actions.js';
+import { loadNodePty } from './pty.js';
+import { PtyManager, type PtyManagerOptions } from './pty-manager.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
@@ -108,6 +111,8 @@ export interface BuildOptions {
   library?: LibrarySource;
   /** Editor CLI lookup and spawning, for tests (they never launch an editor). */
   editorCli?: Omit<EditorLauncherOptions, 'configured'>;
+  /** Board terminal tuning: tests inject the pty loader and shell. The demo uses a synthetic shell. */
+  pty?: Pick<PtyManagerOptions, 'load' | 'shell' | 'env' | 'max'>;
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -133,6 +138,7 @@ declare module 'fastify' {
     sessionLinker: SessionLinker | null;
     backgroundTracker: BackgroundTracker;
     gitScanner: GitScanner | null;
+    ptyManager: PtyManager;
   }
 }
 
@@ -184,6 +190,8 @@ export async function buildServer(
     persistence.setSetting(key, true);
   };
   app.addHook('onClose', async () => {
+    // Board terminals end with the server.
+    ptyManager.stopAll();
     demo?.stop();
     worst?.stop();
     processScanner?.stop();
@@ -301,6 +309,12 @@ export async function buildServer(
     configured: () => editorCliSetting(settings),
     ...options.editorCli,
   });
+  const ptyManager = new PtyManager({
+    store,
+    load: options.demo ? async () => demoPty() : loadNodePty,
+    ...options.pty,
+  });
+  app.decorate('ptyManager', ptyManager);
   const actions = options.actions ?? defaultActions();
   function defaultActions(): ActionHandlers {
     const roots = () => librarySettings(settings).libraryRoots;
@@ -309,6 +323,8 @@ export async function buildServer(
       send: editorGateway.sendCommand.bind(editorGateway),
     });
     const sessionActions = runner.actions();
+    const boardTerminal = ptyManager.createAction();
+    const demoTerminals = demo?.terminalActions();
     const handlers: ActionHandlers = {
       ...stubActionHandlers(),
       ...editorActions,
@@ -319,6 +335,7 @@ export async function buildServer(
         roots,
         router: editorRouter,
         editorTerminal: editorActions['terminal.create'],
+        boardTerminal,
         sessionCreate: sessionActions['session.create'],
       }),
       ...createProjectActions({
@@ -333,8 +350,17 @@ export async function buildServer(
           : {}),
       }),
       // Demo windows have no socket, so the simulator plays the editor's part.
-      ...demo?.terminalActions(),
       ...demo?.editorActions(),
+      // Board terminals take their own actions; the rest go to the editor (or the demo).
+      ...ptyManager.actions(demoTerminals ?? editorActions),
+      ...(demo && demoTerminals
+        ? {
+            'terminal.create': (action) =>
+              demo.hasWindow(action.projectId)
+                ? demoTerminals['terminal.create'](action)
+                : boardTerminal(action),
+          }
+        : {}),
     };
     return {
       ...handlers,
@@ -359,6 +385,10 @@ export async function buildServer(
       return demo && !result.ok ? demo.decideApproval(decision) : result;
     },
     sendToSession: runner.send.bind(runner),
+    boardTerminals: {
+      input: (terminalId, data) => ptyManager.input(terminalId, data),
+      resize: (terminalId, cols, rows) => ptyManager.resize(terminalId, cols, rows),
+    },
     recentActivity: () =>
       persistence.listActivity({
         since: Date.now() - HISTORY_WINDOW_MS,
@@ -440,6 +470,11 @@ export async function buildServer(
       setup: { hookSeen: seen(HOOK_SEEN_KEY), editorSeen: seen(EDITOR_SEEN_KEY) },
       watched: options.watched ?? false,
       boardSessions: runner.liveCount,
+      boardTerminals: {
+        ...(await ptyManager.availability()),
+        live: ptyManager.liveCount,
+        max: ptyManager.limit,
+      },
       ...(demo ? {} : { editorCli: await editorLauncher.find() }),
     };
   });

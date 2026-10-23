@@ -45,6 +45,11 @@ export interface UiGatewayOptions {
   decideApproval?: (decision: ApprovalDecision) => ActionResult | Promise<ActionResult>;
   /** Handles `session.send`. Defaults to `not_implemented`. */
   sendToSession?: (sessionId: string, text: string) => ActionResult | Promise<ActionResult>;
+  /** Keystrokes and size of a board terminal's xterm (F19). Fire and forget. */
+  boardTerminals?: {
+    input(terminalId: string, data: string): unknown;
+    resize(terminalId: string, cols: number, rows: number): unknown;
+  };
   /** The Pulse window's events (oldest first), sent to each client after its snapshot. */
   recentActivity?: () => ActivityEvent[];
   logger: FastifyBaseLogger;
@@ -73,6 +78,7 @@ export class UiGateway {
   private readonly decideApproval: NonNullable<UiGatewayOptions['decideApproval']>;
   private readonly sendToSession: NonNullable<UiGatewayOptions['sendToSession']>;
   private readonly recentActivity: () => ActivityEvent[];
+  private readonly boardTerminals: UiGatewayOptions['boardTerminals'];
   private readonly log: FastifyBaseLogger;
   private readonly patchIntervalMs: number;
   private readonly maxBufferedBytes: number;
@@ -93,6 +99,7 @@ export class UiGateway {
     this.sendToSession =
       options.sendToSession ?? (() => ({ ok: false, error: NOT_IMPLEMENTED }) as const);
     this.recentActivity = options.recentActivity ?? (() => []);
+    this.boardTerminals = options.boardTerminals;
     this.log = options.logger;
     this.patchIntervalMs = options.patchIntervalMs ?? PATCH_INTERVAL_MS;
     this.maxBufferedBytes = options.maxBufferedBytes ?? MAX_BUFFERED_BYTES;
@@ -194,6 +201,14 @@ export class UiGateway {
       case 'approval.decide': {
         const result = await settle(() => this.decideApproval(message.payload));
         this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
+        return;
+      }
+      case 'terminal.input':
+        this.boardTerminals?.input(message.payload.terminalId, message.payload.data);
+        return;
+      case 'terminal.resize': {
+        const { terminalId, cols, rows } = message.payload;
+        this.boardTerminals?.resize(terminalId, cols, rows);
         return;
       }
       case 'session.send': {

@@ -1,4 +1,4 @@
-import type { BoardState, Terminal } from '@c-board/protocol';
+import type { BoardState, ServerStatus, Terminal } from '@c-board/protocol';
 import { useSyncExternalStore } from 'react';
 
 /** Chips for the project's recent commands in the new-terminal popover. */
@@ -29,6 +29,26 @@ export function recentCommands(
   }
   return commands;
 }
+
+/** Where a new terminal opens: the project's editor window, a board terminal (F19), or nowhere. */
+export type TerminalHost = 'editor' | 'board' | 'none';
+
+/**
+ * An editor window with the project takes it; without one it is a board terminal, unless the
+ * server said node-pty didn't load. While the status is unknown the server gets to answer.
+ */
+export function terminalHost(
+  editorOpen: boolean,
+  status: Pick<ServerStatus, 'boardTerminals'> | null | 'error',
+): TerminalHost {
+  if (editorOpen) return 'editor';
+  if (status === null || status === 'error') return 'board';
+  return status.boardTerminals?.available === false ? 'none' : 'board';
+}
+
+/** Board terminals are off: why, for the new-terminal popover and the launch sheet. */
+export const BOARD_TERMINALS_OFF =
+  'Board terminals are off on this machine (node-pty did not load; see c-board doctor).';
 
 /** The terminal that showed up since `known` was taken: the newest open one not in it. */
 export function arrivedTerminal(

@@ -108,9 +108,15 @@ export function launchSteps(projectId: string, choice: LaunchChoice, prompt: str
 }
 
 /** Why the launch button is off, or null when it can go. */
-export function launchBlocker(choice: LaunchChoice, prompt: string): string | null {
+export function launchBlocker(
+  choice: LaunchChoice,
+  prompt: string,
+  /** No editor window has the folder and board terminals are off: a terminal has nowhere to run. */
+  terminalsOff = false,
+): string | null {
   if (!choice.editor && !choice.claude && !choice.terminal) return 'Pick something to start';
   if (choice.claude && prompt.trim() === '') return 'Tell Claude what to do';
+  if (choice.terminal && terminalsOff) return 'A terminal needs an editor window here';
   return null;
 }
 

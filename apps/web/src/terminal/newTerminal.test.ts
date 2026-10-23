@@ -1,7 +1,7 @@
 import type { BoardState, Execution } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
-import { arrivedTerminal, recentCommands } from './newTerminal.js';
+import { arrivedTerminal, recentCommands, terminalHost } from './newTerminal.js';
 
 const T0 = 1_760_000_000_000;
 
@@ -68,5 +68,26 @@ describe('arrivedTerminal', () => {
     const t3 = { id: 't-3', state: 'open' as const, createdAt: 3 };
     const t4 = { id: 't-4', state: 'open' as const, createdAt: 4 };
     expect(arrivedTerminal(known, [t1, t3, t4, closed])).toBe('t-4');
+  });
+});
+
+describe('terminalHost', () => {
+  const status = (available: boolean) => ({
+    boardTerminals: { available, reason: available ? null : 'no binary', live: 0, max: 16 },
+  });
+
+  it('prefers the editor window, else a board terminal', () => {
+    expect(terminalHost(true, status(false))).toBe('editor');
+    expect(terminalHost(false, status(true))).toBe('board');
+  });
+
+  it('has nowhere to open one when board terminals are off', () => {
+    expect(terminalHost(false, status(false))).toBe('none');
+  });
+
+  it('lets the server answer while the status is unknown', () => {
+    expect(terminalHost(false, null)).toBe('board');
+    expect(terminalHost(false, 'error')).toBe('board');
+    expect(terminalHost(false, {})).toBe('board');
   });
 });
