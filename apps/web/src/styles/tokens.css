@@ -104,6 +104,20 @@
   --dur-dim: 800ms;
   --dur-spark: 900ms;
   --dur-ambient: 1200ms;
+  /* Loop periods and rate ramps (`loop` in motion.ts). */
+  --dur-skeleton: 1600ms;
+  --dur-spin: 900ms;
+  --dur-progress: 1400ms;
+  --dur-shimmer: 2400ms;
+  --dur-caret: 1100ms;
+  --dur-listen: 2400ms;
+  --dur-breathe: 2400ms;
+  --dur-orb: 4000ms;
+  --dur-pulse: 1600ms;
+  --dur-comet: 2400ms;
+  --dur-ramp: 500ms;
+  --dur-fly: 300ms;
+  --dur-expand: 300ms;
 }
 
 [data-theme="light"] {

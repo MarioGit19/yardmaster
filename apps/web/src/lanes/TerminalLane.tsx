@@ -18,7 +18,7 @@ import {
   useBoardList,
   useBoardShallow,
 } from '../data/index.js';
-import { dur, ease, move, slide, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, loop, move, slide, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
@@ -47,7 +47,7 @@ const PEEK_DELAY_MS = 140;
 const COMET: RateLoopSpec = {
   // motion-still: only runs at Full; Reduced shows the static CSS glow.
   keyframes: [{ transform: 'translateX(-100%)' }, { transform: 'translateX(260%)' }],
-  durationMs: 2400,
+  durationMs: loop.comet * 1000,
   easing: 'linear',
   pseudoElement: '::after',
 };

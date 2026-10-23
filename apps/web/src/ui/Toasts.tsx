@@ -45,11 +45,12 @@ export function Toasts() {
   return (
     <Toaster
       theme={theme}
-      // Above the Pulse rail (AppShell publishes its height), so its newest events stay visible.
+      // Lifted above the Pulse rail by a transform in index.css (AppShell publishes its height as
+      // `--pulse-h`), so its newest events stay visible and a rail resize glides the toasts.
       position="bottom-right"
       gap={8}
-      offset={{ right: 16, bottom: 'calc(var(--pulse-h, 0px) + 16px)' }}
-      mobileOffset={{ left: 16, right: 16, bottom: 'calc(var(--pulse-h, 0px) + 16px)' }}
+      offset={{ right: 16, bottom: 16 }}
+      mobileOffset={{ left: 16, right: 16, bottom: 16 }}
       toastOptions={{
         unstyled: true,
         classNames: {

@@ -6,6 +6,7 @@ import {
   applyInitialMotion,
   dur,
   ease,
+  loop,
   moment,
   motionConfigFor,
   motionPreference,
@@ -162,9 +163,23 @@ function rawTimes(css: string): string[] {
   return leaks;
 }
 
+/**
+ * Raw periods on `infinite` loops. They take a `loop` token, except the crew sprites, whose
+ * frame-by-frame choreography keeps its own timings (like the effects in `fx/`).
+ */
+function rawLoops(css: string): string[] {
+  return [...css.matchAll(/\banimation:\s*([\w-]+)([^;]*\binfinite\b[^;]*);/g)]
+    .filter(
+      ([, name = '', rest = '']) =>
+        !name.startsWith('crew-') &&
+        /(?<![\w-])\d*\.?\d+m?s\b/.test(rest.replace(/var\([^)]*\)/g, '')),
+    )
+    .map(([line]) => line.trim());
+}
+
 describe('CSS motion tokens', () => {
-  it('mirror dur, moment and ease from motion.ts', () => {
-    for (const [name, seconds] of Object.entries({ ...dur, ...moment })) {
+  it('mirror dur, moment, loop and ease from motion.ts', () => {
+    for (const [name, seconds] of Object.entries({ ...dur, ...moment, ...loop })) {
       const value = cssVar(tokensCss, `dur-${name}`);
       expect(value, `--dur-${name}`).toBeDefined();
       expect(toSeconds(value ?? ''), `--dur-${name}`).toBeCloseTo(seconds, 6);
@@ -180,6 +195,16 @@ describe('CSS motion tokens', () => {
 
   it('leave no raw one-shot durations in the stylesheet', () => {
     expect(rawTimes(indexCss)).toEqual([]);
+  });
+
+  it('give every loop outside the crew sprites a token period', () => {
+    expect(rawLoops(indexCss)).toEqual([]);
+  });
+
+  it('flags a raw loop period', () => {
+    expect(rawLoops('a { animation: spin 0.9s linear infinite; }')).toHaveLength(1);
+    expect(rawLoops('a { animation: spin var(--dur-spin) linear infinite; }')).toEqual([]);
+    expect(rawLoops('a { animation: crew-hop 2s var(--ease-out) infinite; }')).toEqual([]);
   });
 
   it('flags a raw duration', () => {

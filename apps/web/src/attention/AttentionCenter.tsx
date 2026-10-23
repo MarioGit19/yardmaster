@@ -190,9 +190,15 @@ function SheetBody() {
         />
       </header>
       {count === 0 && cards.length === 0 ? (
-        <p className="px-5 py-8 text-center text-body-sm text-text-2">
+        // Fades in so it doesn't pop in the frame the last decided card leaves.
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: dur.base, ease: ease.out }}
+          className="px-5 py-8 text-center text-body-sm text-text-2"
+        >
           Nothing is waiting for you.
-        </p>
+        </motion.p>
       ) : (
         <div className="flex min-h-0 flex-col overflow-y-auto">
           {cards.length > 0 && (

@@ -21,7 +21,7 @@ import {
 import { useLocation } from 'wouter';
 import { type FrameHandle, frameScheduler } from '../anim/scheduler.js';
 import { useBoard, useBoardStore } from '../data/index.js';
-import { dur, ease, moment, move, useMotionLevel } from '../motion.js';
+import { dur, ease, loop, moment, move, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { resolveColor } from '../orb/colors.js';
 import { orbStateFor } from '../orb/model.js';
@@ -63,7 +63,7 @@ import {
 } from './prefs.js';
 
 /** How long a new dot takes to fly in from the right gutter. */
-const FLY_MS = 300;
+const FLY_MS = loop.fly * 1000;
 /** Only events this fresh fly in; older arrivals (a backfill, a late batch) just appear. */
 const FLY_MAX_AGE_MS = 10_000;
 /** New dots keep a soft halo that fades over this long. */

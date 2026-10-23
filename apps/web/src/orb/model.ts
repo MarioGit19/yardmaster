@@ -1,5 +1,5 @@
 import type { SessionStatus, ToolFamily } from '@c-board/protocol';
-import { moment } from '../motion.js';
+import { dur, loop, moment } from '../motion.js';
 
 /** The orb's visual states, DESIGN.md §4.2. */
 export const ORB_STATES = [
@@ -45,9 +45,9 @@ export type OrbEffect = 'ripple' | 'glitch' | 'sweep' | 'expand';
 /** Seconds. */
 export const EFFECT_DURATION: Record<OrbEffect, number> = {
   ripple: moment.ripple,
-  glitch: 0.12,
+  glitch: dur.fast,
   sweep: moment.sweep,
-  expand: 0.3,
+  expand: loop.expand,
 };
 
 export function enterEffect(previous: OrbState | null, next: OrbState): OrbEffect | null {

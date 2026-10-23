@@ -21,6 +21,29 @@ export const dur = { fast: 0.12, base: 0.22, slow: 0.42 } as const;
  */
 export const moment = { ripple: 0.9, sweep: 0.6, dim: 0.8, spark: 0.9, ambient: 1.2 } as const;
 
+/**
+ * Seconds. Loop periods (one cycle at rate 1), mirrored as `--dur-<name>`: the skeleton, progress
+ * and shimmer sweeps, the HUD spinner, the composer caret, onboarding's listening ring, a
+ * waiting pod's and an idle orb's breathing, a running dot's pulse, a lane's comet, and how long
+ * a looping rate change (`useRateLoop`) or a new Pulse dot's fly-in takes to land. `expand` is
+ * the orb easing back to size after compacting.
+ */
+export const loop = {
+  skeleton: 1.6,
+  spin: 0.9,
+  progress: 1.4,
+  shimmer: 2.4,
+  caret: 1.1,
+  listen: 2.4,
+  breathe: 2.4,
+  orb: 4,
+  pulse: 1.6,
+  comet: 2.4,
+  ramp: 0.5,
+  fly: 0.3,
+  expand: 0.3,
+} as const;
+
 export const ease = {
   out: [0.16, 1, 0.3, 1],
   inOut: [0.65, 0, 0.35, 1],

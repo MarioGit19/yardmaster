@@ -693,11 +693,12 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - **Verify:** `pnpm check && pnpm motion:record chrome`
   - Note: `@starting-style` doesn't fire on a class toggle (only on first style or after `display: none`), so the maximized column instead jumps over an always-mounted `.focus-col-cover` that fades in and out. Segmented thumbs share `ui/SegmentThumb.tsx`. New motion moments: `chrome-pulse-filter` and `focus-maximize`.
 
-- [ ] **10.8g Tokenise loop durations, and two seams from the sheets**
+- [x] **10.8g Tokenise loop durations, and two seams from the sheets**
   - Hand-typed loop and spinner lengths: `skeleton-sweep 1.6s`, `hud-spin 0.9s`, `progress-sweep 1.4s`, `shimmer-sweep 2.4s`, `caret-glow 1.1s`, `onboarding-listen 2.4s`, `pod-breathe 2.4s` (§3 rule 4's breathing), `anim/dotPulse.ts` 1600, `lanes/TerminalLane.tsx` 2400, `pulse/PulseRail.tsx` `FLY_MS = 300`, `anim/useRateLoop.ts` `RAMP_MS = 500`, `orb/model.ts` `glitch: 0.12` (= `dur.fast`) and `expand: 0.3`. Name them in `motion.ts` (a `loop` group) with their `--dur-*` mirror, and keep `motion.test.ts` checking that the two stay equal.
   - From the 10.8 contact sheets: `chrome-approval-allow`, where "Nothing is waiting for you." pops in after the last card leaves (fade it in at `dur.base`); and `chrome-pulse-collapse`, where the bottom-right toast jumps down in one frame when the rail shrinks (move the toast offset with a `dur.base` transform transition, or anchor it so the rail doesn't move it).
   - **Done when:** `grep` finds no literal loop durations outside `tokens.css`/`motion.ts` (fx internals excepted), and both seams read smoothly in a fresh `pnpm motion:record chrome`.
   - **Verify:** `pnpm check && pnpm motion:record chrome`
+  - Note: `loop` in motion.ts also holds the one-shot `fly` and `expand` and the `ramp`, so every hand-typed length has one home; `orb-breathe` (4 s) joined too. The crew sprites' CSS loops and `CrewMascot` timings stay literal, like fx internals; `motion.test.ts` now fails on a raw `infinite` period outside `crew-*`. The toast sits above the rail via a `translateY(-var(--pulse-h))` transform (still at Reduced/Off) instead of Sonner's `bottom` offset.
 
 - [ ] **10.10 Pointer cursor on everything clickable**
   - Maintainer feedback: some clickable elements show the default arrow, so it isn't clear they can be clicked. Tailwind 4's preflight sets `cursor: default` on `button`, so every hand-rolled pressable that doesn't add `cursor-pointer` itself looks inert.

@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useRef } from 'react';
+import { loop } from '../motion.js';
 import { approach } from '../pod/activity.js';
 import { type FrameHandle, frameScheduler, type Scheduler } from './scheduler.js';
 
@@ -12,7 +13,7 @@ export interface RateLoopSpec {
 }
 
 /** Rate changes ease in over about this long, like the pod border light. */
-const RAMP_MS = 500;
+const RAMP_MS = loop.ramp * 1000;
 const SETTLED = 0.005;
 
 /**

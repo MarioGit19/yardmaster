@@ -1,4 +1,4 @@
-import { ease } from '../motion.js';
+import { ease, loop } from '../motion.js';
 import type { RateLoopSpec } from './useRateLoop.js';
 
 /**
@@ -12,7 +12,7 @@ export const DOT_PULSE: RateLoopSpec = {
     // motion-still: as above.
     { transform: 'scale(2.8)', opacity: 0 },
   ],
-  durationMs: 1600,
+  durationMs: loop.pulse * 1000,
   easing: `cubic-bezier(${ease.out.join(', ')})`,
   pseudoElement: '::after',
 };
