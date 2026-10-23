@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { type Browser, type BrowserContextOptions, chromium, type Page } from '@playwright/test';
 import { startBoard } from '../board.js';
-import { signedInState } from '../fixtures.js';
+import { disableWebgl, signedInState } from '../fixtures.js';
 
 const run = promisify(execFile);
 const OUT_DIR = fileURLToPath(new URL('../../artifacts/motion/', import.meta.url));
@@ -278,9 +278,13 @@ const SCENARIOS = {
     );
   },
 
-  /** 11.5: the Grid's 2D map: packets on the pipelines, a burst, and the flat cockpit. */
+  /**
+   * 11.5: the Grid's 2D map: packets on the pipelines, a burst, and the flat cockpit. Without
+   * WebGL, so Full motion shows the map rather than the 3D network (`grid3d`).
+   */
   async grid(r: Recorder) {
     const { page } = r;
+    await disableWebgl(page);
     await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
     await openOverview(page);
     await page.locator('[data-grid-map]').waitFor();
@@ -319,6 +323,89 @@ const SCENARIOS = {
       async () => {
         await page.keyboard.press('Escape');
         await page.locator('[data-grid-map]').waitFor();
+        await page.waitForTimeout(700);
+      },
+    );
+  },
+
+  /** 11.6: the Grid's 3D network: the idle orbit, packets, drag, double-click reset, zoom. */
+  async grid3d(r: Recorder) {
+    const { page } = r;
+    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+    await openOverview(page);
+    const stage = page.locator('[data-grid-3d][data-ready]');
+    const ready = await stage.waitFor({ timeout: 15_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (!ready) {
+      console.warn('motion:record: no 3D Grid (no WebGL, or Reduced); recording the map instead');
+      await r.moment('activity', 'activity', '8 s of the 2D map', hold(page, 8000));
+      return;
+    }
+    await page.waitForTimeout(1500);
+    await r.moment(
+      'activity',
+      'activity',
+      '8 s of the network: the idle orbit drifts, packets flow out to busy nodes',
+      hold(page, 8000),
+    );
+    await r.moment(
+      'packets',
+      'transition',
+      '2 s at 12 fps: packets travel the curved pipelines, faster on busier ones',
+      hold(page, 2000),
+    );
+    const box = await stage.boundingBox();
+    if (!box) return;
+    // The floor's front corner: clear of labels and monoliths.
+    const at = { x: box.x + 70, y: box.y + box.height - 40 };
+    await r.moment(
+      'drag',
+      'transition',
+      'drag on the floor: the camera turns round the ring and stops with the pointer',
+      async () => {
+        await page.mouse.move(at.x, at.y);
+        await page.mouse.down();
+        await page.mouse.move(at.x + 320, at.y - 30, { steps: 24 });
+        await page.mouse.up();
+        await page.waitForTimeout(400);
+      },
+    );
+    await r.moment(
+      'reset',
+      'transition',
+      'double-click: the camera eases home (700 ms)',
+      async () => {
+        await page.mouse.dblclick(at.x, at.y);
+        await page.waitForTimeout(1000);
+      },
+    );
+    await r.moment(
+      'zoom',
+      'transition',
+      'scroll in, then out: the zoom stops at its clamps',
+      async () => {
+        for (let i = 0; i < 8; i++) {
+          await page.mouse.wheel(0, -160);
+          await page.waitForTimeout(40);
+        }
+        for (let i = 0; i < 14; i++) {
+          await page.mouse.wheel(0, 200);
+          await page.waitForTimeout(40);
+        }
+        await page.waitForTimeout(300);
+      },
+    );
+    await r.moment(
+      'hover',
+      'transition',
+      'hover a label: its pipeline and edges brighten, the counts tip shows',
+      async () => {
+        await page
+          .locator('[data-grid-node]')
+          .first()
+          .hover({ position: { x: 100, y: 10 } });
         await page.waitForTimeout(700);
       },
     );

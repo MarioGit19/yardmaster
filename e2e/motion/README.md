@@ -11,7 +11,8 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `layouts`  | `switch` (⌥2 Minimal → Office → ⌥1 cross-fade), `inspector` (a crew opens the Actor inspector, Esc closes it) |
 | `office`   | `activity` (8 s of the building), `walk` (a character crosses to its new station, when the demo gets there), `name-tag` (hover a character) |
 | `room`     | `enter` (click a room: the Office camera zooms in), `workspace` (Open workspace cross-fades to the focus view, Esc back), `leave` (Esc zooms out) |
-| `grid`     | `activity` (8 s of the network), `packets` (2 s at 12 fps), `burst` (an event's three-packet burst), `enter` (a node cross-fades to its flat cockpit), `leave` (Esc back) |
+| `grid`     | Without WebGL (the 2D map): `activity` (8 s of the network), `packets` (2 s at 12 fps), `burst` (an event's three-packet burst), `enter` (a node cross-fades to its flat cockpit), `leave` (Esc back) |
+| `grid3d`   | `activity` (8 s of the 3D network and its idle orbit), `packets` (2 s at 12 fps), `drag` (turn the camera), `reset` (double-click home), `zoom` (wheel in and out to the clamps), `hover` (a label lights its pipeline) |
 | `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |

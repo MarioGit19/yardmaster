@@ -2543,6 +2543,88 @@ main[data-office-zoom] {
   }
 }
 
+/* The 3D network (§10.4): each label is a card the renderer floats above its monolith (its
+   anchor is the card's bottom center), the far side of the ring a little faded. The node's
+   satellite buttons ride over the 3D satellites: a ring on hover or focus, the 3D shape inside. */
+.grid-stage {
+  touch-action: none;
+}
+.grid-float {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+  /* Off stage until the renderer places it, on its first frame. */
+  transform: translate3d(-9999px, 0, 0);
+}
+/* A label lifted clear of a nearer one hangs on a stem down to its monolith. */
+.grid-float::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: var(--stem, 0px);
+  background: color-mix(in srgb, var(--grid-neon) 35%, transparent);
+  opacity: var(--grid-depth, 1);
+}
+.grid-node[data-variant="float"] {
+  position: absolute;
+  left: -100px;
+  bottom: 0;
+  width: 200px;
+  padding: 10px 12px;
+  pointer-events: auto;
+  opacity: var(--grid-depth, 1);
+}
+.grid-float[data-hot] .grid-node,
+.grid-node[data-variant="float"]:is(:hover, :focus-within) {
+  border-color: color-mix(in srgb, var(--grid-neon) 45%, transparent);
+  opacity: 1;
+}
+.grid-node[data-variant="float"] .grid-satellites {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+.grid-node[data-variant="float"] .grid-satellite-slot {
+  position: absolute;
+  top: -11px;
+  left: -11px;
+  will-change: transform;
+}
+.grid-node[data-variant="float"] .grid-satellite-slot::before {
+  content: none;
+}
+.grid-node[data-variant="float"] .grid-satellite {
+  border-radius: 9999px;
+}
+.grid-node[data-variant="float"] .grid-satellite-mark {
+  opacity: 0;
+}
+.grid-node[data-variant="float"] .grid-satellite:is(:hover, :focus-visible, [data-state="open"]) {
+  background: none;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--grid-neon) 70%, transparent);
+}
+.grid-node[data-variant="float"] .grid-more {
+  border: 1px solid color-mix(in srgb, var(--grid-neon) 30%, transparent);
+  border-radius: var(--radius-chip);
+  background: var(--grid-panel);
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .grid-node[data-variant="float"] .grid-satellite-slot {
+    top: -22px;
+    left: -22px;
+  }
+}
+
 /* The flat cockpit: glass screens with a neon hairline. */
 .grid-screen {
   border: 1px solid color-mix(in srgb, var(--grid-neon) 22%, transparent);

@@ -1,11 +1,20 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
 import { SCENE_TICK_MS, useSceneModel } from '../layouts/useScene.js';
-import { dur, ease } from '../motion.js';
+import { dur, ease, useMotionLevel } from '../motion.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { FlatCockpit } from './FlatCockpit.js';
 import { GridMap } from './GridMap.js';
@@ -17,12 +26,16 @@ const HISTORY_KEY = 'cboardGridNode';
 
 const fade = { duration: dur.slow, ease: ease.inOut };
 
+/** The 3D network and `three` arrive in their own chunk, only when the 3D view is shown. */
+const Grid3D = lazy(() => import('./Grid3D.js'));
+
 /**
- * DESIGN.md §10.4: the board as a neon network. This is the flat version (the 2D map): a ring
- * of nodes around the core with packets on straight pipelines, or one trunk on a phone. Enter on
- * a node (or a click) cross-fades to its flat cockpit; Esc, the Back button or the browser's
- * back step out again and focus lands back on the node. The Grid draws its own floor, so the
- * ambient field steps out while it's shown.
+ * DESIGN.md §10.4: the board as a neon network. At Full motion with WebGL it's the 3D network
+ * (`Grid3D`); at Reduced or Off, without WebGL, or when its context is lost it's the 2D map, a
+ * ring of nodes around the core with packets on straight pipelines, and on a phone one trunk.
+ * Enter on a node (or a click) cross-fades to its flat cockpit; Esc, the Back button or the
+ * browser's back step out again and focus lands back on the node. The Grid draws its own floor,
+ * so the ambient field steps out while it's shown.
  */
 export default function GridLayout() {
   useOwnBackdrop();
@@ -32,6 +45,9 @@ export default function GridLayout() {
   const [width, setWidth] = useState(0);
   const [nodeId, setNodeId] = useState<string | null>(null);
   const offstage = useContext(OffstageContext);
+  const level = useMotionLevel();
+  const [webglLost, setWebglLost] = useState(false);
+  const onWebglLost = useCallback(() => setWebglLost(true), []);
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -44,6 +60,7 @@ export default function GridLayout() {
   }, []);
 
   const narrow = width > 0 && width < TRUNK_BELOW;
+  const deep = !narrow && level === 'full' && !webglLost;
   const entered = nodeId ? scene.projects.find((p) => p.id === nodeId) : undefined;
 
   // A node whose project left the board closes its cockpit.
@@ -104,11 +121,11 @@ export default function GridLayout() {
 
   return (
     <>
-      <GridFloor />
+      <GridFloor flat={!deep} />
       <div
         ref={ref}
         data-grid
-        data-grid-view={entered ? 'cockpit' : narrow ? 'trunk' : 'map'}
+        data-grid-view={entered ? 'cockpit' : narrow ? 'trunk' : deep ? '3d' : 'map'}
         data-grid-entered={entered?.id}
         data-paused={offstage || undefined}
         className="grid-world relative w-full"
@@ -139,6 +156,10 @@ export default function GridLayout() {
                   </p>
                 ) : narrow ? (
                   <GridTrunk projects={scene.projects} onEnter={enter} />
+                ) : deep ? (
+                  <Suspense fallback={null}>
+                    <Grid3D projects={scene.projects} onEnter={enter} onLost={onWebglLost} />
+                  </Suspense>
                 ) : (
                   <GridMap projects={scene.projects} width={width} onEnter={enter} />
                 )}
@@ -160,12 +181,19 @@ function focusNode(id: string) {
   );
 }
 
-/** The floor behind the network: a faint grid fading into fog, with scanlines. Still. */
-function GridFloor() {
+/**
+ * The ground behind the network: near-black with the fog's glow, plus (for the flat views) a
+ * faint grid and scanlines. The 3D view draws its own perspective floor and scanlines over it.
+ */
+function GridFloor({ flat }: { flat: boolean }) {
   return (
-    <div aria-hidden data-grid-floor className="grid-floor pointer-events-none fixed inset-0 -z-10">
-      <div className="grid-floor-lines absolute inset-0" />
-      <div className="grid-floor-scan absolute inset-0" />
+    <div
+      aria-hidden
+      data-grid-floor={flat ? 'flat' : '3d'}
+      className="grid-floor pointer-events-none fixed inset-0 -z-10"
+    >
+      {flat && <div className="grid-floor-lines absolute inset-0" />}
+      {flat && <div className="grid-floor-scan absolute inset-0" />}
     </div>
   );
 }

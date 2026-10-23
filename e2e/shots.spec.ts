@@ -1,5 +1,12 @@
 import type { WebSocketRoute } from '@playwright/test';
-import { expect, firstProjectRoute, openRoute, type Theme, test } from './fixtures.js';
+import {
+  disableWebgl,
+  expect,
+  firstProjectRoute,
+  openRoute,
+  type Theme,
+  test,
+} from './fixtures.js';
 import { openLongTranscript } from './messages.js';
 
 const VIEWPORTS = [
@@ -1238,7 +1245,7 @@ test.describe('layouts', () => {
       }
 
       // 11.5: the Grid's 2D map (a trunk on a phone), at rest and under demo activity, and the
-      // flat cockpit of a node.
+      // flat cockpit of a node. Without WebGL, so the wide views show the map, not the 3D network.
       for (const viewport of [
         { width: 1440, height: 900 },
         { width: 1920, height: 1080 },
@@ -1246,6 +1253,7 @@ test.describe('layouts', () => {
       ]) {
         test(`grid ${viewport.width}`, async ({ page }) => {
           test.slow();
+          await disableWebgl(page);
           await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
@@ -1270,6 +1278,41 @@ test.describe('layouts', () => {
           await expect(page.locator('[data-grid-cockpit]')).toBeVisible();
           await page.waitForTimeout(900);
           await shot('cockpit');
+        });
+      }
+
+      // 11.6: the Grid's 3D network, at rest and under demo activity, and with a node hovered.
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
+      ]) {
+        test(`grid 3d ${viewport.width}`, async ({ page }) => {
+          test.slow();
+          await page.addInitScript(() => {
+            localStorage.setItem('cboard.layout', 'grid');
+            localStorage.setItem('cboard.motion', 'full');
+          });
+          await page.setViewportSize(viewport);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+          await page.waitForTimeout(1500);
+          const shot = (moment: string) =>
+            page.screenshot({
+              path: new URL(`layout-grid3d-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                .pathname,
+            });
+          await shot('rest');
+          await expect(page.locator('[data-grid-node][data-tone="wait"]').first()).toBeVisible({
+            timeout: 30_000,
+          });
+          await page.waitForTimeout(1200);
+          await shot('active');
+          await page
+            .locator('[data-grid-node]')
+            .first()
+            .hover({ position: { x: 100, y: 10 } });
+          await page.waitForTimeout(500);
+          await shot('hover');
         });
       }
     });

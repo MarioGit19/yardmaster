@@ -122,6 +122,23 @@ for (const ambient of ['veil', 'aurora'] as const) {
   });
 }
 
+// 11.6: the Grid's 3D network (one WebGL context, instanced packets, projected labels).
+test('@perf the Grid 3D network keeps 55 fps under the stress load', async ({ page }) => {
+  test.slow();
+  await fullMotion(page);
+  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.goto('/#/');
+  await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+  await expect(page.locator('[data-grid-label]')).toHaveCount(10);
+  await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
+  await page.waitForTimeout(3_000);
+
+  const stats = await measure(page, SAMPLE_MS);
+  report('grid 3d', stats);
+  expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+  expect(stats.longTasks).toEqual([]);
+});
+
 test('@perf overview main-thread time under the stress load', async ({ page }) => {
   test.slow();
   await fullMotion(page);

@@ -1,6 +1,6 @@
 import type { Browser, BrowserContextOptions, Page } from '@playwright/test';
 import { startDemoBoard } from './board.js';
-import { expect, openRoute, signedInState, test } from './fixtures.js';
+import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -58,10 +58,14 @@ test('a terminal deep link opens the focus view on that terminal', async ({ page
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 });
 
-/** A demo board of the test's own: these tests stop terminals and decide requests. */
+/**
+ * A demo board of the test's own: these tests stop terminals and decide requests. `init` runs
+ * on the page before it first loads.
+ */
 async function openBoard(
   browser: Browser,
   options: BrowserContextOptions = { viewport: { width: 1440, height: 900 } },
+  init?: (page: Page) => Promise<void>,
 ): Promise<{ page: Page; stop(): Promise<void> }> {
   const board = await startDemoBoard();
   const context = await browser.newContext({
@@ -75,6 +79,7 @@ async function openBoard(
   };
   try {
     const page = await context.newPage();
+    await init?.(page);
     await openRoute(page, '/');
     return { page, stop };
   } catch (err) {
@@ -470,10 +475,11 @@ async function gridCues(page: Page) {
 /** Packets in flight per activity step, as `packetFlow` in grid/map.ts. */
 const PACKETS = ['0', '1', '2', '3'];
 
+// Without WebGL: at Full motion a desktop otherwise shows the 3D network (below).
 test.describe('the Grid map', () => {
   test('shows the same amber and rose cues as Minimal, on its own floor', async ({ browser }) => {
     test.slow();
-    const { page, stop } = await openBoard(browser);
+    const { page, stop } = await openBoard(browser, undefined, disableWebgl);
     try {
       await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
         timeout: 30_000,
@@ -515,7 +521,7 @@ test.describe('the Grid map', () => {
 
   test('packets follow activity, and nothing flashes faster than 3 Hz', async ({ browser }) => {
     test.slow();
-    const { page, stop } = await openBoard(browser);
+    const { page, stop } = await openBoard(browser, undefined, disableWebgl);
     try {
       await page.keyboard.press('Alt+Digit3');
       await expect(page.locator('[data-grid-map]')).toBeVisible();
@@ -563,7 +569,7 @@ test.describe('the Grid map', () => {
   test('a satellite opens the inspector; a node opens its cockpit and Esc steps back', async ({
     browser,
   }) => {
-    const { page, stop } = await openBoard(browser);
+    const { page, stop } = await openBoard(browser, undefined, disableWebgl);
     try {
       await page.keyboard.press('Alt+Digit3');
       const grid = page.locator('[data-grid]');
@@ -705,6 +711,199 @@ test.describe('the Grid map', () => {
       await page.locator('[data-cockpit-back]').tap();
       await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
       await expect(grid).toHaveAttribute('data-grid-view', 'trunk');
+    } finally {
+      await stop();
+    }
+  });
+});
+
+interface GridCamera {
+  azimuth: number;
+  polar: number;
+  distance: number;
+  home: number;
+}
+
+/** The 3D Grid's camera orbit, from the renderer's test hook on its stage. */
+const camera = (page: Page) =>
+  page
+    .locator('[data-grid-3d]')
+    .evaluate((el) => (el as unknown as { gridCamera(): GridCamera }).gridCamera());
+
+test.describe('the Grid 3D network', () => {
+  test('draws the network in one WebGL context, with the same cues as Minimal', async ({
+    browser,
+  }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await expect(page.locator('[data-pod][data-tone="wait"]').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect
+        .poll(
+          async () => {
+            await page.keyboard.press('Alt+Digit1');
+            await expect(layout(page)).toHaveAttribute('data-layout', 'minimal');
+            await expect(page.locator('main [data-layout="grid"]')).toHaveCount(0);
+            const minimal = await cues(page, false);
+            await page.keyboard.press('Alt+Digit3');
+            await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+            await expect(page.locator('main [data-layout="minimal"]')).toHaveCount(0);
+            const grid = await gridCues(page);
+            return minimal.wait === grid.wait && minimal.err === grid.err && minimal.wait > 0;
+          },
+          { timeout: 40_000, intervals: [500] },
+        )
+        .toBe(true);
+      await expect(page.locator('[data-grid]')).toHaveAttribute('data-grid-view', '3d');
+      // One canvas, and the ambient field is gone: one WebGL context at a time.
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
+      await expect(page.locator('[data-ambient]')).toHaveCount(0);
+      await expect(page.locator('[data-grid-floor]')).toHaveAttribute('data-grid-floor', '3d');
+      // Every project has its label floating on screen, as crisp DOM text.
+      const projects = await page.locator('a[href^="#/p/"]').count();
+      await expect(page.locator('[data-grid-label] [data-grid-node]')).toHaveCount(projects);
+      const stage = await page.locator('[data-grid-3d]').boundingBox();
+      for (const label of await page.locator('[data-grid-label] [data-grid-node]').all()) {
+        const box = await label.boundingBox();
+        expect(box && stage && box.x >= stage.x - 1 && box.y >= stage.y - 1).toBe(true);
+      }
+    } finally {
+      await stop();
+    }
+  });
+
+  test('the camera drifts, stops under the pointer, turns on a drag and resets', async ({
+    browser,
+  }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      const stage = page.locator('[data-grid-3d][data-ready]');
+      await expect(stage).toBeVisible();
+      await page.mouse.move(5, 5);
+      // The idle orbit: about a revolution per three minutes.
+      const start = await camera(page);
+      await page.waitForTimeout(1_500);
+      const drifted = (await camera(page)).azimuth - start.azimuth;
+      expect(drifted).toBeGreaterThan(0.02);
+      expect(drifted).toBeLessThan(0.15);
+
+      // The pointer over the scene holds the camera still.
+      const box = await stage.boundingBox();
+      if (!box) throw new Error('no stage');
+      const floor = { x: box.x + 60, y: box.y + box.height - 30 };
+      await page.mouse.move(floor.x, floor.y);
+      const held = await camera(page);
+      await page.waitForTimeout(1_000);
+      expect((await camera(page)).azimuth).toBe(held.azimuth);
+
+      // A drag turns it (and tilts it, within limits); a double-click eases it home.
+      await page.mouse.down();
+      await page.mouse.move(floor.x + 300, floor.y - 400, { steps: 12 });
+      await page.mouse.up();
+      const turned = await camera(page);
+      expect(Math.abs(turned.azimuth - held.azimuth)).toBeGreaterThan(1);
+      expect(turned.polar).toBeGreaterThan(0.5);
+      expect(turned.polar).toBeLessThan(1.4);
+      await page.mouse.dblclick(floor.x, floor.y);
+      await expect.poll(async () => (await camera(page)).azimuth).toBeCloseTo(0, 3);
+      const home = await camera(page);
+      expect(home.distance).toBeCloseTo(home.home, 3);
+
+      // The wheel zooms within its clamps, and the page itself doesn't scroll.
+      for (let i = 0; i < 20; i++) await page.mouse.wheel(0, 400);
+      await expect
+        .poll(async () => {
+          const { distance, home } = await camera(page);
+          return distance / home;
+        })
+        .toBeCloseTo(1.6, 3);
+      for (let i = 0; i < 30; i++) await page.mouse.wheel(0, -400);
+      await expect
+        .poll(async () => {
+          const { distance, home } = await camera(page);
+          return distance / home;
+        })
+        .toBeCloseTo(0.55, 3);
+      expect(await page.locator('main').evaluate((el) => el.scrollTop)).toBe(0);
+    } finally {
+      await stop();
+    }
+  });
+
+  test('a satellite opens the inspector; a label opens its cockpit and Esc comes back', async ({
+    browser,
+  }) => {
+    test.slow();
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      const grid = page.locator('[data-grid]');
+      await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+      const any = page
+        .locator('[data-grid-node]', { has: page.locator('[data-scene-actor^="t:"]') })
+        .first();
+      const nodeId = await any.getAttribute('data-grid-node');
+      const node = page.locator(`[data-grid-node="${nodeId}"]`);
+      // Hold the camera still so the satellites hold still too.
+      await page.mouse.move(400, 500);
+
+      // The satellite's button rides over its 3D satellite: a click opens the inspector.
+      const satellite = node.locator('[data-scene-actor^="t:"]').first();
+      await satellite.click();
+      const inspector = page.locator('[data-actor-inspector]');
+      await expect(inspector.locator('[data-actor]')).toContainText('Terminal ·');
+      await page.keyboard.press('Escape');
+      await expect(inspector).toHaveCount(0);
+      await expect(satellite).toBeFocused();
+
+      // Keyboard: Esc back to the node, Enter opens the cockpit, Esc returns to the network.
+      await page.keyboard.press('Escape');
+      await expect(node).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+      await expect(page.locator(`[data-grid-cockpit="${nodeId}"]`)).toBeVisible();
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(grid).toHaveAttribute('data-grid-view', '3d');
+      await expect(page.locator(`[data-grid-node="${nodeId}"]`)).toBeFocused();
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(1);
+
+      // A click on the label opens it too.
+      await page.locator(`[data-grid-node="${nodeId}"]`).click({ position: { x: 100, y: 10 } });
+      await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
+    } finally {
+      await stop();
+    }
+  });
+
+  test('without WebGL the Grid shows the 2D map', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser, undefined, disableWebgl);
+    try {
+      await page.keyboard.press('Alt+Digit3');
+      await expect(page.locator('[data-grid]')).toHaveAttribute('data-grid-view', 'map');
+      await expect(page.locator('[data-grid-map]')).toBeVisible();
+      await expect(page.locator('[data-grid-map] [data-grid-pipe]').first()).toBeAttached();
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(0);
+      await expect(page.locator('[data-grid-floor]')).toHaveAttribute('data-grid-floor', 'flat');
+    } finally {
+      await stop();
+    }
+  });
+
+  test('at Reduced the Grid shows the 2D map', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.evaluate(() => {
+        localStorage.setItem('cboard.layout', 'grid');
+        localStorage.setItem('cboard.motion', 'reduced');
+      });
+      await page.reload();
+      await expect(page.locator('[data-grid-map]')).toBeVisible();
+      await expect(page.locator('canvas[data-grid-canvas]')).toHaveCount(0);
     } finally {
       await stop();
     }

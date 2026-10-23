@@ -56,3 +56,15 @@ export async function firstProjectRoute(page: Page): Promise<string> {
   if (!href) throw new Error('no project in the rail');
   return href.slice(1);
 }
+
+/** Every canvas refuses WebGL from the page's first script on, as a browser without it would. */
+export async function disableWebgl(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args) {
+      return String(args[0]).includes('webgl')
+        ? null
+        : (getContext.apply(this, args as Parameters<typeof getContext>) as never);
+    } as typeof getContext;
+  });
+}

@@ -9,11 +9,16 @@ import { toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { HEX_R, MAX_SATELLITES, nodeCaption, nodeCounts } from './map.js';
+import { shownSatellites } from './network.js';
 
 export interface GridNodeProps {
   project: SceneProject;
-  /** `map`: a fixed card on the ring; `trunk`: a full-width row on the phone's trunk. */
-  variant: 'map' | 'trunk';
+  /**
+   * `map`: a fixed card on the ring; `trunk`: a full-width row on the phone's trunk; `float`: a
+   * label over its 3D monolith, its satellite buttons placed over the 3D satellites by the
+   * renderer.
+   */
+  variant: 'map' | 'trunk' | 'float';
   style?: CSSProperties;
   /** A click on the node (not on a satellite) or Enter on it: the cockpit. */
   onEnter(): void;
@@ -29,7 +34,9 @@ export interface GridNodeProps {
 export function GridNode({ project, variant, style, onEnter, onHover }: GridNodeProps) {
   const caption = nodeCaption(project);
   const counts = nodeCounts(project.actors);
-  const shown = project.actors.slice(0, MAX_SATELLITES);
+  // Floating over the 3D network, each button rides its satellite: they keep a stable order.
+  const shown =
+    variant === 'float' ? shownSatellites(project.actors) : project.actors.slice(0, MAX_SATELLITES);
   const hidden = project.actors.length - shown.length;
   const branch = project.branch
     ? `${project.branch}${project.dirty > 0 ? ` ±${project.dirty}` : ''}`
@@ -103,20 +110,20 @@ export function GridNode({ project, variant, style, onEnter, onHover }: GridNode
       }
       className={cx(
         'grid-node cursor-pointer outline-none',
-        variant === 'map' ? 'absolute' : 'relative',
+        variant === 'map' ? 'absolute' : variant === 'trunk' ? 'relative' : undefined,
       )}
       style={{ '--accent': `var(--accent-${project.accent})`, ...style } as CSSProperties}
     >
       {project.tone === 'wait' && variant === 'map' && (
         <span aria-hidden data-grid-beacon className="grid-beacon" />
       )}
-      {variant === 'map' && (
+      {variant !== 'trunk' && (
         <span aria-hidden data-grid-tip className="grid-tip font-mono text-meta tabular">
           {counts}
         </span>
       )}
       <div className="flex min-w-0 items-start gap-2.5">
-        <Hex project={project} />
+        {variant !== 'float' && <Hex project={project} />}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
           <h2 className="flex min-w-0 items-center gap-2">
             <span
@@ -147,12 +154,17 @@ export function GridNode({ project, variant, style, onEnter, onHover }: GridNode
       {project.actors.length > 0 && (
         <ul aria-label={`${project.name} actors`} className="grid-satellites">
           {shown.map((actor) => (
-            <li key={actor.id} className="grid-satellite-slot" data-kind={actor.kind}>
+            <li
+              key={actor.id}
+              className="grid-satellite-slot"
+              data-kind={actor.kind}
+              data-grid-slot={actor.id}
+            >
               <Satellite actor={actor} projectName={project.name} />
             </li>
           ))}
           {hidden > 0 && (
-            <li className="grid-satellite-slot" data-kind="more">
+            <li className="grid-satellite-slot" data-kind="more" data-grid-slot-more>
               <span
                 role="img"
                 aria-label={`${hidden} more in ${project.name}`}
