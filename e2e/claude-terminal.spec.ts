@@ -24,6 +24,10 @@ async function claudeTab(stack: Locator) {
 }
 
 test.describe('Claude terminals', () => {
+  // In order, in one worker: two tests reply to the same demo session, and one TUI takes one
+  // prompt at a time.
+  test.describe.configure({ mode: 'default' });
+
   // The WebGL renderer draws text into a canvas; the DOM fallback keeps it readable here.
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -39,39 +43,106 @@ test.describe('Claude terminals', () => {
   test.describe('desktop', () => {
     test.use({ viewport: { width: 1440, height: 900 } });
 
-    test('the tab and the session row select the same session; raw on demand', async ({ page }) => {
+    test('the tab shows the chat in the stack, the session row in the Claude column; raw on demand', async ({
+      page,
+    }) => {
+      // The reply waits for the demo session to be at its prompt (see the phone test).
+      test.setTimeout(300_000);
       const stack = await openProject(page);
       const { tab, sessionId } = await claudeTab(stack);
       await expect(tab).toHaveAccessibleName(/^claude, Claude, /);
 
+      // The Claude column on something else: a new session's composer.
+      await page.locator('[data-new-session]').click();
+      const column = page.locator('[data-new-session-panel]');
+      await expect(column).toBeVisible();
+      const url = page.url();
+
+      // Picking the Claude terminal only changes the stack: its chat shows there, compact.
       await tab.click();
-      await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));
       await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(page.locator(`[data-session-panel="${sessionId}"]`)).toBeVisible();
-      await expect(page.locator(`a[data-session="${sessionId}"]`)).toHaveAttribute(
+      const chat = stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`);
+      await expect(chat).toBeVisible();
+      await expect(chat).toHaveAttribute('data-density', 'compact');
+      expect(page.url()).toBe(url);
+      await expect(column).toBeVisible();
+      await expect(page.locator(`a[data-session="${sessionId}"]`)).not.toHaveAttribute(
         'aria-current',
         'page',
       );
-      // The Claude column shows the chat already: the pane points to it.
-      await expect(stack.locator(`[data-chat-beside="${sessionId}"]`)).toBeVisible();
+
+      // A reply from the stack's composer is typed into the terminal.
+      const input = chat.getByRole('textbox', { name: /^Message / });
+      await expect
+        .poll(async () => ((await input.isVisible()) ? input.getAttribute('placeholder') : null), {
+          timeout: 200_000,
+          intervals: [500],
+        })
+        .toBe('Reply to Claude…');
+      const reply = marker('stack-reply');
+      await input.fill(`Also cover ${reply}`);
+      await chat.getByRole('button', { name: 'Send' }).click();
+      await expect(input).toHaveValue('');
+      await expect(chat.locator('[data-row="user"]', { hasText: reply })).toBeVisible();
 
       await stack.getByRole('button', { name: 'Raw terminal' }).click();
       const pane = stack.locator('[data-pane]');
       await expect(pane).toHaveAttribute('data-pane-content', 'xterm');
-      await expect(stack.locator('[data-xterm]')).toBeVisible();
+      await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(reply);
 
       // Another tab and back: the raw choice holds for the page's lifetime.
       await stack.getByRole('tab', { name: /^zsh\b/ }).click();
       await expect(stack.locator('[data-claude-pane]')).toHaveCount(0);
-      // The session row picks the Claude tab again.
-      await page.locator(`a[data-session="${sessionId}"]`).click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await tab.click();
       await expect(stack.getByRole('button', { name: 'Raw terminal' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );
       await stack.getByRole('button', { name: 'Chat' }).click();
-      await expect(stack.locator(`[data-chat-beside="${sessionId}"]`)).toBeVisible();
+      await expect(chat).toBeVisible();
+
+      // The session row moves the chat to the Claude column; the stack keeps its tab and says so.
+      await page.locator(`a[data-session="${sessionId}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`/s/${sessionId}$`));
+      await expect(page.locator(`[data-session-panel="${sessionId}"]`)).toHaveCount(1);
+      await expect(stack.locator(`[data-chat-beside="${sessionId}"]`)).toContainText(
+        'Chat is open in the Claude column',
+      );
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+
+      // "Show here instead" gives it back to the stack, and the Claude column moves on.
+      await stack.getByRole('button', { name: 'Show here instead' }).click();
+      await expect(chat).toBeVisible();
+      await expect(chat).toHaveAttribute('data-density', 'compact');
+      await expect(page).not.toHaveURL(new RegExp(`/s/${sessionId}$`));
+      await expect(page.locator(`[data-session-panel="${sessionId}"]`)).toHaveCount(1);
+      await expect(page.locator(`a[data-session="${sessionId}"]`)).not.toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    });
+
+    test('⌘K opens a Claude terminal in the stack without moving the Claude column', async ({
+      page,
+    }) => {
+      const stack = await openProject(page);
+      const { tab, sessionId } = await claudeTab(stack);
+      await page.locator('[data-new-session]').click();
+      await expect(page.locator('[data-new-session-panel]')).toBeVisible();
+      const url = page.url();
+
+      await page.keyboard.press('ControlOrMeta+K');
+      const palette = page.getByRole('dialog', { name: 'Command palette' });
+      await palette.getByRole('combobox').fill('Claude in claude');
+      const command = palette.locator(
+        `[data-command="terminal:${await tab.getAttribute('data-tab')}"]`,
+      );
+      await expect(command).toBeVisible();
+      await command.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`)).toBeVisible();
+      expect(page.url()).toBe(url);
+      await expect(page.locator('[data-new-session-panel]')).toBeVisible();
     });
 
     test('a new terminal opens from a recent-command chip and becomes the active tab', async ({

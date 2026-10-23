@@ -19,7 +19,6 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useLocation } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import {
@@ -42,7 +41,6 @@ import { LiveCaption } from '../pod/LiveCaption.js';
 import { sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
-import { sessionHref } from '../routes.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
@@ -59,12 +57,7 @@ import {
   useClaudeTerminalView,
 } from './claudeTerminal.js';
 import { NewTerminalPopover } from './NewTerminalPopover.js';
-import {
-  arrivedTerminal,
-  CLAUDE_COMMAND,
-  newTerminalRequest,
-  useNewTerminalRequest,
-} from './newTerminal.js';
+import { arrivedTerminal, newTerminalRequest, useNewTerminalRequest } from './newTerminal.js';
 import {
   actionErrorText,
   gridTerminals,
@@ -89,15 +82,13 @@ export interface TerminalStackProps {
   onMaximizedChange?: (maximized: boolean) => void;
   /** Hold the renderers back until the pod-to-focus morph has settled, so it keeps its frames. */
   deferRenderers?: boolean;
-  /** The session in the route: the tab of the terminal it runs in becomes the active one. */
-  sessionId?: string;
-  /** Counts picks of a session row, so picking the routed session again selects its tab too. */
-  sessionPick?: number;
   /**
    * The session the Claude column shows beside the stack, if it is on screen. A Claude terminal
    * running it points there instead of showing the same chat twice.
    */
   besideSessionId?: string;
+  /** "Show here instead": the Claude column lets the session go so the stack can show it. */
+  onShowChatHere?: (sessionId: string) => void;
 }
 
 /** How long a new terminal may take to show up before the stack stops waiting to select it. */
@@ -114,9 +105,8 @@ export function TerminalStack({
   maximized,
   onMaximizedChange,
   deferRenderers = false,
-  sessionId,
-  sessionPick = 0,
   besideSessionId,
+  onShowChatHere,
 }: TerminalStackProps) {
   const [renderersReady, setRenderersReady] = useState(!deferRenderers);
   useEffect(() => {
@@ -136,32 +126,17 @@ export function TerminalStack({
   }, [target, ordered]);
   const interactiveIds = useBoard(selectInteractiveIds(ordered));
   const interactive = useMemo(() => new Set(interactiveIds.split('\n')), [interactiveIds]);
-  // Claude terminals: terminal id → its live session. The tab and the session's row select the
-  // same thing, so picking one moves the route, and the route picks the tab.
+  // Claude terminals: terminal id → its live session. Picking a tab only changes the stack; the
+  // Claude column follows the route (a session row), never the stack.
   const links = useBoard(selectClaudeLinks(ordered));
   const sessionOf = useMemo(() => parseLinks(links), [links]);
-  const [, navigate] = useLocation();
-  const routed = useRef<string | null>(null);
-  useEffect(() => {
-    const pick = `${sessionId}#${sessionPick}`;
-    if (!sessionId || routed.current === pick) return;
-    const linked = [...sessionOf].find(([, id]) => id === sessionId)?.[0] ?? null;
-    routed.current = linked === null ? null : pick;
-    if (linked !== null) setChosen(linked);
-    // Another session (a board one): a Claude tab would show a second chat, so let it go.
-    else setChosen((current) => (current !== null && sessionOf.has(current) ? null : current));
-  }, [sessionId, sessionPick, sessionOf]);
   const select = (terminalId: string, viaKeyboard: boolean) => {
     setByKeyboard(viaKeyboard);
     setChosen(terminalId);
-    const linked = sessionOf.get(terminalId);
-    if (linked === undefined || linked === sessionId) return;
-    routed.current = `${linked}#${sessionPick}`;
-    navigate(sessionHref(projectId, linked));
   };
 
   // New terminals: the popover (also opened from ⌘K and the pod's menu), then the new tab is
-  // selected once the editor reports it; one started with `claude` opens its session once linked.
+  // selected once the editor reports it; one started with `claude` shows its chat once linked.
   const [creating, setCreating] = useState(false);
   const requested = useNewTerminalRequest(projectId);
   useEffect(() => {
@@ -169,11 +144,10 @@ export function TerminalStack({
     newTerminalRequest.set(null);
     setCreating(true);
   }, [requested, renderersReady]);
-  const [awaiting, setAwaiting] = useState<{ known: Set<string>; claude: boolean } | null>(null);
-  const [claudeTab, setClaudeTab] = useState<string | null>(null);
+  const [awaiting, setAwaiting] = useState<Set<string> | null>(null);
   useEffect(() => {
     if (!awaiting) return;
-    const arrived = arrivedTerminal(awaiting.known, terminals);
+    const arrived = arrivedTerminal(awaiting, terminals);
     if (arrived === null) {
       const timer = setTimeout(() => setAwaiting(null), ARRIVAL_TIMEOUT_MS);
       return () => clearTimeout(timer);
@@ -181,22 +155,12 @@ export function TerminalStack({
     setAwaiting(null);
     setByKeyboard(false);
     setChosen(arrived);
-    if (awaiting.claude) setClaudeTab(arrived);
     // The popover left focus nowhere; unless something took it since, it lands on the new tab.
     if (document.activeElement === document.body || document.activeElement === null) {
       tabRefs.current.get(arrived)?.focus({ preventScroll: true });
     }
   }, [awaiting, terminals]);
-  useEffect(() => {
-    const linked = claudeTab === null ? undefined : sessionOf.get(claudeTab);
-    if (claudeTab === null || linked === undefined) return;
-    setClaudeTab(null);
-    if (chosen !== claudeTab) return;
-    routed.current = `${linked}#${sessionPick}`;
-    navigate(sessionHref(projectId, linked));
-  }, [claudeTab, sessionOf, chosen, navigate, projectId, sessionPick]);
-  const onCreated = (command: string | null) =>
-    setAwaiting({ known: new Set(terminals.map((t) => t.id)), claude: command === CLAUDE_COMMAND });
+  const onCreated = () => setAwaiting(new Set(terminals.map((t) => t.id)));
   const project = useBoard(selectProject(projectId));
   const accent = `var(--accent-${project?.accent ?? 0})`;
   const newTerminal = (trigger: React.ReactElement) => (
@@ -365,6 +329,8 @@ export function TerminalStack({
                 terminal={terminal}
                 accent={accent}
                 besideSessionId={besideSessionId}
+                onShowChatHere={onShowChatHere}
+                compactChat={!maximized}
                 inGrid={grid}
                 active={terminal.id === activeId}
                 wide={panes.length === 3 && i === 2}
@@ -586,6 +552,8 @@ function Pane({
   terminal,
   accent,
   besideSessionId,
+  onShowChatHere,
+  compactChat,
   inGrid,
   active,
   wide,
@@ -596,6 +564,8 @@ function Pane({
   terminal: Terminal;
   accent: string;
   besideSessionId: string | undefined;
+  onShowChatHere: ((sessionId: string) => void) | undefined;
+  compactChat: boolean;
   inGrid: boolean;
   active: boolean;
   wide: boolean;
@@ -676,9 +646,14 @@ function Pane({
           >
             {content === 'chat' && session ? (
               session.id === besideSessionId ? (
-                <ChatBeside session={session} accent={accent} compact={inGrid} />
+                <ChatBeside
+                  session={session}
+                  accent={accent}
+                  compact={inGrid}
+                  onShowHere={onShowChatHere && (() => onShowChatHere(session.id))}
+                />
               ) : (
-                <ClaudePanel session={session} defer={!renderer} />
+                <ClaudePanel session={session} defer={!renderer} compact={compactChat} />
               )
             ) : content === 'interactive' ? (
               <InteractiveCard terminal={terminal} command={view.command} compact={inGrid} />
@@ -770,10 +745,12 @@ function ChatBeside({
   session,
   accent,
   compact,
+  onShowHere,
 }: {
   session: ClaudeSession;
   accent: string;
   compact: boolean;
+  onShowHere: (() => void) | undefined;
 }) {
   return (
     <div
@@ -791,13 +768,23 @@ function ChatBeside({
         showToolLabel={false}
       />
       <div className="flex max-w-72 flex-col gap-1">
-        <p className="font-medium text-body-sm text-text-1">The chat is in the Claude column</p>
+        <p className="font-medium text-body-sm text-text-1">Chat is open in the Claude column</p>
         {!compact && (
           <p className="text-meta text-text-2">
             Reply there, or switch to the raw terminal to see Claude Code's own screen.
           </p>
         )}
       </div>
+      {onShowHere && (
+        <button
+          type="button"
+          data-show-chat-here
+          onClick={onShowHere}
+          className={buttonClass('secondary', 'sm')}
+        >
+          Show here instead
+        </button>
+      )}
     </div>
   );
 }

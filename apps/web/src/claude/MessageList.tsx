@@ -18,6 +18,7 @@ import type { Caption } from '../pod/model.js';
 import { redact, redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
+import { chatColumn, useCompactChat } from './density.js';
 import { Markdown } from './Markdown.js';
 import { ToolCard } from './tools/ToolCard.js';
 import { ToolViewState } from './tools/viewState.js';
@@ -40,11 +41,12 @@ type Item =
   | { kind: 'tail'; id: typeof TAIL_ID; text: string }
   | { kind: 'caption'; id: typeof TAIL_ID; caption: Caption };
 
-function estimate(item: Item | undefined): number {
+/** `collapsed`: tool cards start closed (a compact chat), so only their header counts. */
+function estimate(item: Item | undefined, collapsed: boolean): number {
   if (!item) return 40;
   switch (item.kind) {
     case 'tool':
-      return estimateTool(item);
+      return collapsed ? (CHIP_TOOLS.has(item.name) ? 28 : 34) : estimateTool(item);
     case 'thinking':
     case 'caption':
       return 40;
@@ -114,6 +116,8 @@ export interface MessageListProps {
  */
 export function MessageList({ rows, tail, caption = null, cwd }: MessageListProps) {
   const still = useMotionLevel() !== 'full';
+  const compact = useCompactChat();
+  const column = chatColumn(compact);
   const scrollRef = useRef<HTMLDivElement>(null);
   const items: Item[] =
     tail !== null
@@ -135,11 +139,11 @@ export function MessageList({ rows, tail, caption = null, cwd }: MessageListProp
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => estimate(items[i]),
+    estimateSize: (i) => estimate(items[i], compact),
     getItemKey: (i) => items[i]?.id ?? i,
     overscan: 6,
-    paddingStart: 16,
-    paddingEnd: 24,
+    paddingStart: compact ? 10 : 16,
+    paddingEnd: compact ? 16 : 24,
     anchorTo: 'end',
     followOnAppend: true,
     scrollEndThreshold: STICK_THRESHOLD_PX,
@@ -229,7 +233,7 @@ export function MessageList({ rows, tail, caption = null, cwd }: MessageListProp
 
   const virtualItems = virtualizer.getVirtualItems();
   return (
-    <ToolViewState>
+    <ToolViewState collapsed={compact}>
       <div className="relative min-h-0 flex-1">
         <div
           ref={scrollRef}
@@ -260,18 +264,22 @@ export function MessageList({ rows, tail, caption = null, cwd }: MessageListProp
                   ref={virtualizer.measureElement}
                   data-index={v.index}
                   data-row={item.kind}
-                  className="absolute top-0 left-0 w-full px-5"
+                  className={cx('absolute top-0 left-0 w-full', column.gutter)}
                   style={{ transform: `translateY(${v.start}px)` }}
                 >
                   <div
                     className={cx(
-                      'mx-auto max-w-3xl',
+                      column.measure,
                       turnStart
-                        ? 'pt-6'
+                        ? compact
+                          ? 'pt-4'
+                          : 'pt-6'
                         : prev
                           ? item.kind === 'tool' && prev.kind === 'tool'
                             ? 'pt-1'
-                            : 'pt-3'
+                            : compact
+                              ? 'pt-2'
+                              : 'pt-3'
                           : '',
                       enter && (item.kind === 'tool' ? 'tool-enter' : 'msg-enter'),
                     )}

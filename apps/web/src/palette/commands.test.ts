@@ -113,7 +113,7 @@ describe('buildCommands', () => {
       href: '/p/p-acme',
       terminal: { projectId: 'p-acme', terminalId: 't-acme' },
     });
-    // A Claude terminal goes by its session's title and opens the session.
+    // A Claude terminal goes by its session's title and opens in the stack, not the Claude column.
     expect(byId(commands, 'terminal:t-orbit')).toMatchObject({
       label: 'Rate limiter',
       hint: 'orbit-api · Claude in claude',
@@ -121,7 +121,7 @@ describe('buildCommands', () => {
       tone: 'work',
       run: {
         kind: 'navigate',
-        href: '/p/p-orbit/s/s-2',
+        href: '/p/p-orbit',
         terminal: { projectId: 'p-orbit', terminalId: 't-orbit' },
       },
     });

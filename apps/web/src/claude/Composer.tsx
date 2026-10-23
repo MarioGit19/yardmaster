@@ -45,6 +45,7 @@ import {
   type SendButtonMode,
   sendButtonMode,
 } from './composerModel.js';
+import { chatColumn, useCompactChat } from './density.js';
 
 const ERRORS: Record<string, string> = {
   session_not_running: 'The session is not running',
@@ -188,6 +189,7 @@ function Composer({
   const [sending, setSending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mode = sendButtonMode({ sending, running, text });
+  const column = chatColumn(useCompactChat());
 
   const send = async () => {
     const prompt = text.trim();
@@ -211,7 +213,7 @@ function Composer({
         if (mode === 'stop') onInterrupt();
         else void send();
       }}
-      className="shrink-0 px-5 pt-2 pb-4"
+      className={column.dock}
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 pt-2.5 pb-2 shadow-raised transition-[border-color] duration-fast focus-within:border-line-strong">
         <textarea
@@ -528,8 +530,9 @@ function ComposerMenu({ fork }: { fork: Fork }) {
  */
 function ForkBar({ session, fork }: { session: ClaudeSession; fork: Fork }) {
   const live = isSessionLive(session.status);
+  const column = chatColumn(useCompactChat());
   return (
-    <div data-fork-bar className="shrink-0 px-5 pt-2 pb-4">
+    <div data-fork-bar className={column.dock}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 py-2.5 shadow-raised">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <p className="min-w-0 flex-1 basis-56 text-body-sm text-text-2">
@@ -571,8 +574,9 @@ function TerminalApproval({ session, terminalId }: { session: ClaudeSession; ter
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
+  const column = chatColumn(useCompactChat());
   return (
-    <div data-terminal-approval className="shrink-0 px-5 pt-2 pb-4">
+    <div data-terminal-approval className={column.dock}>
       <div className="mx-auto w-full max-w-3xl">
         {approval?.state === 'pending' ? (
           <InlineApproval approval={approval} />

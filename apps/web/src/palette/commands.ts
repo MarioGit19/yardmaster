@@ -166,7 +166,7 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
   for (const terminal of terminals) {
     const project = projectById.get(terminal.projectId ?? '');
     if (!project) continue;
-    // A Claude terminal goes by its session and opens the session's chat.
+    // A Claude terminal goes by its session; it opens in the stack, which shows its chat.
     const session = terminalSession(board, terminal.id);
     if (session) {
       const status = sessionStatusView(session.status);
@@ -179,7 +179,7 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
         tone: status.tone,
         run: {
           kind: 'navigate',
-          href: sessionHref(project.id, session.id),
+          href: projectHref(project.id),
           terminal: { projectId: project.id, terminalId: terminal.id },
         },
       });

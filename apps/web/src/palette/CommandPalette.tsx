@@ -29,7 +29,7 @@ import { useFocusRoute } from '../focus/FocusStage.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
-import { projectHref } from '../routes.js';
+import { inProject, projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY, railPreference } from '../shell/prefs.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
@@ -208,7 +208,11 @@ function PaletteBody({
       case 'navigate':
         keepFocus();
         close();
-        if (action.terminal) terminalTarget.set(action.terminal);
+        if (action.terminal) {
+          terminalTarget.set(action.terminal);
+          // Already in its focus view: only the stack changes, the Claude column keeps its session.
+          if (inProject(location, action.terminal.projectId)) return;
+        }
         navigate(action.href);
         return;
       case 'action': {
@@ -230,10 +234,7 @@ function PaletteBody({
         keepFocus();
         close();
         newTerminalRequest.set(action.projectId);
-        {
-          const href = projectHref(action.projectId);
-          if (location !== href && !location.startsWith(`${href}/`)) navigate(href);
-        }
+        if (!inProject(location, action.projectId)) navigate(projectHref(action.projectId));
         return;
       case 'motion':
         motionPreference.set(action.next);

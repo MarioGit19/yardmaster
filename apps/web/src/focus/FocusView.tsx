@@ -2,7 +2,7 @@ import type { ClaudeSession, Project } from '@c-board/protocol';
 import { ArrowLeft, GitBranch, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { NewSessionComposer } from '../claude/Composer.js';
@@ -29,7 +29,7 @@ import { DoneSweep } from '../pod/PodActivity.js';
 import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
 import { useMascotState } from '../pod/useMascotState.js';
 import { useMediaQuery } from '../prefs.js';
-import { routes, sessionHref } from '../routes.js';
+import { projectHref, routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
@@ -44,6 +44,7 @@ import { StatusDot } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { EmptyState } from '../views/Page.js';
 import { ColumnHeading } from './ColumnHeading.js';
+import { claudeColumnSession } from './claudeColumn.js';
 import { FocusCaption } from './FocusCaption.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
@@ -124,8 +125,23 @@ function ProjectFocus({
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const selected = useBoard(selectSession(sessionId ?? ''));
   const live = podSessions(sessions);
-  // Without a session in the route, the Claude panel shows the project's most relevant one.
-  const session = selected?.projectId === project.id ? selected : sessionId ? undefined : live[0];
+  // A session the stack took over ("Show here instead") until a row puts it back here.
+  const [released, setReleased] = useState<string | null>(null);
+  useEffect(() => {
+    if (sessionId) setReleased(null);
+  }, [sessionId]);
+  const session = claudeColumnSession({
+    projectId: project.id,
+    sessionId,
+    selected,
+    live,
+    released,
+  });
+  const [, navigate] = useLocation();
+  const showChatInStack = (id: string) => {
+    setReleased(id);
+    if (sessionId === id) navigate(projectHref(project.id));
+  };
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
   // A terminal picked in ⌘K, or a new one asked for there or in the pod's menu.
@@ -148,11 +164,8 @@ function ProjectFocus({
     headingRef.current?.focus({ preventScroll: true });
   }, []);
 
-  // A session row picked again (already in the route) still selects its Claude terminal's tab.
-  const [sessionPick, setSessionPick] = useState(0);
   const sessionsColumn = (
     <SessionsColumn
-      onPick={() => setSessionPick((n) => n + 1)}
       project={project}
       sessions={sessions}
       activeId={composing ? undefined : session?.id}
@@ -178,10 +191,9 @@ function ProjectFocus({
       projectId={project.id}
       terminals={terminals}
       deferRenderers={shared}
-      sessionId={sessionId}
-      sessionPick={sessionPick}
       // Beside the stack only when the Claude column is on screen next to it.
       besideSessionId={tabs || maximized || composing ? undefined : session?.id}
+      onShowChatHere={showChatInStack}
       {...(tabs ? {} : { maximized, onMaximizedChange: setMaximized })}
     />
   );
@@ -381,7 +393,6 @@ function SessionsColumn({
   sharedOrbs,
   composing,
   onNewSession,
-  onPick,
 }: {
   project: Project;
   sessions: readonly ClaudeSession[];
@@ -393,7 +404,6 @@ function SessionsColumn({
   sharedOrbs: boolean;
   composing: boolean;
   onNewSession: () => void;
-  onPick: () => void;
 }) {
   const live = podSessions(sessions);
   const ended = sessions.filter((s) => s.status.kind === 'ended');
@@ -446,10 +456,7 @@ function SessionsColumn({
                     now={now}
                     shared={sharedOrbs}
                     pillGlide={byKeyboard ? tabGlide(true) : spring.smooth}
-                    onPick={(viaKeyboard) => {
-                      setByKeyboard(viaKeyboard);
-                      onPick();
-                    }}
+                    onPick={setByKeyboard}
                   />
                 </motion.li>
               ))}

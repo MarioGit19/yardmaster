@@ -1,16 +1,35 @@
-import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 type Store = Map<string, boolean>;
 
-const ViewStateContext = createContext<Store>(new Map());
+const ViewStateContext = createContext<{ store: Store; collapsed: boolean }>({
+  store: new Map(),
+  collapsed: false,
+});
 
 /**
  * Holds the open/closed state of tool cards for one message list. Virtual rows unmount when they
  * scroll away; the state lives here, so a card comes back the way the reader left it.
+ * `collapsed`: every card starts closed, whatever it would open itself for.
  */
-export function ToolViewState({ children }: { children: ReactNode }) {
+export function ToolViewState({
+  collapsed = false,
+  children,
+}: {
+  collapsed?: boolean;
+  children: ReactNode;
+}) {
   const store = useRef<Store>(new Map());
-  return <ViewStateContext value={store.current}>{children}</ViewStateContext>;
+  const value = useMemo(() => ({ store: store.current, collapsed }), [collapsed]);
+  return <ViewStateContext value={value}>{children}</ViewStateContext>;
 }
 
 /**
@@ -18,10 +37,10 @@ export function ToolViewState({ children }: { children: ReactNode }) {
  * Until the reader toggles it, it follows `fallback` (a card can open itself when its tool fails).
  */
 export function useStickyFlag(key: string, fallback: boolean): [boolean, () => void] {
-  const store = useContext(ViewStateContext);
+  const { store, collapsed } = useContext(ViewStateContext);
   const [local, setLocal] = useState<{ key: string; value: boolean } | null>(null);
   // A changed key (a different row in this slot) drops the local value and reads the store.
-  const value = (local?.key === key ? local.value : store.get(key)) ?? fallback;
+  const value = (local?.key === key ? local.value : store.get(key)) ?? (fallback && !collapsed);
   const toggle = useCallback(() => {
     store.set(key, !value);
     setLocal({ key, value: !value });

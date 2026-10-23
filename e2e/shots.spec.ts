@@ -318,8 +318,12 @@ test.describe('terminal stack', () => {
         await stack.getByRole('button', { name: 'Send Ctrl+C' }).click();
         await expect(stack.locator('[data-interactive]')).toHaveCount(0);
 
-        // The Claude column already shows the chat, so the pane points to it.
-        await stack.getByRole('tab', { name: /^claude\b/ }).click();
+        // With its session in the Claude column, the pane points to it.
+        const claude = stack.getByRole('tab', { name: /^claude\b/ });
+        await claude.click();
+        await page
+          .locator(`a[data-session="${await claude.getAttribute('data-claude-tab')}"]`)
+          .click();
         await expect(stack.locator('[data-chat-beside]')).toBeVisible({ timeout: 10_000 });
         await page.waitForTimeout(600);
         await shot('terminals-claude');
@@ -906,11 +910,30 @@ test.describe('claude terminals', () => {
           const stack = page.locator('[data-terminal-stack]');
           const tab = stack.locator('[data-claude-tab]').first();
           await expect(tab).toBeVisible({ timeout: 30_000 });
+          const sessionId = await tab.getAttribute('data-claude-tab');
+          const wide = viewport.width >= 1024;
+          // The Claude column on a new session's composer, so the stack shows the chat itself.
+          if (wide) await page.locator('[data-new-session]').click();
           await tab.click();
-          await expect(stack.locator('[data-claude-pane]')).toBeVisible();
+          await expect(
+            stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`),
+          ).toBeVisible();
           await page.mouse.move(viewport.width / 2, viewport.height - 4);
           await page.waitForTimeout(1200);
           await shot('claude-terminal');
+
+          if (wide) {
+            // Its row moves the chat to the Claude column; the stack points there.
+            await page.locator(`[data-focus] a[data-session="${sessionId}"]`).click();
+            await expect(stack.locator('[data-chat-beside]')).toBeVisible();
+            await page.mouse.move(viewport.width / 2, viewport.height - 4);
+            await page.waitForTimeout(800);
+            await shot('claude-terminal-beside');
+            await stack.getByRole('button', { name: 'Show here instead' }).click();
+            await expect(
+              stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`),
+            ).toBeVisible();
+          }
 
           await stack.getByRole('button', { name: 'Raw terminal' }).click();
           await page.waitForTimeout(800);

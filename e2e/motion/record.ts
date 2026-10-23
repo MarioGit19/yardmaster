@@ -256,7 +256,7 @@ const SCENARIOS = {
       await r.moment(
         'claude-tab',
         'transition',
-        "pick the Claude terminal's tab: the tab pill glides, the pane points to the chat",
+        "pick the Claude terminal's tab: the tab pill glides, its chat fades in the stack (or points to the Claude column)",
         async () => {
           await claudeTab.click();
           await page.waitForTimeout(900);
