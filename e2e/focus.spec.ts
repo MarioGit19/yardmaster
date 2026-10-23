@@ -127,6 +127,59 @@ test.describe('at 1440', () => {
       '340',
     );
   });
+
+  test('terminals refit once when a resize lands, not every frame', async ({ page }) => {
+    const { card } = await openFirstPod(page);
+    const screen = card.locator('[data-xterm] .xterm-screen').first();
+    await expect(screen).toBeVisible();
+    const handle = card.locator('[role="separator"][data-resize="right"]');
+    const now = Number(await handle.getAttribute('aria-valuenow'));
+    const max = Number(await handle.getAttribute('aria-valuemax'));
+    // Release 16px short of a wider snap, so the handle springs the rest of the way.
+    const snap = [340, 420, 520, 620].find((s) => s >= now + 60 && s <= max);
+    if (!snap) throw new Error(`no snap width above ${now}`);
+    const box = await handle.boundingBox();
+    if (!box) throw new Error('no handle');
+
+    // Every frame: the terminal's drawn width, and whether the grid is mid-resize.
+    await page.evaluate(() => {
+      const w = window as unknown as { __frames: { w: number; resizing: boolean }[] };
+      w.__frames = [];
+      const tick = () => {
+        const el = document.querySelector('[data-focus] [data-xterm] .xterm-screen');
+        const resizing = !!document.querySelector('[data-focus] [data-resizing]');
+        if (el) w.__frames.push({ w: Math.round(el.getBoundingClientRect().width), resizing });
+        if (w.__frames.length < 2000) requestAnimationFrame(tick);
+      };
+      tick();
+    });
+    const before = Math.round((await screen.boundingBox())?.width ?? 0);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - (snap - 16 - now) / 2, y, { steps: 5 });
+    await page.mouse.move(x - (snap - 16 - now), y, { steps: 5 });
+    // Mid-drag the ARIA value follows the pointer, but the terminal keeps its size.
+    await expect(handle).toHaveAttribute('aria-valuenow', String(snap - 16));
+    expect(Math.round((await screen.boundingBox())?.width ?? 0)).toBe(before);
+    await page.mouse.up();
+    await expect(handle).toHaveAttribute('aria-valuenow', String(snap));
+    await expect(card.locator('[data-resizing]')).toHaveCount(0);
+    await expect
+      .poll(async () => Math.round((await screen.boundingBox())?.width ?? 0))
+      .toBeGreaterThan(before);
+
+    const frames = await page.evaluate(
+      () => (window as unknown as { __frames: { w: number; resizing: boolean }[] }).__frames,
+    );
+    const during = frames.filter((f) => f.resizing);
+    expect(during.length).toBeGreaterThan(5);
+    expect(new Set(during.map((f) => f.w))).toEqual(new Set([before]));
+    // One fit after it lands: the terminal jumps straight from its old width to its new one.
+    const widths = frames.map((f) => f.w).filter((w, i, all) => i === 0 || w !== all[i - 1]);
+    expect(widths).toHaveLength(2);
+  });
 });
 
 for (const viewport of [

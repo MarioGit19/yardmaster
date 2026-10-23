@@ -5,6 +5,7 @@ import { type ISearchOptions, SearchAddon } from '@xterm/addon-search';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
+import { RESIZE_END, resizingAncestor } from '../anim/resizing.js';
 import { useBoardClient } from '../data/index.js';
 import { StreamRedactor } from '../redact/redact.js';
 import { domColorResolver, xtermTheme } from './theme.js';
@@ -148,15 +149,32 @@ export default function XtermView({
         if (hold) clearTimeout(hold);
       });
 
+      // A fit re-measures and reflows the whole buffer: while a column drag or spring runs, skip
+      // the per-frame fits and fit once when it lands.
       let frame = 0;
-      const ro = new ResizeObserver(() => {
+      let waiting: Element | null = null;
+      const scheduleRefit = () => {
         cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(refit);
-      });
+        frame = requestAnimationFrame(settledRefit);
+      };
+      const onResizeEnd = () => {
+        waiting = null;
+        scheduleRefit();
+      };
+      const settledRefit = () => {
+        const resizing = resizingAncestor(host);
+        if (!resizing) return refit();
+        if (waiting === resizing) return;
+        waiting?.removeEventListener(RESIZE_END, onResizeEnd);
+        waiting = resizing;
+        resizing.addEventListener(RESIZE_END, onResizeEnd, { once: true });
+      };
+      const ro = new ResizeObserver(scheduleRefit);
       ro.observe(host);
       cleanups.push(() => {
         cancelAnimationFrame(frame);
         ro.disconnect();
+        waiting?.removeEventListener(RESIZE_END, onResizeEnd);
       });
 
       // The light/dark switch only flips an attribute on <html>; re-read the tokens then.
