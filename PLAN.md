@@ -778,9 +778,6 @@ Spec: DESIGN.md §10. Build against `pnpm dev:demo`. For every task in this phas
   - For Office, Grid, Transit and Retro: `review-animations` (read its SKILL.md), an `impeccable` critique of each overview and enter view, `break-ui` with worst-case data (20 projects, a room with 12 actors, very long names, no terminals, only errors), a **phone pass** of every layout and enter view (Playwright iPhone device profile: touch, 390 px, tap targets ≥ 44 px, inspector as bottom sheet, back gesture), and a `--demo-stress` FPS check of every layout (≥ 55 fps, no long tasks over 50 ms). Add the DESIGN.md §10.7 checks to the shots review. Fix what is found (up to 10 issues; add `11.10b` for the rest).
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
 
-- [ ] **[HUMAN] 11.11 Try the layouts**
-  - Run `pnpm dev:demo` (and `pnpm dev` for your real projects), switch between all five layouts (on your phone too, once 12.5 is done, or with your browser's phone emulation now), and write any feedback as new tasks below this one before ticking it.
-
 ## Phase 12 — Workspaces: open projects from the board, board terminals, phone access
 
 Goal: start work from the board (or a phone) on a project that isn't open anywhere yet. Spec: PRD F25–F27 and §8 items 10–12. The overview stays focused: only **active** projects appear on it; the library is reached through the picker.
@@ -792,7 +789,7 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Verify:** `pnpm --filter @c-board/server test && pnpm --filter @c-board/web test`
 
 - [ ] **12.2 Open-project picker and launch sheet**
-  - An "Open project" button in the HUD and project rail, ⌘K "Open project…" (`⌘O`): a searchable list of library folders (git badge, branch for repos, recents first, fuzzy search), designed for phone widths too. Choosing one opens a **launch sheet**: *Open in Cursor*, *New Claude session* (prompt field, model and permission mode), and *New terminal* (with a command field, and the project's recent commands as one-tap chips, such as `pnpm dev`). Several can be ticked at once ("Cursor + pnpm dev + Claude"), and the sheet remembers the last choice per project. The project joins the overview with the normal enter animation and lands in the focus view.
+  - An "Open project" button in the HUD and project rail, ⌘K "Open project…" (`⌘O`): a searchable list of library folders (git badge, branch for repos, recents first, fuzzy search), designed for phone widths too. Choosing one opens a **launch sheet**: _Open in Cursor_, _New Claude session_ (prompt field, model and permission mode), and _New terminal_ (with a command field, and the project's recent commands as one-tap chips, such as `pnpm dev`). Several can be ticked at once ("Cursor + pnpm dev + Claude"), and the sheet remembers the last choice per project. The project joins the overview with the normal enter animation and lands in the focus view.
   - **Done when:** e2e (demo mode with a synthetic library) opens a project from the picker, starts a Claude session and a terminal in it, and sees both in the focus view; screenshots at 390 and 1440.
   - **Verify:** `pnpm e2e && pnpm shots`
 
@@ -802,12 +799,12 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Verify:** `pnpm --filter @c-board/server test`
 
 - [ ] **12.4 Board-owned terminals (node-pty)**
-  - PRD F19. `node-pty` as an **optional** dependency (prebuilt binaries; if it fails to load, `doctor` says so and *New terminal* without an editor is disabled with an explanation). `PtyManager`: spawns the user's `$SHELL -l` in the project folder, optional initial command, resize, input, kill, exit codes, ring buffers like editor terminals, process and port scanning attached, max 16 terminals. Board terminals are fully interactive in xterm (keystrokes go straight to the pty, so TUIs work), marked with a "board" origin icon, and they survive UI reconnects but not a server stop (the UI says so before stopping).
+  - PRD F19. `node-pty` as an **optional** dependency (prebuilt binaries; if it fails to load, `doctor` says so and _New terminal_ without an editor is disabled with an explanation). `PtyManager`: spawns the user's `$SHELL -l` in the project folder, optional initial command, resize, input, kill, exit codes, ring buffers like editor terminals, process and port scanning attached, max 16 terminals. Board terminals are fully interactive in xterm (keystrokes go straight to the pty, so TUIs work), marked with a "board" origin icon, and they survive UI reconnects but not a server stop (the UI says so before stopping).
   - **Done when:** tests spawn a real pty running `/bin/sh` with synthetic commands (echo, exit codes, Ctrl+C, resize) and an e2e test types into a board terminal in demo mode.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm e2e`
 
 - [ ] **12.5 Phone access over Tailscale**
-  - Opt-in setting `remote.allowedHosts` (exact host names such as `my-mac.tailnet-name.ts.net`; only `*.ts.net` names are accepted from the UI). The server still binds `127.0.0.1`; `tailscale serve` forwards to it. Host and Origin checks accept the listed hosts over HTTPS only. **Pairing:** Settings → Phone shows a QR code with a one-time pairing code (valid 5 min, single use) instead of the raw token; scanning it on the phone sets the session cookie. A list of paired devices with *revoke*. A phone pass over the overview (every layout), picker, launch sheet, focus view (tabs), Attention Center and composer at 390 px. Docs: a short "Use it from your phone" guide (install Tailscale on both devices, `tailscale serve`, add the host, scan the QR).
+  - Opt-in setting `remote.allowedHosts` (exact host names such as `my-mac.tailnet-name.ts.net`; only `*.ts.net` names are accepted from the UI). The server still binds `127.0.0.1`; `tailscale serve` forwards to it. Host and Origin checks accept the listed hosts over HTTPS only. **Pairing:** Settings → Phone shows a QR code with a one-time pairing code (valid 5 min, single use) instead of the raw token; scanning it on the phone sets the session cookie. A list of paired devices with _revoke_. A phone pass over the overview (every layout), picker, launch sheet, focus view (tabs), Attention Center and composer at 390 px. Docs: a short "Use it from your phone" guide (install Tailscale on both devices, `tailscale serve`, add the host, scan the QR).
   - **Done when:** security tests cover an unlisted host refused, plain HTTP refused for remote hosts, pairing code expiry and single use, and revoke; phone screenshots of every screen look right.
   - **Verify:** `pnpm --filter @c-board/server test && pnpm shots`
 
