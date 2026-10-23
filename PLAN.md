@@ -677,7 +677,7 @@ Performance numbers: machine load varies a lot from day to day, so a Done-when t
   - Note: The scene model (11.1) doesn't exist yet, so its `background` actors are now part of 11.1's text.
   - Note: Verify ran under load (avg 5–36). `pnpm check` passes, and so does `background.spec` (2 tests). `pnpm e2e` stopped at `messages.spec`'s 500+ long-task test. Under the same load a clean `HEAD` failed it 4 of 4 runs and this branch passed 2 of 4, so it's load, not this change. `perf-stress` passed. The `e2e` project had 2 timing failures (attention deny, onboarding), and both passed on a 1-worker rerun. `pnpm shots`: 104 passed. 4 timed out at load ~36 (3 claude-terminal shots and 1 background shot), and all 8 in those groups passed on a 2-worker rerun.
 
-- [ ] **[HUMAN] 10.9g Update the extension in Cursor**
+- [x] **[HUMAN] 10.9g Update the extension in Cursor**
   - 10.9c changed the extension, so the installed copy is out of date. From the repo root run:
     `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`
   - Then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Rename a terminal tab (right-click the tab, "Rename…") and check the board shows the new name within a few seconds.
