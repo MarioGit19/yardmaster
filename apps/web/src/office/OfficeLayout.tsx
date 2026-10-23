@@ -303,7 +303,8 @@ export default function OfficeLayout() {
                         width={units}
                         now={now}
                         entered={project.id === roomId}
-                        onEnter={() => enter(project.id)}
+                        onEnter={enter}
+                        fit={fit}
                       />
                     </div>
                   </motion.li>

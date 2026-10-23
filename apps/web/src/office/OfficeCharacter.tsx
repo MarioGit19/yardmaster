@@ -21,6 +21,8 @@ export interface OfficeCharacterProps {
   projectName: string;
   /** Visor color: the project accent for the main session, else the status colors. */
   color?: string;
+  /** The room's drawing scale: the tap target grows to stay 44 px on screen. */
+  fit?: number;
 }
 
 /**
@@ -28,7 +30,13 @@ export interface OfficeCharacterProps {
  * inspector, and a name tag with the live caption on hover or focus. A new spot is a walk along
  * the floor (600–900 ms, legs swinging) at Full, a cross-fade at Reduced, a jump at Off.
  */
-export function OfficeCharacter({ actor, placement, projectName, color }: OfficeCharacterProps) {
+export function OfficeCharacter({
+  actor,
+  placement,
+  projectName,
+  color,
+  fit = 1,
+}: OfficeCharacterProps) {
   const level = useMotionLevel();
   const left = placement.x - placement.size / 2;
   const top = placement.y - placement.size;
@@ -77,7 +85,7 @@ export function OfficeCharacter({ actor, placement, projectName, color }: Office
     };
   }, [left, top, x, y, opacity]);
 
-  const hit = Math.max(TAP_PX, placement.size);
+  const hit = Math.max(Math.ceil(TAP_PX / Math.min(1, fit)), placement.size);
   const mini = actor.parentId !== null;
   const facing = walking ? Math.sign(left - x.get()) : 0;
 

@@ -2,11 +2,13 @@ import type { ActivityEvent, ActivityKind } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import type { SceneActor } from '../layouts/scene.js';
 import {
+  AXIS_GUTTER,
   alongAt,
   branchPoints,
   buildBranches,
   buildStations,
   horizontalFrame,
+  lineAcross,
   MERGE_PX,
   placeStops,
   placeTrains,
@@ -94,8 +96,12 @@ describe('frames', () => {
     expect(frame.platformAt).toBeLessThan(frame.nowAt);
     expect(point(10, 20, frame)).toEqual({ x: 20, y: 10 });
     // Columns share the width but stay wide enough to tap.
-    expect(frame.lineGap).toBe(89);
-    expect(verticalFrame(9, 358).lineGap).toBe(52);
+    expect(frame.lineGap).toBe(81);
+    expect(verticalFrame(9, 358).lineGap).toBe(44);
+    // The demo's six lines fit a 390 px phone's stage (302 px beside the rail).
+    expect(verticalFrame(6, 302).breadth).toBeLessThanOrEqual(302);
+    // The time labels get a gutter of their own, left of the first line's column.
+    expect(lineAcross(0, frame) - frame.lineGap / 2).toBe(AXIS_GUTTER);
   });
 });
 
@@ -140,7 +146,7 @@ describe('stations', () => {
     expect(stations.has('p2')).toBe(false);
   });
 
-  it('merges stations closer than 12 px into one stop with the worst kind', () => {
+  it('merges stations closer than a stop into one stop with the worst kind', () => {
     const frame = horizontalFrame(1);
     const msPerPx = MIN / frame.pxPerMin;
     const stations = buildStations(
@@ -148,8 +154,8 @@ describe('stations', () => {
         event('a', 'stop', NOW - 30 * MIN),
         event('b', 'exec.end', NOW - 30 * MIN + 5 * msPerPx, { data: { exitCode: 1 } }),
         event('c', 'stop', NOW - 30 * MIN + 10 * msPerPx),
-        // Just past 12 px from the first: a stop of its own.
-        event('d', 'stop', NOW - 30 * MIN + (MERGE_PX + 0.5) * msPerPx),
+        // Just past MERGE_PX from the merged stop's middle (5 px in): a stop of its own.
+        event('d', 'stop', NOW - 30 * MIN + (MERGE_PX + 5.5) * msPerPx),
         event('e', 'stop', NOW - 5 * MIN),
       ],
       [project()],

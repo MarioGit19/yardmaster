@@ -105,6 +105,8 @@ const CLICK_SLOP = 4;
 const LABEL_LIFT = 1.1;
 /** The float label's width (CSS `.grid-node[data-variant="float"]`), px. */
 const LABEL_W = 200;
+/** The compact label (name only) a crowded ring falls back to; matches `.grid-float[data-compact]`. */
+const LABEL_COMPACT = { width: 112, height: 36 };
 /** A lifted label eases to its new height over about this long, ms. */
 const LIFT_TAU = 140;
 const DIVE_MS = moment.dive * 1000;
@@ -303,6 +305,8 @@ interface LabelEntry {
   /** How far it's lifted above its node to stay clear of nearer labels, px. */
   lift: number;
   stem: number;
+  /** Its form on screen: full, compact (name only) or crowded out (hidden until hovered). */
+  fit: 'full' | 'compact' | 'crowded';
 }
 
 const BODY_GEOMETRY = new CylinderGeometry(NODE_R, NODE_R, 1, 6).translate(0, 0.5, 0);
@@ -905,13 +909,15 @@ export class GridRenderer {
         el,
         slots,
         more: el.querySelector<HTMLElement>('[data-grid-slot-more]'),
-        height: card?.offsetHeight || 76,
+        // A compact card is shorter: keep the full height it was measured at.
+        height: (keep?.fit === 'compact' ? keep.height : card?.offsetHeight) || 76,
         x: keep?.x ?? Number.NaN,
         y: keep?.y ?? Number.NaN,
         z: keep?.z ?? -1,
         opacity: keep?.opacity ?? -1,
         lift: keep?.lift ?? 0,
         stem: keep?.stem ?? -1,
+        fit: keep?.fit ?? 'full',
       };
     }
   }
@@ -944,14 +950,29 @@ export class GridRenderer {
         scratch.v.set(entry.position.x, entry.height + LABEL_LIFT, entry.position.z),
         at,
       );
-      return { x: at.x, y: at.y, width: LABEL_W, height: entry.label.height };
+      return {
+        x: at.x,
+        y: at.y,
+        width: LABEL_W,
+        height: entry.label.height,
+        compact: LABEL_COMPACT,
+      };
     });
     const lifted = declutter(boxes, 8);
     ranked.forEach(({ entry, depth }, i) => {
       const label = entry.label;
       const box = boxes[i];
       if (!box) return;
-      label.lift = approach(label.lift, box.y - (lifted[i] ?? box.y), dt, LIFT_TAU);
+      const place = lifted[i];
+      label.lift = approach(label.lift, box.y - (place?.y ?? box.y), dt, LIFT_TAU);
+      const fit = place?.crowded ? 'crowded' : place?.compact ? 'compact' : 'full';
+      if (fit !== label.fit) {
+        if (fit === 'crowded') label.el.dataset.crowded = '';
+        else delete label.el.dataset.crowded;
+        if (fit === 'compact') label.el.dataset.compact = '';
+        else delete label.el.dataset.compact;
+        label.fit = fit;
+      }
       const x = Math.round(box.x);
       const y = Math.round(box.y - label.lift);
       if (x !== label.x || y !== label.y) {
@@ -966,7 +987,7 @@ export class GridRenderer {
       }
       const z = ranked.length - i;
       if (z !== label.z) {
-        label.el.style.zIndex = String(z);
+        label.el.style.setProperty('--z', String(z));
         label.z = z;
       }
       const opacity =

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   type KeyboardEvent,
   type MouseEvent,
+  memo,
   type ReactNode,
   useEffect,
   useMemo,
@@ -62,14 +63,24 @@ export interface OfficeRoomProps {
   /** This room is the one the room view shows. */
   entered?: boolean;
   /** A click on the room (not on a character) or Enter on it: the room view. */
-  onEnter?(): void;
+  onEnter?(projectId: string): void;
+  /** The scale the room is drawn at (a phone's room is scaled down to fit). */
+  fit?: number;
 }
 
 /**
  * One project's room in the building (DESIGN.md §10.3): the shell with door light, nameplate and
  * ceiling light, the whiteboard and port sign, a station per actor and everyone at theirs.
+ * Memoized: the scene keeps an unchanged project's object, so a busy room doesn't redraw the rest.
  */
-export function OfficeRoom({ project, width, now, entered = false, onEnter }: OfficeRoomProps) {
+export const OfficeRoom = memo(function OfficeRoom({
+  project,
+  width,
+  now,
+  entered = false,
+  onEnter,
+  fit = 1,
+}: OfficeRoomProps) {
   const work = useRef<ReadonlyMap<string, WorkStation>>(new Map());
   const plan = useMemo(
     () => planRoom(project.actors, { width, now, previous: work.current }),
@@ -95,7 +106,7 @@ export function OfficeRoom({ project, width, now, entered = false, onEnter }: Of
     if (event.target === room) {
       if (event.key === 'Enter' && !entered && onEnter) {
         event.preventDefault();
-        onEnter();
+        onEnter(project.id);
         return;
       }
     } else if (event.key === 'Escape' && !entered && !event.defaultPrevented) {
@@ -122,7 +133,7 @@ export function OfficeRoom({ project, width, now, entered = false, onEnter }: Of
     const target = event.target as Element;
     if (!event.currentTarget.contains(target)) return;
     if (target.closest('button, a, [data-scene-actor]')) return;
-    onEnter();
+    onEnter(project.id);
   };
 
   return (
@@ -191,6 +202,7 @@ export function OfficeRoom({ project, width, now, entered = false, onEnter }: Of
                 placement={placement}
                 projectName={project.name}
                 color={actor.id === main ? accent : undefined}
+                fit={fit}
               />
             );
           })}
@@ -210,7 +222,7 @@ export function OfficeRoom({ project, width, now, entered = false, onEnter }: Of
       </RoomShell>
     </section>
   );
-}
+});
 
 /** A station stands on the floor and slides when the room's furniture shifts. */
 function StationSlot({ station, children }: { station: PlacedStation; children: ReactNode }) {

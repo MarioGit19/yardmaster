@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SLEEP_AFTER_MS } from '../crew/model.js';
 import type { Pulses } from '../data/activity.js';
 import { makeProject, makeSession, makeTerminal, sampleBoard } from '../test/board.js';
-import { actorId, buildSceneModel, buildSceneProject, opsStateFor } from './scene.js';
+import { actorId, buildSceneModel, buildSceneProject, opsStateFor, shareScene } from './scene.js';
 
 const T0 = 1_760_000_000_000;
 const NOW = T0 + 60_000;
@@ -310,5 +310,33 @@ describe('buildSceneModel', () => {
 
   it('returns null for a project that is gone', () => {
     expect(buildSceneProject(sampleBoard(), {}, 'p-gone', NOW)).toBeNull();
+  });
+});
+
+describe('shareScene', () => {
+  const now = 1_800_000_000_000;
+  const board = (): BoardState => ({
+    ...sampleBoard(),
+    projects: { a: makeProject('a', 'acme-shop'), b: makeProject('b', 'blog') },
+    sessions: {},
+    terminals: { t1: makeTerminal('t1', 'a'), t2: makeTerminal('t2', 'b') },
+  });
+
+  it('keeps the previous model when nothing changed', () => {
+    const first = buildSceneModel(board(), {}, now);
+    expect(shareScene(first, buildSceneModel(board(), {}, now))).toBe(first);
+    expect(shareScene(null, first)).toBe(first);
+  });
+
+  it('keeps unchanged projects and replaces the one that changed', () => {
+    const first = buildSceneModel(board(), {}, now);
+    const changed = board();
+    changed.terminals.t2 = { ...makeTerminal('t2', 'b'), name: 'renamed' };
+    const next = shareScene(first, buildSceneModel(changed, {}, now));
+    expect(next).not.toBe(first);
+    const [a, b] = ['a', 'b'].map((id) => next.projects.find((p) => p.id === id));
+    expect(a).toBe(first.projects.find((p) => p.id === 'a'));
+    expect(b).not.toBe(first.projects.find((p) => p.id === 'b'));
+    expect(next.actors.get(actorId.terminal('t2'))?.name).toContain('renamed');
   });
 });

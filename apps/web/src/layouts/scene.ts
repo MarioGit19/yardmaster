@@ -536,6 +536,46 @@ export function buildSceneModel(board: BoardState, pulses: Pulses, now: number):
   return { projects: ordered, actors };
 }
 
+/** Deep equality for the scene's plain data (objects, arrays, primitives). */
+function sameData(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, i) => sameData(item, b[i]));
+  }
+  if (Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  return keys.every((key) => key in y && sameData(x[key], y[key]));
+}
+
+/**
+ * `next` with every project that didn't change since `prev` kept as `prev`'s object, so a layout
+ * can skip re-rendering it: a log firehose rebuilds the model many times a second, but only its
+ * own project's scene changes (and often not even that). Returns `prev` when nothing changed.
+ */
+export function shareScene(prev: SceneModel | null, next: SceneModel): SceneModel {
+  if (!prev) return next;
+  const before = new Map(prev.projects.map((p) => [p.id, p]));
+  let changed = prev.projects.length !== next.projects.length;
+  const projects = next.projects.map((project, i) => {
+    const old = before.get(project.id);
+    if (old && sameData(old, project)) {
+      if (prev.projects[i] !== old) changed = true;
+      return old;
+    }
+    changed = true;
+    return project;
+  });
+  if (!changed) return prev;
+  const actors = new Map<string, SceneActor>();
+  for (const project of projects) for (const actor of project.actors) actors.set(actor.id, actor);
+  return { projects, actors };
+}
+
 /** One project's scene (what an open inspector needs), or null when it's gone. */
 export function buildSceneProject(
   board: BoardState,

@@ -65,6 +65,13 @@ describe('WorstBoard', () => {
       true,
     );
     expect(Object.values(state.terminals).some((t) => t.name === '')).toBe(true);
+    // A project with nothing but failures.
+    expect(
+      projects.some((p) => {
+        const own = Object.values(state.sessions).filter((s) => s.projectId === p.id);
+        return own.length > 0 && own.every((s) => s.status.kind === 'error');
+      }),
+    ).toBe(true);
     expect(Object.values(state.approvals).every((a) => a.state === 'pending')).toBe(true);
   });
 

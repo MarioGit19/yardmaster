@@ -1,4 +1,4 @@
-import type { Browser, BrowserContextOptions, Page } from '@playwright/test';
+import { type Browser, type BrowserContextOptions, devices, type Page } from '@playwright/test';
 import { startBoard, startDemoBoard } from './board.js';
 import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures.js';
 
@@ -1431,4 +1431,175 @@ test.describe('the Retro console', () => {
       await stop();
     }
   });
+});
+
+// 11.10: the phone pass. Every layout and enter view on an iPhone profile (touch, 390 px wide),
+// in Chromium: every tap target is at least 44 px, an actor opens the inspector as a bottom
+// sheet, and the back gesture closes the sheet and leaves the enter view, like Esc.
+const { defaultBrowserType: _webkit, ...iPhone } = devices['iPhone 13'];
+
+/** Visible pressable things in the layout smaller than 44 × 44 px. */
+function smallTargets(page: Page, scope: string) {
+  return page.evaluate((scope) => {
+    const root = document.querySelector(scope);
+    if (!root) return ['no layout'];
+    const small: string[] = [];
+    for (const el of root.querySelectorAll<HTMLElement>(
+      'button, a[href], [role="button"], [role="link"], [role="tab"], [tabindex="0"]',
+    )) {
+      if (el.closest('[inert], [aria-hidden="true"]')) continue;
+      const box = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      if (box.width === 0 || box.height === 0 || style.visibility === 'hidden') continue;
+      if (Number(style.opacity) === 0 || style.pointerEvents === 'none') continue;
+      if (box.bottom < 0 || box.top > innerHeight) continue;
+      // Half a px of slack for subpixel layout.
+      if (box.width < 43.5 || box.height < 43.5) {
+        const name = el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 40) ?? '';
+        small.push(
+          `${el.tagName.toLowerCase()} "${name}" ${box.width.toFixed(0)}×${box.height.toFixed(0)}`,
+        );
+      }
+    }
+    return small;
+  }, scope);
+}
+
+const PHONE_LAYOUTS = {
+  office: { item: '[data-room]', enter: '[data-office]', entered: 'data-office-entered' },
+  grid: { item: '[data-grid-node]', enter: '[data-grid]', entered: 'data-grid-entered' },
+  transit: { item: '[data-transit-line]', enter: null, entered: null },
+  retro: { item: '[data-retro-frame]', enter: null, entered: null },
+} as const;
+
+test.describe('the phone pass', () => {
+  test.use({ ...iPhone });
+
+  for (const [name, spec] of Object.entries(PHONE_LAYOUTS)) {
+    test(`${name}: 44 px targets, the inspector a sheet, Back closes it`, async ({ page }) => {
+      await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+      await openRoute(page, '/');
+      const scope = 'main [data-layout]:not([aria-hidden])';
+      await expect(page.locator(spec.item).first()).toBeVisible();
+      await page.waitForTimeout(600);
+      expect(await smallTargets(page, scope)).toEqual([]);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      const actor = layout(page).locator('[data-scene-actor]').first();
+      await actor.scrollIntoViewIfNeeded();
+      await actor.tap();
+      const sheet = page.locator('[data-actor-inspector][data-sheet]');
+      await expect(sheet).toBeVisible();
+      await page.goBack();
+      await expect(sheet).toHaveCount(0);
+      await expect(page).toHaveURL(/#\/$/);
+      await expect(page.locator(spec.item).first()).toBeVisible();
+      // Closing it another way doesn't leave an entry behind for Back to land on.
+      await actor.tap();
+      await expect(sheet).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+      await expect.poll(() => page.evaluate(() => history.state?.cboardInspector)).toBeUndefined();
+    });
+
+    if (!spec.enter || !spec.entered) continue;
+    const { enter, entered } = spec;
+    test(`${name}: the enter view on a phone, and Back leaves it`, async ({ page }) => {
+      await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+      await openRoute(page, '/');
+      const item = page.locator(spec.item).first();
+      await expect(item).toBeVisible();
+      await item.tap({ position: { x: 60, y: 6 } });
+      const stage = page.locator(enter);
+      await expect(stage).toHaveAttribute(entered, /.+/);
+      await page.waitForTimeout(900);
+      expect(await smallTargets(page, scope(name))).toEqual([]);
+
+      // An actor in the enter view opens the sheet; Back closes the sheet, then the view.
+      const actor = page.locator(`${ENTERED_ACTORS[name as 'office' | 'grid']}`).first();
+      await actor.tap();
+      const sheet = page.locator('[data-actor-inspector][data-sheet]');
+      await expect(sheet).toBeVisible();
+      await page.goBack();
+      await expect(sheet).toHaveCount(0);
+      await expect(stage).toHaveAttribute(entered, /.+/);
+      await page.goBack();
+      await expect(stage).not.toHaveAttribute(entered, /.+/);
+      await expect(page).toHaveURL(/#\/$/);
+    });
+  }
+});
+
+const scope = (name: string) =>
+  name === 'grid' ? '[data-grid-cockpit]' : 'main [data-layout]:not([aria-hidden])';
+const ENTERED_ACTORS = {
+  office: '[data-office-room-panel] [data-room-actor]',
+  grid: '[data-grid-cockpit] [data-scene-actor]',
+} as const;
+
+// 11.10: DESIGN.md §10.7 on the worst-case board (`?worst=1`): long names, a fleet of 231
+// actors, an empty project and one with nothing but errors.
+test.describe('the layouts with worst-case data', () => {
+  const openWorst = async (page: Page, name: string) => {
+    await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+    await page.goto('/?worst=1#/');
+  };
+
+  test('Office: nameplates truncate with a tooltip, +N past 8, every cue', async ({ page }) => {
+    await openWorst(page, 'office');
+    const rooms = page.locator('[data-room]');
+    await expect(rooms).toHaveCount(7);
+    const fleet = rooms.filter({ hasText: 'fleet-load-test' });
+    // 104 sessions and 127 terminals: at most 8 drawn, the rest in the door's "+N".
+    await expect(fleet.locator('[data-room-more]')).toBeVisible();
+    const shown = await fleet.locator('[data-scene-actor]').count();
+    expect(shown).toBeLessThanOrEqual(8);
+    await expect(fleet.locator('[data-room-more]')).toHaveAttribute(
+      'data-room-more',
+      String(231 - shown),
+    );
+    const plate = page.locator('[data-room] [title^="northwind-industries"]').first();
+    const clipped = await plate.evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(clipped).toBe(true);
+    // Only errors: the room reads rose.
+    await expect(rooms.filter({ hasText: 'nightly-etl' })).toHaveAttribute('data-tone', 'err');
+  });
+
+  for (const name of ['grid', 'transit', 'retro'] as const) {
+    test(`${name}: the long names stay inside their columns`, async ({ page }) => {
+      if (name === 'grid') await disableWebgl(page);
+      await openWorst(page, name);
+      const item = {
+        grid: '[data-grid-node]',
+        transit: '[data-transit-line]',
+        retro: '[data-retro-frame]',
+      }[name];
+      await expect(page.locator(item)).toHaveCount(7);
+      await page.waitForTimeout(400);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      await expect(page.locator(item).filter({ hasText: 'nightly-etl' })).toHaveAttribute(
+        'data-tone',
+        'err',
+      );
+      if (name === 'grid') {
+        // The 2D map's node cards never overlap, whatever their names.
+        const cards = await page
+          .locator('[data-grid-map] [data-grid-node]')
+          .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
+        for (const [i, a] of cards.entries()) {
+          for (const b of cards.slice(i + 1)) {
+            const apart =
+              a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+            expect(apart).toBe(true);
+          }
+        }
+      }
+    });
+  }
 });

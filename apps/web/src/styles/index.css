@@ -2429,9 +2429,6 @@ main[data-office-zoom] {
     0 0 0 1px color-mix(in srgb, var(--st-err) 30%, transparent),
     0 8px 40px -8px var(--st-err-glow);
 }
-.grid-node[data-dim]:not(:hover, :focus-within) {
-  opacity: 0.7;
-}
 .grid-hex-edge {
   fill: var(--grid-bg);
   stroke: var(--edge);
@@ -2504,6 +2501,14 @@ main[data-office-zoom] {
   stroke: var(--grid-bg);
   stroke-width: 1;
 }
+/* Dims the contents, not the card: a pipeline ends under the card's hexagon and would show
+   through a faded panel. */
+.grid-node[data-variant] > * {
+  transition: opacity var(--dur-dim) var(--ease-out);
+}
+.grid-node[data-dim]:not(:hover, :focus-within) > * {
+  opacity: 0.7;
+}
 .grid-satellite[data-tone="work"] .grid-satellite-mark > * {
   fill: var(--st-work);
 }
@@ -2555,6 +2560,7 @@ main[data-office-zoom] {
   left: 0;
   width: 0;
   height: 0;
+  z-index: var(--z, 0);
   will-change: transform;
   /* Off stage until the renderer places it, on its first frame. */
   transform: translate3d(-9999px, 0, 0);
@@ -2583,6 +2589,38 @@ main[data-office-zoom] {
 .grid-node[data-variant="float"]:is(:hover, :focus-within) {
   border-color: color-mix(in srgb, var(--grid-neon) 45%, transparent);
   opacity: 1;
+}
+/* A crowded label (below) shows in answer to a hover or focus: fast, not at the slow dim fade. */
+.grid-float[data-crowded] .grid-node[data-variant="float"] {
+  transition-duration: var(--dur-fast);
+}
+/* A far label with no room on screen (a crowded ring) waits at its monolith, hidden, until its
+   node is hovered or focused; its satellites stay clickable. */
+.grid-float[data-crowded]:not([data-hot], :focus-within)::before {
+  opacity: 0;
+}
+.grid-float[data-crowded]:not([data-hot], :focus-within) .grid-node[data-variant="float"] {
+  opacity: 0;
+  pointer-events: none;
+}
+.grid-float[data-crowded]:is([data-hot], :focus-within) {
+  z-index: 1000;
+}
+.grid-float[data-crowded] .grid-satellite-slot {
+  pointer-events: auto;
+}
+/* Where the full card finds no room, the label shrinks to its name (the renderer's
+   LABEL_COMPACT: 112 × 36), and grows back while its node is hovered or focused. */
+.grid-float[data-compact]:not([data-hot], :focus-within) .grid-node[data-variant="float"] {
+  left: -56px;
+  width: 112px;
+  padding: 7px 10px;
+}
+.grid-float[data-compact]:not([data-hot], :focus-within) .grid-node-meta {
+  display: none;
+}
+.grid-float[data-compact]:is([data-hot], :focus-within) {
+  z-index: 1000;
 }
 .grid-node[data-variant="float"] .grid-satellites {
   position: absolute;
@@ -2799,8 +2837,14 @@ main[data-office-zoom] {
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
-.grid-node:is(:hover, :focus-visible) .grid-tip {
+/* Touch has no hover: a tap would leave the tip stuck on (the counts are in the sheet). */
+.grid-node:focus-visible .grid-tip {
   opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .grid-node:hover .grid-tip {
+    opacity: 1;
+  }
 }
 .grid-node[data-variant="trunk"] .grid-satellite-slot::before {
   width: 0;

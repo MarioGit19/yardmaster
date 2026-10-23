@@ -145,12 +145,12 @@ export function GridNode({ project, variant, style, onEnter, onHover }: GridNode
               className="ml-auto shrink-0"
             />
           </h2>
-          <p className="truncate font-mono text-meta text-text-3 tabular">
+          <p className="grid-node-meta truncate font-mono text-meta text-text-3 tabular">
             {branch ?? 'No branch'}
           </p>
         </div>
       </div>
-      <LiveCaption caption={caption} className="mt-1.5 text-meta" />
+      <LiveCaption caption={caption} className="grid-node-meta mt-1.5 text-meta" />
       {project.actors.length > 0 && (
         <ul aria-label={`${project.name} actors`} className="grid-satellites">
           {shown.map((actor) => (

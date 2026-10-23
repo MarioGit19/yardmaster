@@ -394,36 +394,78 @@ export interface LabelBox {
   y: number;
   width: number;
   height: number;
+  /** A smaller, name-only form to fall back to when the full card finds no room. */
+  compact?: { width: number; height: number };
 }
 
 /** Labels keep at least this much air between them, px. */
 const LABEL_GAP = 8;
 
+export interface LabelPlace {
+  /** The label's anchor y, px. */
+  y: number;
+  /** Placed in its compact form: the full card found no room. */
+  compact: boolean;
+  /**
+   * No room for it even compact and lifted to the top (a crowded far side): it stays at its
+   * node, hidden until its node is hovered or focused, and nothing else makes way for it.
+   */
+  crowded: boolean;
+}
+
+type Placed = { x: number; y: number; width: number; height: number };
+
+const overlaps = (box: { x: number; width: number }, y: number, height: number, other: Placed) =>
+  Math.abs(box.x - other.x) < (box.width + other.width) / 2 + LABEL_GAP &&
+  y - height < other.y + LABEL_GAP &&
+  y > other.y - other.height - LABEL_GAP;
+
+/** Where a box of this size settles: lifted above every placed label it runs into, or null. */
+function lift(
+  box: { x: number; y: number; width: number },
+  height: number,
+  placed: readonly Placed[],
+  top: number,
+): number | null {
+  let y = box.y;
+  // Re-check after each lift: rising past one label can run into another.
+  for (let pass = 0; pass <= placed.length; pass++) {
+    let moved = false;
+    for (const other of placed) {
+      if (!overlaps(box, y, height, other)) continue;
+      y = other.y - other.height - LABEL_GAP;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  y = Math.max(y, top + height);
+  return placed.some((other) => overlaps(box, y, height, other)) ? null : y;
+}
+
 /**
  * Lifts labels clear of each other: from the nearest to the farthest (the order given), each
  * label rises above any nearer one it would overlap. The far side of the ring sits higher on
- * screen, so lifting it only pulls the two further apart. Returns each label's anchor y.
+ * screen, so lifting it only pulls the two further apart. A label that would still overlap one
+ * once it hits `top` tries its compact form, and is crowded out if even that finds no room,
+ * instead of piling up there.
  */
-export function declutter(boxes: readonly LabelBox[], top = 0): number[] {
-  const placed: { x: number; y: number; width: number; height: number }[] = [];
+export function declutter(boxes: readonly LabelBox[], top = 0): LabelPlace[] {
+  const placed: Placed[] = [];
   return boxes.map((box) => {
-    let y = box.y;
-    // Re-check after each lift: rising past one label can run into another.
-    for (let pass = 0; pass < boxes.length; pass++) {
-      let moved = false;
-      for (const other of placed) {
-        const apart = Math.abs(box.x - other.x) >= (box.width + other.width) / 2 + LABEL_GAP;
-        const below = y - box.height >= other.y + LABEL_GAP;
-        const above = y <= other.y - other.height - LABEL_GAP;
-        if (apart || below || above) continue;
-        y = other.y - other.height - LABEL_GAP;
-        moved = true;
-      }
-      if (!moved) break;
+    const full = lift(box, box.height, placed, top);
+    if (full !== null) {
+      placed.push({ x: box.x, y: full, width: box.width, height: box.height });
+      return { y: full, compact: false, crowded: false };
     }
-    y = Math.max(y, top + box.height);
-    placed.push({ x: box.x, y, width: box.width, height: box.height });
-    return y;
+    if (box.compact) {
+      const small = { ...box, width: box.compact.width };
+      const y = lift(small, box.compact.height, placed, top);
+      if (y !== null) {
+        placed.push({ x: box.x, y, width: box.compact.width, height: box.compact.height });
+        return { y, compact: true, crowded: false };
+      }
+    }
+    return { y: box.y, compact: false, crowded: true };
   });
 }
 

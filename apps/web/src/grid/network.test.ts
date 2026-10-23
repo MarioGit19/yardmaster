@@ -229,21 +229,46 @@ describe('the camera', () => {
 describe('labels', () => {
   const box = (x: number, y: number) => ({ x, y, width: 200, height: 70 });
 
+  const ys = (places: { y: number }[]) => places.map((p) => p.y);
+
   it('leaves labels that are clear of each other where they are', () => {
-    expect(declutter([box(100, 400), box(400, 380), box(700, 300)])).toEqual([400, 380, 300]);
+    const places = declutter([box(100, 400), box(400, 380), box(700, 300)]);
+    expect(ys(places)).toEqual([400, 380, 300]);
+    expect(places.some((p) => p.crowded)).toBe(false);
   });
 
   it('lifts a farther label above a nearer one it would cover', () => {
-    const [near, far] = declutter([box(300, 400), box(350, 380)]);
+    const [near, far] = ys(declutter([box(300, 400), box(350, 380)]));
     expect(near).toBe(400);
     expect(far).toBe(400 - 70 - 8);
   });
 
   it('keeps lifting past every label it runs into, but not off the top', () => {
-    const [, , third] = declutter([box(300, 400), box(320, 322), box(340, 390)]);
+    const [, , third] = ys(declutter([box(300, 400), box(320, 322), box(340, 390)]));
     expect(third).toBe(322 - 70 - 8);
-    const [, high] = declutter([box(300, 100), box(310, 90)], 8);
+    const [, high] = ys(declutter([box(300, 300), box(900, 40)], 8));
     expect(high).toBe(8 + 70);
+  });
+
+  it('crowds out a label that would still overlap at the top, instead of piling it up', () => {
+    const [first, second, third] = declutter([box(300, 160), box(320, 150), box(340, 140)], 8);
+    expect(first).toEqual({ y: 160, compact: false, crowded: false });
+    // 160 − 78 = 82 ≥ 78: the second just fits above the first.
+    expect(second).toEqual({ y: 82, compact: false, crowded: false });
+    // No room left above the second: it stays at its node, and nobody makes way for it.
+    expect(third).toEqual({ y: 140, compact: false, crowded: true });
+  });
+
+  it('falls back to the compact form where only that fits', () => {
+    const compact = { width: 120, height: 30 };
+    // Two cards 336 px apart leave 136 px between them: room for a 120 px chip, not a card.
+    const places = declutter(
+      [box(300, 140), box(636, 140), { ...box(468, 120), compact }, { ...box(468, 110), compact }],
+      60,
+    );
+    expect(places[2]).toEqual({ y: 120, compact: true, crowded: false });
+    // The next one finds the chip in its way and no room above it (the top is at 60): crowded out.
+    expect(places[3]?.crowded).toBe(true);
   });
 });
 

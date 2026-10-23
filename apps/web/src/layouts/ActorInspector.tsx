@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, ExternalLink, OctagonX, SquareArrowOutUpRight, X } from 'lucide-react';
 import { AnimatePresence, motion, useDragControls } from 'motion/react';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { useNow } from '../anim/clock.js';
@@ -65,11 +65,13 @@ export function ActorInspector({
   onOpenChange,
 }: ActorInspectorProps) {
   const [open, setOpenState] = useState(false);
+  const sheet = useMediaQuery(SHEET_QUERY);
+  const back = useBackCloses(open && sheet, () => setOpen(false));
   const setOpen = (next: boolean) => {
     setOpenState(next);
     onOpenChange?.(next);
+    if (sheet) back(next);
   };
-  const sheet = useMediaQuery(SHEET_QUERY);
   const body = (
     <InspectorBody projectId={projectId} actorId={actorId} close={() => setOpen(false)} />
   );
@@ -95,6 +97,53 @@ export function ActorInspector({
       {body}
     </Popover>
   );
+}
+
+/** The history entry an open sheet pushes, so the back gesture closes it like Esc (§10.1). */
+const HISTORY_KEY = 'cboardInspector';
+let sheetEntries = 0;
+
+/**
+ * While `open`, the back gesture (or the browser's Back) calls `close` instead of leaving the
+ * page. Returns the hook to call on every open and close: opening pushes an entry; closing any
+ * other way steps back over it, unless something navigated on top meanwhile (Open's link).
+ */
+function useBackCloses(open: boolean, close: () => void): (open: boolean) => void {
+  const entry = useRef<{ token: number; href: string } | null>(null);
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    if (!open) return;
+    const onPop = () => {
+      const current = entry.current;
+      if (!current || window.history.state?.[HISTORY_KEY] === current.token) return;
+      entry.current = null;
+      closeRef.current();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [open]);
+  return (next) => {
+    if (next) {
+      if (entry.current) return;
+      sheetEntries += 1;
+      entry.current = { token: sheetEntries, href: window.location.href };
+      window.history.pushState({ ...window.history.state, [HISTORY_KEY]: sheetEntries }, '');
+      return;
+    }
+    const current = entry.current;
+    if (!current) return;
+    entry.current = null;
+    // After the click that closed it has run: a link inside the sheet navigates first.
+    setTimeout(() => {
+      if (
+        window.history.state?.[HISTORY_KEY] === current.token &&
+        window.location.href === current.href
+      ) {
+        window.history.back();
+      }
+    });
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { type DemoBoard, startBoard } from './board.js';
-import { test as base, expect, signedInState } from './fixtures.js';
+import { test as base, disableWebgl, expect, signedInState } from './fixtures.js';
 import { formatMainThread, mainThread } from './perf.js';
 
 // PRD §9 on the `--demo-stress` board: 10 projects × 6 terminals, two log firehoses at about
@@ -139,6 +139,33 @@ test('@perf the Grid 3D network keeps 55 fps under the stress load', async ({ pa
   expect(stats.longTasks).toEqual([]);
 });
 
+// 11.10: every other layout under the same load (the Grid's 2D map without WebGL).
+const LAYOUT_ITEMS = {
+  office: '[data-room]',
+  'grid 2d': '[data-grid-node]',
+  transit: '[data-transit-line]',
+  retro: '[data-retro-frame]',
+} as const;
+for (const [name, item] of Object.entries(LAYOUT_ITEMS)) {
+  test(`@perf the ${name} layout keeps 55 fps under the stress load`, async ({ page }) => {
+    test.slow();
+    await fullMotion(page);
+    if (name === 'grid 2d') await disableWebgl(page);
+    await page.addInitScript(
+      (layout) => localStorage.setItem('cboard.layout', layout),
+      name.split(' ')[0] ?? name,
+    );
+    await page.goto('/#/');
+    await expect(page.locator(item)).toHaveCount(10);
+    await page.waitForTimeout(3_000);
+
+    const stats = await measure(page, SAMPLE_MS);
+    report(name, stats);
+    expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+    expect(stats.longTasks).toEqual([]);
+  });
+}
+
 test('@perf overview main-thread time under the stress load', async ({ page }) => {
   test.slow();
   await fullMotion(page);
@@ -207,4 +234,70 @@ test('the expanded Pulse rail measures no text in its steady frames under the st
   // Events keep flying in, so the rail paints well beyond its once-a-second drift.
   expect(frames).toBeGreaterThan(10);
   expect(measures).toBe(0);
+});
+
+/** Pairs of the given elements whose boxes overlap (by more than `slack` px each way). */
+function overlaps(page: Page, selector: string, slack = 0) {
+  return page.locator(selector).evaluateAll((els, slack) => {
+    const boxes = els
+      .map((el) => ({ el, box: el.getBoundingClientRect() }))
+      .filter(({ box }) => box.width > 0 && box.height > 0);
+    const hits: string[] = [];
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]?.box;
+        const b = boxes[j]?.box;
+        if (!a || !b) continue;
+        const x = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (x > slack && y > slack) hits.push(`${i}×${j}`);
+      }
+    }
+    return hits;
+  }, slack);
+}
+
+// DESIGN.md §10.7 on the busy board (10 projects, an hour of stations).
+test('the Grid labels never overlap at 1440 with 10 projects', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.goto('/#/');
+  await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+  await expect(page.locator('[data-grid-label]')).toHaveCount(10);
+  // Lifted labels ease to their place.
+  await page.waitForTimeout(1_500);
+  // The camera drifts: sample a few moments. A label with no room shrinks to its name, or
+  // hides until hovered (`data-crowded`), so the ones on screen never overlap.
+  for (let sample = 0; sample < 6; sample++) {
+    expect(
+      await overlaps(page, '[data-grid-label]:not([data-crowded]) > [data-grid-node]'),
+    ).toEqual([]);
+    await page.waitForTimeout(500);
+  }
+});
+
+test('Transit stops never overlap in a busy hour', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+  await page.goto('/#/');
+  await expect(page.locator('[data-transit-line]')).toHaveCount(10);
+  await page.waitForTimeout(1_000);
+  // Stations merge into a count: the marks on one line keep clear of each other.
+  const crowded = await page.locator('[data-transit-line]').evaluateAll((lines) =>
+    lines.flatMap((line) => {
+      const marks = [...line.querySelectorAll('[data-transit-station] .transit-mark')].map((m) =>
+        m.getBoundingClientRect(),
+      );
+      return marks.flatMap((a, i) =>
+        marks
+          .slice(i + 1)
+          .filter(
+            (b) =>
+              Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0 &&
+              Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0,
+          )
+          .map(() => line.getAttribute('data-transit-line')),
+      );
+    }),
+  );
+  expect(await page.locator('[data-transit-station]').count()).toBeGreaterThan(20);
+  expect(crowded).toEqual([]);
 });

@@ -81,7 +81,7 @@ export function RoomPanel({ project, box, sheet, onBack }: RoomPanelProps) {
           aria-expanded={!fold}
           onPointerDown={(e) => drag.start(e)}
           onClick={() => setFolded((f) => !f)}
-          className="flex h-6 w-full shrink-0 cursor-grab touch-none select-none items-center justify-center active:cursor-grabbing"
+          className="-mb-5 flex h-11 w-full shrink-0 cursor-grab touch-none select-none items-start justify-center pt-2.5 active:cursor-grabbing"
         >
           <span aria-hidden className="h-1 w-10 rounded-full bg-line-strong" />
         </button>

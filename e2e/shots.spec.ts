@@ -715,7 +715,7 @@ test.describe('worst case', () => {
               animations: 'disabled',
             });
           await openWorst(page);
-          await expect(page.locator('[data-pod]')).toHaveCount(6);
+          await expect(page.locator('[data-pod]')).toHaveCount(7);
           await page.waitForTimeout(800);
           await shot('overview');
           // The board scrolls inside its own column: the lower pods get a shot of their own.
@@ -1455,6 +1455,105 @@ test.describe('layouts', () => {
       });
     });
   }
+});
+
+// 11.10: every layout on the worst-case board (long names, a fleet of 231 actors, an empty
+// project, one with only errors, non-Latin and emoji names), with its enter view, and with 20
+// projects (`--demo-stress --demo-projects 20`). For the DESIGN.md §10.7 review.
+const LAYOUT_OVERVIEWS = {
+  office: '[data-room]',
+  grid: '[data-grid-node]',
+  transit: '[data-transit-line]',
+  retro: '[data-retro-frame]',
+} as const;
+
+test.describe('layouts worst case', () => {
+  test.describe.configure({ mode: 'serial' });
+  for (const [layout, item] of Object.entries(LAYOUT_OVERVIEWS)) {
+    for (const [theme, viewport] of [
+      ['dark', { width: 1440, height: 900 }],
+      ['light', { width: 1440, height: 900 }],
+      ['dark', { width: 390, height: 844 }],
+    ] as const) {
+      test.describe(`${layout} ${theme} ${viewport.width}`, () => {
+        test.use({ theme, viewport });
+        test('overview and enter view', async ({ page }) => {
+          test.slow();
+          if (layout === 'grid') await disableWebgl(page);
+          await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+          await page.goto('/?worst=1#/');
+          await expect(page.locator(item)).toHaveCount(7);
+          await page.waitForTimeout(1200);
+          const shot = (moment: string, fullPage = true) =>
+            page.screenshot({
+              path: new URL(
+                `layout-worst-${layout}-${moment}-${viewport.width}-${theme}.png`,
+                OUT_DIR,
+              ).pathname,
+              fullPage,
+              animations: 'disabled',
+            });
+          await shot('overview');
+          if (layout === 'office') {
+            await page
+              .locator('[data-room]')
+              .first()
+              .click({ position: { x: 40, y: 4 } });
+            await expect(page.locator('[data-room-entered]')).toBeVisible();
+            await expect(page.locator('[data-office]')).not.toHaveAttribute(
+              'data-office-moving',
+              '',
+            );
+            await page.waitForTimeout(500);
+            await shot('enter', false);
+          }
+          if (layout === 'grid') {
+            await page
+              .locator('[data-grid-node]')
+              .first()
+              .click({ position: { x: 60, y: 8 } });
+            await expect(page.locator('[data-grid-cockpit]')).toBeVisible();
+            await page.waitForTimeout(900);
+            await shot('enter', false);
+          }
+        });
+      });
+    }
+  }
+});
+
+test.describe('layouts stress', () => {
+  test('20 projects', async ({ browser }) => {
+    test.slow();
+    const board = await startBoard({ demo: true, stress: true, projects: 20 });
+    try {
+      for (const layout of ['office', 'grid', 'transit'] as const) {
+        const context = await browser.newContext({
+          viewport: { width: 1440, height: 900 },
+          colorScheme: 'dark',
+          baseURL: board.url,
+          storageState: signedInState(board.url, board.cookie),
+        });
+        const page = await context.newPage();
+        await page.addInitScript((l) => {
+          localStorage.setItem('cboard.layout', l);
+          localStorage.setItem('cboard.theme', 'dark');
+          localStorage.setItem('cboard.motion', 'full');
+        }, layout);
+        await openRoute(page, '/');
+        await expect(page.locator(LAYOUT_OVERVIEWS[layout])).not.toHaveCount(0);
+        await page.waitForTimeout(2500);
+        await page.screenshot({
+          path: new URL(`layout-stress-${layout}-1440-dark.png`, OUT_DIR).pathname,
+          fullPage: layout !== 'grid',
+          animations: 'disabled',
+        });
+        await context.close();
+      }
+    } finally {
+      await board.stop();
+    }
+  });
 });
 
 test.describe('retro amber', () => {

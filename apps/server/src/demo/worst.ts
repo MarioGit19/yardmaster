@@ -286,6 +286,40 @@ const PROJECTS: ProjectDef[] = [
   },
   { name: 'x', git: null, sessions: [], terminals: [] },
   {
+    // Nothing but failures: every session errored, every terminal exited non-zero.
+    name: 'nightly-etl',
+    git: {
+      branch: 'main',
+      head: 'badf00d',
+      detached: false,
+      dirty: 0,
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 0,
+    },
+    sessions: [
+      { status: { kind: 'error', message: LONG_ERROR }, title: 'Backfill the warehouse' },
+      {
+        status: { kind: 'error', message: 'Prompt is too long' },
+        title: 'Explain the failing DAG',
+      },
+    ],
+    terminals: [
+      {
+        name: 'airflow scheduler',
+        command: 'airflow scheduler',
+        exit: 137,
+        output: ['Killed'],
+      },
+      {
+        name: 'dbt run',
+        command: 'dbt run --select +orders',
+        exit: 2,
+        output: ['Compilation Error in model orders (models/orders.sql)'],
+      },
+    ],
+  },
+  {
     name: 'fleet-load-test',
     git: {
       branch: null,

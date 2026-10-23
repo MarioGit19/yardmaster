@@ -9,8 +9,12 @@ import { eventDetail, eventLabel, exitCodeOf } from '../pulse/model.js';
 // desktop map (time left → right) and the phone's (lines top → bottom, now on top) share it.
 
 export const TRANSIT_WINDOW_MS = HISTORY_WINDOW_MS;
-/** Stations closer than this (px along the line) merge into one stop with a count (§10.7). */
-export const MERGE_PX = 12;
+/**
+ * Stations closer than this (px along the line) to a stop merge into it, showing a count. §10.7
+ * asks for at least 12 px; a stop's footprint (its 24 px target, and the count pill's ring) needs
+ * this much, or a busy hour draws pills on top of each other.
+ */
+export const MERGE_PX = 24;
 /** Below this stage width the lines run top to bottom. */
 export const VERTICAL_BELOW = 640;
 
@@ -77,10 +81,14 @@ const HEADER = 56;
  * The phone's map: one column per line, "now" at the top with the trains above it, the hour
  * running down. Columns share the width, never narrower than a 44 px tap target plus a gap.
  */
+/** The phone's left gutter for the time labels ("−60m"), so no line runs through one (§10.7). */
+export const AXIS_GUTTER = 32;
+
 export function verticalFrame(lines: number, width: number): TransitFrame {
   const pxPerMin = 16;
   const maxTrains = 3;
-  const lineGap = Math.max(52, Math.floor(width / Math.max(1, lines)));
+  // At least a 44 px tap target per column.
+  const lineGap = Math.max(44, Math.floor((width - AXIS_GUTTER) / Math.max(1, lines)));
   const platform = maxTrains * (TRAIN.len + TRAIN.gap) + MORE;
   const nowAt = HEADER + platform + PLATFORM_GAP;
   return {
@@ -91,9 +99,9 @@ export function verticalFrame(lines: number, width: number): TransitFrame {
     startAt: nowAt + 60 * pxPerMin,
     platformAt: nowAt - PLATFORM_GAP,
     length: nowAt + 60 * pxPerMin + PAD,
-    breadth: Math.max(1, lines) * lineGap,
+    breadth: AXIS_GUTTER + Math.max(1, lines) * lineGap,
     lineGap,
-    firstLine: lineGap / 2,
+    firstLine: AXIS_GUTTER + lineGap / 2,
     maxTrains,
   };
 }
@@ -224,7 +232,8 @@ export interface StationStop {
 /**
  * Stations as stops along a line: a station within `MERGE_PX` of the stop before it joins that
  * stop, which then shows a count. A merged stop sits at its members' middle and takes the worst
- * kind; clicking it opens its newest station.
+ * kind; clicking it opens its newest station. Distances are measured from that middle, and a
+ * stop only moves on (toward newer time), so two stops never sit closer than `MERGE_PX`.
  */
 export function placeStops(
   stations: readonly Station[],
@@ -233,12 +242,11 @@ export function placeStops(
   mergePx = MERGE_PX,
 ): StationStop[] {
   const stops: StationStop[] = [];
-  let anchor = Number.NaN;
   let current: StationStop | null = null;
   let sum = 0;
   for (const station of stations) {
     const along = alongAt(station.ts, now, frame);
-    if (current && Math.abs(along - anchor) < mergePx) {
+    if (current && Math.abs(along - current.along) < mergePx) {
       current.stations.push(station);
       sum += along;
       current.along = sum / current.stations.length;
@@ -246,7 +254,6 @@ export function placeStops(
       continue;
     }
     current = { id: station.id, along, kind: station.kind, stations: [station] };
-    anchor = along;
     sum = along;
     stops.push(current);
   }
