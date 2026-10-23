@@ -256,9 +256,11 @@ describe('rail keyboard navigation', () => {
   it('moves focus between items with arrows, Home and End', () => {
     render('/');
     const items = railItems();
-    // Overview, acme-shop, orbit-api, zen-notes, Settings (projects sorted by name).
+    // Overview, Open project (a button), acme-shop, orbit-api, zen-notes, Settings (projects
+    // sorted by name).
     expect(items.map((a) => a.getAttribute('href'))).toEqual([
       '/',
+      null,
       '/p/p-acme',
       '/p/p-orbit',
       '/p/p-zen',
@@ -272,7 +274,7 @@ describe('rail keyboard navigation', () => {
     press('ArrowUp');
     expect(document.activeElement).toBe(items[1]);
     press('End');
-    expect(document.activeElement).toBe(items[4]);
+    expect(document.activeElement).toBe(items[5]);
     press('ArrowDown');
     expect(document.activeElement).toBe(items[0]);
     press('Home');

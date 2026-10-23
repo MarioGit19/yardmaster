@@ -13,6 +13,7 @@ import {
   type GitInfo,
   makeMessage,
   type PortBinding,
+  type Project,
   projectIdFromPath,
   type ResumableSessionStatus,
   type ServerToUi,
@@ -123,6 +124,8 @@ const STRESS_PACE: Pace = {
 const STRESS_APPROVAL_TIMEOUT_MS = 3_000;
 /** How long a new terminal takes to appear, and then to start its command. */
 const CREATE_DELAY_MS = 300;
+/** How long an editor window takes to connect after "Open in Cursor". */
+const OPEN_EDITOR_DELAY_MS = 900;
 const DEV_KINDS: ReadonlySet<TerminalKind> = new Set(['next', 'vite', 'rails']);
 
 /** What a terminal created with this command plays out as. */
@@ -342,6 +345,65 @@ export class DemoSimulator {
       'terminal.create': ({ projectId, name, command }) =>
         this.createTerminal(projectId, name, command),
       'terminal.close': offline,
+    };
+  }
+
+  /**
+   * A library folder opened from the board (12.2): it joins the demo board without an editor
+   * window or terminals, ready for a session, a terminal or "Open in Cursor".
+   */
+  addProject(project: Project, git: boolean): void {
+    if (!this.running || this.projects.some((p) => p.id === project.id)) {
+      this.store.upsertProject(project);
+      return;
+    }
+    const ctx: ProjectCtx = {
+      id: project.id,
+      def: {
+        name: project.name,
+        path: project.path,
+        branch: 'main',
+        window: -1,
+        terminals: [],
+        testFiles: [],
+        scenarios: DEMO_PROJECTS[0]?.scenarios ?? [],
+      },
+      // Not the seeded random sequence: opening a folder mustn't shift the rest of the demo.
+      windowId: `demo-window-${project.id}`,
+      dirty: 0,
+      seededAt: project.createdAt,
+      scenarioCursor: 0,
+    };
+    this.projects.push(ctx);
+    this.store.upsertProject({
+      ...project,
+      git: git ? this.gitInfo(ctx, project.createdAt) : null,
+    });
+  }
+
+  /** "Open in Cursor" plays out as a Cursor window for the project connecting a moment later. */
+  editorActions(): Pick<ActionHandlers, 'project.openInEditor'> {
+    return {
+      'project.openInEditor': ({ projectId }) => {
+        const project = this.running ? this.projects.find((p) => p.id === projectId) : undefined;
+        if (!project) return { ok: false, error: 'unknown_project' };
+        if (this.store.state.windows[project.windowId]) return { ok: true };
+        this.after(OPEN_EDITOR_DELAY_MS, () => {
+          const ts = this.now();
+          this.store.upsertWindow({
+            id: project.windowId,
+            appName: 'Cursor',
+            appVersion: DEMO_WINDOWS[0].appVersion,
+            extensionVersion: '0.1.0',
+            workspaceFolders: [project.def.path],
+            projectIds: [project.id],
+            capabilities: { shellExecution: true },
+            connectedAt: ts,
+            lastSeenAt: ts,
+          });
+        });
+        return { ok: true };
+      },
     };
   }
 
@@ -1389,7 +1451,8 @@ export class DemoSimulator {
   private markDirty(project: ProjectCtx): void {
     project.dirty = Math.min(project.dirty + 1, 24);
     const current = this.store.state.projects[project.id];
-    if (current) this.store.upsertProject({ ...current, git: this.gitInfo(project, this.now()) });
+    if (current?.git)
+      this.store.upsertProject({ ...current, git: this.gitInfo(project, this.now()) });
   }
 
   private gitInfo(project: ProjectCtx, ts: number): GitInfo {

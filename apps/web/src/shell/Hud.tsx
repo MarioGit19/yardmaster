@@ -1,4 +1,13 @@
-import { CirclePause, Monitor, MonitorCog, Moon, Sparkle, Sparkles, Sun } from 'lucide-react';
+import {
+  CirclePause,
+  FolderOpen,
+  Monitor,
+  MonitorCog,
+  Moon,
+  Sparkle,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
@@ -10,12 +19,14 @@ import {
   useBoard,
   useBoardShallow,
 } from '../data/index.js';
+import { pickerOpen } from '../library/OpenProject.js';
 import { type MotionSetting, motionPreference, nextMotion, useMotionLevel } from '../motion.js';
 import { paletteOpen } from '../palette/palette.js';
 import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
 import { formatCount, type Tone } from '../status.js';
 import { NEXT_THEME, type ThemeSetting, useTheme } from '../theme/theme.js';
+import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Kbd } from '../ui/Kbd.js';
@@ -128,6 +139,19 @@ export function Hud() {
         </li>
       </ul>
       <div className="flex-1" />
+      <Tooltip content="Open project" shortcut={IS_MAC ? '⌘O' : 'Ctrl+O'}>
+        <button
+          type="button"
+          data-hud="open-project"
+          aria-label="Open project"
+          aria-keyshortcuts={IS_MAC ? 'Meta+O' : 'Control+O'}
+          onClick={() => pickerOpen.set('open')}
+          className={cx(buttonClass('ghost', 'sm'), 'max-lg:size-7 max-lg:px-0 max-md:size-11')}
+        >
+          <FolderOpen aria-hidden className="size-4" strokeWidth={1.5} />
+          <span className="max-lg:sr-only">Open project</span>
+        </button>
+      </Tooltip>
       <Connection />
       <Tooltip content="Command palette">
         <button

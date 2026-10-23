@@ -248,15 +248,17 @@ describe('settings routes', () => {
     expect(listed.entries.map((e) => [e.name, e.git])).toEqual([['acme-shop', true]]);
   });
 
-  it('gives the demo board a synthetic library', async () => {
+  it('gives the demo board a synthetic library, under ~/Desktop until changed', async () => {
     const { token } = await boot({ demo: true });
-    expect((await call('GET', '/api/library', token)).json()).toEqual({ roots: [], entries: [] });
-    await call('PUT', '/api/settings', token, { libraryRoots: ['~/Desktop'] });
+    const settings = BoardSettings.parse((await call('GET', '/api/settings', token)).json());
+    expect(settings.libraryRoots).toEqual(['~/Desktop']);
     const listed = LibraryResponse.parse((await call('GET', '/api/library', token)).json());
     expect(listed.entries.length).toBeGreaterThan(4);
     expect(listed.entries.every((e) => e.path.startsWith('/home/dev/'))).toBe(true);
     expect(listed.entries.find((e) => e.name === 'garden-planner')?.projectId).toBeNull();
     expect(listed.entries[0]?.projectId).not.toBeNull();
+    await call('PUT', '/api/settings', token, { libraryRoots: [] });
+    expect((await call('GET', '/api/library', token)).json()).toEqual({ roots: [], entries: [] });
   });
 
   it('plans, confirms and installs the hooks, writing only what was shown', async () => {

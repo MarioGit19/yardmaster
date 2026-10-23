@@ -1,5 +1,5 @@
 import type { Project } from '@c-board/protocol';
-import { LayoutGrid, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
+import { FolderOpen, LayoutGrid, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import { forwardRef, type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { Link, useRoute } from 'wouter';
 import {
@@ -9,6 +9,7 @@ import {
   useBoard,
   useBoardList,
 } from '../data/index.js';
+import { pickerOpen } from '../library/OpenProject.js';
 import { projectHref, routes } from '../routes.js';
 import { projectTone, toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
@@ -74,6 +75,9 @@ export function ProjectRail({ collapsed, onToggle }: ProjectRailProps) {
             tabStop={tabStop === 0}
             icon={<LayoutGrid className="size-4" strokeWidth={1.5} />}
           />
+        </li>
+        <li>
+          <RailOpenProject collapsed={collapsed} />
         </li>
         <li aria-hidden className="mx-2 my-1.5 h-px bg-line" />
         {!hydrated && projects.length === 0 && <RailSkeleton collapsed={collapsed} />}
@@ -218,6 +222,36 @@ function RailLink({
   return (
     <Tooltip content={label} side="right">
       {link}
+    </Tooltip>
+  );
+}
+
+/** "Open project" (F25): opens the picker, so it's a button among the rail's links. */
+function RailOpenProject({ collapsed }: { collapsed: boolean }) {
+  const button = (
+    <button
+      type="button"
+      aria-label={collapsed ? 'Open project' : undefined}
+      tabIndex={-1}
+      data-rail-item=""
+      data-rail-open-project=""
+      onClick={() => pickerOpen.set('open')}
+      className={cx(
+        'relative flex h-9 w-full items-center gap-2 rounded-control px-2 text-body-sm text-text-2 outline-none',
+        'transition-colors duration-fast ease-out hover:bg-bg-2/60 hover:text-text-1',
+        collapsed && 'justify-center px-0',
+      )}
+    >
+      <span className="flex size-6 shrink-0 items-center justify-center text-text-2">
+        <FolderOpen className="size-4" strokeWidth={1.5} />
+      </span>
+      {!collapsed && <span className="min-w-0 flex-1 truncate text-left">Open project</span>}
+    </button>
+  );
+  if (!collapsed) return button;
+  return (
+    <Tooltip content="Open project" side="right">
+      {button}
     </Tooltip>
   );
 }

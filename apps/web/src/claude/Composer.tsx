@@ -307,7 +307,7 @@ function Composer({
   );
 }
 
-function Pill<V extends string>({
+export function Pill<V extends string>({
   name,
   icon,
   label,

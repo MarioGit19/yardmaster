@@ -1,14 +1,23 @@
 import type { LibraryEntry, LibraryResponse, Project } from '@c-board/protocol';
 import type { LibrarySource } from '../library.js';
-import { DEMO_HOME } from './content.js';
+import { DEMO_HOME, DEMO_PROJECTS } from './content.js';
 
 /** Folders on the demo "desktop" that aren't on the board yet. */
-const EXTRA_FOLDERS = [
+export const DEMO_LIBRARY_FOLDERS = [
   { name: 'garden-planner', git: true },
   { name: 'recipe-box', git: true },
   { name: 'tax-notes', git: false },
   { name: 'weather-bot', git: true },
 ] as const;
+
+/** The root the demo board starts with, the one onboarding suggests. */
+export const DEMO_LIBRARY_ROOT = '~/Desktop';
+
+/** Whether a demo library folder is a git repository. */
+export function demoFolderHasGit(path: string): boolean {
+  const folder = DEMO_LIBRARY_FOLDERS.find((f) => `${DEMO_HOME}/${f.name}` === path);
+  return folder?.git ?? DEMO_PROJECTS.some((p) => p.path === path);
+}
 
 /**
  * A synthetic library for the demo board: its projects plus a few folders that aren't open
@@ -30,7 +39,10 @@ export function demoLibrary(): LibrarySource {
             projectId: p.id,
             lastActiveAt: p.lastActivityAt ?? p.createdAt,
           })),
-        ...EXTRA_FOLDERS.map((folder) => ({
+        // A folder opened from the board is listed once, as its project.
+        ...DEMO_LIBRARY_FOLDERS.filter(
+          (folder) => !projects.some((p) => p.path === `${DEMO_HOME}/${folder.name}`),
+        ).map((folder) => ({
           name: folder.name,
           path: `${DEMO_HOME}/${folder.name}`,
           root,
@@ -51,6 +63,15 @@ export function demoLibrary(): LibrarySource {
         })),
         entries,
       };
+    },
+    // The demo board's own folders and the extra ones, once a root is configured.
+    async resolve(roots: readonly string[], path: string): Promise<string | null> {
+      if (roots.length === 0) return null;
+      const name = path.startsWith(`${DEMO_HOME}/`) ? path.slice(DEMO_HOME.length + 1) : '';
+      const known =
+        DEMO_LIBRARY_FOLDERS.some((f) => f.name === name) ||
+        DEMO_PROJECTS.some((p) => p.path === path);
+      return known ? path : null;
     },
   };
 }

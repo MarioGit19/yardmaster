@@ -3,6 +3,7 @@ import {
   type HealthResponse,
   HISTORY_WINDOW_MS,
   type LibraryResponse,
+  type Project,
   ProjectId,
   type ServerStatus,
   type SessionHistoryResponse,
@@ -20,7 +21,7 @@ import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { createDemoQuery } from './demo/demo-query.js';
-import { demoLibrary } from './demo/library.js';
+import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
 import { createEditorActions } from './editor-actions.js';
@@ -34,6 +35,7 @@ import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
+import { createProjectActions } from './project-actions.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
@@ -42,6 +44,7 @@ import {
   EDITOR_SEEN_KEY,
   HOOK_SEEN_KEY,
   type HookSettingsFile,
+  LIBRARY_ROOTS_KEY,
   librarySettings,
   memoryHookSettings,
   migrateTerminalReply,
@@ -285,6 +288,11 @@ export async function buildServer(
     state: () => store.state,
     isConnected: (windowId) => editorGateway.isConnected(windowId),
   });
+  const library = options.library ?? (options.demo ? demoLibrary() : new ProjectLibrary());
+  // The demo's synthetic library sits on a made-up Desktop, so the picker has folders to show.
+  if (options.demo && settings[LIBRARY_ROOTS_KEY] === undefined) {
+    settings[LIBRARY_ROOTS_KEY] = [DEMO_LIBRARY_ROOT];
+  }
   const actions = options.actions ?? defaultActions();
   function defaultActions(): ActionHandlers {
     const handlers: ActionHandlers = {
@@ -294,8 +302,19 @@ export async function buildServer(
         send: editorGateway.sendCommand.bind(editorGateway),
       }),
       ...runner.actions(),
+      ...createProjectActions({
+        store,
+        library,
+        roots: () => librarySettings(settings).libraryRoots,
+        ...(demo
+          ? {
+              add: (project: Project) => demo?.addProject(project, demoFolderHasGit(project.path)),
+            }
+          : {}),
+      }),
       // Demo windows have no socket, so the simulator plays the editor's part.
       ...demo?.terminalActions(),
+      ...demo?.editorActions(),
     };
     return {
       ...handlers,
@@ -417,7 +436,6 @@ export async function buildServer(
         },
   });
 
-  const library = options.library ?? (options.demo ? demoLibrary() : new ProjectLibrary());
   app.get('/api/library', async (): Promise<LibraryResponse> => {
     const { libraryRoots } = librarySettings(settings);
     return library.list(libraryRoots, Object.values(store.state.projects));

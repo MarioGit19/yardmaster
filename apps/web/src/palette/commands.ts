@@ -31,6 +31,7 @@ export type PaletteRun =
   | { kind: 'theme'; next: ThemeSetting }
   | { kind: 'layout'; next: LayoutId }
   | { kind: 'attention' }
+  | { kind: 'openProject' }
   | { kind: 'rail' }
   | { kind: 'pulse' };
 
@@ -50,7 +51,8 @@ export type PaletteIcon =
   | 'attention'
   | 'rail'
   | 'pulse'
-  | 'overview';
+  | 'overview'
+  | 'open';
 
 export interface PaletteCommand {
   /** Stable and unique: the cmdk item value. */
@@ -82,6 +84,8 @@ export interface PaletteContext {
   layout: LayoutId;
   /** The rail can be toggled (it is pinned to icons on narrow screens). */
   railToggle: boolean;
+  /** Shortcut hints use ⌘ rather than Ctrl. */
+  mac?: boolean;
 }
 
 const MOTION_NAME: Record<MotionSetting, string> = {
@@ -343,6 +347,15 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
     });
   }
   commands.push(
+    {
+      id: 'open-project',
+      group: 'Actions',
+      label: 'Open project…',
+      hint: 'from your project folders',
+      icon: 'open',
+      shortcut: context.mac ? ['⌘', 'O'] : ['Ctrl', 'O'],
+      run: { kind: 'openProject' },
+    },
     {
       id: 'attention',
       group: 'Actions',

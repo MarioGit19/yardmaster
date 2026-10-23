@@ -1605,7 +1605,7 @@ test.describe('grid reduced', () => {
 });
 
 // Settings → Projects (12.1): two library roots, one readable and one blocked by macOS privacy
-// settings. Both routes are faked for this page only, so the shared demo board keeps no roots.
+// settings. Both routes are faked for this page only; the shared demo board keeps its one root.
 for (const theme of THEMES) {
   for (const width of [1440, 390]) {
     test.describe(`settings projects ${theme} ${width}`, () => {
@@ -1645,6 +1645,41 @@ for (const theme of THEMES) {
         await page.waitForTimeout(400);
         await section.screenshot({
           path: new URL(`settings-projects-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      });
+    });
+  }
+}
+
+// Open project (12.2): the picker over the demo's synthetic library, and the launch sheet with
+// all three options ticked. Nothing is launched, so the shared board doesn't change.
+for (const theme of THEMES) {
+  for (const width of [1440, 390]) {
+    test.describe(`open project ${theme} ${width}`, () => {
+      test.use({ theme, viewport: { width, height: width < 1024 ? 844 : 900 } });
+
+      test('picker and launch sheet', async ({ page }) => {
+        await openRoute(page, '/');
+        await page.locator('[data-hud="open-project"]').click();
+        const dialog = page.locator('[data-open-project]');
+        await expect(dialog.locator('[data-library-entry="weather-bot"]')).toBeVisible();
+        await page.waitForTimeout(400);
+        await page.screenshot({
+          path: new URL(`open-project-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+        await dialog.locator('[data-library-entry="weather-bot"]').click();
+        const sheet = dialog.locator('[data-launch-sheet="weather-bot"]');
+        await sheet.locator('[data-launch-option="claude"] label').click();
+        await sheet
+          .getByRole('textbox', { name: 'What should Claude do?' })
+          .fill('Add a 7-day forecast command');
+        await sheet.locator('[data-launch-option="terminal"] label').click();
+        await sheet.getByRole('textbox', { name: 'Command to run (optional)' }).fill('pnpm dev');
+        await page.waitForTimeout(400);
+        await page.screenshot({
+          path: new URL(`open-project-launch-${width}-${theme}.png`, OUT_DIR).pathname,
           animations: 'disabled',
         });
       });

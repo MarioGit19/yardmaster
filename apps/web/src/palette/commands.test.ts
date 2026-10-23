@@ -210,6 +210,16 @@ describe('buildCommands', () => {
     expect(found[0]?.command.id).toBe('layout:retro');
   });
 
+  it('opens the project picker, with the platform shortcut', () => {
+    const open = byId(buildCommands(board(), context({ mac: true })), 'open-project');
+    expect(open).toMatchObject({ label: 'Open project…', shortcut: ['⌘', 'O'] });
+    expect(open?.run).toEqual({ kind: 'openProject' });
+    expect(byId(buildCommands(board(), context()), 'open-project')?.shortcut).toEqual([
+      'Ctrl',
+      'O',
+    ]);
+  });
+
   it('skips interactive and empty commands when re-running', () => {
     const b = board();
     b.executions['e-4'] = { ...execution('e-4', 't-acme', 'htop', T0 + 99), interactive: true };

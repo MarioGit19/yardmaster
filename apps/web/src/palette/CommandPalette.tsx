@@ -8,6 +8,7 @@ import {
   CircleStop,
   CornerDownLeft,
   ExternalLink,
+  FolderOpen,
   LayoutDashboard,
   LayoutGrid,
   type LucideIcon,
@@ -28,6 +29,7 @@ import { attentionOpen } from '../attention/attention.js';
 import { useBoard, useBoardClient } from '../data/index.js';
 import { useFocusRoute } from '../focus/FocusStage.js';
 import { layoutPreference } from '../layouts/registry.js';
+import { pickerOpen } from '../library/OpenProject.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
@@ -67,11 +69,14 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   rail: PanelLeft,
   pulse: Activity,
   overview: LayoutGrid,
+  open: FolderOpen,
 };
 
 type Page = { kind: 'root' } | { kind: 'prompt'; projectId: string; projectName: string };
 
 const close = () => paletteOpen.set('closed');
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /**
  * ⌘K, DESIGN.md §4.8: a glass modal over cmdk with Projects, Sessions, Terminals and Actions.
@@ -188,6 +193,7 @@ function PaletteBody({
         nextTheme: NEXT_THEME[theme],
         layout,
         railToggle: !narrow,
+        mac: IS_MAC,
       }),
     [board, focus?.projectId, motion, theme, layout, narrow],
   );
@@ -252,6 +258,11 @@ function PaletteBody({
       case 'layout':
         layoutPreference.set(action.next);
         close();
+        return;
+      case 'openProject':
+        keepFocus();
+        close();
+        pickerOpen.set('open');
         return;
       case 'attention':
         keepFocus();

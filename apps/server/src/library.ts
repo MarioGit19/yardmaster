@@ -70,6 +70,8 @@ interface Listed {
 /** What `GET /api/library` lists from; the demo board swaps in a synthetic one. */
 export interface LibrarySource {
   list(roots: readonly string[], projects: readonly Project[]): Promise<LibraryResponse>;
+  /** The realpath of a folder that may be opened from the library, or null. */
+  resolve(roots: readonly string[], path: string): Promise<string | null>;
 }
 
 export interface ProjectLibraryOptions {

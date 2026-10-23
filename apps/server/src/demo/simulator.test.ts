@@ -453,6 +453,54 @@ describe('DemoSimulator', () => {
       sim.stop();
     });
 
+    it('adds a library folder, opens it in Cursor and runs a terminal in it', async () => {
+      const { store, sim, advance } = run();
+      sim.start();
+      advance(500);
+      const id = 'f01de2a0b1c3';
+      sim.addProject(
+        {
+          id,
+          path: '/home/dev/garden-planner',
+          name: 'garden-planner',
+          accent: 0,
+          source: 'manual',
+          git: null,
+          createdAt: T0,
+          lastActivityAt: T0,
+        },
+        true,
+      );
+      expect(store.state.projects[id]).toMatchObject({ name: 'garden-planner', source: 'manual' });
+      expect(store.state.projects[id]?.git?.branch).toBe('main');
+      const windows = () =>
+        Object.values(store.state.windows).filter((w) => w.projectIds.includes(id));
+      expect(windows()).toEqual([]);
+
+      const open = sim.editorActions()['project.openInEditor'];
+      expect(await open({ kind: 'project.openInEditor', projectId: id })).toEqual({ ok: true });
+      advance(1_000);
+      expect(windows()).toMatchObject([
+        { appName: 'Cursor', workspaceFolders: ['/home/dev/garden-planner'] },
+      ]);
+      expect(await open({ kind: 'project.openInEditor', projectId: 'nope' })).toEqual({
+        ok: false,
+        error: 'unknown_project',
+      });
+
+      const create = sim.terminalActions()['terminal.create'];
+      expect(await create({ kind: 'terminal.create', projectId: id, command: 'pnpm dev' })).toEqual(
+        {
+          ok: true,
+        },
+      );
+      advance(1_500);
+      const terminal = Object.values(store.state.terminals).find((t) => t.projectId === id);
+      expect(terminal).toMatchObject({ state: 'open', windowId: windows()[0]?.id });
+      expect(execsOf(store, terminal?.id ?? '').at(-1)).toMatchObject({ commandLine: 'pnpm dev' });
+      sim.stop();
+    });
+
     it('runs htop full screen until Ctrl+C', async () => {
       const { store, sim, advance } = run();
       sim.start();

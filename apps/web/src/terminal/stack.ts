@@ -99,6 +99,8 @@ const ERRORS: Record<string, string> = {
   disconnected: 'c-board is offline',
   timeout: 'No answer from c-board',
   not_implemented: 'Not available yet',
+  outside_library: 'That folder is not in your project library',
+  unknown_project: 'That project is no longer on the board',
 };
 
 /** A server error code as a sentence for a toast. */
