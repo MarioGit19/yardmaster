@@ -16,6 +16,7 @@ import { MotionRoot } from './MotionRoot.js';
 import { dur, ease } from './motion.js';
 import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
 import { CommandPalette } from './palette/CommandPalette.js';
+import { PortShareDialog } from './ports/PortShareDialog.js';
 import { PulseRail } from './pulse/PulseRail.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
@@ -152,6 +153,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <CommandPalette />
           <OpenProjectDialog />
           <CloseProjectDialog />
+          <PortShareDialog />
           <EditorLaunchWatcher />
         </Router>
         <Toasts />

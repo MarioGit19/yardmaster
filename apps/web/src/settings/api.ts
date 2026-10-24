@@ -9,6 +9,8 @@ import {
   OkResponse,
   PairedDevicesResponse,
   PairingResponse,
+  PortShare,
+  PortSharesResponse,
   ServerStatus,
 } from '@c-board/protocol';
 
@@ -74,4 +76,8 @@ export const api = {
     request(PairedDevicesResponse, 'GET', '/api/remote/devices', undefined, signal),
   revokeDevice: (id: string) =>
     request(OkResponse, 'DELETE', `/api/remote/devices/${encodeURIComponent(id)}`),
+  portShares: (signal?: AbortSignal) =>
+    request(PortSharesResponse, 'GET', '/api/ports/shares', undefined, signal),
+  sharePort: (port: number) => request(PortShare, 'POST', `/api/ports/${port}/share`, {}),
+  unsharePort: (port: number) => request(OkResponse, 'DELETE', `/api/ports/${port}/share`),
 };

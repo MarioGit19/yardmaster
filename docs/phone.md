@@ -28,6 +28,26 @@ Still on the Mac, click **Show pairing code**. Point your phone's camera at the 
 
 Your phone now appears under **Paired devices**. It stays signed in until you **revoke** it there, which also disconnects it right away. Add c-board to your home screen for a full-screen board.
 
+## Dev servers on your phone
+
+Once phone access works, the board can open a project's dev servers on your phone too. Click a port chip (`:3000` on a lane, in the focus view, the Actor inspector, the Office port sign or the Grid screens) and choose **Open on phone**. The board runs:
+
+```bash
+tailscale serve --bg --https=3000 http://127.0.0.1:3000
+```
+
+and shows the address, `https://my-mac.tailnet-name.ts.net:3000`, with Copy, Open and a QR code. On the phone itself, tapping a port chip opens that address straight away, sharing the port first if needed. A shared port carries a small phone mark wherever its chip appears.
+
+- **Tailnet only.** The board uses `tailscale serve`, never Funnel, so only devices signed in to your tailnet can open the address.
+- **It cleans up after itself.** The board remembers which serve entries it created, in its data folder, and removes only those: when the port stops listening, when you click **Stop sharing**, and when c-board stops. It never touches its own `4317` entry or anything you served yourself; those show up as shared, but stay.
+- **Hidden** until Tailscale is installed (on `PATH`, or the app in `/Applications`) and phone access is set up (an allowed host in step 3). **Settings → Phone → Dev servers on your phone** says what's missing and lists what is shared.
+
+Common snags:
+
+- **"Blocked request. This host is not allowed."** Vite only answers the host names it knows. Add the tailnet name to `server.allowedHosts` in `vite.config.ts` (`allowedHosts: ['.ts.net']` allows any tailnet name), then reload. The board checks for this right after sharing and says so in the sheet.
+- **The page loads, but its data doesn't.** An app that calls `localhost:<another port>` (an API on `:8080`, say) reaches your phone's own localhost. Share that port too, and point the app's API URL at `https://my-mac.tailnet-name.ts.net:8080`.
+- **Serve isn't enabled.** The first share can hit the same "Serve is not enabled on your tailnet" approval as step 2. Approve it from the link in the message, then try again.
+
 ## Why not ngrok or Cloudflare Tunnel?
 
 Public tunnels put the board on the internet. The board can type into your terminals and start Claude sessions, so a leaked link or a weak spot in a tunnel would be a remote shell on your Mac. c-board refuses any host that isn't on your allowed list, and the docs only support Tailscale, where the only devices that can reach the board are the ones you signed in to your tailnet.

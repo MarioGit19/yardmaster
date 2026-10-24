@@ -34,11 +34,13 @@ import { attentionOpen } from '../attention/attention.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import {
   selectApproval,
+  selectPortsByTerminal,
   selectProject,
   selectTerminalSession,
   selectWindow,
   useBoard,
   useBoardClient,
+  useBoardList,
   useBoardShallow,
 } from '../data/index.js';
 import type { BoardStoreState } from '../data/store.js';
@@ -47,6 +49,7 @@ import { draftKey, useHasDraft } from '../drafts/drafts.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { laneView, selectLaneExecution, terminalDisplay } from '../lanes/lane.js';
+import { PortChip } from '../lanes/PortChip.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { orbStateFor } from '../orb/model.js';
@@ -925,6 +928,7 @@ function ActiveControls({
   const interrupt = () => act({ kind: 'terminal.interrupt', terminalId: terminal.id });
   const rerunnable = open && !view.running && execution.id !== null && Boolean(view.command);
   const board = isBoardTerminal(terminal);
+  const [port, ...morePorts] = useBoardList(selectPortsByTerminal(terminal.id));
 
   return (
     <div className="flex shrink-0 flex-col gap-2">
@@ -1004,7 +1008,18 @@ function ActiveControls({
             onClick={() => reveal.toggle(`term:${terminal.id}`)}
           />
         )}
-        <span className="ml-auto min-w-0 truncate pl-2 font-mono text-meta text-text-2">
+        {port && (
+          <span className="ml-auto flex shrink-0 pl-2" data-focus-port="">
+            <PortChip port={port} others={morePorts} />
+          </span>
+        )}
+        <span
+          className={cx(
+            'min-w-0 truncate pl-2 font-mono text-meta text-text-2',
+            // Beside a port chip on a phone there is no room for it; the tab's dot says it.
+            port ? 'max-sm:hidden' : 'ml-auto',
+          )}
+        >
           {view.running
             ? 'running'
             : view.exit

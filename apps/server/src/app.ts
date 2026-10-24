@@ -25,6 +25,7 @@ import { createDemoQuery } from './demo/demo-query.js';
 import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library.js';
 import { demoPty } from './demo/pty.js';
 import { DemoSimulator } from './demo/simulator.js';
+import { demoTailscale } from './demo/tailscale.js';
 import { WorstBoard } from './demo/worst.js';
 import { closeProjectWindows, createEditorActions } from './editor-actions.js';
 import { EditorLauncher, type EditorLauncherOptions } from './editor-cli.js';
@@ -37,6 +38,14 @@ import { EditorRouter } from './editor-router.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
+import {
+  createTailscaleCli,
+  PORT_SHARES_KEY,
+  PortShares,
+  type PortSharesOptions,
+  registerPortShareRoutes,
+  type TailscaleCli,
+} from './port-shares.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
 import {
   createCloseActions,
@@ -120,6 +129,10 @@ export interface BuildOptions {
   editorCli?: Omit<EditorLauncherOptions, 'configured'>;
   /** Board terminal tuning: tests inject the pty loader and shell. The demo uses a synthetic shell. */
   pty?: Pick<PtyManagerOptions, 'load' | 'shell' | 'env' | 'max' | 'integrationDir'>;
+  /** The `tailscale` CLI behind "Open on phone". The demo uses a simulated one. */
+  tailscale?: TailscaleCli;
+  /** The Vite "Blocked request" check after sharing a port, for tests. */
+  portShareProbe?: PortSharesOptions['probe'];
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -197,6 +210,8 @@ export async function buildServer(
     persistence.setSetting(key, true);
   };
   app.addHook('onClose', async () => {
+    // Serve entries the board made end with it; the user's own stay.
+    await portShares.stop();
     // Board terminals end with the server.
     ptyManager.stopAll();
     demo?.stop();
@@ -538,6 +553,26 @@ export async function buildServer(
 
   registerRemoteRoutes(app, { devices: remoteDevices, hosts: allowedRemoteHosts });
 
+  const portShares = new PortShares({
+    store,
+    cli: options.tailscale ?? (options.demo ? demoTailscale(config.port) : createTailscaleCli()),
+    load: () => settings[PORT_SHARES_KEY],
+    save: (shares) => {
+      settings[PORT_SHARES_KEY] = shares;
+      persistence.setSetting(PORT_SHARES_KEY, shares);
+    },
+    // The demo simulates phone access along with Tailscale.
+    phoneAccess: () => Boolean(options.demo) || allowedRemoteHosts().length > 0,
+    boardPort: config.port,
+    logger: logger.child({ component: 'port-shares' }),
+    ...(options.portShareProbe
+      ? { probe: options.portShareProbe }
+      : options.demo
+        ? { probe: async () => null }
+        : {}),
+  });
+  registerPortShareRoutes(app, portShares);
+
   app.get('/api/library', async (): Promise<LibraryResponse> => {
     const { libraryRoots } = librarySettings(settings);
     return library.list(libraryRoots, Object.values(store.state.projects));
@@ -574,6 +609,7 @@ export async function buildServer(
   }
 
   await app.ready();
+  void portShares.start();
   demo?.start();
   worst?.start(() => (worstGateway?.clientCount ?? 0) > 0);
   discovery?.start();

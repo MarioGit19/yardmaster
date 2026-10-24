@@ -29,6 +29,7 @@ import {
 } from '../layouts/scene.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
+import { PortButton } from '../ports/PortButton.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { isTypingTarget } from '../shell/railNav.js';
@@ -650,9 +651,14 @@ function TerminalMeta({ actor, now }: { actor: SceneActor; now: number }) {
   return (
     <>
       {actor.ports.map((port) => (
-        <span key={port} data-screen-port={port} className="text-st-ok-ink">
-          :{port}
-        </span>
+        <PortButton
+          key={port}
+          port={port}
+          fineOnly
+          className="relative inline-flex cursor-pointer items-center gap-1 rounded-chip text-st-ok-ink transition-colors duration-fast hover:text-text-1"
+        >
+          <span data-screen-port={port}>:{port}</span>
+        </PortButton>
       ))}
       <span title={actor.runningSince ? 'Running for' : 'Open for'}>{uptime}</span>
     </>
@@ -712,11 +718,14 @@ function PortsScreen({ project }: { project: SceneProject }) {
       ) : (
         <ul className="flex flex-wrap gap-1.5">
           {project.ports.map((port) => (
-            <li
-              key={port}
-              className="rounded-chip border border-line px-1.5 font-mono text-label text-st-ok-ink tabular"
-            >
-              :{port}
+            <li key={port} className="flex">
+              <PortButton
+                port={port}
+                fineOnly
+                className="inline-flex cursor-pointer items-center gap-1 rounded-chip border border-line px-1.5 font-mono text-label text-st-ok-ink tabular transition-colors duration-fast hover:border-line-strong"
+              >
+                :{port}
+              </PortButton>
             </li>
           ))}
         </ul>

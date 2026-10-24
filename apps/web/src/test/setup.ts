@@ -8,3 +8,10 @@ if (typeof Element !== 'undefined' && typeof Element.prototype.animate === 'func
     return animation;
   };
 }
+
+// Unit tests never reach a server: happy-dom's fetch would try localhost and log the refusal.
+if (typeof window !== 'undefined') {
+  globalThis.fetch = async () => {
+    throw new TypeError('no network in unit tests');
+  };
+}

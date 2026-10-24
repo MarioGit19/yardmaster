@@ -269,3 +269,41 @@ export type PairedDevice = z.infer<typeof PairedDevice>;
 /** `GET /api/remote/devices`: paired devices, newest first. */
 export const PairedDevicesResponse = z.object({ devices: z.array(PairedDevice) });
 export type PairedDevicesResponse = z.infer<typeof PairedDevicesResponse>;
+
+export const PortNumber = z.coerce.number().int().min(1).max(65535);
+
+/** Why sharing dev servers on the phone is off (12.6e2). */
+export const PortShareUnavailable = z.enum([
+  /** No `tailscale` on PATH or in the macOS app bundle. */
+  'not_installed',
+  /** Phone access (Settings → Phone) has no allowed host yet. */
+  'no_phone_access',
+  /** Tailscale is installed but not signed in or not running. */
+  'not_connected',
+]);
+export type PortShareUnavailable = z.infer<typeof PortShareUnavailable>;
+
+/**
+ * A port served on the tailnet with `tailscale serve --https=<port>` (never Funnel). `mine` is
+ * false for an entry the user made outside the board: the board shows it but never removes it.
+ */
+export const PortShare = z.object({
+  port: PortNumber,
+  /** `https://<machine>.<tailnet>.ts.net:<port>` */
+  url: z.string(),
+  mine: z.boolean(),
+  sharedAt: Timestamp.nullable(),
+  /** `vite_blocked`: the dev server answered 403 "Blocked request" for the tailnet name. */
+  hint: z.enum(['vite_blocked']).nullable(),
+});
+export type PortShare = z.infer<typeof PortShare>;
+
+/** `GET /api/ports/shares` (authenticated). */
+export const PortSharesResponse = z.object({
+  available: z.boolean(),
+  reason: PortShareUnavailable.nullable(),
+  /** The tailnet name, from `tailscale status --json` (`Self.DNSName`). */
+  host: z.string().nullable(),
+  shares: z.array(PortShare),
+});
+export type PortSharesResponse = z.infer<typeof PortSharesResponse>;

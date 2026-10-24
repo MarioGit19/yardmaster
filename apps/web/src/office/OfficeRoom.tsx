@@ -184,7 +184,7 @@ export const OfficeRoom = memo(function OfficeRoom({
               className="absolute flex justify-end"
               style={{ right: 8, top: 6, maxWidth: width * 0.4 }}
             >
-              <PortSign ports={project.ports} />
+              <PortSign ports={project.ports} interactive />
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import {
   type PairedDevice,
   type PairingResponse,
+  type PortShareUnavailable,
   REMOTE_MAX_HOSTS,
   RemoteHost,
 } from '@c-board/protocol';
@@ -8,16 +9,14 @@ import { Smartphone, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { encode } from 'uqr';
+import { stopSharing, usePortShares } from '../ports/shares.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { Button } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { ApiRequestError, api } from './api.js';
 import type { ServerSettings } from './boardSettings.js';
-
-/** True when this page itself came in over Tailscale: pairing codes are made on the Mac only. */
-const onRemoteHost = () =>
-  typeof location !== 'undefined' && location.hostname.toLowerCase().endsWith('.ts.net');
+import { onRemoteHost } from './remoteHost.js';
 
 const PAIRED_POLL_MS = 2_000;
 
@@ -62,6 +61,7 @@ export function PhoneSettings({ server }: { server: ServerSettings }) {
       <RemoteHostsRow server={server} />
       <PairRow server={server} devices={devices} reload={reload} />
       <DevicesRow devices={devices} failed={failed} reload={reload} />
+      <DevServersRow />
     </>
   );
 }
@@ -330,7 +330,15 @@ function PairRow({
 const QUIET_ZONE = 3;
 
 /** A QR code as crisp SVG modules, dark on a white tile in both themes so every camera reads it. */
-export function QrCode({ value, className }: { value: string; className?: string }) {
+export function QrCode({
+  value,
+  label = 'Pairing QR code',
+  className,
+}: {
+  value: string;
+  label?: string;
+  className?: string;
+}) {
   const { path, size } = useMemo(() => {
     const qr = encode(value, { ecc: 'M', border: QUIET_ZONE });
     let d = '';
@@ -345,7 +353,7 @@ export function QrCode({ value, className }: { value: string; className?: string
     <svg
       viewBox={`0 0 ${size} ${size}`}
       role="img"
-      aria-label="Pairing QR code"
+      aria-label={label}
       shapeRendering="crispEdges"
       className={cx('overflow-hidden rounded-control', className)}
       data-qr
@@ -434,6 +442,77 @@ function DevicesRow({
               >
                 {revoking === device.id ? 'Revoking…' : 'Revoke'}
               </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const SHARE_UNAVAILABLE: Record<PortShareUnavailable, string> = {
+  not_installed: 'Install Tailscale on this Mac to open its dev servers on your phone.',
+  no_phone_access: 'Add an allowed host above first.',
+  not_connected: 'Tailscale isn’t running or signed in on this Mac.',
+};
+
+/** Dev servers on the phone (12.6e2): whether Open on phone shows, and what is shared now. */
+function DevServersRow() {
+  const shares = usePortShares();
+  const [stopping, setStopping] = useState<number | null>(null);
+  const stop = async (port: number) => {
+    setStopping(port);
+    try {
+      await stopSharing(port);
+    } catch {
+      toast.error(`Could not stop sharing :${port}`);
+    } finally {
+      setStopping(null);
+    }
+  };
+  let summary: string;
+  if (shares === null) summary = 'Checking Tailscale…';
+  else if (!shares.available && shares.reason) summary = SHARE_UNAVAILABLE[shares.reason];
+  else
+    summary =
+      'Port chips offer Open on phone: the port is served on your tailnet only, never the public internet, and stops when it closes or the board stops.';
+  return (
+    <div className="flex flex-col gap-3 p-5" data-setting="dev-servers">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="font-medium text-body text-text-1">Dev servers on your phone</h3>
+        <p className="text-label text-text-2">{summary}</p>
+        <p className="text-meta text-text-3">
+          Setup and fixes: the phone guide,{' '}
+          <code className="font-mono text-text-2">docs/phone.md</code>.
+        </p>
+      </div>
+      {shares && shares.shares.length > 0 && (
+        <ul className="flex flex-col divide-y divide-line rounded-control border border-line bg-bg-0">
+          {shares.shares.map((share) => (
+            <li
+              key={share.port}
+              data-shared-port={share.port}
+              className="flex min-w-0 items-center gap-3 py-1.5 pr-1.5 pl-3"
+            >
+              <Smartphone aria-hidden className="size-4 shrink-0 stroke-[1.5] text-text-3" />
+              <span
+                className="min-w-0 flex-1 truncate font-mono text-label text-text-1"
+                title={share.url}
+              >
+                {share.url}
+              </span>
+              {share.mine ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopping === share.port}
+                  onClick={() => void stop(share.port)}
+                >
+                  Stop sharing
+                </Button>
+              ) : (
+                <span className="shrink-0 pr-1.5 text-meta text-text-3">Yours</span>
+              )}
             </li>
           ))}
         </ul>
