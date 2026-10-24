@@ -307,29 +307,31 @@ test('the Grid labels never overlap at 1440 with 10 projects', async ({ page }) 
   }
 });
 
-test('Transit stops never overlap in a busy hour', async ({ page }) => {
+test('Transit stations and log bins never overlap in a busy hour', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
   await page.goto('/#/');
   await expect(page.locator('[data-transit-line]')).toHaveCount(10);
   await page.waitForTimeout(1_000);
-  // Stations merge into a count: the marks on one line keep clear of each other.
+  // Events share fixed bins and stations their columns: on one line, nothing sits on another.
   const crowded = await page.locator('[data-transit-line]').evaluateAll((lines) =>
     lines.flatMap((line) => {
-      const marks = [...line.querySelectorAll('[data-transit-station] .transit-mark')].map((m) =>
-        m.getBoundingClientRect(),
-      );
-      return marks.flatMap((a, i) =>
-        marks
+      const boxes = [
+        ...line.querySelectorAll(
+          '[data-transit-event], [data-transit-station], [data-transit-more]',
+        ),
+      ].map((m) => m.getBoundingClientRect());
+      return boxes.flatMap((a, i) =>
+        boxes
           .slice(i + 1)
           .filter(
             (b) =>
-              Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0 &&
-              Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0,
+              Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 &&
+              Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5,
           )
           .map(() => line.getAttribute('data-transit-line')),
       );
     }),
   );
-  expect(await page.locator('[data-transit-station]').count()).toBeGreaterThan(20);
+  expect(await page.locator('[data-transit-event]').count()).toBeGreaterThan(20);
   expect(crowded).toEqual([]);
 });

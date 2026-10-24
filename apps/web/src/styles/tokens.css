@@ -85,14 +85,17 @@
   --grid-bg: #03060b;
   --grid-fog: rgb(40 110 160 / 0.16);
   --grid-panel: rgb(6 14 22 / 0.86);
-  /* Transit's metro map (§10.5): a deep-navy ground, white stops ringed in the ground's ink, the
-     trains' cars, and the hairlines of the time axis. */
+  /* Transit's concourse (§10.5): a deep-navy ground, white station marks ringed in the ground's
+     ink, the trains' cars, the service log's rule, the departures board (dark in both themes)
+     and the ink on a route roundel. */
   --transit-ground: #0b1228;
   --transit-stop: #eef1f8;
   --transit-ink: #0b1228;
   --transit-car: #d9deea;
   --transit-window: #1a2140;
-  --transit-rule: rgb(255 255 255 / 0.06);
+  --transit-rule: rgb(255 255 255 / 0.1);
+  --transit-board: #050816;
+  --transit-on-route: #0b1228;
   --retro-fg: #4dff8f;
   --retro-amber: #ffb000;
   --retro-bg: #030805;
@@ -215,7 +218,9 @@
   --transit-ink: #1c2230;
   --transit-car: #2a3142;
   --transit-window: #e7e9ed;
-  --transit-rule: rgb(0 0 0 / 0.07);
+  --transit-rule: rgb(0 0 0 / 0.12);
+  --transit-board: #161c2e;
+  --transit-on-route: #0b1228;
   --retro-fg: #1f3a24;
   --retro-amber: #6b4300;
   --retro-bg: #f3efe3;

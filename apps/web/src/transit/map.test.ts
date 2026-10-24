@@ -1,27 +1,26 @@
 import type { ActivityEvent, ActivityKind } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
-import type { SceneActor } from '../layouts/scene.js';
+import type { ActorState, SceneActor } from '../layouts/scene.js';
 import {
-  AXIS_GUTTER,
-  alongAt,
-  branchPoints,
-  buildBranches,
-  buildStations,
-  horizontalFrame,
-  lineAcross,
-  lineGroups,
-  MERGE_PX,
-  PHONE_LINES,
-  placeStops,
-  placeTrains,
-  point,
-  stationKind,
-  stopTarget,
-  TRAIN,
+  BIN_PX,
+  binHeight,
+  binTarget,
+  boardRows,
+  boardStatus,
+  buildServiceLog,
+  busiestLine,
+  eventKind,
+  lineStations,
+  MIN_COLUMNS,
+  PHONE_BELOW,
+  placeBins,
+  SLOT_MIN,
+  slotCount,
+  TRAIN_AT,
   TRANSIT_WINDOW_MS,
   trainMotion,
-  transitFrame,
-  verticalFrame,
+  transitMode,
+  WIDE_FROM,
 } from './map.js';
 
 const NOW = 1_800_000_000_000;
@@ -80,47 +79,136 @@ const project = (
   ...overrides,
 });
 
-describe('frames', () => {
-  it('runs the desktop hour left to right with "now" on the right and trains past it', () => {
-    const frame = horizontalFrame(3);
-    expect(alongAt(NOW, NOW, frame)).toBe(frame.nowAt);
-    expect(alongAt(NOW - 60 * MIN, NOW, frame)).toBe(frame.startAt);
-    expect(alongAt(NOW - 30 * MIN, NOW, frame)).toBeLessThan(frame.nowAt);
-    // Later than now is now.
-    expect(alongAt(NOW + MIN, NOW, frame)).toBe(frame.nowAt);
-    expect(frame.platformAt).toBeGreaterThan(frame.nowAt);
-    expect(point(10, 20, frame)).toEqual({ x: 10, y: 20 });
-  });
-
-  it('runs the phone hour top to bottom with "now" on top and the trains above it', () => {
-    const frame = verticalFrame(4, 358);
-    expect(alongAt(NOW - 60 * MIN, NOW, frame)).toBe(frame.startAt);
-    expect(frame.startAt).toBeGreaterThan(frame.nowAt);
-    expect(frame.platformAt).toBeLessThan(frame.nowAt);
-    expect(point(10, 20, frame)).toEqual({ x: 20, y: 10 });
-    // Columns share the width but stay wide enough to tap.
-    expect(frame.lineGap).toBe(81);
-    expect(verticalFrame(9, 358).lineGap).toBe(44);
-    // The demo's six lines fit a 390 px phone's stage (302 px beside the rail).
-    expect(verticalFrame(6, 302).breadth).toBeLessThanOrEqual(302);
-    // The time labels get a gutter of their own, left of the first line's column.
-    expect(lineAcross(0, frame) - frame.lineGap / 2).toBe(AXIS_GUTTER);
+describe('the concourse', () => {
+  it('stands the board beside the map when wide, above it when not, and lists on a phone', () => {
+    expect(transitMode(390)).toBe('phone');
+    expect(transitMode(PHONE_BELOW - 1)).toBe('phone');
+    expect(transitMode(PHONE_BELOW)).toBe('stacked');
+    expect(transitMode(WIDE_FROM - 1)).toBe('stacked');
+    expect(transitMode(WIDE_FROM)).toBe('wide');
+    // The demo at 1440: a map about 750 px wide holds five stations a line.
+    expect(slotCount(750)).toBe(5);
+    expect(slotCount(SLOT_MIN - 1)).toBe(1);
+    // A wide map spreads to the busiest line's stations, never fewer than four columns.
+    expect(slotCount(1150, 5)).toBe(5);
+    expect(slotCount(1150, 1)).toBe(MIN_COLUMNS);
+    expect(slotCount(1150, 20)).toBe(8);
+    expect(
+      busiestLine([{ actors: [actor('t:1'), actor('s:1', { kind: 'claude' })] }, { actors: [] }]),
+    ).toBe(2);
   });
 });
 
 describe('stations', () => {
-  it('marks finished turns, exits and crashes, and skips the rest', () => {
-    expect(stationKind(event('a', 'stop', NOW))).toBe('turn');
-    expect(stationKind(event('b', 'stop.failure', NOW))).toBe('crash');
-    expect(stationKind(event('c', 'exec.end', NOW, { data: { exitCode: 0 } }))).toBe('ok');
-    expect(stationKind(event('d', 'exec.end', NOW, { data: { exitCode: 2 } }))).toBe('fail');
-    // Ctrl+C is the user stopping it.
-    expect(stationKind(event('e', 'exec.end', NOW, { data: { exitCode: 130 } }))).toBeNull();
-    expect(stationKind(event('f', 'tool.start', NOW))).toBeNull();
+  const session = (id: string, state: ActorState, since: number) =>
+    actor(id, { kind: 'claude', state, since });
+  const terminal = (id: string, state: ActorState, since: number) =>
+    actor(id, { kind: 'terminal', state, since });
+
+  it('gives each session and terminal a station in a stable order, subagents on its spur', () => {
+    const { stations, hidden } = lineStations(
+      [
+        terminal('t:old', 'running', 1),
+        session('s:b', 'waiting', 5),
+        actor('b:s:b:1', { kind: 'subagent', parentId: 's:b', state: 'thinking' }),
+        session('s:a', 'idle', 2),
+        terminal('t:new', 'error', 9),
+      ],
+      8,
+    );
+    expect(stations.map((s) => s.actor.id)).toEqual(['s:a', 's:b', 't:old', 't:new']);
+    expect(stations[1]?.minis.map((m) => m.id)).toEqual(['b:s:b:1']);
+    expect(hidden).toBe(0);
   });
 
-  it('collects the hour per project with commits as interchanges, oldest first', () => {
-    const stations = buildStations(
+  it('keeps the ones that need you when not all fit, leaving the last slot to "+N"', () => {
+    const actors = [
+      session('s:1', 'idle', 1),
+      session('s:2', 'idle', 2),
+      terminal('t:1', 'idle', 3),
+      terminal('t:2', 'waiting', 4),
+      terminal('t:3', 'error', 5),
+    ];
+    const { stations, hidden } = lineStations(actors, 3);
+    expect(stations.map((s) => s.actor.id)).toEqual(['t:2', 't:3']);
+    expect(hidden).toBe(3);
+    // Everything fits: no "+N".
+    expect(lineStations(actors, 5).hidden).toBe(0);
+  });
+});
+
+describe('trains', () => {
+  it('glides when working, opens doors when waiting, stops on an error, parks otherwise', () => {
+    expect(trainMotion('typing')).toBe('glide');
+    expect(trainMotion('waiting')).toBe('wait');
+    expect(trainMotion('error')).toBe('stop');
+    expect(trainMotion('serving')).toBe('park');
+    // A working train pulls out of the platform; a failed one halts short of it.
+    expect(TRAIN_AT.glide).toBeGreaterThan(TRAIN_AT.stop);
+    expect(TRAIN_AT.stop).toBeGreaterThan(TRAIN_AT.park);
+    expect(TRAIN_AT.wait).toBe(TRAIN_AT.park);
+  });
+});
+
+describe('the departures board', () => {
+  it('words each state like a station board', () => {
+    expect(boardStatus({ state: 'waiting', tone: 'wait', exit: null })).toEqual({
+      word: 'Due · needs you',
+      tone: 'wait',
+    });
+    expect(boardStatus({ state: 'error', tone: 'err', exit: 2 })).toEqual({
+      word: 'Cancelled · exit 2',
+      tone: 'err',
+    });
+    expect(boardStatus({ state: 'typing', tone: 'tool', exit: null }).word).toBe('Departing');
+    expect(boardStatus({ state: 'serving', tone: 'ok', exit: null }).word).toBe('In service');
+    expect(boardStatus({ state: 'idle', tone: 'idle', exit: null }).word).toBe('At platform');
+  });
+
+  it('lists what needs you first across projects, then work, in project order, capped', () => {
+    const projects = [
+      {
+        id: 'p1',
+        name: 'acme-shop',
+        accent: 1 as const,
+        actors: [
+          actor('t:a', { state: 'running', projectId: 'p1' }),
+          actor('b:x', { kind: 'subagent', parentId: 's:z', state: 'thinking', projectId: 'p1' }),
+          actor('t:b', { state: 'idle', projectId: 'p1' }),
+        ],
+      },
+      {
+        id: 'p2',
+        name: 'docs-site',
+        accent: 2 as const,
+        actors: [
+          actor('s:w', { kind: 'claude', state: 'waiting', projectId: 'p2' }),
+          actor('t:c', { state: 'error', projectId: 'p2' }),
+        ],
+      },
+    ];
+    const { rows, hidden, due, departing } = boardRows(projects, 3);
+    expect(rows.map((r) => r.actor.id)).toEqual(['s:w', 't:c', 't:a']);
+    expect(rows[0]?.project.name).toBe('docs-site');
+    expect(hidden).toBe(1);
+    expect(due).toBe(1);
+    expect(departing).toBe(1);
+  });
+});
+
+describe('the service log', () => {
+  it('logs finished turns, exits and crashes, and skips the rest', () => {
+    expect(eventKind(event('a', 'stop', NOW))).toBe('turn');
+    expect(eventKind(event('b', 'stop.failure', NOW))).toBe('crash');
+    expect(eventKind(event('c', 'exec.end', NOW, { data: { exitCode: 0 } }))).toBe('ok');
+    expect(eventKind(event('d', 'exec.end', NOW, { data: { exitCode: 2 } }))).toBe('fail');
+    // Ctrl+C is the user stopping it.
+    expect(eventKind(event('e', 'exec.end', NOW, { data: { exitCode: 130 } }))).toBeNull();
+    expect(eventKind(event('f', 'tool.start', NOW))).toBeNull();
+  });
+
+  it('collects the hour per project with its commits, oldest first', () => {
+    const log = buildServiceLog(
       [
         event('old', 'stop', NOW - TRANSIT_WINDOW_MS - 1),
         event('t1', 'stop', NOW - 20 * MIN),
@@ -139,180 +227,47 @@ describe('stations', () => {
       ],
       NOW,
     );
-    const list = stations.get('p1') ?? [];
+    const list = log.get('p1') ?? [];
     expect(list.map((s) => [s.id, s.kind])).toEqual([
       ['t1', 'turn'],
       ['commit:abcdef1234', 'commit'],
       ['x', 'fail'],
     ]);
     expect(list[1]).toMatchObject({ label: 'Commit abcdef1', detail: 'Fix totals', event: null });
-    expect(stations.has('p2')).toBe(false);
+    expect(log.has('p2')).toBe(false);
   });
 
-  it('merges stations closer than a stop into one stop with the worst kind', () => {
-    const frame = horizontalFrame(1);
-    const msPerPx = MIN / frame.pxPerMin;
-    const stations = buildStations(
+  it('puts the hour in fixed bins: one stop each, the worst kind, a bin apart', () => {
+    // 240 px: ten bins of six minutes.
+    const width = 10 * BIN_PX;
+    const binMs = TRANSIT_WINDOW_MS / 10;
+    const at = Math.floor(NOW / binMs) * binMs;
+    const log = buildServiceLog(
       [
-        event('a', 'stop', NOW - 30 * MIN),
-        event('b', 'exec.end', NOW - 30 * MIN + 5 * msPerPx, { data: { exitCode: 1 } }),
-        event('c', 'stop', NOW - 30 * MIN + 10 * msPerPx),
-        // Just past MERGE_PX from the merged stop's middle (5 px in): a stop of its own.
-        event('d', 'stop', NOW - 30 * MIN + (MERGE_PX + 5.5) * msPerPx),
-        event('e', 'stop', NOW - 5 * MIN),
+        event('a', 'stop', at + 1),
+        event('b', 'exec.end', at + 2, { data: { exitCode: 1 } }),
+        event('c', 'stop', at + 3),
+        event('d', 'stop', at - binMs + 1),
+        event('e', 'stop', at - 9 * binMs + 1),
       ],
       [project()],
       NOW,
     );
-    const stops = placeStops(stations.get('p1') ?? [], NOW, frame);
-    expect(stops.map((s) => [s.id, s.kind, s.stations.length])).toEqual([
-      ['a', 'fail', 3],
-      ['d', 'turn', 1],
-      ['e', 'turn', 1],
+    const bins = placeBins(log.get('p1') ?? [], NOW, width);
+    expect(bins.map((b) => [b.kind, b.events.length, b.x])).toEqual([
+      ['turn', 1, BIN_PX / 2],
+      ['turn', 1, width - BIN_PX * 1.5],
+      ['fail', 3, width - BIN_PX / 2],
     ]);
-    const merged = stops[0];
-    if (!merged) throw new Error('no stop');
-    expect(merged.along).toBeCloseTo(alongAt(NOW - 30 * MIN + 5 * msPerPx, NOW, frame));
-    expect(stopTarget(merged).id).toBe('c');
-  });
-});
-
-describe('branches', () => {
-  const start = (id: string, agent: string, ts: number) =>
-    event(id, 'subagent.start', ts, { summary: 'Explore', data: { agentId: agent } });
-  const stop = (id: string, agent: string, ts: number) =>
-    event(id, 'subagent.stop', ts, { data: { agentId: agent } });
-
-  it('forks at a subagent start and rejoins at its stop, stacking overlaps', () => {
-    const branches = buildBranches(
-      [
-        start('s1', 'a', NOW - 40 * MIN),
-        start('s2', 'b', NOW - 38 * MIN),
-        stop('e1', 'a', NOW - 35 * MIN),
-        stop('e2', 'b', NOW - 30 * MIN),
-        start('s3', 'c', NOW - 20 * MIN),
-        stop('e3', 'c', NOW - 18 * MIN),
-      ],
-      [project()],
-      NOW,
-    ).get('p1');
-    expect(branches).toEqual([
-      { id: 's1', label: 'Explore', from: NOW - 40 * MIN, to: NOW - 35 * MIN, level: 0 },
-      { id: 's2', label: 'Explore', from: NOW - 38 * MIN, to: NOW - 30 * MIN, level: 1 },
-      { id: 's3', label: 'Explore', from: NOW - 20 * MIN, to: NOW - 18 * MIN, level: 0 },
-    ]);
-  });
-
-  it('runs an open branch to now only while its session has a subagent at work', () => {
-    const events = [start('s1', 'a', NOW - 4 * MIN)];
-    expect(buildBranches(events, [project()], NOW).get('p1')).toEqual([]);
-    const busy = {
-      ...project(),
-      actors: [
-        actor('b:s1:a', {
-          kind: 'subagent',
-          links: { href: '#', sessionId: 's1', terminalId: null, approvalId: null },
-        }),
-      ],
-    };
-    expect(buildBranches(events, [busy], NOW).get('p1')).toEqual([
-      { id: 's1', label: 'Explore', from: NOW - 4 * MIN, to: null, level: 0 },
-    ]);
-  });
-
-  it('branches from the window start when the fork fell out of it', () => {
-    const branches = buildBranches([stop('e1', 'a', NOW - 50 * MIN)], [project()], NOW);
-    expect(branches.get('p1')?.[0]?.from).toBe(NOW - TRANSIT_WINDOW_MS);
-  });
-
-  it('leaves the line at 45° and comes back, or peaks when short', () => {
-    const frame = horizontalFrame(1);
-    const long = branchPoints(
-      { id: 'b', label: '', from: NOW - 30 * MIN, to: NOW - 20 * MIN, level: 0 },
-      NOW,
-      frame,
-    );
-    expect(long).toHaveLength(4);
-    const [a, b, c, d] = long;
-    // Above the line on the desktop, at 45°.
-    expect(b?.across).toBe(-14);
-    expect((b?.along ?? 0) - (a?.along ?? 0)).toBe(14);
-    expect((d?.along ?? 0) - (c?.along ?? 0)).toBe(14);
-    expect(d?.across).toBe(0);
-
-    const short = branchPoints(
-      { id: 'b', label: '', from: NOW - 30 * MIN, to: NOW - 30 * MIN + 30_000, level: 1 },
-      NOW,
-      frame,
-    );
-    expect(short).toHaveLength(3);
-    expect(short[1]?.across).toBeCloseTo(-7);
-
-    // On the phone: to the right, and an open branch stays out until now.
-    const phone = verticalFrame(2, 358);
-    const open = branchPoints(
-      { id: 'b', label: '', from: NOW - 10 * MIN, to: null, level: 0 },
-      NOW,
-      phone,
-    );
-    expect(open.at(-1)).toEqual({ along: phone.nowAt, across: 14 });
-  });
-});
-
-describe('trains', () => {
-  it('glides while working, opens doors while waiting, stops on an error', () => {
-    expect(trainMotion('typing')).toBe('glide');
-    expect(trainMotion('running')).toBe('glide');
-    expect(trainMotion('waiting')).toBe('wait');
-    expect(trainMotion('error')).toBe('stop');
-    expect(trainMotion('serving')).toBe('park');
-    expect(trainMotion('idle')).toBe('park');
-  });
-
-  it('queues attention first from now outward, short trains for subagents, then +N', () => {
-    const frame = horizontalFrame(1);
-    const actors = [
-      actor('s:1', { kind: 'claude' }),
-      actor('b:1:a', { kind: 'subagent' }),
-      actor('t:1'),
-      actor('t:2'),
-      actor('t:3'),
-      actor('t:4'),
-    ];
-    const { trains, hidden, moreAt } = placeTrains(actors, frame);
-    expect(trains.map((t) => [t.actor.id, t.mini, t.slot])).toEqual([
-      ['s:1', false, 0],
-      ['b:1:a', true, 1],
-      ['t:1', false, 2],
-      ['t:2', false, 3],
-    ]);
-    expect(hidden).toBe(2);
-    expect(trains[0]?.along).toBe(frame.platformAt + TRAIN.len / 2);
-    expect(trains[1]?.along).toBe(frame.platformAt + TRAIN.len + TRAIN.gap + TRAIN.miniLen / 2);
-    expect(moreAt).toBeGreaterThan(trains[3]?.along ?? 0);
-    expect(moreAt).toBeLessThan(frame.length);
-
-    // On the phone they stack up from now toward the line's name.
-    const phone = verticalFrame(1, 358);
-    const up = placeTrains(actors, phone);
-    expect(up.trains).toHaveLength(3);
-    expect(up.trains[0]?.along).toBe(phone.platformAt - TRAIN.len / 2);
-    expect(up.moreAt).toBeGreaterThan(0);
-  });
-});
-
-describe('the phone screens of lines', () => {
-  it('groups lines four to a screen, in order', () => {
-    expect(PHONE_LINES).toBe(4);
-    expect(lineGroups([1, 2, 3, 4, 5, 6])).toEqual([
-      [1, 2, 3, 4],
-      [5, 6],
-    ]);
-    expect(lineGroups([])).toEqual([]);
-  });
-
-  it('sizes the columns for a full screen, so every screen lines up', () => {
-    expect(transitFrame('vertical', 6, 358).lineGap).toBe(transitFrame('vertical', 4, 358).lineGap);
-    expect(transitFrame('vertical', 2, 358).lineGap).toBeGreaterThan(80);
+    const newest = bins.at(-1);
+    if (!newest) throw new Error('no bin');
+    expect(binTarget(newest).id).toBe('c');
+    // A bin keeps its key as "now" moves on, and steps left a bin when its time has passed.
+    const later = placeBins(log.get('p1') ?? [], NOW + binMs, width);
+    expect(later.find((b) => b.id === newest.id)?.x).toBe(width - BIN_PX * 1.5);
+    // The bar grows with the count, up to a cap.
+    expect(binHeight(1)).toBe(4);
+    expect(binHeight(3)).toBe(8);
+    expect(binHeight(40)).toBe(binHeight(5));
   });
 });

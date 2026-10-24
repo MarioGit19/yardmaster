@@ -2906,7 +2906,7 @@ main[data-office-zoom] {
   background: var(--bg-1);
 }
 
-/* ── Transit (DESIGN.md §10.5): a metro map, one accent line per project ─────────────────── */
+/* ── Transit (DESIGN.md §10.5): a station concourse, a departures board beside the line map ── */
 
 .transit-ground {
   background:
@@ -2920,264 +2920,319 @@ main[data-office-zoom] {
 [data-theme="light"] .transit-ground {
   background: var(--transit-ground);
 }
-.transit-scroller {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+.transit-concourse.is-wide {
+  display: grid;
+  align-items: start;
+}
+.transit-concourse.is-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-/* The time axis: hairline rules every ten minutes, a stronger one at "now". */
-.transit-axis line {
-  stroke: var(--transit-rule);
-  stroke-width: 1;
+/* Signage type: Geist, bold and tight. */
+.transit-name-text,
+.transit-board-title {
+  font-weight: 650;
+  font-size: 16px;
+  line-height: 20px;
+  letter-spacing: -0.015em;
+  color: var(--text-1);
 }
-.transit-axis text {
-  fill: var(--text-3);
-  font:
-    500 11px / 1 "Geist Mono Variable",
-    ui-monospace,
-    monospace;
-  font-variant-numeric: tabular-nums;
-}
-[data-transit-axis-labels] text {
-  paint-order: stroke;
-  stroke: var(--transit-ground);
-  stroke-width: 4px;
-  stroke-linejoin: round;
-}
-.transit-axis .transit-now line {
-  stroke: var(--line-strong);
-  stroke-dasharray: 3 3;
-}
-.transit-axis .transit-now text {
-  fill: var(--text-2);
+.transit-roundel {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--route);
+  color: var(--transit-on-route);
+  font-weight: 750;
+  font-size: 12px;
+  line-height: 1;
 }
 
-/* Lines: thick, flat, round-capped, in the project's accent; the platform past "now" is fainter. */
-.transit-track,
-.transit-platform,
-.transit-branch {
-  fill: none;
-  stroke: var(--route);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.transit-track {
-  stroke-width: 6;
-}
-.transit-platform {
-  stroke-width: 6;
-  opacity: 0.32;
-}
-.transit-branch {
-  stroke-width: 3;
-  opacity: 0.85;
-}
-.transit-branch[data-transit-branch="open"] {
-  stroke-dasharray: 6 4;
-}
-.transit-line[data-dim] :is(.transit-track, .transit-branch) {
-  opacity: 0.55;
-}
-
-/* A line's name: sticky over the map on the desktop so stations slide under it. */
-.transit-name {
-  z-index: 3;
-  border-radius: var(--radius-control);
-}
-[data-transit-axis="horizontal"] .transit-name {
-  background: linear-gradient(
-    to right,
-    var(--transit-ground) 0,
-    var(--transit-ground) calc(100% - 20px),
-    transparent 100%
-  );
-}
-[data-transit-axis="vertical"] .transit-name {
-  background: var(--transit-ground);
-  text-align: center;
-  gap: 4px;
-}
-/* A phone column is 44–60 px: the name takes two lines, breaking after a hyphen where it can, so
-   "ledger-sync" reads whole instead of "led…". */
-.transit-name-text {
-  display: block;
+/* The departures board: a dark flat panel in both themes, like a real concourse's, so it keeps
+   the Night text and status tones in Daylight too. */
+.transit-board {
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  border-radius: var(--radius-panel);
+  background: var(--transit-board);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+  color-scheme: dark;
+}
+[data-theme="light"] .transit-board {
+  --text-1: #edeff5;
+  --text-2: #a3a9b8;
+  --text-3: #8a90a2;
+  --st-work: #7c9cff;
+  --st-tool: #5ee7ff;
+  --st-wait: #ffb547;
+  --st-ok: #3ddc97;
+  --st-err: #ff5c7a;
+  --st-idle: #6b7183;
+  --st-work-ink: #7c9cff;
+  --st-tool-ink: #5ee7ff;
+  --st-wait-ink: #ffb547;
+  --st-ok-ink: #3ddc97;
+  --st-err-ink: #ff5c7a;
+  --line-strong: rgb(255 255 255 / 0.14);
+  box-shadow: 0 12px 32px -18px rgb(14 17 22 / 0.5);
+}
+.transit-board-item {
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+}
+.transit-board-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 16px;
+  text-align: left;
+  outline: none;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .transit-board-row:hover {
+    background: rgb(255 255 255 / 0.04);
+  }
+}
+.transit-board-row:focus-visible,
+.transit-board-row[data-state="open"] {
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+/* What needs you carries an edge bar in its tone, beside the words. */
+.transit-board-row:is([data-tone="wait"], [data-tone="err"])::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--st-err);
+}
+.transit-board-row[data-tone="wait"]::before {
+  background: var(--st-wait);
+  box-shadow: 0 0 8px var(--st-wait-glow);
+}
+@keyframes transit-due {
+  50% {
+    opacity: 0.45;
+  }
+}
+[data-motion="full"] .transit-board-row[data-tone="wait"]::before {
+  animation: transit-due var(--dur-breathe) var(--ease-in-out) infinite;
+}
+.transit-board-status {
+  font-weight: 600;
+  font-size: 12px;
   line-height: 16px;
+  white-space: nowrap;
+  color: var(--text-2);
+  animation: fade-in var(--dur-base) var(--ease-out) both;
+}
+[data-motion="off"] .transit-board-status {
+  animation: none;
+}
+.transit-board-status[data-tone="wait"] {
+  color: var(--st-wait-ink);
+}
+.transit-board-status[data-tone="err"] {
+  color: var(--st-err-ink);
+}
+.transit-board-status[data-tone="work"] {
+  color: var(--st-work-ink);
+}
+.transit-board-status[data-tone="tool"] {
+  color: var(--st-tool-ink);
+}
+.transit-board-status[data-tone="ok"] {
+  color: var(--st-ok-ink);
+}
+
+/* A line's sign: roundel and name, ringed in amber or rose when the line needs you. */
+.transit-name {
+  margin-left: -3px;
+  padding: 2px 8px 2px 3px;
+  border-radius: 9999px;
 }
 .transit-name:focus-visible {
   box-shadow: var(--focus-ring);
 }
-.transit-swatch {
-  width: 16px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--route);
-}
-
-/* Stations: buttons centered on their point; the mark is what shows. */
-.transit-stop {
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border-radius: 9999px;
-  outline: none;
-}
-.transit-stop:hover,
-.transit-stop:focus-visible {
-  z-index: 2;
-}
-.transit-stop:focus-visible {
-  box-shadow: var(--focus-ring);
-}
-.transit-mark {
-  display: grid;
-  place-items: center;
-  width: 10px;
-  height: 10px;
-  border-radius: 9999px;
-  background: var(--transit-stop);
-  box-shadow: 0 0 0 2.5px var(--transit-ink);
-  color: var(--transit-ink);
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-.transit-stop:focus-visible .transit-mark {
-  transform: scale(1.25);
-}
 @media (hover: hover) and (pointer: fine) {
-  .transit-stop:hover .transit-mark {
-    transform: scale(1.25);
+  .transit-name:hover .transit-name-text {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 }
-.transit-mark[data-kind="ok"],
-.transit-mark[data-kind="fail"] {
-  width: 14px;
-  height: 14px;
-}
-.transit-mark[data-kind="ok"] {
-  box-shadow: 0 0 0 2px var(--st-ok);
-  color: var(--st-ok);
-}
-.transit-mark[data-kind="fail"] {
-  box-shadow: 0 0 0 2px var(--st-err);
-  color: var(--st-err-ink);
-}
-/* A commit is an interchange: the bigger white circle with a heavy ink ring. */
-.transit-mark[data-kind="commit"] {
-  width: 15px;
-  height: 15px;
+.transit-line:is([data-tone="wait"], [data-tone="err"]) .transit-name .transit-roundel {
   box-shadow:
-    0 0 0 3px var(--transit-ink),
-    0 0 0 4.5px var(--route);
+    0 0 0 2px var(--transit-ground),
+    0 0 0 4px var(--st-err);
 }
-.transit-mark[data-kind="crash"] {
-  width: 14px;
-  height: 14px;
-  background: var(--st-err);
+.transit-line[data-tone="wait"] .transit-name .transit-roundel {
   box-shadow:
-    0 0 0 2px var(--transit-ink),
-    0 0 10px var(--st-err-glow);
-  color: var(--transit-ink);
+    0 0 0 2px var(--transit-ground),
+    0 0 0 4px var(--st-wait),
+    0 0 12px var(--st-wait-glow);
 }
-/* Merged stops: a pill with the count, ringed in the worst kind's color. */
-.transit-stop[data-count]:not([data-count="1"]) .transit-mark {
-  width: auto;
-  min-width: 18px;
-  height: 16px;
-  padding: 0 4px;
-  font-size: 11px;
-  line-height: 1;
+.transit-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
   font-weight: 600;
-  color: var(--transit-ink);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--st-err-ink);
+  background: color-mix(in srgb, var(--st-err) 14%, transparent);
 }
-.transit-glyph {
-  width: 10px;
-  height: 10px;
+.transit-flag[data-tone="wait"] {
+  color: var(--st-wait-ink);
+  background: color-mix(in srgb, var(--st-wait) 14%, transparent);
+}
+
+/* The track: thick, flat, in the project's accent, a terminus bar at each end. */
+.transit-track {
+  stroke: var(--route);
+  stroke-width: 8;
+}
+.transit-terminus {
+  stroke: var(--route);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.transit-spur {
   fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
+  stroke: var(--route);
+  stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-@keyframes transit-pop {
-  from {
-    transform: scale(0.5);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-  }
-}
-@keyframes transit-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-[data-motion="full"] .transit-pop {
-  animation: transit-pop var(--dur-base) var(--ease-out) both;
-}
-[data-motion="reduced"] .transit-pop {
-  animation: transit-fade var(--dur-base) var(--ease-out) both;
+.transit-line[data-dim] :is(.transit-track, .transit-terminus, .transit-spur) {
+  opacity: 0.55;
 }
 
-/* Trains: a car with windows in the state's tone; it glides to a new place in the queue. */
-.transit-train-slot {
-  z-index: 2;
+/* A station: its sign above the line, the mark on it, the train at the platform past it. */
+.transit-station-slot {
+  z-index: 1;
 }
-[data-motion="full"] .transit-train-slot {
+.transit-station {
+  --tone: var(--st-tool);
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 40px;
+  border-radius: var(--radius-control);
+  text-align: left;
+  outline: none;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.transit-station-name {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  left: 6px;
+  overflow: hidden;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-1);
+}
+.transit-station-name[data-tone="wait"] {
+  color: var(--st-wait-ink);
+}
+.transit-station-name[data-tone="err"] {
+  color: var(--st-err-ink);
+}
+.transit-station[data-lit],
+.transit-station:focus-visible,
+.transit-station[data-state="open"] {
+  background: color-mix(in srgb, var(--route) 16%, transparent);
+}
+.transit-station:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .transit-station:hover {
+    background: color-mix(in srgb, var(--route) 12%, transparent);
+  }
+}
+.transit-mark {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--transit-stop);
+  box-shadow: 0 0 0 3px var(--transit-ink);
+}
+.transit-mark[data-kind="terminal"] {
+  border-radius: 4px;
+}
+.transit-station .transit-mark {
+  position: absolute;
+  top: 25px;
+  left: 7px;
+}
+[data-actor-state="waiting"] > .transit-mark {
+  box-shadow:
+    0 0 0 3px var(--st-wait),
+    0 0 10px var(--st-wait-glow);
+}
+[data-actor-state="error"] > .transit-mark {
+  box-shadow:
+    0 0 0 3px var(--st-err),
+    0 0 10px var(--st-err-glow);
+}
+
+/* Trains. The slot stands the car past the mark; Full rolls it there when its work starts or
+   ends. */
+.transit-car-slot {
+  position: absolute;
+  top: 32px;
+  left: 14px;
+  display: block;
+  transform: translate(-50%, -50%) translateX(var(--train-at));
+  pointer-events: none;
+}
+[data-motion="full"] .transit-car-slot {
   transition: transform var(--dur-slow) var(--ease-out);
 }
-.transit-train {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 28px;
-  translate: -50% -50%;
-  border-radius: var(--radius-control);
-  outline: none;
+.transit-car {
+  display: block;
 }
-.transit-train.is-vertical {
-  width: 28px;
-  height: 44px;
+:is(.transit-station, .transit-mini, .transit-phone-row)[data-tone="work"] {
+  --tone: var(--st-work);
 }
-.transit-train.is-vertical .transit-car {
-  rotate: -90deg;
+:is(.transit-station, .transit-mini, .transit-phone-row)[data-tone="ok"] {
+  --tone: var(--st-ok);
 }
-.transit-train:focus-visible,
-.transit-train[data-state="open"] {
-  box-shadow: var(--focus-ring);
+.transit-mini,
+.transit-phone-row {
+  --tone: var(--st-tool);
 }
 .transit-body {
   fill: var(--transit-car);
   stroke: var(--route);
   stroke-width: 1.5;
 }
-.transit-window {
-  fill: var(--transit-window);
-}
+.transit-window,
 .transit-light {
   fill: var(--transit-window);
 }
-.transit-train[data-train="glide"][data-tone="work"] {
-  --tone: var(--st-work);
-}
-.transit-train[data-train="glide"] {
-  --tone: var(--st-tool);
-}
-.transit-train[data-train="glide"] :is(.transit-window, .transit-light),
-.transit-train[data-tone="ok"] .transit-window {
-  fill: var(--tone, var(--st-ok));
-}
-.transit-train[data-tone="ok"] {
-  --tone: var(--st-ok);
+[data-train="glide"] :is(.transit-window, .transit-light),
+[data-tone="ok"] .transit-window {
+  fill: var(--tone);
 }
 .transit-trail-glow {
   fill: var(--tone);
@@ -3201,7 +3256,7 @@ main[data-office-zoom] {
   animation: transit-speed var(--dur-glide) linear infinite;
 }
 /* Waiting: amber doors that pulse on the breathing period (§3 rule 4). */
-.transit-train[data-train="wait"] .transit-body {
+[data-train="wait"] .transit-body {
   stroke: var(--st-wait);
   filter: drop-shadow(0 0 4px var(--st-wait-glow));
 }
@@ -3216,62 +3271,261 @@ main[data-office-zoom] {
 [data-motion="full"] .transit-doors {
   animation: transit-doors var(--dur-breathe) var(--ease-in-out) infinite;
 }
-/* Off stage (a view on top, the page hidden) the loops hold. */
-.transit[data-paused] :is(.transit-speed, .transit-doors) {
-  animation-play-state: paused;
-}
-/* Errored: rose and stopped, with a "!" marker. */
-.transit-train[data-train="stop"] .transit-body {
-  fill: color-mix(in srgb, var(--st-err) 30%, var(--transit-car));
+/* Errored: a rose car halted short of the next station, a "!" for windows. */
+[data-train="stop"] .transit-body {
+  fill: var(--st-err);
   stroke: var(--st-err);
 }
-.transit-train[data-train="stop"] .transit-window {
-  fill: var(--st-err);
-}
-.transit-alert circle {
-  fill: var(--st-err);
-}
-.transit-alert path {
-  stroke: var(--transit-ink);
-  stroke-width: 1.8;
+.transit-alert {
+  stroke: var(--transit-stop);
+  stroke-width: 2;
   stroke-linecap: round;
 }
-.transit-train.is-vertical .transit-alert {
-  rotate: 90deg;
+/* Off stage (a view on top, the page hidden) the loops hold. */
+.transit[data-paused] :is(.transit-speed, .transit-doors, .transit-board-row::before) {
+  animation-play-state: paused;
 }
-.transit-more {
-  position: absolute;
-  top: 0;
-  left: 0;
+
+/* Subagents and background tasks: short trains on their session's spur. */
+.transit-mini-slot {
+  z-index: 1;
+}
+.transit-mini {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 20px;
-  margin: -10px 0 0 -16px;
+  width: 28px;
+  height: 24px;
+  border-radius: 6px;
+  outline: none;
+}
+.transit-mini:focus-visible,
+.transit-mini[data-state="open"] {
+  box-shadow: var(--focus-ring);
+}
+:is(.transit-mini, .transit-phone-row) .transit-car-slot {
+  position: static;
+  transform: none;
+  transition: none;
+}
+.transit-mini-more,
+.transit-more {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  height: 24px;
+  padding: 0 8px;
   border-radius: 9999px;
   background: var(--bg-2);
   box-shadow: inset 0 0 0 1px var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  outline: none;
+}
+.transit-mini-more {
+  min-width: 0;
+  height: 16px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.transit-more:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
-/* Hover card: above its stop or train. */
+/* The service log: the hour in bins under the line, a bar per bin in its worst kind. */
+.transit-log {
+  position: relative;
+}
+.transit-log-rule {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  left: 0;
+  height: 1px;
+  background: var(--transit-rule);
+}
+.transit-bin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: var(--bin);
+  height: 100%;
+  padding-bottom: 4px;
+  border-radius: 6px;
+  outline: none;
+}
+[data-motion="full"] .transit-bin {
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.transit-bin:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .transit-bin:hover {
+    background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  }
+}
+.transit-bar {
+  position: relative;
+  display: block;
+  width: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--text-3);
+  transform-origin: bottom;
+}
+.transit-bar[data-kind="ok"] {
+  background: var(--st-ok);
+}
+.transit-bar:is([data-kind="fail"], [data-kind="crash"]) {
+  background: var(--st-err);
+}
+.transit-bar[data-kind="commit"] {
+  background: var(--route);
+}
+/* The non-color cues: a diamond caps a failure, a ring a commit. */
+.transit-bar:is([data-kind="fail"], [data-kind="crash"], [data-kind="commit"])::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  translate: -50% 0;
+  rotate: 45deg;
+  background: var(--st-err);
+}
+.transit-bar[data-kind="commit"]::after {
+  top: -7px;
+  width: 7px;
+  height: 7px;
+  rotate: none;
+  border-radius: 9999px;
+  background: var(--transit-stop);
+  box-shadow: 0 0 0 2px var(--route);
+}
+@keyframes transit-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes transit-fade {
+  from {
+    opacity: 0;
+  }
+}
+[data-motion="full"] .transit-grow {
+  animation: transit-grow var(--dur-base) var(--ease-out) both;
+}
+[data-motion="reduced"] .transit-grow {
+  animation: transit-fade var(--dur-base) var(--ease-out) both;
+}
+/* A new station opens with a quick scale-in (Reduced: a fade). */
+@keyframes transit-pop {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+[data-motion="full"] .transit-pop {
+  animation: transit-pop var(--dur-base) var(--ease-out) both;
+}
+[data-motion="reduced"] .transit-pop {
+  animation: transit-fade var(--dur-base) var(--ease-out) both;
+}
+.transit-axis {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 20px;
+  margin-top: -4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* The phone: each line a station list, the track down its left edge. */
+.transit-phone-stations {
+  position: relative;
+  margin-top: 4px;
+}
+.transit-phone-stations::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: 26px;
+  left: 18px;
+  width: 6px;
+  border-radius: 3px;
+  background: var(--route);
+}
+.transit-line[data-dim] .transit-phone-stations::before {
+  opacity: 0.55;
+}
+.transit-phone-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 4px 0 44px;
+  border-radius: var(--radius-control);
+  text-align: left;
+  outline: none;
+}
+.transit-phone-row:focus-visible,
+.transit-phone-row[data-state="open"] {
+  box-shadow: var(--focus-ring);
+}
+.transit-phone-row:active {
+  background: color-mix(in srgb, var(--route) 12%, transparent);
+}
+.transit-phone-row .transit-mark {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  margin-top: -7px;
+}
+.transit-phone-station[data-mini] .transit-phone-row {
+  min-height: 44px;
+  padding-left: 64px;
+}
+/* A subagent hangs off the line on a short branch. */
+.transit-phone-station[data-mini] .transit-phone-row::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 21px;
+  width: 26px;
+  height: 3px;
+  margin-top: -1.5px;
+  background: var(--route);
+}
+.transit-phone-row .transit-mark[data-kind="mini"] {
+  left: 44px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  box-shadow: 0 0 0 2.5px var(--transit-ink);
+}
+.transit-phone-row .transit-mark[data-kind="more"] {
+  width: 12px;
+  height: 12px;
+  left: 15px;
+  margin-top: -6px;
+  background: var(--transit-ground);
+  box-shadow: 0 0 0 3px var(--route);
+}
+
+/* Hover card: above its station or bin. */
 .transit-tip {
   transform: translate(-50%, calc(-100% - 8px));
-}
-
-@media (pointer: coarse), (max-width: 767px) {
-  .transit-stop {
-    width: 44px;
-    height: 44px;
-    margin: -22px 0 0 -22px;
-  }
-  .transit-train {
-    width: 44px;
-    height: 44px;
-  }
-  .transit-train.is-vertical {
-    width: 44px;
-    height: 44px;
-  }
 }
 
 /* ── Retro (DESIGN.md §10.6): a phosphor text console on one character grid ────────────────── */

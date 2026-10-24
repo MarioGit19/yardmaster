@@ -1377,8 +1377,9 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.8: the Transit map (lines top to bottom on a phone), at rest and under demo activity,
-      // plus a station's hover card and a train's inspector.
+      // 12.6j: the Transit concourse (the departures board beside the line map; on a phone the
+      // board above the station lists), at rest and under demo activity, plus a service-log
+      // bin's hover card, a board row lighting its station, and a station's inspector.
       for (const viewport of [
         { width: 1440, height: 900 },
         { width: 1920, height: 1080 },
@@ -1391,11 +1392,11 @@ test.describe('layouts', () => {
           await openRoute(page, '/');
           await expect(page.locator('[data-transit-line]').first()).toBeVisible();
           await page.waitForTimeout(800);
-          const shot = (moment: string) =>
+          const shot = (moment: string, fullPage = true) =>
             page.screenshot({
               path: new URL(`layout-transit-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
                 .pathname,
-              fullPage: true,
+              fullPage,
               animations: 'disabled',
             });
           await shot('rest');
@@ -1404,15 +1405,24 @@ test.describe('layouts', () => {
           });
           await page.waitForTimeout(600);
           await shot('active');
-          if (viewport.width < 768) return;
-          await page.locator('[data-transit-station][data-count="1"]').first().hover();
+          if (viewport.width < 768) {
+            await page.locator('[data-transit-line] [data-transit-station]').first().click();
+            await expect(page.locator('[data-actor-inspector][data-sheet]')).toBeVisible();
+            await page.waitForTimeout(600);
+            await shot('inspector', false);
+            return;
+          }
+          await page.locator('[data-transit-event][data-count="1"]').first().hover();
           await expect(page.locator('[data-transit-tip]')).toBeVisible();
-          await shot('station');
+          await shot('log', false);
+          await page.locator('[data-board-row]').first().hover();
+          await expect(page.locator('[data-transit-station][data-lit]')).toHaveCount(1);
+          await shot('lit', false);
           await page.mouse.move(4, 4);
-          await page.locator('[data-transit-line] [data-scene-actor]').first().click();
+          await page.locator('[data-transit-line] [data-transit-station]').first().click();
           await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
           await page.waitForTimeout(600);
-          await shot('inspector');
+          await shot('inspector', false);
         });
       }
 
@@ -2117,7 +2127,7 @@ for (const size of FIT_SIZES) {
 }
 
 // 12.6d: every layout's phone version inside the phone shell at 360, 390 and 412 in both themes:
-// the overview, the Transit's next screen of lines, the Office room and the Grid cockpit with its
+// the overview, the Transit's station lists, the Office room and the Grid cockpit with its
 // next screen, and the inspector sheet.
 for (const theme of THEMES) {
   for (const width of [360, 390, 412] as const) {
@@ -2152,14 +2162,10 @@ for (const theme of THEMES) {
       test('transit', async ({ page }) => {
         await open(page, 'transit', '[data-transit-line]');
         await shot(page, 'transit');
-        const groups = page.locator('[data-transit-groups]');
-        await groups.getByRole('button', { name: 'Next screen', exact: true }).tap();
-        await expect(groups.locator('[data-swipe-position]')).toHaveAttribute(
-          'data-swipe-position',
-          '1',
-        );
-        await page.waitForTimeout(700);
-        await shot(page, 'transit-next');
+        // Below the board: the lines as station lists.
+        await page.locator('[data-transit-line]').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
+        await shot(page, 'transit-lines');
       });
 
       test('office', async ({ page }) => {

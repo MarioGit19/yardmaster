@@ -455,7 +455,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 11.8: the Transit map: trains at "now", a new station scaling in, a train's inspector. */
+  /** 12.6j: the Transit concourse: trains at their stations, the service log, the board. */
   async transit(r: Recorder) {
     const { page } = r;
     await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
@@ -465,28 +465,37 @@ const SCENARIOS = {
     await r.moment(
       'activity',
       'activity',
-      '8 s of the map: working trains trail speed lines',
+      '8 s of the concourse: trains pull out and roll back as work starts and ends, the board re-sorts',
       hold(page, 8000),
     );
     await r.moment(
       'glide',
       'transition',
-      '2 s at 12 fps: speed lines slip back past the working trains, waiting doors pulse',
+      '2 s at 12 fps: speed lines slip back past the working trains, waiting doors and due rows pulse',
       hold(page, 2000),
     );
     await catchMoment(
       r,
+      'log',
+      "a new bin's bar grows up from the service log's rule (dur.base, ease.out)",
+      '.transit-grow',
+      { ms: 600, leadMs: 300 },
+    );
+    await catchMoment(
+      r,
       'station',
-      'a new station scales in on its line (dur.base, ease.out)',
+      'a new station scales in on its line (dur.base, ease.out), when the demo gets there',
       '.transit-pop',
       { ms: 600, leadMs: 300 },
     );
     await r.moment(
       'inspector',
       'transition',
-      'click a train: the Actor inspector opens beside it, Esc closes it',
+      'point at a board row (its station lights), click a station: the Actor inspector, Esc',
       async () => {
-        await page.locator('[data-transit-line] [data-scene-actor]').first().click();
+        await page.locator('[data-board-row]').first().hover();
+        await page.waitForTimeout(400);
+        await page.locator('[data-transit-line] [data-transit-station]').first().click();
         await page.locator('[data-actor-inspector] [data-actor]').waitFor();
         await page.waitForTimeout(500);
         await page.keyboard.press('Escape');

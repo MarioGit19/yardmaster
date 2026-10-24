@@ -1072,7 +1072,7 @@ test.describe('the Grid 3D network', () => {
   });
 });
 
-test.describe('the Transit map', () => {
+test.describe('the Transit concourse', () => {
   test('shows the same amber and rose cues as Minimal, on its own ground', async ({ browser }) => {
     test.slow();
     const { page, stop } = await openBoard(browser);
@@ -1101,52 +1101,65 @@ test.describe('the Transit map', () => {
           { timeout: 40_000, intervals: [500] },
         )
         .toBe(true);
-      // The waiting session is a train with amber doors.
+      await expect(page.locator('[data-transit]')).toHaveAttribute('data-transit-mode', 'wide');
+      // The waiting session: a train with amber doors at its station, and on top of the board.
       await expect(
         page.locator('[data-transit-line] [data-scene-actor][data-train="wait"]').first(),
       ).toBeVisible();
+      await expect(page.locator('[data-board-row]').first()).toHaveAttribute('data-tone', 'wait');
+      await expect(page.locator('[data-board-row]').first()).toContainText('Due · needs you');
       await expect(page.locator('[data-transit-ground]')).toHaveCount(1);
       await expect(page.locator('[data-ambient]')).toHaveCount(0);
-      // The hour's history: stations on every line, "now" pinned at the right.
-      await expect(page.locator('[data-transit-station]').first()).toBeVisible();
-      const pinned = await page
-        .locator('[data-transit-scroller]')
-        .evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft);
-      expect(pinned).toBeLessThanOrEqual(1);
+      // The hour's service log under the lines.
+      await expect(page.locator('[data-transit-event]').first()).toBeVisible();
     } finally {
       await stop();
     }
   });
 
-  test('a station lands on its event, a train opens the inspector, a name opens the project', async ({
+  test('a log bin lands on its event, a station or board row opens the inspector, a name the project', async ({
     browser,
   }) => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.keyboard.press('Alt+Digit4');
       // A single finished turn: it opens its session.
-      const station = page
-        .locator('[data-transit-station][data-kind="turn"][data-count="1"][data-session]')
+      const bin = page
+        .locator('[data-transit-event][data-kind="turn"][data-count="1"][data-session]')
         .first();
-      await expect(station).toBeVisible();
-      const stationId = await station.getAttribute('data-transit-station');
-      const sessionId = await station.getAttribute('data-session');
-      const pinnedStation = page.locator(`[data-transit-station="${stationId}"]`);
-      await pinnedStation.hover();
-      await expect(page.locator(`[data-transit-tip="${stationId}"]`)).toContainText(
-        'Turn finished',
-      );
-      await pinnedStation.click();
+      await expect(bin).toBeVisible({ timeout: 20_000 });
+      const binId = await bin.getAttribute('data-transit-event');
+      const sessionId = await bin.getAttribute('data-session');
+      const line = await bin
+        .locator('xpath=ancestor::*[@data-transit-line][1]')
+        .getAttribute('data-transit-line');
+      const pinned = page.locator(`[data-transit-line="${line}"] [data-transit-event="${binId}"]`);
+      await pinned.hover();
+      await expect(page.locator(`[data-transit-tip="${binId}"]`)).toContainText('Turn finished');
+      await pinned.click();
       await expect(page).toHaveURL(new RegExp(`#/p/[^/]+/s/${sessionId}$`));
       await expect(page.locator('[data-focus]').first()).toBeVisible();
 
       await page.goBack();
       await expect(layout(page)).toHaveAttribute('data-layout', 'transit');
-      const train = page.locator('[data-transit-line] [data-scene-actor]').first();
-      const actorId = await train.getAttribute('data-scene-actor');
-      await page.locator(`[data-scene-actor="${actorId}"]`).click();
+      const station = page.locator('[data-transit-line] [data-transit-station]').first();
+      const actorId = await station.getAttribute('data-transit-station');
+      await page.locator(`[data-transit-station="${actorId}"]`).click();
       const inspector = page.locator('[data-actor-inspector]');
       await expect(inspector.locator('[data-actor]')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(inspector).toHaveCount(0);
+
+      // Pointing at a board row lights its station on the map; a click inspects it.
+      const row = page.locator('[data-board-row]').first();
+      const rowActor = await row.getAttribute('data-board-row');
+      await row.hover();
+      await expect(page.locator(`[data-transit-station="${rowActor}"]`)).toHaveAttribute(
+        'data-lit',
+        '',
+      );
+      await row.click();
+      await expect(page.locator(`[data-actor-inspector="${rowActor}"]`)).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(inspector).toHaveCount(0);
 
@@ -1159,7 +1172,7 @@ test.describe('the Transit map', () => {
     }
   });
 
-  test('keyboard: Tab to a line, arrows to a train, Enter inspects, Esc steps back', async ({
+  test('keyboard: Tab to a line, arrows to a station, Enter inspects, Esc steps back', async ({
     browser,
   }) => {
     const { page, stop } = await openBoard(browser);
@@ -1172,22 +1185,38 @@ test.describe('the Transit map', () => {
       await page.keyboard.press('ArrowRight');
       const first = line.locator('[data-transit-item]').first();
       await expect(first).toBeFocused();
+      await expect(first).toHaveAttribute('data-transit-station', /.+/);
       await page.keyboard.press('Enter');
       await expect(page.locator('[data-actor-inspector] [data-actor]')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.locator('[data-actor-inspector]')).toHaveCount(0);
       await expect(first).toBeFocused();
-      // ← from the first item wraps to the oldest station.
+      // ← from the first item wraps to the log's oldest bin.
       await page.keyboard.press('ArrowLeft');
       await expect(line.locator('[data-transit-item]').last()).toBeFocused();
       await page.keyboard.press('Escape');
       await expect(name).toBeFocused();
+
+      // The board is one Tab stop; the arrows move between its rows.
+      // The live board can re-sort between key presses, so compare positions, not rows.
+      const rows = page.locator('[data-board-row]');
+      const focusedIndex = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('[data-board-row]')].indexOf(
+            document.activeElement as Element,
+          ),
+        );
+      await rows.first().focus();
+      await page.keyboard.press('ArrowDown');
+      await expect.poll(focusedIndex).toBeGreaterThan(0);
+      await page.keyboard.press('Home');
+      await expect.poll(focusedIndex).toBe(0);
     } finally {
       await stop();
     }
   });
 
-  test('on a touch phone: lines run top to bottom, 44 px targets, the inspector a sheet', async ({
+  test('on a touch phone: the board, then each line as a station list, 44 px targets', async ({
     browser,
   }) => {
     const { page, stop } = await openBoard(browser, {
@@ -1198,59 +1227,35 @@ test.describe('the Transit map', () => {
     try {
       await page.evaluate(() => localStorage.setItem('cboard.layout', 'transit'));
       await page.reload();
-      await expect(page.locator('[data-transit]')).toHaveAttribute('data-transit-axis', 'vertical');
+      await expect(page.locator('[data-transit]')).toHaveAttribute('data-transit-mode', 'phone');
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(0);
-      // At most four lines a screen, the rest a swipe away.
-      const groups = page.locator('[data-transit-groups]');
-      await expect(groups).toHaveAttribute('data-transit-groups', '2');
-      const firstPage = groups.locator('[data-swipe-page="0"]');
-      await expect(firstPage.locator('[data-transit-line]')).toHaveCount(4);
-      await expect(groups.locator('[data-swipe-page="1"] [data-transit-line]')).toHaveCount(2);
-      const pageBox = await firstPage.boundingBox();
-      expect(pageBox?.x).toBeCloseTo(16, 0);
-      expect(pageBox?.width).toBeCloseTo(390 - 32, 0);
-      // The line names read whole on one line, nothing clipped (the demo's names fit).
-      const clipped = await page
-        .locator('[data-transit-name] .transit-name-text')
-        .evaluateAll((names) =>
-          names
-            .filter((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1)
-            .map((n) => n.textContent),
-        );
-      expect(clipped).toEqual([]);
-      // "Now" on top: the first line's trains sit above its newest station.
-      const line = page.locator('[data-transit-line]').first();
-      const train = line.locator('[data-scene-actor]').first();
-      const newest = line.locator('[data-transit-station]').first();
-      const trainBox = await train.boundingBox();
-      const stationBox = await newest.boundingBox();
-      expect(trainBox?.y ?? 0).toBeLessThan(stationBox?.y ?? 0);
-      for (const box of [trainBox, stationBox]) {
+      // The board first, at most five departures.
+      const board = page.locator('[data-transit-board]');
+      const firstLine = page.locator('[data-transit-line]').first();
+      const boardBox = await board.boundingBox();
+      const lineBox = await firstLine.boundingBox();
+      expect(boardBox?.y ?? 0).toBeLessThan(lineBox?.y ?? 0);
+      expect(await board.locator('[data-board-row]').count()).toBeLessThanOrEqual(5);
+      // Every line is there, one after the other.
+      expect(await page.locator('[data-transit-line]').count()).toBe(6);
+      // Stations and log bins are 44 px targets.
+      const station = firstLine.locator('[data-transit-station]').first();
+      const bin = firstLine.locator('[data-transit-event]').first();
+      await station.scrollIntoViewIfNeeded();
+      await expect(bin).toBeVisible({ timeout: 20_000 });
+      for (const target of [station, bin]) {
+        const box = await target.boundingBox();
         expect(box?.width).toBeGreaterThanOrEqual(44);
         expect(box?.height).toBeGreaterThanOrEqual(44);
       }
-      await train.tap();
+      await station.tap();
       const sheet = page.locator('[data-actor-inspector][data-sheet]');
       await expect(sheet).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
-      // A swipe brings the next screen of lines in.
-      const position = groups.locator('[data-swipe-position]');
-      await expect(position).toHaveAttribute('data-swipe-position', '0');
-      const client = await page.context().newCDPSession(page);
-      await client.send('Input.synthesizeScrollGesture', {
-        x: 300,
-        y: 420,
-        xDistance: -220,
-        yDistance: 0,
-        gestureSourceType: 'touch',
-        speed: 1200,
-      });
-      await expect(position).toHaveAttribute('data-swipe-position', '1');
-      await restsOnAPage(groups);
     } finally {
       await stop();
     }
