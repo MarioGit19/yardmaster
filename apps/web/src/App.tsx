@@ -9,6 +9,7 @@ import { AttentionCenter, AttentionPage } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { useLayoutShortcuts } from './layouts/LayoutStage.js';
+import { CloseProjectDialog } from './library/CloseProject.js';
 import { OpenProjectDialog } from './library/OpenProject.js';
 import { EditorLaunchWatcher } from './library/opening.js';
 import { MotionRoot } from './MotionRoot.js';
@@ -150,6 +151,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <AppRoutes />
           <CommandPalette />
           <OpenProjectDialog />
+          <CloseProjectDialog />
           <EditorLaunchWatcher />
         </Router>
         <Toasts />

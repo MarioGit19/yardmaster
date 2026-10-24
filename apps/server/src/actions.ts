@@ -41,7 +41,8 @@ export function stubActionHandlers(): ActionHandlers {
     'session.setPermissionMode': notImplemented,
     'session.replyInTerminal': notImplemented,
     'project.add': notImplemented,
-    'project.remove': notImplemented,
+    'project.close': notImplemented,
+    'project.forget': notImplemented,
     'project.openInEditor': notImplemented,
     'settings.set': notImplemented,
   };

@@ -1,20 +1,36 @@
 import type { Project } from '@c-board/protocol';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { ArrowUpRight, ExternalLink, Pin, PinOff, SquareTerminal } from 'lucide-react';
+import {
+  ArrowUpRight,
+  ExternalLink,
+  FolderX,
+  Pin,
+  PinOff,
+  SquareTerminal,
+  Trash2,
+} from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useBoard, useBoardClient } from '../data/index.js';
+import { requestClose } from '../library/closing.js';
 import { usePin } from '../library/useActive.js';
 import { projectHref } from '../routes.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 
 /**
- * A pod's context menu (right click, or the context-menu key on its link): open it, open a new
- * terminal in it (the focus view's popover), open it in the editor, or pin it to the overview.
+ * A project's context menu on the overview (right click, or the context-menu key): on a pod, an
+ * Office room, a Grid node or a Transit line. Open it, open a new terminal in it (the focus
+ * view's popover), open it in the editor, pin it to the overview, or close or forget it.
  */
-export function PodMenu({ project, children }: { project: Project; children: ReactElement }) {
+export function PodMenu({
+  project,
+  children,
+}: {
+  project: Pick<Project, 'id' | 'name'>;
+  children: ReactElement;
+}) {
   const [, navigate] = useLocation();
   const client = useBoardClient();
   const editor = useBoard(
@@ -61,6 +77,13 @@ export function PodMenu({ project, children }: { project: Project; children: Rea
           </MenuItem>
           <MenuItem icon={pin.pinned ? <PinOff /> : <Pin />} onSelect={pin.toggle}>
             {pin.pinned ? 'Unpin from the overview' : 'Pin to the overview'}
+          </MenuItem>
+          <ContextMenu.Separator className="mx-2 my-1 h-px bg-line" />
+          <MenuItem icon={<FolderX />} onSelect={() => requestClose(project.id)}>
+            Close project…
+          </MenuItem>
+          <MenuItem icon={<Trash2 />} onSelect={() => requestClose(project.id, true)}>
+            Forget project…
           </MenuItem>
         </ContextMenu.Content>
       </ContextMenu.Portal>

@@ -146,6 +146,8 @@ export const CmdDisposeTerminal = command(
   z.object({ terminalId: TerminalId }),
 );
 export const CmdRerun = command('cmd.rerun', z.object({ execId: ExecutionId }));
+/** Closes the editor window (`project.close` with its checkbox ticked). */
+export const CmdCloseWindow = command('cmd.closeWindow', z.object({}));
 
 export const ServerToEditor = z.discriminatedUnion('type', [
   CmdSendText,
@@ -154,6 +156,7 @@ export const ServerToEditor = z.discriminatedUnion('type', [
   CmdFocusTerminal,
   CmdDisposeTerminal,
   CmdRerun,
+  CmdCloseWindow,
 ]);
 export type ServerToEditor = z.infer<typeof ServerToEditor>;
 
@@ -279,7 +282,13 @@ export const UiAction = z.discriminatedUnion('kind', [
   /** Types a line into a terminal session's linked terminal (F14, `claude.terminalReply`). */
   action('session.replyInTerminal', { sessionId: SessionId, text: Text.min(1) }),
   action('project.add', { path: Path }),
-  action('project.remove', { projectId: ProjectId }),
+  /**
+   * Closes a project (12.6e): stops what the board runs there and hides it until something new
+   * happens in it. `closeWindow` also closes the editor windows open on it.
+   */
+  action('project.close', { projectId: ProjectId, closeWindow: z.boolean().optional() }),
+  /** Closes it, then drops it from the board and the picker's recents. */
+  action('project.forget', { projectId: ProjectId, closeWindow: z.boolean().optional() }),
   action('project.openInEditor', { projectId: ProjectId }),
   action('settings.set', { key: z.string().min(1).max(128), value: z.unknown() }),
 ]);

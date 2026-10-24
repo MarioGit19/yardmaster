@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, ExternalLink, OctagonX, SquareArrowOutUpRight, X } from 'lucide-react';
+import { Check, ExternalLink, FolderX, OctagonX, SquareArrowOutUpRight, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import {
 import { formatUptime } from '../lanes/lane.js';
 import { PortChip } from '../lanes/PortChip.js';
 import { TerminalPeek } from '../lanes/TerminalPeek.js';
+import { requestClose } from '../library/closing.js';
 import { dur, ease } from '../motion.js';
 import { editorName } from '../palette/commands.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
@@ -28,6 +29,7 @@ import { actionErrorText } from '../terminal/stack.js';
 import { SheetPanel } from '../ui/BottomSheet.js';
 import { Button, buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
+import { IconButton } from '../ui/IconButton.js';
 import { Popover } from '../ui/Popover.js';
 import { StatusDot } from '../ui/StatusDot.js';
 
@@ -238,9 +240,21 @@ function InspectorBody({
       className="flex min-w-0 flex-col gap-3"
     >
       <header className="flex min-w-0 flex-col gap-1">
-        <p className="truncate text-meta text-text-2">
-          {actorKindName(actor.kind)} · {scene.name}
-        </p>
+        <div className="-my-1 flex min-w-0 items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-meta text-text-2">
+            {actorKindName(actor.kind)} · {scene.name}
+          </p>
+          <IconButton
+            label={`Close ${scene.name}…`}
+            size="sm"
+            data-inspector-close-project=""
+            onClick={() => {
+              close();
+              requestClose(projectId);
+            }}
+            icon={<FolderX className="size-3.5" strokeWidth={1.75} />}
+          />
+        </div>
         <h2 className="truncate font-medium text-text-1 text-title-sm" title={actor.label}>
           {actor.label}
         </h2>

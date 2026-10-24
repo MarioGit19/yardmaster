@@ -5,6 +5,7 @@ import { GlitchText } from '../fx/GlitchText.js';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
+import { PodMenu } from '../pod/PodMenu.js';
 import { toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
@@ -86,98 +87,100 @@ export function GridNode({ project, variant, style, onEnter, onHover }: GridNode
   };
 
   return (
-    <section
-      aria-roledescription="node"
-      aria-label={`${project.name}, ${toneLabel(project.tone)}, ${counts}`}
-      aria-keyshortcuts="Enter"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: each node is one Tab stop (§10.1).
-      tabIndex={0}
-      data-grid-node={project.id}
-      data-focus-return={project.id}
-      data-tone={project.tone}
-      data-dim={project.dim || undefined}
-      data-variant={variant}
-      onKeyDown={onKeyDown}
-      onClick={onClick}
-      onPointerEnter={onHover && (() => onHover(true))}
-      onPointerLeave={onHover && (() => onHover(false))}
-      onFocus={onHover && (() => onHover(true))}
-      onBlur={
-        onHover &&
-        ((event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onHover(false);
-        })
-      }
-      className={cx(
-        'grid-node cursor-pointer outline-none',
-        variant === 'map' ? 'absolute' : variant === 'trunk' ? 'relative' : undefined,
-      )}
-      style={{ '--accent': `var(--accent-${project.accent})`, ...style } as CSSProperties}
-    >
-      {project.tone === 'wait' && variant === 'map' && (
-        <span aria-hidden data-grid-beacon className="grid-beacon" />
-      )}
-      {variant !== 'trunk' && (
-        <span aria-hidden data-grid-tip className="grid-tip font-mono text-meta tabular">
-          {counts}
-        </span>
-      )}
-      <div className="flex min-w-0 items-start gap-2.5">
-        {variant !== 'float' && <Hex project={project} />}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
-          <h2 className="flex min-w-0 items-center gap-2">
-            <span
-              className={cx(
-                'min-w-0 truncate font-medium text-body-sm',
-                project.tone === 'err' ? 'text-st-err-ink' : 'text-text-1',
-              )}
-              title={project.name}
-            >
-              {project.tone === 'err' ? (
-                <GlitchText burst={erredAt.current}>{project.name}</GlitchText>
-              ) : (
-                project.name
-              )}
-            </span>
-            <StatusDot
-              tone={project.tone}
-              label={toneLabel(project.tone)}
-              className="ml-auto shrink-0"
-            />
-          </h2>
-          <p className="grid-node-meta truncate font-mono text-meta text-text-3 tabular">
-            {branch ?? 'No branch'}
-          </p>
-        </div>
-      </div>
-      <LiveCaption caption={caption} className="grid-node-meta mt-1.5 text-meta" />
-      {project.actors.length > 0 && (
-        <ul aria-label={`${project.name} actors`} className="grid-satellites">
-          {shown.map((actor) => (
-            <li
-              key={actor.id}
-              className="grid-satellite-slot"
-              data-kind={actor.kind}
-              data-grid-slot={actor.id}
-            >
-              <Satellite actor={actor} projectName={project.name} />
-            </li>
-          ))}
-          {hidden > 0 && (
-            <li className="grid-satellite-slot" data-kind="more" data-grid-slot-more>
+    <PodMenu project={project}>
+      <section
+        aria-roledescription="node"
+        aria-label={`${project.name}, ${toneLabel(project.tone)}, ${counts}`}
+        aria-keyshortcuts="Enter"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: each node is one Tab stop (§10.1).
+        tabIndex={0}
+        data-grid-node={project.id}
+        data-focus-return={project.id}
+        data-tone={project.tone}
+        data-dim={project.dim || undefined}
+        data-variant={variant}
+        onKeyDown={onKeyDown}
+        onClick={onClick}
+        onPointerEnter={onHover && (() => onHover(true))}
+        onPointerLeave={onHover && (() => onHover(false))}
+        onFocus={onHover && (() => onHover(true))}
+        onBlur={
+          onHover &&
+          ((event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onHover(false);
+          })
+        }
+        className={cx(
+          'grid-node cursor-pointer outline-none',
+          variant === 'map' ? 'absolute' : variant === 'trunk' ? 'relative' : undefined,
+        )}
+        style={{ '--accent': `var(--accent-${project.accent})`, ...style } as CSSProperties}
+      >
+        {project.tone === 'wait' && variant === 'map' && (
+          <span aria-hidden data-grid-beacon className="grid-beacon" />
+        )}
+        {variant !== 'trunk' && (
+          <span aria-hidden data-grid-tip className="grid-tip font-mono text-meta tabular">
+            {counts}
+          </span>
+        )}
+        <div className="flex min-w-0 items-start gap-2.5">
+          {variant !== 'float' && <Hex project={project} />}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+            <h2 className="flex min-w-0 items-center gap-2">
               <span
-                role="img"
-                aria-label={`${hidden} more in ${project.name}`}
-                data-grid-more={hidden}
-                className="grid-more font-mono text-meta text-text-2 tabular"
+                className={cx(
+                  'min-w-0 truncate font-medium text-body-sm',
+                  project.tone === 'err' ? 'text-st-err-ink' : 'text-text-1',
+                )}
+                title={project.name}
               >
-                +{hidden}
+                {project.tone === 'err' ? (
+                  <GlitchText burst={erredAt.current}>{project.name}</GlitchText>
+                ) : (
+                  project.name
+                )}
               </span>
-            </li>
-          )}
-        </ul>
-      )}
-    </section>
+              <StatusDot
+                tone={project.tone}
+                label={toneLabel(project.tone)}
+                className="ml-auto shrink-0"
+              />
+            </h2>
+            <p className="grid-node-meta truncate font-mono text-meta text-text-3 tabular">
+              {branch ?? 'No branch'}
+            </p>
+          </div>
+        </div>
+        <LiveCaption caption={caption} className="grid-node-meta mt-1.5 text-meta" />
+        {project.actors.length > 0 && (
+          <ul aria-label={`${project.name} actors`} className="grid-satellites">
+            {shown.map((actor) => (
+              <li
+                key={actor.id}
+                className="grid-satellite-slot"
+                data-kind={actor.kind}
+                data-grid-slot={actor.id}
+              >
+                <Satellite actor={actor} projectName={project.name} />
+              </li>
+            ))}
+            {hidden > 0 && (
+              <li className="grid-satellite-slot" data-kind="more" data-grid-slot-more>
+                <span
+                  role="img"
+                  aria-label={`${hidden} more in ${project.name}`}
+                  data-grid-more={hidden}
+                  className="grid-more font-mono text-meta text-text-2 tabular"
+                >
+                  +{hidden}
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
+      </section>
+    </PodMenu>
   );
 }
 

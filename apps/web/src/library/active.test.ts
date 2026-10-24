@@ -1,7 +1,7 @@
 import { type BoardState, type EditorWindow, emptyBoardState } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeProject, makeSession, makeTerminal } from '../test/board.js';
-import { type ActiveRule, activeKey, activeProjectIds } from './active.js';
+import { type ActiveRule, activeKey, activeProjectIds, closedProjectIds } from './active.js';
 
 const NOW = 10_000_000;
 const MIN = 60_000;
@@ -89,5 +89,38 @@ describe('activeProjectIds', () => {
     b.windows.w1 = editorWindow('w1', ['h', 'a']);
     expect(activeKey(b, rule())).toBe('a\nh');
     expect(activeKey(emptyBoardState(), rule())).toBe('');
+  });
+});
+
+describe('closed projects', () => {
+  const closed = (b: BoardState, id: string, at: number) => {
+    const project = b.projects[id];
+    if (project) b.projects[id] = { ...project, closedAt: at };
+  };
+
+  it('hides a closed project whatever is still running there from before', () => {
+    const b = board();
+    b.windows.w1 = editorWindow('w1', ['a']);
+    b.terminals.t1 = { ...makeTerminal('t1', 'a'), createdAt: NOW - 60 * MIN };
+    b.sessions.s1 = { ...makeSession('s1', 'a', { kind: 'working' }), startedAt: NOW - 60 * MIN };
+    b.projects.b = { ...makeProject('b', 'project-b'), lastActivityAt: NOW };
+    closed(b, 'a', NOW - 10 * MIN);
+    closed(b, 'b', NOW - 10 * MIN);
+    const active = activeProjectIds(b, rule({ pinned: new Set(['a']) }));
+    expect(active.has('a')).toBe(false);
+    expect(active.has('b')).toBe(false);
+    expect([...closedProjectIds(b)].sort()).toEqual(['a', 'b']);
+  });
+
+  it('brings it back for a new terminal, session, window, or opening it', () => {
+    const b = board();
+    for (const id of ['a', 'b', 'c', 'd', 'e']) closed(b, id, NOW - 10 * MIN);
+    b.terminals.t1 = { ...makeTerminal('t1', 'a'), createdAt: NOW - MIN };
+    b.terminals.t2 = { ...makeTerminal('t2', 'e', 0), createdAt: NOW - MIN }; // already exited
+    b.sessions.s1 = { ...makeSession('s1', 'b', { kind: 'working' }), startedAt: NOW - MIN };
+    b.windows.w1 = { ...editorWindow('w1', ['c']), connectedAt: NOW - MIN };
+    const active = activeProjectIds(b, rule({ opened: new Map([['d', NOW - MIN]]) }));
+    expect([...active].sort()).toEqual(['a', 'b', 'c', 'd']);
+    expect([...closedProjectIds(b)].sort()).toEqual(['d', 'e']);
   });
 });

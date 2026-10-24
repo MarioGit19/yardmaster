@@ -12,6 +12,7 @@ import {
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { dur, ease, spring } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
+import { PodMenu } from '../pod/PodMenu.js';
 import { toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { Bookshelf, Couch, Desk, ServerRack, SideDesk, Workbench } from './kit/furniture.js';
@@ -139,91 +140,97 @@ export const OfficeRoom = memo(function OfficeRoom({
   };
 
   return (
-    <section
-      aria-roledescription="room"
-      aria-label={`${project.name}, ${toneLabel(project.tone)}`}
-      aria-keyshortcuts={entered ? undefined : 'Enter'}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: each room is one Tab stop (§10.1).
-      tabIndex={0}
-      data-room={project.id}
-      data-room-entered={entered || undefined}
-      data-focus-return={entered ? undefined : project.id}
-      data-tone={project.tone}
-      data-dim={project.dim || undefined}
-      onKeyDown={onKeyDown}
-      onClick={onClick}
-      className={cx(
-        'office-room relative outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-inset',
-        !entered && onEnter && 'cursor-pointer',
-      )}
-      style={{ width, height: ROOM_HEIGHT }}
-    >
-      <RoomShell
-        project={project}
-        branch={project.branch}
-        dirty={project.dirty}
-        doorLight={DOOR_LIGHT[project.tone] ?? 'off'}
-        light={Math.max(project.activity, ...project.actors.map((a) => a.activity))}
-        dim={project.dim}
-        w={width}
-        h={ROOM_HEIGHT}
+    <PodMenu project={project}>
+      <section
+        aria-roledescription="room"
+        aria-label={`${project.name}, ${toneLabel(project.tone)}`}
+        aria-keyshortcuts={entered ? undefined : 'Enter'}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: each room is one Tab stop (§10.1).
+        tabIndex={0}
+        data-room={project.id}
+        data-room-entered={entered || undefined}
+        data-focus-return={entered ? undefined : project.id}
+        data-tone={project.tone}
+        data-dim={project.dim || undefined}
+        onKeyDown={onKeyDown}
+        onClick={onClick}
+        className={cx(
+          'office-room relative outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-inset',
+          !entered && onEnter && 'cursor-pointer',
+        )}
+        style={{ width, height: ROOM_HEIGHT }}
       >
-        {whiteboard && (
-          <div className="absolute" style={{ left: WHITEBOARD.x, top: WHITEBOARD.y }}>
-            <Whiteboard items={project.todos} summary={project.summary} scale={WHITEBOARD.scale} />
-          </div>
-        )}
-        {project.ports.length > 0 && (
-          <div
-            className="absolute flex justify-end"
-            style={{ right: 8, top: 6, maxWidth: width * 0.4 }}
-          >
-            <PortSign ports={project.ports} />
-          </div>
-        )}
-
-        <AnimatePresence initial={false}>
-          {plan.stations.map((station) => (
-            <StationSlot key={station.key} station={station}>
-              <StationArt
-                station={station}
-                owner={station.owner ? actors.get(station.owner) : undefined}
-                whiteboard={whiteboard}
+        <RoomShell
+          project={project}
+          branch={project.branch}
+          dirty={project.dirty}
+          doorLight={DOOR_LIGHT[project.tone] ?? 'off'}
+          light={Math.max(project.activity, ...project.actors.map((a) => a.activity))}
+          dim={project.dim}
+          w={width}
+          h={ROOM_HEIGHT}
+        >
+          {whiteboard && (
+            <div className="absolute" style={{ left: WHITEBOARD.x, top: WHITEBOARD.y }}>
+              <Whiteboard
+                items={project.todos}
+                summary={project.summary}
+                scale={WHITEBOARD.scale}
               />
-            </StationSlot>
-          ))}
-        </AnimatePresence>
+            </div>
+          )}
+          {project.ports.length > 0 && (
+            <div
+              className="absolute flex justify-end"
+              style={{ right: 8, top: 6, maxWidth: width * 0.4 }}
+            >
+              <PortSign ports={project.ports} />
+            </div>
+          )}
 
-        <AnimatePresence initial={false}>
-          {placements.map((placement) => {
-            const actor = actors.get(placement.actorId);
-            if (!actor) return null;
-            return (
-              <OfficeCharacter
-                key={actor.id}
-                actor={actor}
-                placement={placement}
-                projectName={project.name}
-                color={actor.id === main ? accent : undefined}
-                fit={fit}
-              />
-            );
-          })}
-        </AnimatePresence>
+          <AnimatePresence initial={false}>
+            {plan.stations.map((station) => (
+              <StationSlot key={station.key} station={station}>
+                <StationArt
+                  station={station}
+                  owner={station.owner ? actors.get(station.owner) : undefined}
+                  whiteboard={whiteboard}
+                />
+              </StationSlot>
+            ))}
+          </AnimatePresence>
 
-        {plan.hidden > 0 && (
-          <span
-            role="img"
-            aria-label={`${plan.hidden} more in ${project.name}`}
-            data-room-more={plan.hidden}
-            className="absolute grid h-6 min-w-8 place-items-center rounded-chip border border-line-strong bg-bg-1 px-1.5 font-mono text-label text-text-1 tabular shadow-raised"
-            style={{ left: 34, top: 132, transform: 'translateX(-50%)' }}
-          >
-            +{plan.hidden}
-          </span>
-        )}
-      </RoomShell>
-    </section>
+          <AnimatePresence initial={false}>
+            {placements.map((placement) => {
+              const actor = actors.get(placement.actorId);
+              if (!actor) return null;
+              return (
+                <OfficeCharacter
+                  key={actor.id}
+                  actor={actor}
+                  placement={placement}
+                  projectName={project.name}
+                  color={actor.id === main ? accent : undefined}
+                  fit={fit}
+                />
+              );
+            })}
+          </AnimatePresence>
+
+          {plan.hidden > 0 && (
+            <span
+              role="img"
+              aria-label={`${plan.hidden} more in ${project.name}`}
+              data-room-more={plan.hidden}
+              className="absolute grid h-6 min-w-8 place-items-center rounded-chip border border-line-strong bg-bg-1 px-1.5 font-mono text-label text-text-1 tabular shadow-raised"
+              style={{ left: 34, top: 132, transform: 'translateX(-50%)' }}
+            >
+              +{plan.hidden}
+            </span>
+          )}
+        </RoomShell>
+      </section>
+    </PodMenu>
   );
 });
 

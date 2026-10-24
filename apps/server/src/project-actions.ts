@@ -51,6 +51,7 @@ export function createProjectActions(
       if (real === null) return { ok: false, error: OUTSIDE_LIBRARY };
       const id = projectIdFromPath(real);
       if (store.state.projects[id]) {
+        store.reopenProject(id);
         store.touchProject(id);
         return { ok: true };
       }
@@ -74,6 +75,7 @@ export function createProjectActions(
       if (!project) return { ok: false, error: ROUTE_ERRORS.unknownProject };
       const opened = await launcher.open(project.path);
       if (!opened.ok) return opened;
+      store.reopenProject(projectId);
       store.touchProject(projectId);
       return { ok: true, editor: opened.editor };
     },
@@ -116,6 +118,52 @@ export function createLaunchActions(
         if (refused) return refused;
       }
       return sessionCreate(action);
+    },
+  };
+}
+
+export interface CloseActionsOptions {
+  store: BoardStore;
+  /** Board terminals in the project: Ctrl+C, then killed if still running a moment later. */
+  stopTerminals: (projectId: string) => void;
+  /** Board Claude sessions in the project: interrupted, so History can resume them. */
+  suspendSessions: (projectId: string) => Promise<void>;
+  /** The editor windows open on the project, closed (only when the user asked). */
+  closeWindows: (projectId: string) => Promise<ActionResult>;
+  /** Drops the project from the overview's pins. */
+  unpin: (projectId: string) => void;
+  now?: () => number;
+}
+
+export const WINDOW_NOT_CLOSED = 'window_not_closed';
+
+/**
+ * `project.close` (12.6e): stops what the board owns in the project (terminal-origin sessions
+ * and editor terminals keep running, just hidden), optionally closes its editor windows, unpins
+ * it and marks it closed. `project.forget` does the same, then drops it from the board and so
+ * from the picker's recents; it comes back only when it is opened again or something runs there.
+ */
+export function createCloseActions(
+  options: CloseActionsOptions,
+): Pick<ActionHandlers, 'project.close' | 'project.forget'> {
+  const { store, stopTerminals, suspendSessions, closeWindows, unpin } = options;
+  const now = options.now ?? Date.now;
+  const close = async (projectId: string, closeWindow: boolean): Promise<ActionResult> => {
+    if (!store.state.projects[projectId]) return { ok: false, error: ROUTE_ERRORS.unknownProject };
+    stopTerminals(projectId);
+    await suspendSessions(projectId);
+    unpin(projectId);
+    const windows = closeWindow ? await closeWindows(projectId) : { ok: true as const };
+    store.closeProject(projectId, now());
+    return windows.ok ? { ok: true } : { ok: false, error: WINDOW_NOT_CLOSED };
+  };
+  return {
+    'project.close': ({ projectId, closeWindow }) => close(projectId, closeWindow === true),
+    'project.forget': async ({ projectId, closeWindow }) => {
+      const closed = await close(projectId, closeWindow === true);
+      if (!closed.ok && closed.error === ROUTE_ERRORS.unknownProject) return closed;
+      store.removeProject(projectId);
+      return closed;
     },
   };
 }

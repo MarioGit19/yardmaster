@@ -101,6 +101,7 @@ const ERRORS: Record<string, string> = {
   not_implemented: 'Not available yet',
   outside_library: 'That folder is not in your project library',
   unknown_project: 'That project is no longer on the board',
+  window_not_closed: 'The editor window did not close',
   editor_not_found:
     'No Cursor or VS Code command line found. Install its shell command, or set its path in Settings',
   editor_launch_failed: 'The editor could not be started',

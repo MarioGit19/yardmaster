@@ -11,6 +11,7 @@ import {
   MAX_REMEMBERED,
   pickerRows,
   runLaunch,
+  withoutForgotten,
 } from './launch.js';
 
 const entry = (name: string, extra: Partial<LibraryEntry> = {}): LibraryEntry => ({
@@ -248,5 +249,33 @@ describe('runLaunch', () => {
       }),
     ).toEqual({ ok: false, error: 'timeout' });
     expect(silent.action).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('withoutForgotten', () => {
+  const entry = (name: string, projectId: string | null, lastActiveAt: number | null) => ({
+    name,
+    path: `/home/dev/${name}`,
+    root: '~/Desktop',
+    git: false,
+    projectId,
+    lastActiveAt,
+  });
+
+  it('drops a forgotten project from the recents and sorts it by name', () => {
+    const entries = [
+      entry('zen', 'p-zen', 30),
+      entry('acme', 'p-acme', 20),
+      entry('blog', null, null),
+    ];
+    const same = withoutForgotten(entries, { 'p-zen': {}, 'p-acme': {} });
+    expect(same).toBe(entries);
+    expect(
+      withoutForgotten(entries, { 'p-acme': {} }).map((e) => [e.name, e.lastActiveAt]),
+    ).toEqual([
+      ['acme', 20],
+      ['blog', null],
+      ['zen', null],
+    ]);
   });
 });

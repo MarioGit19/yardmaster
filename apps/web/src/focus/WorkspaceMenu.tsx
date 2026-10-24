@@ -4,15 +4,18 @@ import {
   Copy,
   EllipsisVertical,
   ExternalLink,
+  FolderX,
   Pin,
   PinOff,
   Plus,
   SquareTerminal,
+  Trash2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { useBoard, useBoardClient } from '../data/index.js';
+import { requestClose } from '../library/closing.js';
 import { usePin } from '../library/useActive.js';
 import { dur, ease } from '../motion.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
@@ -118,6 +121,13 @@ export function WorkspaceMenu({
                     })}
                   >
                     Copy path
+                  </Item>
+                  <div aria-hidden className="mx-3 my-1 h-px bg-line" />
+                  <Item icon={<FolderX />} onSelect={run(() => requestClose(project.id))}>
+                    Close project…
+                  </Item>
+                  <Item icon={<Trash2 />} onSelect={run(() => requestClose(project.id, true))}>
+                    Forget project…
                   </Item>
                 </div>
               </SheetPanel>

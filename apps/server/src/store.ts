@@ -108,10 +108,28 @@ export class BoardStore {
     this.remove('projects', id);
   }
 
+  /** The user closed it (12.6e): hidden until something new happens there. */
+  closeProject(id: string, ts = this.now()): void {
+    if (this.state.projects[id]) this.merge('projects', id, { closedAt: ts });
+  }
+
+  /**
+   * Something new happened in a closed project (a terminal, a Claude session or an editor window
+   * appeared, or the user opened it again): it comes back. Things older than the close don't count.
+   */
+  reopenProject(id: string, ts = this.now()): void {
+    const closedAt = this.state.projects[id]?.closedAt;
+    if (closedAt != null && ts >= closedAt) this.merge('projects', id, { closedAt: null });
+  }
+
   // Editor windows
 
   upsertWindow(window: EditorWindow): void {
+    const before = this.state.windows[window.id]?.projectIds ?? [];
     this.put('windows', window.id, window);
+    for (const id of window.projectIds) {
+      if (!before.includes(id)) this.reopenProject(id, window.connectedAt);
+    }
   }
 
   touchWindow(id: string, ts = this.now()): void {
@@ -147,6 +165,9 @@ export class BoardStore {
           executionIds: [],
         };
     this.put('terminals', terminal.id, terminal);
+    if (terminal.projectId && terminal.projectId !== existing?.projectId) {
+      this.reopenProject(terminal.projectId, existing ? this.now() : terminal.createdAt);
+    }
     return terminal;
   }
 
@@ -265,13 +286,20 @@ export class BoardStore {
         };
     this.put('sessions', session.id, session);
     this.numberSession(session.id);
+    if (session.projectId && session.projectId !== existing?.projectId) {
+      this.reopenProject(session.projectId, existing ? ts : session.startedAt);
+    }
     if (session.projectId) this.touchProject(session.projectId, session.updatedAt);
     return this.state.sessions[session.id] ?? session;
   }
 
   updateSession(id: string, fields: Partial<Omit<ClaudeSession, 'id'>>, ts = this.now()): void {
-    if (!this.state.sessions[id]) return;
+    const existing = this.state.sessions[id];
+    if (!existing) return;
     const patch = { ...defined(fields), updatedAt: fields.updatedAt ?? ts };
+    if (fields.projectId && fields.projectId !== existing.projectId) {
+      this.reopenProject(fields.projectId, ts);
+    }
     // New assistant text is stamped, so the board never shows it under a later prompt.
     if (fields.lastAssistantText !== undefined && fields.lastAssistantAt === undefined) {
       patch.lastAssistantAt = fields.lastAssistantText === null ? null : ts;

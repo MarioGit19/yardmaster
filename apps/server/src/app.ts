@@ -26,7 +26,7 @@ import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library
 import { demoPty } from './demo/pty.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { WorstBoard } from './demo/worst.js';
-import { createEditorActions } from './editor-actions.js';
+import { closeProjectWindows, createEditorActions } from './editor-actions.js';
 import { EditorLauncher, type EditorLauncherOptions } from './editor-cli.js';
 import {
   EditorGateway,
@@ -38,7 +38,11 @@ import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import { ProcessScanner, type ProcessScannerOptions } from './process-scanner.js';
-import { createLaunchActions, createProjectActions } from './project-actions.js';
+import {
+  createCloseActions,
+  createLaunchActions,
+  createProjectActions,
+} from './project-actions.js';
 import { loadNodePty } from './pty.js';
 import { PtyManager, type PtyManagerOptions } from './pty-manager.js';
 import { DEVICES_KEY, RemoteDevices, registerRemoteRoutes, remoteHosts } from './remote.js';
@@ -55,6 +59,7 @@ import {
   librarySettings,
   memoryHookSettings,
   migrateTerminalReply,
+  PINNED_KEY,
   RETENTION_KEY,
   registerSettingsRoutes,
   retentionDays,
@@ -366,6 +371,24 @@ export async function buildServer(
               add: (project: Project) => demo?.addProject(project, demoFolderHasGit(project.path)),
             }
           : {}),
+      }),
+      ...createCloseActions({
+        store,
+        stopTerminals: (projectId) => ptyManager.stopProject(projectId),
+        suspendSessions: (projectId) => runner.suspendProject(projectId),
+        closeWindows: demo
+          ? async (projectId) => demo?.closeWindow(projectId) ?? { ok: true }
+          : closeProjectWindows({
+              state: () => store.state,
+              send: editorGateway.sendCommand.bind(editorGateway),
+            }),
+        unpin: (projectId) => {
+          const pins = settings[PINNED_KEY];
+          if (!Array.isArray(pins) || !pins.includes(projectId)) return;
+          const next = pins.filter((id) => id !== projectId);
+          settings[PINNED_KEY] = next;
+          persistence.setSetting(PINNED_KEY, next);
+        },
       }),
       // Demo windows have no socket, so the simulator plays the editor's part.
       ...demo?.editorActions(),

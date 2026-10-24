@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useNow } from '../anim/clock.js';
 import { useBoard } from '../data/index.js';
 import { boardSettings, useBoardSettings } from '../settings/boardSettings.js';
-import { activeKey } from './active.js';
+import { activeKey, closedKey } from './active.js';
 
 /** How often the overview re-checks the idle window when nothing else changes. */
 export const ACTIVE_TICK_MS = 15_000;
@@ -47,6 +47,15 @@ export function useActiveProjects(): ReadonlySet<string> {
   const idleHideMs = (settings?.libraryIdleHideMin ?? DEFAULT_IDLE_HIDE_MIN) * MIN_MS;
   const key = useBoard((s) => activeKey(s.board, { now, idleHideMs, pinned, opened }));
   return useMemo(() => new Set(key === '' ? [] : key.split('\n')), [key]);
+}
+
+const NONE: ReadonlySet<string> = new Set();
+
+/** Closed projects with nothing newer since (12.6e): the rail and the phone list leave them out. */
+export function useClosedProjects(): ReadonlySet<string> {
+  const opened = useSyncExternalStore(openedProjects.subscribe, openedProjects.get);
+  const key = useBoard((s) => closedKey(s.board, opened));
+  return useMemo(() => (key === '' ? NONE : new Set(key.split('\n'))), [key]);
 }
 
 /** A project's pin (the pod menu): pinned projects stay on the overview however quiet. */

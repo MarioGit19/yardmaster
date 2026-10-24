@@ -19,6 +19,7 @@ import {
   Search,
   ShieldCheck,
   SquareTerminal,
+  X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
@@ -49,6 +50,8 @@ import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { Kbd } from '../ui/Kbd.js';
 import { Skeleton } from '../ui/Skeleton.js';
+import { Tooltip } from '../ui/Tooltip.js';
+import { requestClose } from './closing.js';
 import {
   entryProjectId,
   type LaunchChoice,
@@ -59,6 +62,7 @@ import {
   type PickerRow,
   pickerRows,
   runLaunch,
+  withoutForgotten,
 } from './launch.js';
 
 // In memory only: a reload starts with the picker closed.
@@ -84,6 +88,7 @@ export function isPickerShortcut(
 }
 
 const close = () => pickerOpen.set('closed');
+const NO_ENTRIES: readonly LibraryEntry[] = [];
 
 const STEP_NAME: Record<LaunchStep['kind'], string> = {
   editor: 'The editor did not open',
@@ -273,7 +278,8 @@ function LibraryList({
   onPick: (entry: LibraryEntry) => void;
 }) {
   const projects = useBoard((s) => s.board.projects);
-  const entries = library.state === 'ready' ? library.data.entries : [];
+  const listed = library.state === 'ready' ? library.data.entries : NO_ENTRIES;
+  const entries = useMemo(() => withoutForgotten(listed, projects), [listed, projects]);
   const rows = useMemo(() => pickerRows(entries, query, projects), [entries, query, projects]);
   const [selected, setSelected] = useState('');
   const value = rows.some((r) => r.entry.path === selected)
@@ -401,12 +407,13 @@ function FolderItem({
 }) {
   const { entry, indices, branch } = row;
   const avatar = { name: entry.name, accent: accentIndexForProject(entryProjectId(entry)) };
+  const onBoard = useBoard((s) => entry.projectId !== null && !!s.board.projects[entry.projectId]);
   return (
     <Command.Item
       value={entry.path}
       onSelect={() => onPick(entry)}
       data-library-entry={entry.name}
-      className="palette-item"
+      className="palette-item group/item"
     >
       <ProjectAvatar project={avatar} size="sm" />
       <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -445,7 +452,31 @@ function FolderItem({
           {formatWhen(entry.lastActiveAt, now)}
         </time>
       )}
+      {onBoard && entry.projectId !== null && (
+        <ForgetButton projectId={entry.projectId} name={entry.name} />
+      )}
     </Command.Item>
+  );
+}
+
+/** Forget a recent project (12.6e) without picking its row: the confirm opens over the picker. */
+function ForgetButton({ projectId, name }: { projectId: string; name: string }) {
+  return (
+    <Tooltip content={`Forget ${name}`}>
+      <button
+        type="button"
+        aria-label={`Forget ${name}`}
+        data-library-forget={name}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          requestClose(projectId, true);
+        }}
+        className="-mr-1 grid size-7 shrink-0 place-items-center rounded-control text-text-3 opacity-0 transition-[opacity,background-color,color] duration-fast hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-data-[selected=true]/item:opacity-100 touch:size-11 touch:opacity-100"
+      >
+        <X aria-hidden className="size-3.5" strokeWidth={1.75} />
+      </button>
+    </Tooltip>
   );
 }
 

@@ -18,6 +18,7 @@ import { NAME_POLL_MS, TerminalTracker } from './core/terminal-tracker.js';
 import { cboardHome, readToken } from './core/token.js';
 
 const WINDOW_ID_KEY = 'cboard.windowId';
+const CLOSE_WINDOW_DELAY_MS = 200;
 
 function readConfig(): ExtensionConfig {
   const section = vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -77,6 +78,12 @@ export function activate(context: vscode.ExtensionContext): void {
       onShellIntegration: (listener) =>
         vscode.window.onDidChangeTerminalShellIntegration(({ terminal }) => listener(terminal)),
       execution: (execId) => executions.lookup(execId),
+      // A beat later, so the `cmd.result` reaches the board before the window goes.
+      closeWindow: () =>
+        setTimeout(
+          () => void vscode.commands.executeCommand('workbench.action.closeWindow'),
+          CLOSE_WINDOW_DELAY_MS,
+        ),
     },
     reply: (id, ok, error) =>
       link?.send('cmd.result', error === undefined ? { id, ok } : { id, ok, error }),

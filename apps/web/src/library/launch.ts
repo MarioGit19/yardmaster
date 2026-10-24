@@ -69,6 +69,32 @@ export function pickerRows(
   return scored.map((s) => s.row);
 }
 
+/**
+ * The library as the board stands now: a folder whose project was forgotten (12.6e) while the
+ * picker was open is no longer recent, and moves down among the others by name, as the server
+ * orders them.
+ */
+export function withoutForgotten(
+  entries: readonly LibraryEntry[],
+  projects: Readonly<Record<string, unknown>>,
+): readonly LibraryEntry[] {
+  if (entries.every((e) => e.projectId === null || projects[e.projectId] !== undefined)) {
+    return entries;
+  }
+  return entries
+    .map((e) =>
+      e.projectId !== null && projects[e.projectId] === undefined
+        ? { ...e, projectId: null, lastActiveAt: null }
+        : e,
+    )
+    .sort(
+      (a, b) =>
+        (b.lastActiveAt ?? -1) - (a.lastActiveAt ?? -1) ||
+        a.name.localeCompare(b.name) ||
+        a.path.localeCompare(b.path),
+    );
+}
+
 /** One step of a launch, in the order they are sent. */
 export type LaunchStep =
   | { kind: 'editor'; action: Extract<UiAction, { kind: 'project.openInEditor' }> }

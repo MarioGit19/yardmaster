@@ -7,10 +7,17 @@ import {
 } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import type { ActionResult } from './actions.js';
+import { closeProjectWindows } from './editor-actions.js';
 import { EDITOR_NOT_FOUND, EditorLauncher, type Spawner } from './editor-cli.js';
 import { EditorRouter, ROUTE_ERRORS } from './editor-router.js';
 import type { LibrarySource } from './library.js';
-import { createLaunchActions, createProjectActions, OUTSIDE_LIBRARY } from './project-actions.js';
+import {
+  createCloseActions,
+  createLaunchActions,
+  createProjectActions,
+  OUTSIDE_LIBRARY,
+  WINDOW_NOT_CLOSED,
+} from './project-actions.js';
 import { BoardStore } from './store.js';
 
 const T0 = 1_760_000_000_000;
@@ -284,5 +291,155 @@ describe('launch routing', () => {
     expect(await session(api.id)).toEqual({ ok: true });
     expect(await session(tools.id)).toEqual({ ok: true });
     expect(calls).toEqual(['runner:session.create', 'runner:session.create']);
+  });
+});
+
+function closeSetup(windowResult: ActionResult = { ok: true }) {
+  const store = new BoardStore({ autoFlush: false, now: () => T0 + 10_000 });
+  const calls: string[] = [];
+  const actions = createCloseActions({
+    store,
+    stopTerminals: (id) => calls.push(`stop:${id}`),
+    suspendSessions: async (id) => {
+      calls.push(`suspend:${id}`);
+    },
+    closeWindows: async (id) => {
+      calls.push(`window:${id}`);
+      return windowResult;
+    },
+    unpin: (id) => calls.push(`unpin:${id}`),
+    now: () => T0 + 5_000,
+  });
+  const shop = project('/home/dev/acme-shop', 'editor');
+  store.upsertProject(shop);
+  return {
+    store,
+    calls,
+    shop,
+    close: (projectId: string, closeWindow?: boolean) =>
+      actions['project.close']({
+        kind: 'project.close',
+        projectId,
+        ...(closeWindow !== undefined ? { closeWindow } : {}),
+      }),
+    forget: (projectId: string) => actions['project.forget']({ kind: 'project.forget', projectId }),
+  };
+}
+
+describe('project.close', () => {
+  it('stops what the board owns, unpins and marks the project closed', async () => {
+    const { store, calls, shop, close } = closeSetup();
+    expect(await close(shop.id)).toEqual({ ok: true });
+    expect(calls).toEqual([`stop:${shop.id}`, `suspend:${shop.id}`, `unpin:${shop.id}`]);
+    expect(store.state.projects[shop.id]?.closedAt).toBe(T0 + 5_000);
+  });
+
+  it('closes the editor windows only when asked', async () => {
+    const { calls, shop, close } = closeSetup();
+    await close(shop.id, false);
+    expect(calls).not.toContain(`window:${shop.id}`);
+    await close(shop.id, true);
+    expect(calls).toContain(`window:${shop.id}`);
+  });
+
+  it('still closes the project when a window would not close, and says so', async () => {
+    const { store, shop, close } = closeSetup({ ok: false, error: 'editor_offline' });
+    expect(await close(shop.id, true)).toEqual({ ok: false, error: WINDOW_NOT_CLOSED });
+    expect(store.state.projects[shop.id]?.closedAt).toBe(T0 + 5_000);
+  });
+
+  it('refuses an unknown project and touches nothing', async () => {
+    const { calls, close } = closeSetup();
+    expect(await close('ffffffffffff')).toEqual({
+      ok: false,
+      error: ROUTE_ERRORS.unknownProject,
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it('comes back when a new terminal opens there, not for older ones', async () => {
+    const { store, shop, close } = closeSetup();
+    store.upsertWindow(window('w1', [shop.id]));
+    store.upsertTerminal({
+      id: 't-old',
+      windowId: 'w1',
+      name: 'zsh',
+      projectId: shop.id,
+      createdAt: T0,
+    });
+    await close(shop.id);
+    // The editor re-reporting what it already had changes nothing.
+    store.upsertTerminal({ id: 't-old', windowId: 'w1', name: 'zsh', active: true });
+    store.upsertWindow({ ...window('w1', [shop.id]), lastSeenAt: T0 + 6_000 });
+    expect(store.state.projects[shop.id]?.closedAt).toBe(T0 + 5_000);
+    store.upsertTerminal({ id: 't-new', windowId: 'w1', name: 'zsh', projectId: shop.id });
+    expect(store.state.projects[shop.id]?.closedAt).toBeNull();
+  });
+
+  it('comes back for a new Claude session or editor window', async () => {
+    const { store, shop, close } = closeSetup();
+    await close(shop.id);
+    store.upsertSession({ id: 's-new', projectId: shop.id, startedAt: T0 + 7_000 });
+    expect(store.state.projects[shop.id]?.closedAt).toBeNull();
+
+    await close(shop.id);
+    store.upsertWindow({ ...window('w2', [shop.id]), connectedAt: T0 + 8_000 });
+    expect(store.state.projects[shop.id]?.closedAt).toBeNull();
+  });
+
+  it('comes back when the picker opens it again', async () => {
+    const { store, close } = closeSetup();
+    const recipes = project('/home/dev/recipe-box');
+    store.upsertProject(recipes);
+    await close(recipes.id);
+    const actions = createProjectActions({
+      store,
+      library,
+      roots: () => ['~/Desktop'],
+      launcher: fakeLauncher().launcher,
+    });
+    await actions['project.add']({ kind: 'project.add', path: recipes.path });
+    expect(store.state.projects[recipes.id]?.closedAt).toBeNull();
+  });
+});
+
+describe('project.forget', () => {
+  it('closes the project, then drops it from the board', async () => {
+    const { store, calls, shop, forget } = closeSetup();
+    expect(await forget(shop.id)).toEqual({ ok: true });
+    expect(calls).toEqual([`stop:${shop.id}`, `suspend:${shop.id}`, `unpin:${shop.id}`]);
+    expect(store.state.projects[shop.id]).toBeUndefined();
+  });
+
+  it('refuses an unknown project', async () => {
+    const { forget } = closeSetup();
+    expect(await forget('ffffffffffff')).toEqual({
+      ok: false,
+      error: ROUTE_ERRORS.unknownProject,
+    });
+  });
+});
+
+describe('closeProjectWindows', () => {
+  it('sends cmd.closeWindow to each window open on the project', async () => {
+    const sent: [string, string][] = [];
+    const windows = {
+      w1: window('w1', ['p-shop']),
+      w2: window('w2', ['p-blog']),
+      w3: window('w3', ['p-blog', 'p-shop']),
+    };
+    const close = closeProjectWindows({
+      state: () => ({ windows }),
+      send: async (windowId, type) => {
+        sent.push([windowId, type]);
+        return windowId === 'w3' ? { ok: false, error: 'editor_offline' } : { ok: true };
+      },
+    });
+    expect(await close('p-blog')).toEqual({ ok: false, error: 'editor_offline' });
+    expect(sent).toEqual([
+      ['w2', 'cmd.closeWindow'],
+      ['w3', 'cmd.closeWindow'],
+    ]);
+    expect(await close('p-none')).toEqual({ ok: true });
   });
 });

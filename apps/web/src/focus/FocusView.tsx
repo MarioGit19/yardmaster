@@ -28,6 +28,7 @@ import {
   selectTerminalsByProject,
   useBoard,
   useBoardList,
+  useBoardStore,
 } from '../data/index.js';
 import { DraftMarker } from '../drafts/DraftMarker.js';
 import { draftKey } from '../drafts/drafts.js';
@@ -95,13 +96,16 @@ export function FocusView({
   const hydrated = useBoard(selectHydrated);
   const project = useBoard(selectProject(projectId));
   const known = project !== undefined;
+  const store = useBoardStore();
   // Opened from the board: it's on the overview when the user comes back (F26), however long
-  // they stayed.
+  // they stayed. Unless they left by closing it (12.6e).
   useEffect(() => {
     if (!known) return;
     markOpened(projectId);
-    return () => markOpened(projectId);
-  }, [known, projectId]);
+    return () => {
+      if (store.getState().board.projects[projectId]?.closedAt == null) markOpened(projectId);
+    };
+  }, [known, projectId, store]);
 
   if (!project) {
     return (

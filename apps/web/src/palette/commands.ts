@@ -32,6 +32,7 @@ export type PaletteRun =
   | { kind: 'layout'; next: LayoutId }
   | { kind: 'attention' }
   | { kind: 'openProject' }
+  | { kind: 'closeProject'; projectId: string; forget: boolean }
   | { kind: 'rail' }
   | { kind: 'pulse' };
 
@@ -52,7 +53,9 @@ export type PaletteIcon =
   | 'rail'
   | 'pulse'
   | 'overview'
-  | 'open';
+  | 'open'
+  | 'close'
+  | 'forget';
 
 export interface PaletteCommand {
   /** Stable and unique: the cmdk item value. */
@@ -329,6 +332,30 @@ function projectActions(
         action: { kind: 'project.openInEditor', projectId: project.id },
         done: `Opened in ${editor}`,
       },
+    });
+  }
+
+  for (const project of scope) {
+    // A closed project is still findable (opening it brings it back), but not closable again.
+    if (project.closedAt == null) {
+      commands.push({
+        id: `close:${project.id}`,
+        group: 'Actions',
+        label: `Close ${project.name}`,
+        hint: 'stops what the board runs there',
+        icon: 'close',
+        searchOnly,
+        run: { kind: 'closeProject', projectId: project.id, forget: false },
+      });
+    }
+    commands.push({
+      id: `forget:${project.id}`,
+      group: 'Actions',
+      label: `Forget ${project.name}`,
+      hint: 'and drop it from recents',
+      icon: 'forget',
+      searchOnly: true,
+      run: { kind: 'closeProject', projectId: project.id, forget: true },
     });
   }
   return commands;

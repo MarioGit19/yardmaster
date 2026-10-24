@@ -689,6 +689,17 @@ describe('SessionRunner resume', () => {
     expect(session(store, SESSION_B).status).toEqual({ kind: 'interrupted', turnRunning: false });
   });
 
+  it("interrupts only the closing project's board sessions", async () => {
+    const { store, runner } = setup();
+    await runner.startSession({ projectId: PROJECT.id, prompt: 'One' });
+    await settle();
+    await runner.suspendProject('ffffffffffff');
+    expect(runner.liveCount).toBe(1);
+    await runner.suspendProject(PROJECT.id);
+    expect(runner.liveCount).toBe(0);
+    expect(session(store, SESSION_A).status.kind).toBe('interrupted');
+  });
+
   it('resumes a past session from the history browser by project', async () => {
     const { store, runner } = setup();
     expect(await runner.resumeSession(SESSION_B)).toEqual({ ok: false, error: UNKNOWN_SESSION });

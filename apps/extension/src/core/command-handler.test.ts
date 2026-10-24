@@ -82,6 +82,11 @@ class FakeEditor implements EditorFacade<FakeTerminal> {
   execution(execId: string) {
     return this.executions.get(execId);
   }
+
+  closed = 0;
+  closeWindow() {
+    this.closed++;
+  }
 }
 
 let seq = 0;
@@ -162,6 +167,13 @@ describe('CommandHandler', () => {
     };
     await handler.handle(cmd('cmd.disposeTerminal', { terminalId: 'term-1' }));
     expect(replies).toEqual([{ id: 'cmd-1', ok: false, error: 'terminal already disposed' }]);
+  });
+
+  it('closes the window and replies', async () => {
+    const { editor, handler, replies } = setup();
+    await handler.handle(cmd('cmd.closeWindow', {}));
+    expect(editor.closed).toBe(1);
+    expect(replies).toEqual([{ id: 'cmd-1', ok: true }]);
   });
 
   describe('createTerminal', () => {

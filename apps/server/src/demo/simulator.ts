@@ -387,6 +387,13 @@ export class DemoSimulator {
     return project !== undefined && this.store.state.windows[project.windowId] !== undefined;
   }
 
+  /** Closing a project with its window ticked: the demo Cursor window for it goes away. */
+  closeWindow(projectId: string): ActionResult {
+    const project = this.running ? this.projects.find((p) => p.id === projectId) : undefined;
+    if (project) this.store.removeWindow(project.windowId);
+    return { ok: true };
+  }
+
   /** "Open in Cursor" plays out as a Cursor window for the project connecting a moment later. */
   editorActions(): Pick<ActionHandlers, 'project.openInEditor'> {
     return {

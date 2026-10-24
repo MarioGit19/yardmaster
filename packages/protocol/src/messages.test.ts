@@ -69,6 +69,7 @@ const serverToEditor: ServerToEditor[] = [
   env('cmd.focusTerminal', { terminalId: 'term-1' }, 'cmd-4'),
   env('cmd.disposeTerminal', { terminalId: 'term-1' }, 'cmd-5'),
   env('cmd.rerun', { execId: 'exec-1' }, 'cmd-6'),
+  env('cmd.closeWindow', {}, 'cmd-7'),
 ] as ServerToEditor[];
 
 const serverToUi: ServerToUi[] = [
@@ -127,7 +128,9 @@ const uiToServer: UiToServer[] = [
   env('action', { kind: 'session.setPermissionMode', sessionId: 'sess-1', permissionMode: 'plan' }),
   env('action', { kind: 'session.replyInTerminal', sessionId: 'sess-1', text: 'yes, go ahead' }),
   env('action', { kind: 'project.add', path: '/home/dev/acme-shop' }),
-  env('action', { kind: 'project.remove', projectId: 'a1b2c3d4e5f6' }),
+  env('action', { kind: 'project.close', projectId: 'a1b2c3d4e5f6' }),
+  env('action', { kind: 'project.close', projectId: 'a1b2c3d4e5f6', closeWindow: true }),
+  env('action', { kind: 'project.forget', projectId: 'a1b2c3d4e5f6' }),
   env('action', { kind: 'project.openInEditor', projectId: 'a1b2c3d4e5f6' }),
   env('action', { kind: 'settings.set', key: 'motion', value: 'reduced' }),
   env('session.send', { sessionId: 'sess-1', text: 'Now add a test' }),

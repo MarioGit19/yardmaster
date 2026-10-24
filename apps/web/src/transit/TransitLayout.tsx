@@ -19,6 +19,7 @@ import { ActorInspector } from '../layouts/ActorInspector.js';
 import { actorKindName, type SceneActor, type SceneProject } from '../layouts/scene.js';
 import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { dur, ease, useMotionLevel } from '../motion.js';
+import { PodMenu } from '../pod/PodMenu.js';
 import { formatAgo, pulseTarget } from '../pulse/model.js';
 import { projectHref } from '../routes.js';
 import { toneLabel } from '../status.js';
@@ -419,32 +420,34 @@ function TransitLine({
         ))}
       </svg>
 
-      <Link
-        href={projectHref(project.id)}
-        data-transit-name={project.id}
-        aria-label={`${project.name} line, ${toneLabel(project.tone)}, ${counts}. Arrow keys move through its trains and stations.`}
-        className={cx(
-          'transit-name group flex min-w-0 items-center gap-2 outline-none',
-          horizontal ? 'sticky left-0 h-full pr-4 pl-1' : 'h-14 flex-col justify-center px-0.5',
-        )}
-        style={horizontal ? { width: LABEL_W } : undefined}
-      >
-        <span aria-hidden className="transit-swatch shrink-0" />
-        <span
+      <PodMenu project={project}>
+        <Link
+          href={projectHref(project.id)}
+          data-transit-name={project.id}
+          aria-label={`${project.name} line, ${toneLabel(project.tone)}, ${counts}. Arrow keys move through its trains and stations.`}
           className={cx(
-            'min-w-0 font-medium text-text-1',
-            horizontal ? 'truncate text-body-sm' : 'transit-name-text max-w-full text-label',
+            'transit-name group flex min-w-0 items-center gap-2 outline-none',
+            horizontal ? 'sticky left-0 h-full pr-4 pl-1' : 'h-14 flex-col justify-center px-0.5',
           )}
-          title={project.name}
+          style={horizontal ? { width: LABEL_W } : undefined}
         >
-          {project.name}
-        </span>
-        <StatusDot
-          tone={project.tone}
-          label={toneLabel(project.tone)}
-          className={horizontal ? 'ml-auto shrink-0' : 'shrink-0'}
-        />
-      </Link>
+          <span aria-hidden className="transit-swatch shrink-0" />
+          <span
+            className={cx(
+              'min-w-0 font-medium text-text-1',
+              horizontal ? 'truncate text-body-sm' : 'transit-name-text max-w-full text-label',
+            )}
+            title={project.name}
+          >
+            {project.name}
+          </span>
+          <StatusDot
+            tone={project.tone}
+            label={toneLabel(project.tone)}
+            className={horizontal ? 'ml-auto shrink-0' : 'shrink-0'}
+          />
+        </Link>
+      </PodMenu>
 
       {trains.map((train) => (
         <Train

@@ -1,6 +1,6 @@
 import type { Project } from '@c-board/protocol';
 import { FolderOpen, LayoutGrid, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
-import { forwardRef, type KeyboardEvent, type ReactNode, useRef } from 'react';
+import { forwardRef, type KeyboardEvent, type ReactNode, useMemo, useRef } from 'react';
 import { Link, useRoute } from 'wouter';
 import {
   selectProjects,
@@ -10,6 +10,7 @@ import {
   useBoardList,
 } from '../data/index.js';
 import { pickerOpen } from '../library/OpenProject.js';
+import { useClosedProjects } from '../library/useActive.js';
 import { projectHref, routes } from '../routes.js';
 import { projectTone, toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
@@ -27,7 +28,9 @@ export interface ProjectRailProps {
 }
 
 export function ProjectRail({ collapsed, onToggle }: ProjectRailProps) {
-  const projects = useBoardList(selectProjects);
+  const all = useBoardList(selectProjects);
+  const closed = useClosedProjects();
+  const projects = useMemo(() => all.filter((p) => !closed.has(p.id)), [all, closed]);
   const hydrated = useBoard((s) => s.hydrated);
   const listRef = useRef<HTMLUListElement>(null);
   const [onOverview] = useRoute(routes.overview);

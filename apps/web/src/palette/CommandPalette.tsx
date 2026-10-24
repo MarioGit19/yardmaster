@@ -9,6 +9,7 @@ import {
   CornerDownLeft,
   ExternalLink,
   FolderOpen,
+  FolderX,
   LayoutDashboard,
   LayoutGrid,
   type LucideIcon,
@@ -20,6 +21,7 @@ import {
   Sparkles,
   SquareTerminal,
   SunMoon,
+  Trash2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type KeyboardEvent, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,6 +31,7 @@ import { attentionOpen } from '../attention/attention.js';
 import { useBoard, useBoardClient } from '../data/index.js';
 import { useFocusRoute } from '../focus/FocusStage.js';
 import { layoutPreference } from '../layouts/registry.js';
+import { requestClose } from '../library/closing.js';
 import { pickerOpen } from '../library/OpenProject.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
@@ -71,6 +74,8 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   pulse: Activity,
   overview: LayoutGrid,
   open: FolderOpen,
+  close: FolderX,
+  forget: Trash2,
 };
 
 type Page = { kind: 'root' } | { kind: 'prompt'; projectId: string; projectName: string };
@@ -282,6 +287,11 @@ function PaletteBody({
         keepFocus();
         close();
         pickerOpen.set('open');
+        return;
+      case 'closeProject':
+        keepFocus();
+        close();
+        requestClose(action.projectId, action.forget);
         return;
       case 'attention':
         keepFocus();

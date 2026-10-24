@@ -164,6 +164,34 @@ realPty('PtyManager with a real pty', () => {
     expect(store.state.terminals[id]).toBeUndefined();
   });
 
+  it('stops a closing project: Ctrl+C first, then a kill after the grace period', async () => {
+    const { store, manager } = setup();
+    const quits = await created(manager);
+    const stays = await created(manager);
+    // One shell exits on Ctrl+C; the other ignores it and has to be killed.
+    manager.sendText(quits, "trap 'exit 3' INT; echo re''ady-1", true);
+    manager.sendText(stays, "trap '' INT; echo re''ady-2", true);
+    await vi.waitFor(() => expect(output(store, quits)).toContain('ready-1'), { timeout: 5_000 });
+    await vi.waitFor(() => expect(output(store, stays)).toContain('ready-2'), { timeout: 5_000 });
+    manager.stopProject(PROJECT.id, 300);
+    await vi.waitFor(() => expect(store.state.terminals[quits]?.exitCode).toBe(3), {
+      timeout: 5_000,
+    });
+    expect(store.state.terminals[stays]?.state).toBe('open');
+    await vi.waitFor(() => expect(store.state.terminals[stays]?.state).toBe('closed'), {
+      timeout: 5_000,
+    });
+    expect(manager.liveCount).toBe(0);
+  });
+
+  it("leaves other projects' terminals running when one closes", async () => {
+    const { store, manager } = setup();
+    const id = await created(manager);
+    manager.stopProject('ffffffffffff', 0);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(store.state.terminals[id]?.state).toBe('open');
+  });
+
   it('ends every shell when the server stops, without touching the board again', async () => {
     const { store, manager } = setup();
     const id = await created(manager);

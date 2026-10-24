@@ -1025,6 +1025,67 @@ const SCENARIOS = {
         await page.waitForTimeout(500);
       },
     );
+    await page.locator('[data-tab-bar] [data-tab="projects"]').tap();
+    const row = page.locator('[data-phone-project-row]').first();
+    await row.waitFor();
+    const rowId = await row.getAttribute('data-phone-project-row');
+    await r.moment(
+      'project-swipe',
+      'transition',
+      'Projects: swipe a row open and shut, then Close it: the sheet rises, the row leaves',
+      async () => {
+        const box = await row.boundingBox();
+        if (!box || !rowId) return;
+        const y = box.y + box.height / 2;
+        const cdp = await page.context().newCDPSession(page);
+        for (const [x0, x1] of [
+          [box.width - 40, 60],
+          [60, box.width - 40],
+          [box.width - 40, 60],
+        ] as const) {
+          await cdp.send('Input.dispatchTouchEvent', {
+            type: 'touchStart',
+            touchPoints: [{ x: x0, y }],
+          });
+          for (let i = 1; i <= 6; i++) {
+            await cdp.send('Input.dispatchTouchEvent', {
+              type: 'touchMove',
+              touchPoints: [{ x: x0 + ((x1 - x0) * i) / 6, y }],
+            });
+          }
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await page.waitForTimeout(600);
+        }
+        await cdp.detach();
+        await page.locator(`[data-phone-close="${rowId}"]`).tap();
+        const sheet = page.locator(`[data-close-project="${rowId}"]`);
+        await sheet.waitFor();
+        await page.waitForTimeout(700);
+        await sheet.locator('[data-close-confirm]').tap();
+        await sheet.waitFor({ state: 'detached' });
+        await page.waitForTimeout(700);
+      },
+    );
+  },
+
+  async close(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(1500);
+    const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+    if (!id) throw new Error('no pod on the overview');
+    const dialog = page.locator(`[data-close-project="${id}"]`);
+    await r.moment('confirm', 'transition', 'pod menu → Close project…: the confirm', async () => {
+      await page.locator(`[data-pod="${id}"]`).click({ button: 'right' });
+      await page.getByRole('menuitem', { name: 'Close project…' }).click();
+      await dialog.waitFor();
+      await page.waitForTimeout(600);
+    });
+    await r.moment('leave', 'transition', 'Close: the pod leaves, the rest settle', async () => {
+      await dialog.locator('[data-close-confirm]').click();
+      await page.locator(`[data-pod="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(900);
+    });
   },
 } satisfies Record<string, (r: Recorder) => Promise<void>>;
 

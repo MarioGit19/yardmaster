@@ -1,6 +1,6 @@
 import { selectHydrated, selectProjectCount, useBoard } from '../data/index.js';
 import { LayoutStage } from '../layouts/LayoutStage.js';
-import { useActiveProjects } from '../library/useActive.js';
+import { useActiveProjects, useClosedProjects } from '../library/useActive.js';
 import { OnboardingWizard } from '../onboarding/OnboardingWizard.js';
 import { useOnboarding } from '../onboarding/useOnboarding.js';
 import { PodGridSkeleton } from '../pod/PodGrid.js';
@@ -12,7 +12,13 @@ export function Overview() {
   const hydrated = useBoard(selectHydrated);
   const total = useBoard(selectProjectCount);
   const count = useActiveProjects().size;
-  const hidden = Math.max(0, total - count);
+  const closed = useClosedProjects().size;
+  const hidden = Math.max(0, total - count - closed);
+  const meta = [
+    plural(count, 'project'),
+    ...(hidden > 0 ? [`${hidden} quiet, hidden`] : []),
+    ...(closed > 0 ? [`${closed} closed`] : []),
+  ].join(' · ');
   const onboarding = useOnboarding();
 
   if (onboarding.show) {
@@ -25,19 +31,17 @@ export function Overview() {
 
   return (
     <Page>
-      <PageHeader
-        title="Overview"
-        meta={
-          hydrated
-            ? `${plural(count, 'project')}${hidden > 0 ? ` · ${hidden} quiet, hidden` : ''}`
-            : 'Loading…'
-        }
-      />
+      <PageHeader title="Overview" meta={hydrated ? meta : 'Loading…'} />
       {!hydrated || onboarding.show === null ? (
         <PodGridSkeleton />
       ) : total === 0 ? (
         <EmptyState title="No projects yet">
           Open a folder in your editor or start Claude Code in a project, and it shows up here.
+        </EmptyState>
+      ) : count === 0 && hidden === 0 ? (
+        <EmptyState title="Nothing open">
+          Every project here is closed. Open one with ⌘O or ⌘K, or start something in one, and it
+          comes back.
         </EmptyState>
       ) : count === 0 ? (
         <EmptyState title="All quiet">

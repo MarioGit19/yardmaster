@@ -415,8 +415,20 @@ export class SessionRunner {
    * (saying whether a turn was cut off) so the next server lists it with a Resume action.
    */
   async suspendAll(): Promise<void> {
+    await this.suspend([...this.runs.values()]);
+  }
+
+  /** A project closed (12.6e): its running board sessions end as `interrupted`, to resume later. */
+  async suspendProject(projectId: string): Promise<void> {
+    await this.suspend(
+      [...this.runs.values()].filter(
+        (run) => this.store.state.sessions[run.id]?.projectId === projectId,
+      ),
+    );
+  }
+
+  private async suspend(runs: Run[]): Promise<void> {
     const ts = this.now();
-    const runs = [...this.runs.values()];
     for (const run of runs) {
       const status = this.status(run.id);
       const turnRunning = status !== undefined && TURN_STATUSES.has(status.kind);

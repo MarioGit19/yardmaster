@@ -30,6 +30,8 @@ export interface EditorFacade<T extends CommandTerminal> {
   onShellIntegration(listener: (terminal: T) => void): Disposable;
   /** A recent execution of this activation. */
   execution(execId: string): { terminalId: string; commandLine: string } | undefined;
+  /** Closes this window, after the reply has gone out. */
+  closeWindow(): void;
 }
 
 export interface CommandHandlerOptions<T extends CommandTerminal> {
@@ -101,6 +103,9 @@ export class CommandHandler<T extends CommandTerminal> {
           run(terminal, execution.commandLine),
         );
       }
+      case 'cmd.closeWindow':
+        this.editor.closeWindow();
+        return { ok: true };
       case 'cmd.createTerminal': {
         const { name, cwd, command: commandLine } = command.payload;
         const terminal = this.editor.createTerminal({ name, cwd });

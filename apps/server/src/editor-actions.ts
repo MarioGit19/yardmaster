@@ -1,4 +1,4 @@
-import { RESUMABLE_SESSION_ID } from '@c-board/protocol';
+import { type BoardState, RESUMABLE_SESSION_ID } from '@c-board/protocol';
 import type { ActionHandlers, ActionResult } from './actions.js';
 import type { CommandPayloads } from './editor-gateway.js';
 import type { EditorRouter } from './editor-router.js';
@@ -80,5 +80,21 @@ export function createEditorActions(options: {
         command,
       });
     },
+  };
+}
+
+/** Closes every editor window open on a project (`project.close` with its checkbox ticked). */
+export function closeProjectWindows(options: {
+  state: () => Pick<BoardState, 'windows'>;
+  send: CommandSender;
+}): (projectId: string) => Promise<ActionResult> {
+  return async (projectId) => {
+    const windows = Object.values(options.state().windows).filter((w) =>
+      w.projectIds.includes(projectId),
+    );
+    const results = await Promise.all(
+      windows.map((w) => options.send(w.id, 'cmd.closeWindow', {})),
+    );
+    return results.find((result) => !result.ok) ?? { ok: true };
   };
 }

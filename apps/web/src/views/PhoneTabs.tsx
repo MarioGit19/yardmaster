@@ -1,6 +1,7 @@
 import type { ActivityEvent, Project } from '@c-board/protocol';
-import { Check, ChevronRight, FolderOpen, Settings } from 'lucide-react';
-import { useMemo } from 'react';
+import { Check, ChevronRight, FolderOpen, FolderX, Settings } from 'lucide-react';
+import { animate, motion, useMotionValue } from 'motion/react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import {
@@ -14,8 +15,16 @@ import {
   useBoardStore,
 } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
+import { requestClose } from '../library/closing.js';
 import { pickerOpen } from '../library/OpenProject.js';
-import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
+import { useClosedProjects } from '../library/useActive.js';
+import {
+  MOTION_SETTINGS,
+  type MotionSetting,
+  motionPreference,
+  spring,
+  useMotionLevel,
+} from '../motion.js';
 import { usePreference } from '../prefs.js';
 import {
   eventDetail,
@@ -44,7 +53,9 @@ const ROW =
 
 /** The Projects tab: the project rail as a list, with Open project at the top. */
 export function ProjectsPage() {
-  const projects = useBoardList(selectProjects);
+  const all = useBoardList(selectProjects);
+  const closed = useClosedProjects();
+  const projects = useMemo(() => all.filter((p) => !closed.has(p.id)), [all, closed]);
   const hydrated = useBoard((s) => s.hydrated);
   return (
     <Page>
@@ -85,29 +96,89 @@ export function ProjectsPage() {
   );
 }
 
+/** How far a Projects row slides left to show its Close action. */
+const REVEAL_PX = 88;
+/** A flick this fast (px/s) opens or shuts the row whatever the distance. */
+const FLICK_VELOCITY = 400;
+
+/** A project in the list: tap to open it, swipe left for Close (12.6e). */
 function ProjectRow({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const tone = projectTone(sessions, terminals);
   const branch = project.git?.branch;
+  const level = useMotionLevel();
+  const x = useMotionValue(0);
+  const [revealed, setRevealed] = useState(false);
+  // A drag ends in a click on the link; that click only settles the row.
+  const dragged = useRef(false);
+  const snap = (open: boolean) => {
+    setRevealed(open);
+    animate(x, open ? -REVEAL_PX : 0, level === 'off' ? { duration: 0 } : spring.snappy);
+  };
   return (
-    <Link href={projectHref(project.id)} data-phone-project={project.id} className={ROW}>
-      <ProjectAvatar project={project} size="lg" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate font-medium text-body text-text-1" title={project.name}>
-          {project.name}
-        </span>
-        <span className="flex min-w-0 items-center gap-2 text-label text-text-2">
-          <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
-          {branch && (
-            <span className="min-w-0 truncate font-mono" title={branch}>
-              · {branch}
+    <div className="relative overflow-hidden" data-phone-project-row={project.id}>
+      <button
+        type="button"
+        data-phone-close={project.id}
+        aria-label={`Close ${project.name}`}
+        onFocus={() => snap(true)}
+        onClick={() => {
+          snap(false);
+          requestClose(project.id);
+        }}
+        className="absolute inset-y-0 right-0 flex flex-col items-center justify-center gap-1 bg-bg-2 text-label text-text-1"
+        style={{ width: REVEAL_PX }}
+      >
+        <FolderX aria-hidden className="size-5" strokeWidth={1.5} />
+        Close
+      </button>
+      <motion.div
+        style={{ x }}
+        drag="x"
+        dragDirectionLock
+        dragConstraints={{ left: -REVEAL_PX, right: 0 }}
+        dragElastic={0.08}
+        dragMomentum={false}
+        onDragStart={() => {
+          dragged.current = true;
+        }}
+        onDragEnd={(_, info) => {
+          const flick = Math.abs(info.velocity.x) > FLICK_VELOCITY;
+          snap(flick ? info.velocity.x < 0 : x.get() < -REVEAL_PX / 2);
+        }}
+        className="relative bg-bg-1"
+      >
+        <Link
+          href={projectHref(project.id)}
+          data-phone-project={project.id}
+          className={ROW}
+          draggable={false}
+          onClick={(event) => {
+            if (!dragged.current && !revealed) return;
+            event.preventDefault();
+            if (!dragged.current) snap(false);
+            dragged.current = false;
+          }}
+        >
+          <ProjectAvatar project={project} size="lg" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate font-medium text-body text-text-1" title={project.name}>
+              {project.name}
             </span>
-          )}
-        </span>
-      </span>
-      <ChevronRight aria-hidden className="size-4 shrink-0 text-text-3" strokeWidth={1.5} />
-    </Link>
+            <span className="flex min-w-0 items-center gap-2 text-label text-text-2">
+              <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
+              {branch && (
+                <span className="min-w-0 truncate font-mono" title={branch}>
+                  · {branch}
+                </span>
+              )}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-4 shrink-0 text-text-3" strokeWidth={1.5} />
+        </Link>
+      </motion.div>
+    </div>
   );
 }
 

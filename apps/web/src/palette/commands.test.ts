@@ -1,4 +1,4 @@
-import type { Approval, BoardState, EditorWindow, Execution } from '@c-board/protocol';
+import type { Approval, BoardState, EditorWindow, Execution, Project } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
 import {
@@ -167,6 +167,27 @@ describe('buildCommands', () => {
       run: { action: { execId: 'e-3' } },
     });
     expect(byId(commands, 'overview')).toBeUndefined();
+  });
+
+  it('closes and forgets projects, but never offers to close a closed one again', () => {
+    const b = board();
+    const focused = buildCommands(b, context({ projectId: 'p-acme' }));
+    expect(byId(focused, 'close:p-acme')).toMatchObject({
+      label: 'Close acme-shop',
+      searchOnly: false,
+      run: { kind: 'closeProject', projectId: 'p-acme', forget: false },
+    });
+    expect(byId(focused, 'forget:p-acme')).toMatchObject({
+      label: 'Forget acme-shop',
+      searchOnly: true,
+      run: { kind: 'closeProject', projectId: 'p-acme', forget: true },
+    });
+    expect(byId(buildCommands(b, context()), 'close:p-orbit')?.searchOnly).toBe(true);
+
+    b.projects['p-acme'] = { ...(b.projects['p-acme'] as Project), closedAt: 1 };
+    const closed = buildCommands(b, context());
+    expect(byId(closed, 'close:p-acme')).toBeUndefined();
+    expect(byId(closed, 'project:p-acme')).toBeDefined();
   });
 
   it('interrupts board sessions through the SDK and terminal ones with Esc', () => {

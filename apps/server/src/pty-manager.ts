@@ -36,6 +36,8 @@ const FLUSH_BYTES = 16 * 1024;
 export const MAX_CLOSED_BOARD_TERMINALS = 16;
 /** A zsh or bash whose markers haven't arrived by then is treated like a shell without them. */
 export const MARKER_TIMEOUT_MS = 5_000;
+/** How long a closing project's board terminals get after Ctrl+C before they are killed. */
+export const STOP_GRACE_MS = 3_000;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching escape sequences is the point.
 const ALT_SCREEN = /\x1b\[\?(?:1049|1047|47)h/;
 const DEFAULT_COLS = 120;
@@ -347,6 +349,21 @@ export class PtyManager {
       return { ok: false, error: ROUTE_ERRORS.unknownTerminal };
     this.store.removeTerminal(terminalId);
     return { ok: true };
+  }
+
+  /**
+   * A project closed (12.6e): its running board terminals get Ctrl+C, and any still running
+   * `graceMs` later are killed.
+   */
+  stopProject(projectId: string, graceMs = STOP_GRACE_MS): void {
+    for (const [id, entry] of this.live) {
+      if (this.store.state.terminals[id]?.projectId !== projectId) continue;
+      entry.pty.write('\x03');
+      const timer = setTimeout(() => {
+        if (this.live.get(id) === entry) this.close(id);
+      }, graceMs);
+      timer.unref?.();
+    }
   }
 
   /** Server stop: every shell ends with it, and nothing writes to the store any more. */
