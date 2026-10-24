@@ -14,7 +14,7 @@ On the Mac, with c-board running:
 tailscale serve --bg 4317
 ```
 
-Tailscale prints the address it serves, such as `https://my-mac.tailnet-name.ts.net`. It terminates HTTPS with a real certificate and forwards to `127.0.0.1:4317`. `tailscale serve status` shows it again; `tailscale serve reset` stops it.
+The first time, Tailscale may answer "Serve is not enabled on your tailnet" with a link: open it, approve Serve (and HTTPS certificates if asked), and the command finishes on its own. Then Tailscale prints the address it serves, such as `https://my-mac.tailnet-name.ts.net`. It terminates HTTPS with a real certificate and forwards to `127.0.0.1:4317`. `tailscale serve status` shows it again; `tailscale serve reset` stops it.
 
 If you run c-board on another port (`CBOARD_PORT`), use that port instead of `4317`.
 
@@ -36,4 +36,5 @@ Public tunnels put the board on the internet. The board can type into your termi
 
 - **`forbidden_host`:** the name in the address bar isn't in Allowed hosts. Check the spelling, including the tailnet part.
 - **`https_required`:** the request didn't come through `tailscale serve` over HTTPS. Use the `https://` address.
+- **The phone can't reach the address:** check `tailscale serve status` on the Mac ("No serve config" means step 2 didn't finish) and that the Tailscale app on the phone says Connected. The very first HTTPS request can take up to a minute while Tailscale gets the certificate.
 - **"Could not pair":** the code was used, replaced by a newer one, or expired. Show a new code on the Mac.
