@@ -91,7 +91,7 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
     await expect(device).toContainText('Notifications off');
     await device.getByRole('button', { name: 'Turn on' }).click();
     await expect(device).toContainText('Notifications on');
-    pushId = await page.evaluate(() => localStorage.getItem('cboard.push.id'));
+    pushId = await page.evaluate(() => localStorage.getItem('yardmaster.push.id'));
     expect(pushId).toBeTruthy();
     const id = pushId ?? '';
     await expect(page.locator(`[data-push-device="${id}"]`)).toContainText('This device');

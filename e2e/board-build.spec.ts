@@ -10,7 +10,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // the web app; the server and its workspace packages are built here.
 test('the built server serves the built app', async ({ browser }) => {
   test.slow();
-  await promisify(execFile)('pnpm', ['--filter', '@c-board/server...', 'build'], { cwd: ROOT });
+  await promisify(execFile)('pnpm', ['--filter', '@yardmaster/server...', 'build'], { cwd: ROOT });
   let board: DemoBoard | undefined;
   try {
     board = await startBoard({ demo: true, built: true });

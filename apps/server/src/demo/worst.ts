@@ -12,7 +12,7 @@ import {
   type SessionStatus,
   type TokenUsage,
   toolFamily,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { BoardStore } from '../store.js';
 import { DEMO_HOME } from './content.js';
 

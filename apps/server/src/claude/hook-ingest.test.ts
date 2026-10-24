@@ -1,7 +1,7 @@
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { projectIdFromPath } from '@c-board/protocol';
+import { projectIdFromPath } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
@@ -14,7 +14,7 @@ import { HOOK_ROUTE, HookIngest, parseClaudePid } from './hook-ingest.js';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -35,7 +35,7 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   return (app as FastifyInstance).inject({
     method: 'POST',
     url: HOOK_ROUTE,
-    headers: { host, 'x-cboard-token': token, 'content-type': 'application/json', ...headers },
+    headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json', ...headers },
     payload: JSON.stringify(body),
   });
 }
@@ -61,10 +61,28 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     expect(app.hookStats.received).toBe(0);
   });
 
+  it('accepts a hook script from before the rename, with the old headers', async () => {
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
+    const res = await app.inject({
+      method: 'POST',
+      url: HOOK_ROUTE,
+      headers: {
+        host,
+        'x-cboard-token': token,
+        'x-cboard-claude-pid': '4321',
+        'content-type': 'application/json',
+      },
+      payload: JSON.stringify(hookFixture('session-start')),
+    });
+    expect(res.statusCode).toBe(204);
+    await settled();
+    expect(app.store.state.sessions[FIXTURE_SESSION_ID]).toMatchObject({ claudePid: 4321 });
+  });
+
   it('replies 204 and drives a session through a turn', async () => {
     app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
 
-    const start = await post(hookFixture('session-start'), { 'x-cboard-claude-pid': '4321' });
+    const start = await post(hookFixture('session-start'), { 'x-yardmaster-claude-pid': '4321' });
     expect(start.statusCode).toBe(204);
     expect(start.body).toBe('');
     await settled();
@@ -139,7 +157,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
   });
 
   it('maps a cwd inside a known project to that project', async () => {
-    tmp = await realpath(await mkdtemp(join(tmpdir(), 'cboard-hooks-')));
+    tmp = await realpath(await mkdtemp(join(tmpdir(), 'yardmaster-hooks-')));
     app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
     const outer = projectIdFromPath(tmp);
     const inner = projectIdFromPath(join(tmp, 'packages'));
@@ -178,7 +196,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     const bad = await app.inject({
       method: 'POST',
       url: HOOK_ROUTE,
-      headers: { host, 'x-cboard-token': token, 'content-type': 'application/json' },
+      headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json' },
       payload: '{not json',
     });
     expect(bad.statusCode).toBe(400);

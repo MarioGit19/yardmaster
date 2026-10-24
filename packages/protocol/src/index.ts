@@ -1,4 +1,4 @@
-export const PACKAGE_NAME = '@c-board/protocol';
+export const PACKAGE_NAME = '@yardmaster/protocol';
 
 export * from './background.js';
 export * from './claude-sessions.js';

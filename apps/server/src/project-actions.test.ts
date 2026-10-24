@@ -4,7 +4,7 @@ import {
   type ProjectSource,
   projectIdFromPath,
   type UiAction,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import type { ActionResult } from './actions.js';
 import { closeProjectWindows } from './editor-actions.js';

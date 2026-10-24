@@ -1,4 +1,4 @@
-import type { PortBinding, ProcessStats, Terminal } from '@c-board/protocol';
+import type { PortBinding, ProcessStats, Terminal } from '@yardmaster/protocol';
 
 /** One row of `ps`. */
 export interface ProcessInfo {

@@ -4,7 +4,7 @@ import {
   emptyBoardState,
   type Project,
   type Terminal,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 // Synthetic sample data only.
 const T0 = 1_760_000_000_000;

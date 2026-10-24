@@ -5,7 +5,7 @@ import {
   type GitFileChange,
   type GitFileStatus,
   type GitInfo,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 /** Arguments for `git status`; `-z` keeps paths unquoted and NUL-separated. */
 export const GIT_STATUS_ARGS = ['status', '--porcelain=v2', '--branch', '-z'] as const;

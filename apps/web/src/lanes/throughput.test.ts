@@ -1,4 +1,4 @@
-import { type BoardState, type Execution, emptyBoardState } from '@c-board/protocol';
+import { type BoardState, type Execution, emptyBoardState } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { sparkLevel, sparkPoints } from './spark.js';
 import { backfill, bytesByTerminal, SAMPLES, SampleRing, ThroughputSampler } from './throughput.js';

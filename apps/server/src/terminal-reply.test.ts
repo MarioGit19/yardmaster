@@ -1,4 +1,4 @@
-import type { ServerToUi, SessionStatus } from '@c-board/protocol';
+import type { ServerToUi, SessionStatus } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTuiInput } from './demo/tui-input.js';
 import { createEditorActions } from './editor-actions.js';

@@ -4,11 +4,12 @@ import { statusTooltip } from './status.js';
 describe('statusTooltip', () => {
   it('describes each link state', () => {
     expect(statusTooltip({ kind: 'connected' }, 4317)).toBe(
-      'c-board: connected to 127.0.0.1:4317. Click to open the dashboard.',
+      'Yardmaster: connected to 127.0.0.1:4317. Click to open the dashboard.',
     );
     expect(statusTooltip({ kind: 'connecting' }, 5000)).toContain('connecting to 127.0.0.1:5000');
-    expect(statusTooltip({ kind: 'stopped' }, 4317)).toContain('cboard.enabled is false');
-    expect(statusTooltip({ kind: 'replaced' }, 4317)).toContain('c-board: Reconnect');
+    expect(statusTooltip({ kind: 'stopped' }, 4317)).toContain('yardmaster.enabled is false');
+    expect(statusTooltip({ kind: 'replaced' }, 4317)).toContain('Yardmaster: Reconnect');
+    expect(statusTooltip({ kind: 'legacy' }, 4317)).toContain('uninstall it and reload');
   });
 
   it('rounds the retry delay to whole seconds', () => {

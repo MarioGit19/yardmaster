@@ -1,4 +1,4 @@
-import type { ClaudeSession, Project, SessionStatus } from '@c-board/protocol';
+import type { ClaudeSession, Project, SessionStatus } from '@yardmaster/protocol';
 import type { ComponentType, ReactNode, RefObject } from 'react';
 import type { CrewView } from '../../pod/SessionCrew.js';
 import type { Tone } from '../../status.js';

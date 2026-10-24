@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BOARD_WINDOW_ID, type Execution, type Project } from '@c-board/protocol';
+import { BOARD_WINDOW_ID, type Execution, type Project } from '@yardmaster/protocol';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResult } from './actions.js';
 import { runCommand } from './process-scanner.js';
@@ -217,7 +217,7 @@ realPty('PtyManager with a real pty', () => {
 
 // A throwaway home with no dotfiles stands in for the user's (like `zsh -f` / `bash --norc`),
 // so only the injected integration loads.
-const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'c-board-shells-')));
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'yardmaster-shells-')));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 const SHELLS = [
@@ -240,7 +240,7 @@ realPty.each(SHELLS)('PtyManager with $name and the shell integration', ({ name,
         LANG: 'C',
         BASH_SILENCE_DEPRECATION_WARNING: '1',
       }),
-      integrationDir: join(home, '.c-board', 'shell-integration'),
+      integrationDir: join(home, '.yardmaster', 'shell-integration'),
     });
     const id = manager.create({
       projectId: PROJECT.id,
@@ -338,7 +338,7 @@ realPty.each(SHELLS)('PtyManager with $name and the shell integration', ({ name,
       timeout: 10_000,
     });
     // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion.
-    manager.sendText(id, 'echo "z=${ZDOTDIR:-unset} u=${CBOARD_USER_ZDOTDIR:-unset}"', true);
+    manager.sendText(id, 'echo "z=${ZDOTDIR:-unset} u=${YARDMASTER_USER_ZDOTDIR:-unset}"', true);
     await vi.waitFor(
       () => expect(executions(store, id).at(-1)).toMatchObject({ endedAt: expect.any(Number) }),
       { timeout: 10_000 },

@@ -5,7 +5,7 @@ import {
   emptyBoardState,
   type Project,
   type Terminal,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { createEditorActions } from './editor-actions.js';
 import { EditorRouter, ROUTE_ERRORS } from './editor-router.js';

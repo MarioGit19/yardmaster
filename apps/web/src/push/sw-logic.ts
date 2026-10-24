@@ -1,4 +1,4 @@
-import type { PushPayload } from '@c-board/protocol';
+import type { PushPayload } from '@yardmaster/protocol';
 
 // The service worker's logic, kept free of imports with runtime code: `sw.ts` bundles it into one
 // classic script, and the tests run it without a worker.
@@ -112,7 +112,7 @@ export interface ClickDeps {
 }
 
 /** The message a board tab gets to open a route (`main` listens for it). */
-export const OPEN_MESSAGE = 'cboard.open';
+export const OPEN_MESSAGE = 'yardmaster.open';
 
 /** A same-origin board route; anything else opens the overview. */
 export function boardRoute(url: string, origin: string): string {

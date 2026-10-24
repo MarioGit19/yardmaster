@@ -1,4 +1,4 @@
-import type { BoardSettings } from '@c-board/protocol';
+import type { BoardSettings } from '@yardmaster/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import { createBoardSettingsStore } from './boardSettings.js';
 

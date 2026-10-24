@@ -1,0 +1,88 @@
+#!/bin/sh
+# Yardmaster hook for Claude Code (PRD §6.1).
+#
+# Default (observer, async): forwards the hook payload on stdin to the local board. It never
+# writes to stdout (Claude Code could read that as a hook decision) and always exits 0.
+#
+# --permission (away mode, sync): asks the board whether away mode is on (300 ms). If it is,
+# posts the PermissionRequest payload and waits for a decision from the board, then prints it:
+#   {"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"|"deny",…}}}
+# Output shape verified against https://code.claude.com/docs/en/hooks on 2026-10-22.
+# Away mode off, a timeout or any error: exit 0 with no output, so the terminal prompt appears.
+
+# fd 4 keeps the real stdout for the decision; everything else goes nowhere.
+exec 4>&1 >/dev/null 2>&1
+
+mode=observe
+[ "${1:-}" = --permission ] && mode=permission
+
+# The old CBOARD_* names and ~/.c-board are read for one version (Yardmaster was c-board).
+home="${YARDMASTER_HOME:-${CBOARD_HOME:-}}"
+if [ -z "$home" ]; then
+  home="$HOME/.yardmaster"
+  # Until the server has started once and moved the old data dir here.
+  [ -r "$home/token" ] || [ ! -r "$HOME/.c-board/token" ] || home="$HOME/.c-board"
+fi
+# A literal "~" in YARDMASTER_HOME is expanded here on purpose.
+# shellcheck disable=SC2088
+case "$home" in
+  "~") home="$HOME" ;;
+  "~/"*) home="$HOME/${home#\~/}" ;;
+esac
+
+port="${YARDMASTER_PORT:-${CBOARD_PORT:-4317}}"
+case "$port" in
+  '' | *[!0-9]*) exit 0 ;;
+esac
+base="http://127.0.0.1:$port"
+
+token=''
+[ -r "$home/token" ] && IFS= read -r token <"$home/token"
+token="${token%"${token##*[![:space:]]}"}"
+case "$token" in
+  '' | *[!A-Za-z0-9_-]*) exit 0 ;;
+esac
+
+command -v curl || exit 0
+
+# Calls the board with the token header. The token goes in through a here-doc instead of argv
+# so it doesn't show up in `ps`. -q skips ~/.curlrc; --noproxy keeps a configured proxy from
+# intercepting loopback.
+board() {
+  curl -q -s --noproxy '*' -H @/dev/fd/3 "$@" 3<<HEADERS
+X-Yardmaster-Token: $token
+HEADERS
+}
+
+if [ "$mode" = observe ]; then
+  board -m 1 -o /dev/null \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -H "X-Yardmaster-Claude-Pid: $PPID" \
+    --data-binary @- \
+    "$base/api/hooks/claude"
+  exit 0
+fi
+
+away=$(board -f -m 0.3 "$base/api/away") || exit 0
+case "$away" in
+  *'"away":true'*) ;;
+  *) exit 0 ;;
+esac
+wait="${away##*\"timeoutSec\":}"
+wait="${wait%%[!0-9]*}"
+case "$wait" in
+  '' | ????*) wait=120 ;;
+esac
+
+# The board answers 204 (no body) when it has no decision; curl gives up a little after it.
+decision=$(board -f -m "$((wait + 5))" \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -H "X-Yardmaster-Claude-Pid: $PPID" \
+  --data-binary @- \
+  "$base/api/hooks/permission") || exit 0
+case "$decision" in
+  '{"hookSpecificOutput":'*'}') printf '%s\n' "$decision" >&4 ;;
+esac
+exit 0

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { OBSERVER_EVENTS } from '@c-board/hook';
+import { OBSERVER_EVENTS } from '@yardmaster/hook';
 import {
   BoardSettings,
   HooksInstallResponse,
@@ -9,7 +9,7 @@ import {
   HooksStatusResponse,
   LibraryResponse,
   ServerStatus,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildServer } from './app.js';
@@ -39,7 +39,7 @@ const LIBRARY_DEFAULTS = {
   notifyHideDetails: false,
   notifyMutedProjects: [],
 };
-const HOOK = '/opt/c-board/bin/c-board-hook';
+const HOOK = '/opt/yardmaster/bin/yardmaster-hook';
 
 let app: FastifyInstance | undefined;
 let home: string | undefined;
@@ -54,7 +54,7 @@ afterEach(async () => {
 async function boot(
   options: { token?: string; hookSettings?: HookSettingsFile; demo?: boolean } = {},
 ) {
-  home = await mkdtemp(join(tmpdir(), 'cboard-settings-'));
+  home = await mkdtemp(join(tmpdir(), 'yardmaster-settings-'));
   const config: ServerConfig = {
     port: 4317,
     host: '127.0.0.1',
@@ -86,7 +86,7 @@ function call(
     url,
     headers: {
       host,
-      ...(token ? { 'x-cboard-token': token } : {}),
+      ...(token ? { 'x-yardmaster-token': token } : {}),
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       ...headers,
     },
@@ -331,7 +331,7 @@ describe('settings routes', () => {
   });
 
   it('installs into a real settings file with a backup, and reports a broken one', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'cboard-claude-'));
+    const dir = await mkdtemp(join(tmpdir(), 'yardmaster-claude-'));
     try {
       const path = join(dir, 'settings.json');
       await writeFile(path, '{ "hooks": {} }\n');
@@ -342,8 +342,8 @@ describe('settings routes', () => {
       const done = HooksInstallResponse.parse(
         (await call('POST', '/api/hooks/install', token, { fingerprint: plan.fingerprint })).json(),
       );
-      expect(done.backup).toMatch(/settings\.json\.c-board-backup-/);
-      expect((await readdir(dir)).some((name) => name.includes('c-board-backup'))).toBe(true);
+      expect(done.backup).toMatch(/settings\.json\.yardmaster-backup-/);
+      expect((await readdir(dir)).some((name) => name.includes('yardmaster-backup'))).toBe(true);
       expect(JSON.parse(await readFile(path, 'utf8')).hooks.Stop).toHaveLength(1);
 
       await writeFile(path, '{ not json');

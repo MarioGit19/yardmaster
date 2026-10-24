@@ -1,4 +1,4 @@
-import type { Execution } from '@c-board/protocol';
+import type { Execution } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { createBoardStore } from '../data/store.js';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';

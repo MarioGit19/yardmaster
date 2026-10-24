@@ -1,4 +1,4 @@
-import { toolFamily } from '@c-board/protocol';
+import { toolFamily } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   type KeyboardEvent,

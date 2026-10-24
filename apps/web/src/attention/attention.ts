@@ -1,4 +1,4 @@
-import type { Approval, ApprovalState, ClaudeSession, Project } from '@c-board/protocol';
+import type { Approval, ApprovalState, ClaudeSession, Project } from '@yardmaster/protocol';
 import type { BoardStoreState } from '../data/store.js';
 import type { MotionLevel } from '../motion.js';
 import { createPreference, type KeyValueStorage } from '../prefs.js';
@@ -7,7 +7,7 @@ import { createPreference, type KeyValueStorage } from '../prefs.js';
 const memory: KeyValueStorage = { getItem: () => null, setItem: () => {} };
 
 export const attentionOpen = createPreference<'open' | 'closed'>(
-  'cboard.attention',
+  'yardmaster.attention',
   ['open', 'closed'],
   'closed',
   memory,
@@ -15,7 +15,7 @@ export const attentionOpen = createPreference<'open' | 'closed'>(
 
 /** Browser notifications for new approvals: opt-in, turned on in Settings. */
 export const notificationsPreference = createPreference<'on' | 'off'>(
-  'cboard.notifications',
+  'yardmaster.notifications',
   ['on', 'off'],
   'off',
 );

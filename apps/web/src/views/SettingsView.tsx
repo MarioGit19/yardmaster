@@ -7,7 +7,7 @@ import {
   type LibraryRootStatus,
   RETENTION_DAYS,
   type RetentionDays,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -231,7 +231,7 @@ function HooksRow() {
   if (state.status === 'loading') summary = 'Checking Claude’s settings…';
   else if (state.status === 'error') summary = 'Could not check the hooks.';
   else if (hooks?.error) summary = `${hooks.path} ${hooks.error}. Fix the file, then check again.`;
-  else if (installed) summary = `All ${total} events report to c-board, from ${hooks?.path}.`;
+  else if (installed) summary = `All ${total} events report to Yardmaster, from ${hooks?.path}.`;
   else {
     const count = hooks?.status?.installed.length ?? 0;
     const outdated = hooks?.status?.outdated.length ?? 0;
@@ -340,7 +340,7 @@ const RETENTION_LABEL = Object.fromEntries(
 ) as Record<`${RetentionDays}`, string>;
 const RETENTION_OPTIONS = RETENTION_DAYS.map((days) => `${days}` as const);
 
-const AWAY_INSTALL = 'c-board hooks install --away';
+const AWAY_INSTALL = 'yardmaster hooks install --away';
 
 /** Routes permission prompts from terminal sessions to the board (F13). */
 function AwayRow({ server: { settings, update } }: { server: ServerSettings }) {
@@ -441,8 +441,8 @@ function LibraryRootsRow({ server: { settings, update } }: { server: ServerSetti
       <div className="flex flex-col gap-0.5">
         <h3 className="font-medium text-body text-text-1">Project folders</h3>
         <p className="text-label text-text-2">
-          “Open project” lists the folders directly inside these. c-board only reads their names and
-          whether they are git repositories.
+          “Open project” lists the folders directly inside these. Yardmaster only reads their names
+          and whether they are git repositories.
         </p>
       </div>
       {roots && roots.length > 0 && (
@@ -692,7 +692,7 @@ function TokenRow({ demo }: { demo: boolean }) {
       await api.rotateToken();
       toast.success('Token rotated', {
         description:
-          'Other browsers sign in again with `c-board start`. Editors reconnect on their own.',
+          'Other browsers sign in again with `yardmaster start`. Editors reconnect on their own.',
       });
     } catch {
       toast.error('Could not rotate the token');

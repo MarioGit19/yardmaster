@@ -1,4 +1,4 @@
-import { type ChatMessage, decodeChatMessage, type Project } from '@c-board/protocol';
+import { type ChatMessage, decodeChatMessage, type Project } from '@yardmaster/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionRunner } from '../claude/runner.js';
 import { BoardStore } from '../store.js';

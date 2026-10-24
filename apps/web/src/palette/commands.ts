@@ -5,7 +5,7 @@ import {
   sessionDisplayName,
   sessionSubtitle,
   type UiAction,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { isWaiting } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';

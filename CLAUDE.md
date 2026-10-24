@@ -1,12 +1,12 @@
-# c-board: working rules for Claude
+# Yardmaster: working rules for Claude
 
-c-board is a local dashboard that mirrors every Cursor/VS Code terminal and Claude Code session across projects. Read `docs/PRD.md` for the product and architecture, `docs/DESIGN.md` for the UI and motion, and `PLAN.md` for the task list.
+Yardmaster is a local dashboard that mirrors every Cursor/VS Code terminal and Claude Code session across projects. Read `docs/PRD.md` for the product and architecture, `docs/DESIGN.md` for the UI and motion, and `PLAN.md` for the task list.
 
 ## Privacy (public repo, hard rules)
 
 - **Never commit personal or machine-specific data:** absolute home paths, usernames, real emails (only `*@users.noreply.github.com` and `noreply@anthropic.com` are allowed), real project or company names, real transcripts, terminal logs, tokens or keys.
 - Test fixtures and demo data are **synthetic**. Use paths like `/home/dev/acme-shop`, made-up UUIDs and fictional project names. Build fake secrets in tests by string concatenation, or mark the line with `privacy-check:allow`.
-- Never read Claude credentials (`~/.claude/.credentials*`, Keychain, `~/.claude.json`) and never require an API key. c-board runs on each user's own Claude Code login.
+- Never read Claude credentials (`~/.claude/.credentials*`, Keychain, `~/.claude.json`) and never require an API key. Yardmaster runs on each user's own Claude Code login.
 - Run `scripts/privacy-check.sh` before every commit. A failure blocks the commit, so fix the content instead of bypassing the check.
 
 ## Engineering conventions
@@ -49,12 +49,12 @@ Precedence: **PRD/DESIGN.md > this file > skill advice.** If a skill wants a dif
 - `pnpm check`: privacy check, lint, typecheck and tests. It must pass before a task is ticked.
 - `pnpm e2e` / `pnpm shots`: Playwright tests and screenshots (into `artifacts/shots/`, gitignored).
 - `pnpm motion:record [scenario]`: records the demo at motion Full and writes contact sheets to `artifacts/motion/`. Every animation task must run it and Read the sheets before it is ticked.
-- When you start the server yourself (`c-board start`, `src/cli.ts start`), always pass `--no-open`. Never open the maintainer's browser.
+- When you start the server yourself (`yardmaster start`, `src/cli.ts start`), always pass `--no-open`. Never open the maintainer's browser.
 
 ## Git
 
 - Small, focused commits. One commit per PLAN task, with the message `<task id>: <title>` and a short body.
 - The maintainer is the **sole author**. Never add `Co-Authored-By` trailers or any AI or tool attribution to commits or PRs.
 - Commits are signed through the repo's local git config. Don't change the git config, the identity or the remote.
-- A task that changes `apps/extension` must add a `[HUMAN]` task right after itself, telling the maintainer to update the installed extension: `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`, then reload every Cursor window. Skip it only if the next unchecked task is already such a check-in.
-- Never commit `loop/logs/`, `artifacts/`, `.c-board/` or `.privacy-denylist`.
+- A task that changes `apps/extension` must add a `[HUMAN]` task right after itself, telling the maintainer to update the installed extension: `pnpm --filter yardmaster-extension package && cursor --install-extension apps/extension/dist/yardmaster.vsix --force`, then reload every Cursor window. Skip it only if the next unchecked task is already such a check-in.
+- Never commit `loop/logs/`, `artifacts/`, `.yardmaster/` or `.privacy-denylist`.

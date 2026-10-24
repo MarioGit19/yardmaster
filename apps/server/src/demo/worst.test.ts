@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { BoardState, type ServerToUi, SessionHistoryResponse } from '@c-board/protocol';
+import { BoardState, type ServerToUi, SessionHistoryResponse } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
@@ -13,7 +13,7 @@ import { WorstBoard } from './worst.js';
 const config: ServerConfig = {
   port: 0,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -95,7 +95,7 @@ describe('WorstBoard', () => {
 async function snapshot(port: number, query = ''): Promise<BoardState> {
   const origin = `http://127.0.0.1:${port}`;
   const socket = new WebSocket(`ws://127.0.0.1:${port}${UI_WS_PATH}${query}`, {
-    headers: { origin, cookie: `cboard_session=${createSessionValue(token)}` },
+    headers: { origin, cookie: `yardmaster_session=${createSessionValue(token)}` },
   });
   sockets.push(socket);
   return new Promise((resolve, reject) => {
@@ -124,7 +124,7 @@ describe('/ws/ui?worst=1', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/projects/${id}/sessions`,
-      headers: { host: `127.0.0.1:${port}`, 'x-cboard-token': token },
+      headers: { host: `127.0.0.1:${port}`, 'x-yardmaster-token': token },
     });
     expect(res.statusCode).toBe(200);
     expect(SessionHistoryResponse.parse(res.json()).sessions.length).toBeGreaterThan(0);

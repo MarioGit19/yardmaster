@@ -39,6 +39,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && hashFiles('apps/extension/dist/*.vsix') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: c-board-extension
+          name: yardmaster-extension
           path: apps/extension/dist/*.vsix
           if-no-files-found: error

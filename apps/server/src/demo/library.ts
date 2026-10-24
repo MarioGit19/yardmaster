@@ -1,4 +1,4 @@
-import type { LibraryEntry, LibraryResponse, Project } from '@c-board/protocol';
+import type { LibraryEntry, LibraryResponse, Project } from '@yardmaster/protocol';
 import type { LibrarySource } from '../library.js';
 import { DEMO_HOME, DEMO_PROJECTS } from './content.js';
 

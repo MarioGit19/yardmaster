@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { ChatMessage } from '@c-board/protocol';
+import { ChatMessage } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   entryUuid,

@@ -7,7 +7,7 @@ import {
   type StreamId,
   type UiAction,
   type UiToServer,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { BoardStore } from './store.js';
 
 /** The slice of the browser WebSocket the client needs, so tests can pass a fake. */
@@ -99,7 +99,7 @@ interface Pending {
 type MessageListener = (message: ServerToUi) => void;
 
 const consoleLogger: Logger = {
-  warn: (message, detail) => console.warn(`[c-board] ${message}`, detail ?? ''),
+  warn: (message, detail) => console.warn(`[yardmaster] ${message}`, detail ?? ''),
 };
 
 /**

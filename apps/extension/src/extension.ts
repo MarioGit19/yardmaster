@@ -8,22 +8,37 @@ import {
   CONFIG_SECTION,
   type ExtensionConfig,
   editorSocketUrl,
+  LEGACY_CONFIG_SECTION,
+  LEGACY_EXTENSION_ID,
   linkSettingsChanged,
+  type RawConfig,
   resolveConfig,
 } from './core/config.js';
 import { EditorLink, type HelloPayload, type LinkStatus } from './core/editor-link.js';
 import { ExecStreamer } from './core/exec-streamer.js';
 import { STATUS_TEXT, statusTooltip } from './core/status.js';
 import { NAME_POLL_MS, TerminalTracker } from './core/terminal-tracker.js';
-import { cboardHome, readToken } from './core/token.js';
+import { readToken, tokenDirs } from './core/token.js';
 
-const WINDOW_ID_KEY = 'cboard.windowId';
+const WINDOW_ID_KEY = 'yardmaster.windowId';
 const CLOSE_WINDOW_DELAY_MS = 200;
 
-function readConfig(): ExtensionConfig {
-  const section = vscode.workspace.getConfiguration(CONFIG_SECTION);
-  return resolveConfig({ enabled: section.get('enabled'), port: section.get('port') });
+/** Only the values the user set, so an unset new key can fall back to its old one. */
+function explicitSettings(name: string): RawConfig {
+  const section = vscode.workspace.getConfiguration(name);
+  const value = (key: string) => {
+    const found = section.inspect(key);
+    return found?.workspaceFolderValue ?? found?.workspaceValue ?? found?.globalValue;
+  };
+  return { enabled: value('enabled'), port: value('port') };
 }
+
+function readConfig(): ExtensionConfig {
+  return resolveConfig(explicitSettings(CONFIG_SECTION), explicitSettings(LEGACY_CONFIG_SECTION));
+}
+
+/** The extension from before the rename to Yardmaster, while it's still installed and enabled. */
+const legacyExtension = () => vscode.extensions.getExtension(LEGACY_EXTENSION_ID);
 
 /**
  * Stable per workspace, so a reloaded window keeps its identity. Empty windows share one
@@ -39,8 +54,8 @@ function windowIdFor(context: vscode.ExtensionContext): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const log = vscode.window.createOutputChannel('c-board', { log: true });
-  const home = cboardHome(process.env, homedir());
+  const log = vscode.window.createOutputChannel('Yardmaster', { log: true });
+  const home = tokenDirs(process.env, homedir());
   const windowId = windowIdFor(context);
   const extensionVersion = String(context.extension.packageJSON.version ?? '0.0.0');
   let config = readConfig();
@@ -48,7 +63,7 @@ export function activate(context: vscode.ExtensionContext): void {
   log.info(`activated (enabled: ${config.enabled}, port: ${config.port})`);
 
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-  statusItem.name = 'c-board';
+  statusItem.name = 'Yardmaster';
   statusItem.text = STATUS_TEXT;
   statusItem.command = COMMANDS.openDashboard;
   const terminals = new TerminalTracker<vscode.Terminal>({
@@ -90,7 +105,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   // Renaming a terminal tab fires no event, so names are polled.
   const namePoll = setInterval(() => terminals.refreshNames(), NAME_POLL_MS);
-  const showStatus = (status: LinkStatus) => {
+  const showStatus = (status: LinkStatus | { kind: 'legacy' }) => {
     statusItem.tooltip = statusTooltip(status, config.port);
     // Every (re)connect gets the full list, so the server drops anything stale.
     if (status.kind === 'connected') terminals.sync(vscode.window.terminals);
@@ -116,6 +131,11 @@ export function activate(context: vscode.ExtensionContext): void {
       showStatus({ kind: 'stopped' });
       return;
     }
+    // Both would mirror this window's terminals under different ids, so wait for the old one.
+    if (legacyExtension()) {
+      showStatus({ kind: 'legacy' });
+      return;
+    }
     link = new EditorLink({
       url: editorSocketUrl(config.port),
       readToken: () => readToken(home),
@@ -130,6 +150,22 @@ export function activate(context: vscode.ExtensionContext): void {
     link.start();
   };
   startLink();
+  if (legacyExtension()) {
+    log.warn('the old c-board extension is still installed; waiting for it to be removed');
+    void vscode.window
+      .showWarningMessage(
+        'Yardmaster replaces the c-board extension, which is still installed. Uninstall c-board and reload the window to connect.',
+        'Show c-board',
+      )
+      .then((choice) => {
+        if (choice) {
+          void vscode.commands.executeCommand(
+            'workbench.extensions.search',
+            `@id:${LEGACY_EXTENSION_ID}`,
+          );
+        }
+      });
+  }
 
   context.subscriptions.push(
     log,
@@ -148,14 +184,23 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!opened) log.warn('the editor declined to open the dashboard');
     }),
     vscode.commands.registerCommand(COMMANDS.reconnect, () => {
+      if (!link && config.enabled && legacyExtension()) {
+        void vscode.window.showInformationMessage(
+          'Yardmaster waits until the old c-board extension is uninstalled and the window reloaded.',
+        );
+        return;
+      }
       if (!link) {
         void vscode.window.showInformationMessage(
-          'c-board is turned off. Enable "cboard.enabled" in the settings to connect.',
+          'Yardmaster is turned off. Enable "yardmaster.enabled" in the settings to connect.',
         );
         return;
       }
       log.info('reconnect requested');
       link.reconnect();
+    }),
+    vscode.extensions.onDidChange(() => {
+      if (!link && config.enabled && !legacyExtension()) startLink();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => link?.sendHello()),
     vscode.window.onDidOpenTerminal((terminal) => terminals.opened(terminal)),
@@ -172,7 +217,12 @@ export function activate(context: vscode.ExtensionContext): void {
       if (state.focused) terminals.refreshNames();
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration(CONFIG_SECTION)) return;
+      if (
+        !event.affectsConfiguration(CONFIG_SECTION) &&
+        !event.affectsConfiguration(LEGACY_CONFIG_SECTION)
+      ) {
+        return;
+      }
       const next = readConfig();
       const changed = linkSettingsChanged(config, next);
       config = next;

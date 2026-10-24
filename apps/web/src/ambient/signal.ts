@@ -1,4 +1,4 @@
-import type { BoardState, Project } from '@c-board/protocol';
+import type { BoardState, Project } from '@yardmaster/protocol';
 import { activityKey, levelAt, type Pulses } from '../data/activity.js';
 
 type ProjectId = Project['id'];

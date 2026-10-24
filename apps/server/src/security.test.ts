@@ -15,7 +15,7 @@ import { generateToken } from './token.js';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -169,10 +169,22 @@ describe('API auth guard', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('accepts the X-CBoard-Token header', async () => {
+  it('accepts the X-Yardmaster-Token header', async () => {
     const res = await get(await withProbe(), '/api/probe', { [TOKEN_HEADER]: token });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ authorized: true });
+  });
+
+  it('accepts the old X-CBoard-Token header and session cookie for one version', async () => {
+    const instance = await withProbe();
+    const byHeader = await get(instance, '/api/probe', { 'x-cboard-token': token });
+    expect(byHeader.json()).toEqual({ authorized: true });
+    const wrong = await get(instance, '/api/probe', { 'x-cboard-token': generateToken() });
+    expect(wrong.statusCode).toBe(401);
+    const byCookie = await get(instance, '/api/probe', {
+      cookie: `cboard_session=${createSessionValue(token)}`,
+    });
+    expect(byCookie.json()).toEqual({ authorized: true });
   });
 
   it('guards percent-encoded variants of /api routes', async () => {
@@ -248,8 +260,8 @@ describe('/auth cookie flow', () => {
 
 describe('readCookie', () => {
   it('finds a cookie among others', () => {
-    expect(readCookie('a=1; cboard_session=x.y; b=2', SESSION_COOKIE)).toBe('x.y');
-    expect(readCookie('xcboard_session=nope', SESSION_COOKIE)).toBeUndefined();
+    expect(readCookie('a=1; yardmaster_session=x.y; b=2', SESSION_COOKIE)).toBe('x.y');
+    expect(readCookie('xyardmaster_session=nope', SESSION_COOKIE)).toBeUndefined();
     expect(readCookie(undefined, SESSION_COOKIE)).toBeUndefined();
   });
 });

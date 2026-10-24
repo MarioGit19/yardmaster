@@ -3,7 +3,7 @@ import { PULSE_FILTERS, type PulseFilter } from './model.js';
 
 /** `auto` until the user toggles: collapsed on short or narrow screens, else expanded. */
 export const pulsePreference = createPreference<'auto' | 'expanded' | 'collapsed'>(
-  'cboard.pulse',
+  'yardmaster.pulse',
   ['auto', 'expanded', 'collapsed'],
   'auto',
 );
@@ -12,7 +12,7 @@ export const pulsePreference = createPreference<'auto' | 'expanded' | 'collapsed
 export const PULSE_COMPACT_QUERY = '(max-height: 959px), (max-width: 767px)';
 
 export const pulseFilterPreference = createPreference<PulseFilter>(
-  'cboard.pulse.filter',
+  'yardmaster.pulse.filter',
   PULSE_FILTERS,
   'all',
 );

@@ -121,7 +121,7 @@ test('quiet pods dim after five minutes', async ({ page }) => {
 });
 
 test('Reduced shows activity without movement', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
   await openRoute(page, '/');
   await expect(page.locator('[data-pod]').first()).toBeVisible();
   // Let the live demo produce events and output.

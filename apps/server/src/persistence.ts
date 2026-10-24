@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
-import { type ActivityEvent, ClaudeSession, Project } from '@c-board/protocol';
+import { type ActivityEvent, ClaudeSession, Project } from '@yardmaster/protocol';
 import { z } from 'zod';
 import type { BoardStore } from './store.js';
 
@@ -488,7 +488,9 @@ function migrate(db: DatabaseSync): void {
   const row = db.prepare('PRAGMA user_version').get();
   const version = Number(row?.user_version ?? 0);
   if (version > SCHEMA_VERSION) {
-    throw new Error(`board.db schema v${version} is newer than this c-board (v${SCHEMA_VERSION})`);
+    throw new Error(
+      `board.db schema v${version} is newer than this Yardmaster (v${SCHEMA_VERSION})`,
+    );
   }
   if (version === SCHEMA_VERSION) return;
   db.exec(`

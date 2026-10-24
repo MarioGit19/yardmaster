@@ -5,7 +5,7 @@ import {
   type PortShare,
   type PortSharesResponse,
   type PortShareUnavailable,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { defaultEditorCliDeps, type EditorCliDeps, findOnPath } from './editor-cli.js';

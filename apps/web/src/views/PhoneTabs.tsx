@@ -1,4 +1,4 @@
-import type { ActivityEvent, Project } from '@c-board/protocol';
+import type { ActivityEvent, Project } from '@yardmaster/protocol';
 import { Check, ChevronRight, FolderOpen, FolderX, Settings } from 'lucide-react';
 import { animate, motion, useMotionValue } from 'motion/react';
 import { useMemo, useRef, useState } from 'react';

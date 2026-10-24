@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 import { runningHelpers } from '../background/model.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import type { CrewTerminal } from '../crew/model.js';

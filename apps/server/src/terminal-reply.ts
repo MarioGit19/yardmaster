@@ -4,7 +4,7 @@ import {
   type ServerToUi,
   type SessionStatus,
   terminalReplyBlock,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { ActionHandler, ActionHandlers } from './actions.js';
 
 export const TERMINAL_REPLY_KEY = 'claude.terminalReply';

@@ -5,7 +5,7 @@ import {
   encodeEditorToServer,
   makeMessage,
   type ServerToEditor,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import WebSocket from 'ws';
 
 export const HEARTBEAT_MS = 10_000;
@@ -16,7 +16,7 @@ export const MAX_QUEUED_MESSAGES = 1_000;
 export const MAX_QUEUED_BYTES = 4 * 1024 * 1024;
 /** Largest server → editor message (characters). */
 export const MAX_SERVER_MESSAGE = 1024 * 1024;
-const TOKEN_HEADER = 'x-cboard-token';
+const TOKEN_HEADER = 'x-yardmaster-token';
 
 export type HelloPayload = Extract<EditorToServer, { type: 'editor.hello' }>['payload'];
 type OutgoingType = Exclude<EditorToServer['type'], 'editor.hello' | 'editor.heartbeat'>;
@@ -150,7 +150,7 @@ export class EditorLink {
     const token = await this.options.readToken().catch(() => null);
     if (generation !== this.generation) return;
     if (token === null) {
-      this.retry(generation, 'no token yet (is the c-board server installed?)');
+      this.retry(generation, 'no token yet (is the Yardmaster server installed?)');
       return;
     }
 
@@ -177,7 +177,7 @@ export class EditorLink {
       this.flushQueue();
       this.startHeartbeat(socket);
       this.setStatus({ kind: 'connected' });
-      this.log.info('connected to the c-board server');
+      this.log.info('connected to the Yardmaster server');
     });
     socket.on('message', (data, isBinary) => {
       if (generation !== this.generation || isBinary) return;

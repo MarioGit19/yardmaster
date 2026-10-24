@@ -1,4 +1,4 @@
-import type { ActivityEvent, ActivityKind } from '@c-board/protocol';
+import type { ActivityEvent, ActivityKind } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import type { ActorState, SceneActor } from '../layouts/scene.js';
 import {

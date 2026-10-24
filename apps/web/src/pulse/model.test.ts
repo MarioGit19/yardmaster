@@ -1,4 +1,4 @@
-import { type ActivityEvent, type ActivityKind, PULSE_WINDOW_MS } from '@c-board/protocol';
+import { type ActivityEvent, type ActivityKind, PULSE_WINDOW_MS } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
 import {

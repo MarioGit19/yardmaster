@@ -10,7 +10,7 @@ import {
   type StreamId,
   TRANSCRIPT_STREAM_PREFIX,
   type UiToServer,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
 import { z } from 'zod';

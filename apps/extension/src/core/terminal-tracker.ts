@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EditorTerminal } from '@c-board/protocol';
+import type { EditorTerminal } from '@yardmaster/protocol';
 
 const MAX_NAME = 256;
 const MAX_PATH = 4_096;

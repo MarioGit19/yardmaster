@@ -1,5 +1,5 @@
-import type { Project } from '@c-board/protocol';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import type { Project } from '@yardmaster/protocol';
 import {
   ArrowUpRight,
   Bell,

@@ -1,4 +1,4 @@
-import type { EditorTerminal, Project, Terminal } from '@c-board/protocol';
+import type { EditorTerminal, Project, Terminal } from '@yardmaster/protocol';
 import { deepestProject } from './claude/project-lookup.js';
 
 export type TerminalEvent =

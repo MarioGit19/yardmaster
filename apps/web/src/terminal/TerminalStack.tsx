@@ -7,7 +7,7 @@ import {
   type Terminal,
   terminalDisplayName,
   type UiAction,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import {
   AppWindow,
   ChevronDown,
@@ -586,9 +586,10 @@ function StackTab({
 }
 
 const BOARD_LABEL = 'Board terminal';
-const BOARD_HINT = 'Runs in c-board, not in an editor. It ends when the c-board server stops.';
+const BOARD_HINT =
+  'Runs in Yardmaster, not in an editor. It ends when the Yardmaster server stops.';
 
-/** The "board" origin mark: this terminal is a pty c-board owns (F19), not an editor's. */
+/** The "board" origin mark: this terminal is a pty Yardmaster owns (F19), not an editor's. */
 function BoardMark({ className }: { className?: string }) {
   return (
     <span
@@ -1304,7 +1305,7 @@ function BoardTerminalNote({
             >
               Type in the terminal
             </button>
-            : keys go straight to it. It ends when the c-board server stops.
+            : keys go straight to it. It ends when the Yardmaster server stops.
           </>
         ) : (
           'This board terminal has ended. Its output stays until you remove it.'

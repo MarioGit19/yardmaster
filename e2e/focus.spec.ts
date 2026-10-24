@@ -317,7 +317,7 @@ for (const layout of FOCUS_LAYOUTS) {
 
     test('at Reduced the focus view swaps without movement', async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
-      await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+      await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
       const opener = OPENERS[layout];
       await openRoute(page, '/');
       const first = page.locator(opener.item).first();
@@ -475,7 +475,7 @@ test.describe('grid at 1440', () => {
   });
 
   test('at Reduced the screens hold still: no sweep, no breathing glow', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     await openRoute(page, '/');
     await openRoute(page, await firstProjectRoute(page));
     const card = page.locator('[data-focus]');
@@ -602,7 +602,7 @@ test.describe('office at 1440', () => {
   });
 
   test('at Reduced the workspace cross-fades in: no room move', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     const id = await enterRoom(page);
     await page.locator(OPENERS.office.link(id)).click();
     const card = page.locator(`[data-focus="${id}"]`);
@@ -735,7 +735,7 @@ test.describe('transit at 1440', () => {
   test('at Reduced the workspace cross-fades in: no line moving into the band', async ({
     page,
   }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     const { id, sign } = await openLine(page);
     await sign.click();
     const card = page.locator(`[data-focus="${id}"]`);

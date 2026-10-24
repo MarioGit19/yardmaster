@@ -13,7 +13,7 @@ import {
   PortSharesResponse,
   PushInfoResponse,
   ServerStatus,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 /** A failed settings call: the HTTP status plus the server's error code and message, if any. */
 export class ApiRequestError extends Error {

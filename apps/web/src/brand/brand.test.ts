@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { emptyBoardState } from '@c-board/protocol';
+import { emptyBoardState } from '@yardmaster/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
 import { applyFavicon, documentTitle, faviconHref, faviconState, waitingCount } from './favicon.js';

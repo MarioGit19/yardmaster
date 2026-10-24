@@ -1,4 +1,4 @@
-import type { SessionStatus } from '@c-board/protocol';
+import type { SessionStatus } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   countdownProgress,

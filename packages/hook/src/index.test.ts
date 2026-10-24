@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PACKAGE_NAME } from './index.js';
 
-describe('@c-board/hook', () => {
+describe('@yardmaster/hook', () => {
   it('exports its package name', () => {
-    expect(PACKAGE_NAME).toBe('@c-board/hook');
+    expect(PACKAGE_NAME).toBe('@yardmaster/hook');
   });
 });

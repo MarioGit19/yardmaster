@@ -206,7 +206,7 @@ const SCENARIOS = {
   /** 11.3: the Office building: live activity, a character walking to a new station, a name tag. */
   async office(r: Recorder) {
     const { page } = r;
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
     await openOverview(page);
     await page.locator('[data-office-building]').waitFor();
     await page.waitForTimeout(1500);
@@ -234,7 +234,7 @@ const SCENARIOS = {
   /** 11.4: the Office room view: zoom in, into the workspace and back, zoom out. */
   async room(r: Recorder) {
     const { page } = r;
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
     await openOverview(page);
     const room = page.locator('[data-room]', { has: page.locator('[data-scene-actor^="t:"]') });
     await room.first().waitFor();
@@ -285,7 +285,7 @@ const SCENARIOS = {
   async grid(r: Recorder) {
     const { page } = r;
     await disableWebgl(page);
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
     await openOverview(page);
     await page.locator('[data-grid-map]').waitFor();
     await page.waitForTimeout(1500);
@@ -331,7 +331,7 @@ const SCENARIOS = {
   /** 11.6: the Grid's 3D network: the idle orbit, packets, drag, double-click reset, zoom. */
   async grid3d(r: Recorder) {
     const { page } = r;
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
     await openOverview(page);
     const stage = page.locator('[data-grid-3d][data-ready]');
     const ready = await stage.waitFor({ timeout: 15_000 }).then(
@@ -458,7 +458,7 @@ const SCENARIOS = {
   /** 12.6j: the Transit concourse: trains at their stations, the service log, the board. */
   async transit(r: Recorder) {
     const { page } = r;
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'transit'));
     await openOverview(page);
     await page.locator('[data-transit-line]').first().waitFor();
     await page.waitForTimeout(1500);
@@ -507,7 +507,7 @@ const SCENARIOS = {
   /** A fresh board's first attention change reorders the pods within seconds. */
   async retro(r: Recorder) {
     const { page } = r;
-    await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'retro'));
     await openOverview(page);
     await page.locator('[data-retro-frame]').first().waitFor();
     await page.waitForTimeout(1500);
@@ -684,7 +684,7 @@ const SCENARIOS = {
 
     // Retro's workspace skin (DESIGN.md §10.8): the frame opens into the workspace, a layout
     // switch swaps the skin in place, and Esc returns to the same frame.
-    await page.evaluate(() => localStorage.setItem('cboard.layout', 'retro'));
+    await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'retro'));
     await page.reload();
     const name = page.locator(`[data-retro-name="${id}"]`);
     await name.waitFor();
@@ -720,7 +720,7 @@ const SCENARIOS = {
 
     // Grid's workspace skin (DESIGN.md §10.8): from the node's cockpit, Open workspace phases the
     // screens into the workspace columns (the cockpit's sweep, --dur-phase); Esc returns to it.
-    await page.evaluate(() => localStorage.setItem('cboard.layout', 'grid'));
+    await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'grid'));
     await page.reload();
     const node = page.locator(`[data-grid-node="${id}"]`);
     await node.waitFor();
@@ -748,7 +748,7 @@ const SCENARIOS = {
 
     // Office's workspace skin (DESIGN.md §10.8): from the room view, Open workspace shrinks the
     // room's front into the header band while the monitors rise in (smooth); Esc returns to it.
-    await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+    await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'office'));
     await page.reload();
     const room = page.locator(`[data-room="${id}"]`);
     await room.waitFor();
@@ -778,7 +778,7 @@ const SCENARIOS = {
     // Transit's workspace skin (DESIGN.md §10.8): the line's sign opens the workspace, the line
     // grows from the map into the header band as the panels rise in (smooth); Esc returns to the
     // map with the line's sign lit.
-    await page.evaluate(() => localStorage.setItem('cboard.layout', 'transit'));
+    await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'transit'));
     await page.reload();
     const sign = page.locator(`[data-transit-name="${id}"]`);
     await sign.waitFor();
@@ -804,7 +804,7 @@ const SCENARIOS = {
         await page.waitForTimeout(1400);
       },
     );
-    await page.evaluate(() => localStorage.removeItem('cboard.layout'));
+    await page.evaluate(() => localStorage.removeItem('yardmaster.layout'));
   },
 
   async chrome(r: Recorder) {
@@ -1215,7 +1215,7 @@ const SCENARIOS = {
     const { page } = r;
     // Measure the guide's header with the moment marked as seen, then forget it so it plays.
     await page.goto('/#/settings');
-    await page.evaluate(() => localStorage.setItem('cboard.brandIntro', 'seen'));
+    await page.evaluate(() => localStorage.setItem('yardmaster.brandIntro', 'seen'));
     await page.goto('/#/welcome');
     const header = page.locator('[data-onboarding] header').first();
     await header.waitFor();
@@ -1234,7 +1234,7 @@ const SCENARIOS = {
         )
       : undefined;
     // Preferences are read once per page load, so reload for the app to see it unset.
-    await page.evaluate(() => localStorage.removeItem('cboard.brandIntro'));
+    await page.evaluate(() => localStorage.removeItem('yardmaster.brandIntro'));
     await page.goto('/#/settings');
     await page.reload();
     await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
@@ -1365,8 +1365,8 @@ async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean, red
     const context = await browser.newContext(options);
     await context.addInitScript(
       (level) => {
-        localStorage.setItem('cboard.theme', 'dark');
-        localStorage.setItem('cboard.motion', level);
+        localStorage.setItem('yardmaster.theme', 'dark');
+        localStorage.setItem('yardmaster.motion', level);
       },
       reduced ? 'reduced' : 'full',
     );

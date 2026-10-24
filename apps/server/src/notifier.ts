@@ -13,7 +13,7 @@ import {
   type SessionStatus,
   sessionDisplayName,
   toolInputDetail,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
 import type { PushSender, PushSubscriptions, SendResult } from './push.js';
 import type { BoardStore } from './store.js';
@@ -174,7 +174,7 @@ export class Notifier {
       {
         type: 'show',
         kind: 'test',
-        title: 'c-board · Test notification',
+        title: 'Yardmaster · Test notification',
         body: 'Notifications reach this device.',
         tag: 'test',
         url: '/',
@@ -553,7 +553,7 @@ export class Notifier {
 
   private projectLabel(projectId: string | null): string {
     return (
-      (projectId ? this.options.store.state.projects[projectId]?.name : undefined) ?? 'c-board'
+      (projectId ? this.options.store.state.projects[projectId]?.name : undefined) ?? 'Yardmaster'
     );
   }
 

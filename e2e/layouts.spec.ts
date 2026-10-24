@@ -295,7 +295,7 @@ test.describe('the Office building', () => {
       isMobile: true,
     });
     try {
-      await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+      await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'office'));
       await page.reload();
       await expect(page.locator('[data-office-building]')).toHaveAttribute('data-columns', '1');
       // No horizontal overflow: the building keeps its gutter.
@@ -329,7 +329,7 @@ const buildingScale = (page: Page) =>
  * opens the workspace and comes back with Esc to the same room view, then Esc to the building.
  */
 async function roomViewRoundTrip(page: Page, touch: boolean) {
-  await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+  await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'office'));
   await page.reload();
   const office = page.locator('[data-office]');
   const room = page
@@ -653,8 +653,8 @@ test.describe('the Grid map', () => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.evaluate(() => {
-        localStorage.setItem('cboard.layout', 'grid');
-        localStorage.setItem('cboard.motion', 'reduced');
+        localStorage.setItem('yardmaster.layout', 'grid');
+        localStorage.setItem('yardmaster.motion', 'reduced');
       });
       await page.reload();
       await expect(page.locator('[data-grid-map]')).toBeVisible();
@@ -678,7 +678,7 @@ test.describe('the Grid map', () => {
       isMobile: true,
     });
     try {
-      await page.evaluate(() => localStorage.setItem('cboard.layout', 'grid'));
+      await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'grid'));
       await page.reload();
       const grid = page.locator('[data-grid]');
       await expect(grid).toHaveAttribute('data-grid-view', 'trunk');
@@ -1060,8 +1060,8 @@ test.describe('the Grid 3D network', () => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.evaluate(() => {
-        localStorage.setItem('cboard.layout', 'grid');
-        localStorage.setItem('cboard.motion', 'reduced');
+        localStorage.setItem('yardmaster.layout', 'grid');
+        localStorage.setItem('yardmaster.motion', 'reduced');
       });
       await page.reload();
       await expect(page.locator('[data-grid-map]')).toBeVisible();
@@ -1225,7 +1225,7 @@ test.describe('the Transit concourse', () => {
       isMobile: true,
     });
     try {
-      await page.evaluate(() => localStorage.setItem('cboard.layout', 'transit'));
+      await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'transit'));
       await page.reload();
       await expect(page.locator('[data-transit]')).toHaveAttribute('data-transit-mode', 'phone');
       const overflow = await page.evaluate(
@@ -1265,8 +1265,8 @@ test.describe('the Transit concourse', () => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.evaluate(() => {
-        localStorage.setItem('cboard.layout', 'transit');
-        localStorage.setItem('cboard.motion', 'reduced');
+        localStorage.setItem('yardmaster.layout', 'transit');
+        localStorage.setItem('yardmaster.motion', 'reduced');
       });
       await page.reload();
       await expect(page.locator('[data-transit-line]').first()).toBeVisible();
@@ -1385,7 +1385,7 @@ test.describe('the Retro console', () => {
     });
     try {
       const page = await context.newPage();
-      await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+      await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'retro'));
       await openRoute(page, '/');
       const frames = page.locator('[data-retro-frame]');
       await expect(frames).toHaveCount(20);
@@ -1441,7 +1441,7 @@ test.describe('the Retro console', () => {
       isMobile: true,
     });
     try {
-      await page.evaluate(() => localStorage.setItem('cboard.layout', 'retro'));
+      await page.evaluate(() => localStorage.setItem('yardmaster.layout', 'retro'));
       await page.reload();
       const console = page.locator('[data-retro]');
       await expect(console).toHaveAttribute('data-stacked', '');
@@ -1484,8 +1484,8 @@ test.describe('the Retro console', () => {
         .getByRole('button', { name: 'Amber' })
         .click();
       await page.evaluate(() => {
-        localStorage.setItem('cboard.layout', 'retro');
-        localStorage.setItem('cboard.motion', 'reduced');
+        localStorage.setItem('yardmaster.layout', 'retro');
+        localStorage.setItem('yardmaster.motion', 'reduced');
       });
       await openRoute(page, '/');
       await page.reload();
@@ -1557,7 +1557,7 @@ test.describe('the phone pass', () => {
 
   for (const [name, spec] of Object.entries(PHONE_LAYOUTS)) {
     test(`${name}: 44 px targets, the inspector a sheet, Back closes it`, async ({ page }) => {
-      await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+      await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), name);
       await openRoute(page, '/');
       const scope = 'main [data-layout]:not([aria-hidden])';
       await expect(page.locator(spec.item).first()).toBeVisible();
@@ -1582,13 +1582,15 @@ test.describe('the phone pass', () => {
       await expect(sheet).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
-      await expect.poll(() => page.evaluate(() => history.state?.cboardInspector)).toBeUndefined();
+      await expect
+        .poll(() => page.evaluate(() => history.state?.yardmasterInspector))
+        .toBeUndefined();
     });
 
     if (!spec.enter || !spec.entered) continue;
     const { enter, entered } = spec;
     test(`${name}: the enter view on a phone, and Back leaves it`, async ({ page }) => {
-      await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+      await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), name);
       await openRoute(page, '/');
       const item = page.locator(spec.item).first();
       await expect(item).toBeVisible();
@@ -1624,7 +1626,7 @@ const ENTERED_ACTORS = {
 // actors, an empty project and one with nothing but errors.
 test.describe('the layouts with worst-case data', () => {
   const openWorst = async (page: Page, name: string) => {
-    await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), name);
+    await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), name);
     await page.goto('/?worst=1#/');
   };
 

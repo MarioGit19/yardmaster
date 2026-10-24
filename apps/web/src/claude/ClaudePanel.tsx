@@ -1,4 +1,4 @@
-import { type ClaudeSession, sessionDisplayName, sessionSubtitle } from '@c-board/protocol';
+import { type ClaudeSession, sessionDisplayName, sessionSubtitle } from '@yardmaster/protocol';
 import { GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useState } from 'react';

@@ -8,13 +8,13 @@ import {
   encodeServerToEditor,
   makeMessage,
   type ServerToEditor,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import type { ActionResult } from './actions.js';
 import { ensureProject, type PathResolver, resolveDir } from './claude/project-lookup.js';
 import { applyExecEvent, type ExecEvent, endRunning } from './exec-reducer.js';
-import { TOKEN_HEADER } from './security.js';
+import { tokenHeader } from './security.js';
 import type { BoardStore } from './store.js';
 import { type TerminalEvent, terminalReducer } from './terminal-reducer.js';
 import { tokensEqual } from './token.js';
@@ -413,7 +413,7 @@ export class EditorGateway {
   }
 }
 
-/** `/ws/editor`: the install token must arrive in the `X-CBoard-Token` header (PRD §8). */
+/** `/ws/editor`: the install token must arrive in the `X-Yardmaster-Token` header (PRD §8). */
 export function registerEditorGateway(
   app: FastifyInstance,
   gateway: EditorGateway,
@@ -425,8 +425,8 @@ export function registerEditorGateway(
     {
       websocket: true,
       preValidation: async (request, reply) => {
-        const header = request.headers[TOKEN_HEADER];
-        if (typeof header !== 'string' || !tokensEqual(header, currentToken())) {
+        const header = tokenHeader(request.headers);
+        if (header === undefined || !tokensEqual(header, currentToken())) {
           return reply.code(401).send({ error: 'unauthorized' });
         }
       },

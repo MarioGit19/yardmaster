@@ -1,4 +1,4 @@
-import type { BoardState, Execution, Project, Terminal } from '@c-board/protocol';
+import type { BoardState, Execution, Project, Terminal } from '@yardmaster/protocol';
 
 export const ROUTE_ERRORS = {
   unknownTerminal: 'unknown_terminal',

@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLocation } from 'wouter';
 import { dur, ease } from '../motion.js';

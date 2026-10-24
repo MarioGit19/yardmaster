@@ -6,14 +6,14 @@ import {
   PairingRequest,
   type PairingResponse,
   RemoteHost,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { tokensEqual } from './token.js';
 
 export const REMOTE_HOSTS_KEY = 'remote.allowedHosts';
 export const DEVICES_KEY = 'remote.devices';
-export const DEVICE_COOKIE = 'cboard_device';
+export const DEVICE_COOKIE = 'yardmaster_device';
 /** A paired phone stays signed in this long without pairing again, unless revoked. */
 export const DEVICE_COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
 export const MAX_DEVICES = 20;

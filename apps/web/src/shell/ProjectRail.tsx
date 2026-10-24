@@ -1,4 +1,4 @@
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { FolderOpen, LayoutGrid, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import { forwardRef, type KeyboardEvent, type ReactNode, useMemo, useRef } from 'react';
 import { Link, useRoute } from 'wouter';

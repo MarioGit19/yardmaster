@@ -51,8 +51,8 @@ function render() {
 
 describe('ambient style', () => {
   it('defaults to the nebula and ignores unknown stored values', () => {
-    const storage = new Map<string, string>([['cboard.ambient', 'lava-lamp']]);
-    const pref = createPreference('cboard.ambient', AMBIENT_STYLES, 'nebula', {
+    const storage = new Map<string, string>([['yardmaster.ambient', 'lava-lamp']]);
+    const pref = createPreference('yardmaster.ambient', AMBIENT_STYLES, 'nebula', {
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
     });

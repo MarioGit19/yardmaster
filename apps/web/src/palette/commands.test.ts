@@ -1,4 +1,4 @@
-import type { Approval, BoardState, EditorWindow, Execution, Project } from '@c-board/protocol';
+import type { Approval, BoardState, EditorWindow, Execution, Project } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
 import {

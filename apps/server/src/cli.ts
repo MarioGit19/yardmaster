@@ -11,14 +11,14 @@ function handleSignals(app: FastifyInstance): void {
     const running = app.sessionRunner.liveCount;
     if (running > 0) {
       process.stderr.write(
-        `c-board: stopping ${running} running board session${running === 1 ? '' : 's'}. ` +
+        `yardmaster: stopping ${running} running board session${running === 1 ? '' : 's'}. ` +
           'They show as interrupted on the next start, with Resume.\n',
       );
     }
     const terminals = app.ptyManager.liveCount;
     if (terminals > 0) {
       process.stderr.write(
-        `c-board: closing ${terminals} board terminal${terminals === 1 ? '' : 's'} and what runs in them.\n`,
+        `yardmaster: closing ${terminals} board terminal${terminals === 1 ? '' : 's'} and what runs in them.\n`,
       );
     }
     app.close().then(
@@ -38,7 +38,7 @@ runCli(process.argv.slice(2), { ...processIo(), onStarted: handleSignals }).then
     if (code !== null) process.exitCode = code;
   },
   (err: unknown) => {
-    process.stderr.write(`c-board: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`yardmaster: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   },
 );

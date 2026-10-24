@@ -87,7 +87,7 @@ export function snapWidth(column: SideColumn, value: number, max: number): numbe
   return Math.round(clamp(best, min, max));
 }
 
-const storageKey = (projectId: string) => `cboard.focus.${projectId}`;
+const storageKey = (projectId: string) => `yardmaster.focus.${projectId}`;
 
 function defaultStorage(): KeyValueStorage | undefined {
   try {

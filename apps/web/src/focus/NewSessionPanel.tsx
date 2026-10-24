@@ -1,4 +1,4 @@
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { NewSessionComposer } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
 import { EmptyState } from '../views/Page.js';

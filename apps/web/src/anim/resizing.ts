@@ -4,7 +4,7 @@
  * once, on the `RESIZE_END` event the container dispatches when it clears the mark.
  */
 export const RESIZING_ATTR = 'data-resizing';
-export const RESIZE_END = 'cboard:resize-end';
+export const RESIZE_END = 'yardmaster:resize-end';
 
 /** The resizing ancestor of `el` (or `el` itself), if a resize is running. */
 export function resizingAncestor(el: Element): Element | null {

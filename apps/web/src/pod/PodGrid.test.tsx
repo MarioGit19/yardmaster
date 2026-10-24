@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { BoardSettings } from '@c-board/protocol';
+import type { BoardSettings } from '@yardmaster/protocol';
 import { MotionGlobalConfig } from 'motion/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

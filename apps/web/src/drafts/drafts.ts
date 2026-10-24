@@ -17,7 +17,7 @@ export interface DraftStorage {
   removeItem(key: string): void;
 }
 
-export const DRAFTS_KEY = 'c-board:drafts';
+export const DRAFTS_KEY = 'yardmaster:drafts';
 export const DRAFT_PERSIST_MS = 300;
 export const MAX_DRAFTS = 50;
 /** Per draft, in UTF-16 code units (about 20 kB of text). Longer text is stored cut off. */

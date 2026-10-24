@@ -1,4 +1,4 @@
-import { type ToolFamily, toolFamily } from '@c-board/protocol';
+import { type ToolFamily, toolFamily } from '@yardmaster/protocol';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { frameDue } from '../ambient/signal.js';
 import { useFrame, useInView } from '../anim/useFrame.js';

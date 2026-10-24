@@ -81,7 +81,7 @@ function report(view: string, stats: FrameStats) {
 
 /** Every animation runs, whatever the machine's reduced-motion setting. */
 async function fullMotion(page: Page) {
-  await page.addInitScript(() => localStorage.setItem('cboard.motion', 'full'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'full'));
 }
 
 /** Waits until the board is busy: firehoses streaming and sessions running tools. */
@@ -110,7 +110,7 @@ for (const ambient of ['veil', 'aurora'] as const) {
   }) => {
     test.slow();
     await fullMotion(page);
-    await page.addInitScript((style) => localStorage.setItem('cboard.ambient', style), ambient);
+    await page.addInitScript((style) => localStorage.setItem('yardmaster.ambient', style), ambient);
     await page.goto('/#/');
     await warmUp(page);
     await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'webgl');
@@ -126,7 +126,7 @@ for (const ambient of ['veil', 'aurora'] as const) {
 test('@perf the Grid 3D network keeps 55 fps under the stress load', async ({ page }) => {
   test.slow();
   await fullMotion(page);
-  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
   await page.goto('/#/');
   await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
   await expect(page.locator('[data-grid-label]')).toHaveCount(10);
@@ -152,7 +152,7 @@ for (const [name, item] of Object.entries(LAYOUT_ITEMS)) {
     await fullMotion(page);
     if (name === 'grid 2d') await disableWebgl(page);
     await page.addInitScript(
-      (layout) => localStorage.setItem('cboard.layout', layout),
+      (layout) => localStorage.setItem('yardmaster.layout', layout),
       name.split(' ')[0] ?? name,
     );
     await page.goto('/#/');
@@ -201,7 +201,7 @@ test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ pag
 test('@perf the Grid workspace keeps 55 fps with a log firehose on screen', async ({ page }) => {
   test.slow();
   await fullMotion(page);
-  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
   await page.goto('/#/');
   await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
   await page.waitForTimeout(3_000);
@@ -234,7 +234,7 @@ test('the expanded Pulse rail measures no text in its steady frames under the st
   test.slow();
   await fullMotion(page);
   await page.addInitScript(() => {
-    localStorage.setItem('cboard.pulse', 'expanded');
+    localStorage.setItem('yardmaster.pulse', 'expanded');
     // Counts the Pulse canvas's frames (one clear each) and its text measurements.
     const counts = { frames: 0, measures: 0 };
     Object.assign(window, { __pulseCounts: counts });
@@ -291,7 +291,7 @@ function overlaps(page: Page, selector: string, slack = 0) {
 
 // DESIGN.md §10.7 on the busy board (10 projects, an hour of stations).
 test('the Grid labels never overlap at 1440 with 10 projects', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
   await page.goto('/#/');
   await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
   await expect(page.locator('[data-grid-label]')).toHaveCount(10);
@@ -308,7 +308,7 @@ test('the Grid labels never overlap at 1440 with 10 projects', async ({ page }) 
 });
 
 test('Transit stations and log bins never overlap in a busy hour', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'transit'));
   await page.goto('/#/');
   await expect(page.locator('[data-transit-line]')).toHaveCount(10);
   await page.waitForTimeout(1_000);

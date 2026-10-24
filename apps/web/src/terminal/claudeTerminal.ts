@@ -1,4 +1,4 @@
-import { CLAUDE_NAME } from '@c-board/protocol';
+import { CLAUDE_NAME } from '@yardmaster/protocol';
 import { useSyncExternalStore } from 'react';
 
 /** What Claude Code's TUI takes as "stop": its own interrupt key. */

@@ -1,14 +1,14 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { claudeSettingsPath } from '@c-board/hook';
+import { claudeSettingsPath } from '@yardmaster/hook';
 import {
   type ClaudeSession,
   isAutomaticSessionName,
   type SessionHistoryEntry,
   SessionRegistryEntry,
   type SessionStatus,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import type { BoardStore } from '../store.js';
@@ -51,7 +51,7 @@ interface Discovered {
 
 /**
  * Finds live Claude Code sessions through the optional `~/.claude/sessions/<pid>.json`
- * registry (PRD §6.4), so sessions started before c-board still show up, and ends them
+ * registry (PRD §6.4), so sessions started before Yardmaster still show up, and ends them
  * when their process is gone. Hooks stay the source of truth: the registry only fills
  * gaps and sets the status of sessions no hook has reported on. Also keeps a per-project
  * list of recent sessions from the SDK for the history browser.

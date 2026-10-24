@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import websocket from '@fastify/websocket';
 import {
   type ActivityEvent,
   type ApprovalDecision,
@@ -9,8 +10,7 @@ import {
   ProjectId,
   type ServerStatus,
   type SessionHistoryResponse,
-} from '@c-board/protocol';
-import websocket from '@fastify/websocket';
+} from '@yardmaster/protocol';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
 import { z } from 'zod';
@@ -194,7 +194,7 @@ export async function buildServer(
   let token = options.token ?? (await ensureToken(config.home));
   const currentToken = () => token;
   const logger: FastifyBaseLogger = pino({
-    name: 'c-board',
+    name: 'yardmaster',
     level: config.logLevel,
     // Omit the default hostname so logs carry nothing machine-specific.
     base: { pid: process.pid },

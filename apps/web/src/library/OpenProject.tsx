@@ -1,10 +1,10 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import {
   accentIndexForProject,
   type LibraryEntry,
   type LibraryResponse,
   type PermissionMode,
-} from '@c-board/protocol';
-import * as Dialog from '@radix-ui/react-dialog';
+} from '@yardmaster/protocol';
 import { Command } from 'cmdk';
 import {
   ArrowLeft,
@@ -69,7 +69,7 @@ import {
 const memory: KeyValueStorage = { getItem: () => null, setItem: () => {} };
 
 export const pickerOpen = createPreference<'open' | 'closed'>(
-  'cboard.picker',
+  'yardmaster.picker',
   ['open', 'closed'],
   'closed',
   memory,

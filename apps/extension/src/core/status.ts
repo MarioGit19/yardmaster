@@ -1,6 +1,6 @@
 import type { LinkStatus } from './editor-link.js';
 
-export const STATUS_TEXT = '$(pulse) c-board';
+export const STATUS_TEXT = '$(pulse) Yardmaster';
 
 function seconds(ms: number): string {
   const s = Math.max(1, Math.round(ms / 1000));
@@ -8,18 +8,20 @@ function seconds(ms: number): string {
 }
 
 /** Status bar tooltip for the link state; clicking the item opens the dashboard. */
-export function statusTooltip(status: LinkStatus, port: number): string {
+export function statusTooltip(status: LinkStatus | { kind: 'legacy' }, port: number): string {
   const action = 'Click to open the dashboard.';
   switch (status.kind) {
+    case 'legacy':
+      return 'Yardmaster: waiting. The old c-board extension is still connected; uninstall it and reload the window.';
     case 'stopped':
-      return `c-board: off (cboard.enabled is false). ${action}`;
+      return `Yardmaster: off (yardmaster.enabled is false). ${action}`;
     case 'connecting':
-      return `c-board: connecting to 127.0.0.1:${port}…`;
+      return `Yardmaster: connecting to 127.0.0.1:${port}…`;
     case 'connected':
-      return `c-board: connected to 127.0.0.1:${port}. ${action}`;
+      return `Yardmaster: connected to 127.0.0.1:${port}. ${action}`;
     case 'disconnected':
-      return `c-board: disconnected, ${status.reason}. Retrying in ${seconds(status.retryInMs)}. ${action}`;
+      return `Yardmaster: disconnected, ${status.reason}. Retrying in ${seconds(status.retryInMs)}. ${action}`;
     case 'replaced':
-      return 'c-board: disconnected, another connection for this window took over. Run "c-board: Reconnect" to retry.';
+      return 'Yardmaster: disconnected, another connection for this window took over. Run "Yardmaster: Reconnect" to retry.';
   }
 }

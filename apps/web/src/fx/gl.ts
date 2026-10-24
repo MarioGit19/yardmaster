@@ -26,7 +26,7 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
-  console.warn('[c-board] fx shader failed to compile', gl.getShaderInfoLog(shader));
+  console.warn('[yardmaster] fx shader failed to compile', gl.getShaderInfoLog(shader));
   gl.deleteShader(shader);
   return null;
 }
@@ -50,7 +50,7 @@ export function createQuadProgram(
   gl.deleteShader(vs);
   gl.deleteShader(fs);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.warn('[c-board] fx shader failed to link', gl.getProgramInfoLog(program));
+    console.warn('[yardmaster] fx shader failed to link', gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
     return null;
   }

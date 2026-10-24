@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 
 /**
  * The session the Claude column shows: the route's, or without one the project's most relevant

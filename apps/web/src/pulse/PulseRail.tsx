@@ -5,7 +5,7 @@ import {
   type Project,
   PULSE_WINDOW_MS,
   sessionDisplayName,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cubicBezier } from 'motion';
 import { AnimatePresence, motion } from 'motion/react';

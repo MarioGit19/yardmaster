@@ -1,4 +1,4 @@
-import type { PatchOp } from '@c-board/protocol';
+import type { PatchOp } from '@yardmaster/protocol';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type CommandRunner, ProcessScanner } from './process-scanner.js';
 import { BoardStore } from './store.js';

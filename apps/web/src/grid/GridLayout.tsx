@@ -23,7 +23,7 @@ import { GridTrunk } from './GridTrunk.js';
 import { TRUNK_BELOW } from './map.js';
 
 /** The history entry the cockpit pushes, so the back gesture leaves it like Esc. */
-const HISTORY_KEY = 'cboardGridNode';
+const HISTORY_KEY = 'yardmasterGridNode';
 
 const fade = { duration: dur.slow, ease: ease.inOut };
 

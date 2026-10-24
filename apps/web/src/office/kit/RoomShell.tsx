@@ -1,4 +1,4 @@
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { type CSSProperties, type ReactNode, useId, useRef } from 'react';
 import { ProjectAvatar } from '../../shell/ProjectAvatar.js';
 import { cx } from '../../ui/cx.js';

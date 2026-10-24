@@ -6,7 +6,7 @@ import {
   AwayStatusResponse,
   PermissionRequestOutput,
   type ServerToUi,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 async function boot(options: { demo?: boolean } = {}) {
-  home = await mkdtemp(join(tmpdir(), 'cboard-away-'));
+  home = await mkdtemp(join(tmpdir(), 'yardmaster-away-'));
   const config: ServerConfig = {
     port: 4317,
     host: '127.0.0.1',
@@ -59,7 +59,7 @@ function call(method: 'GET' | 'PUT' | 'POST', url: string, token: string | null,
     url,
     headers: {
       host,
-      ...(token ? { 'x-cboard-token': token } : {}),
+      ...(token ? { 'x-yardmaster-token': token } : {}),
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(body === undefined ? {} : { payload: JSON.stringify(body) }),

@@ -5,7 +5,7 @@ import {
   emptyBoardState,
   HISTORY_WINDOW_MS,
   type PatchOp,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { ingestEvents, ingestOutput, type Pulses } from './activity.js';
 

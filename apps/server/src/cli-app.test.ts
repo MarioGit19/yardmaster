@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,7 +16,7 @@ let home: string;
 const closers: (() => Promise<unknown>)[] = [];
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'c-board-cli-'));
+  home = await mkdtemp(join(tmpdir(), 'yardmaster-cli-'));
 });
 
 afterEach(async () => {
@@ -30,7 +30,7 @@ function testIo(env: NodeJS.ProcessEnv = {}, extra: Partial<CliIo> = {}) {
   const io: CliIo = {
     stdout: { write: (text: string) => (out += text) },
     stderr: { write: (text: string) => (err += text) },
-    env: { CBOARD_HOME: join(home, '.c-board'), CBOARD_LOG_LEVEL: 'silent', ...env },
+    env: { YARDMASTER_HOME: join(home, '.yardmaster'), YARDMASTER_LOG_LEVEL: 'silent', ...env },
     home,
     ...extra,
   };
@@ -55,17 +55,17 @@ describe('runCli', () => {
 
     const badFlag = testIo();
     expect(await runCli(['doctor', '--wat'], badFlag.io)).toBe(2);
-    expect(badFlag.err()).toContain('c-board doctor:');
+    expect(badFlag.err()).toContain('yardmaster doctor:');
   });
 
   it('reports config errors', async () => {
-    const t = testIo({ CBOARD_HOST: '0.0.0.0' });
+    const t = testIo({ YARDMASTER_HOST: '0.0.0.0' });
     expect(await runCli(['doctor'], t.io)).toBe(1);
     expect(t.err()).toContain('loopback');
   });
 });
 
-describe('c-board doctor', () => {
+describe('yardmaster doctor', () => {
   const fakeDeps = (overrides: Partial<DoctorDeps>) => (config: ServerConfig) => ({
     ...defaultDoctorDeps(home, {}),
     isPortFree: async () => true,
@@ -77,7 +77,7 @@ describe('c-board doctor', () => {
   it('prints the report and exits 0 with only warnings', async () => {
     const t = testIo({}, { doctorDeps: fakeDeps({}) });
     expect(await runCli(['doctor'], t.io)).toBe(0);
-    expect(t.out()).toContain('c-board doctor');
+    expect(t.out()).toContain('yardmaster doctor');
     expect(t.out()).toMatch(/Node\.js\s+v\d+/);
     expect(t.out()).not.toContain('\x1b[');
   });
@@ -101,15 +101,15 @@ describe('c-board doctor', () => {
   });
 });
 
-describe('c-board token', () => {
+describe('yardmaster token', () => {
   it('needs --rotate', async () => {
     const t = testIo();
     expect(await runCli(['token'], t.io)).toBe(2);
-    expect(t.err()).toContain('~/.c-board/token');
+    expect(t.err()).toContain('~/.yardmaster/token');
   });
 
   it('--rotate replaces the token with a new 0600 one', async () => {
-    const dir = join(home, '.c-board');
+    const dir = join(home, '.yardmaster');
     const before = await ensureToken(dir);
     const t = testIo();
     expect(await runCli(['token', '--rotate'], t.io)).toBe(0);
@@ -118,11 +118,57 @@ describe('c-board token', () => {
     expect(after).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect((await stat(join(dir, 'token'))).mode & 0o777).toBe(0o600);
     expect(t.out()).not.toContain(after);
-    expect(t.out()).toContain('Restart c-board');
+    expect(t.out()).toContain('Restart Yardmaster');
   });
 });
 
-describe('c-board start', () => {
+describe('the rename from c-board', () => {
+  it('prints a notice when run as c-board', async () => {
+    const t = testIo({}, { invokedAs: 'c-board' });
+    expect(await runCli(['--version'], t.io)).toBe(0);
+    expect(t.err()).toContain('`c-board` is now `yardmaster`');
+    const plain = testIo({}, { invokedAs: 'yardmaster' });
+    await runCli(['--version'], plain.io);
+    expect(plain.err()).toBe('');
+  });
+
+  it('moves ~/.c-board to ~/.yardmaster on start, keeping the token', async () => {
+    const legacy = join(home, '.c-board');
+    await mkdir(legacy);
+    const token = await ensureToken(legacy);
+    const calls: BuildOptions[] = [];
+    const t = testIo(
+      { YARDMASTER_HOME: '' },
+      {
+        startServer: async (_config, options) => {
+          calls.push(options);
+          return {
+            server: { address: () => ({ port: 4317, address: '127.0.0.1', family: 'IPv4' }) },
+            log: { info: () => {} },
+          } as unknown as FastifyInstance;
+        },
+        openBrowser: async () => false,
+      },
+    );
+    expect(await runCli(['start', '--no-open'], t.io)).toBeNull();
+    expect(calls[0]?.token).toBe(token);
+    expect(t.out()).toContain('Moved your data from ~/.c-board to ~/.yardmaster');
+    expect((await lstat(legacy)).isSymbolicLink()).toBe(true);
+    expect((await readFile(join(home, '.yardmaster', 'token'), 'utf8')).trim()).toBe(token);
+  });
+
+  it('leaves a data dir chosen through CBOARD_HOME where it is', async () => {
+    const chosen = join(home, 'board');
+    await mkdir(chosen);
+    const token = await ensureToken(chosen);
+    const t = testIo({ YARDMASTER_HOME: '', CBOARD_HOME: chosen });
+    expect(await runCli(['token'], t.io)).toBe(2);
+    expect(t.err()).toContain('~/board/token');
+    expect((await readFile(join(chosen, 'token'), 'utf8')).trim()).toBe(token);
+  });
+});
+
+describe('yardmaster start', () => {
   function fakeServer(port: number) {
     const calls: [ServerConfig, BuildOptions][] = [];
     const startServer = async (config: ServerConfig, options: BuildOptions) => {
@@ -142,7 +188,7 @@ describe('c-board start', () => {
     const t = testIo({}, { startServer, openBrowser, onStarted });
 
     expect(await runCli(['start'], t.io)).toBeNull();
-    const token = (await readFile(join(home, '.c-board', 'token'), 'utf8')).trim();
+    const token = (await readFile(join(home, '.yardmaster', 'token'), 'utf8')).trim();
     expect(calls[0]?.[1]).toMatchObject({ token, demo: false });
     expect(calls[0]?.[1].webRoot).toMatch(/web[/\\]dist$/);
     expect(openBrowser).toHaveBeenCalledWith(`http://127.0.0.1:4317/auth?t=${token}`);
@@ -154,7 +200,7 @@ describe('c-board start', () => {
   it('--demo --no-open prints the link instead', async () => {
     const { calls, startServer } = fakeServer(4318);
     const openBrowser = vi.fn(async () => true);
-    const t = testIo({ CBOARD_PORT: '0' }, { startServer, openBrowser });
+    const t = testIo({ YARDMASTER_PORT: '0' }, { startServer, openBrowser });
 
     expect(await runCli(['start', '--demo', '--no-open'], t.io)).toBeNull();
     expect(calls[0]?.[1].demo).toBe(true);
@@ -209,7 +255,7 @@ describe('c-board start', () => {
   it('really listens and serves health (real server, ephemeral port)', async () => {
     let app: FastifyInstance | undefined;
     const t = testIo(
-      { CBOARD_PORT: '0' },
+      { YARDMASTER_PORT: '0' },
       { openBrowser: async () => true, onStarted: (started) => (app = started) },
     );
     expect(await runCli(['start', '--no-open'], t.io)).toBeNull();
@@ -255,7 +301,7 @@ describe('browserCommand', () => {
   });
 });
 
-describe('c-board hooks', () => {
+describe('yardmaster hooks', () => {
   const settingsAt = () => join(home, 'cfg', 'settings.json');
   const env = () => ({ CLAUDE_CONFIG_DIR: join(home, 'cfg') });
 
@@ -263,7 +309,7 @@ describe('c-board hooks', () => {
     const run = testIo(env());
     expect(await runCli(['hooks', 'install', '--dry-run'], run.io)).toBe(0);
     expect(run.out()).toContain('+++ ');
-    expect(run.out()).toContain('c-board-hook');
+    expect(run.out()).toContain('yardmaster-hook');
     expect(run.out()).toContain('Dry run: nothing was written.');
     await expect(stat(settingsAt())).rejects.toThrow();
   });
@@ -282,7 +328,28 @@ describe('c-board hooks', () => {
     const accepted = testIo(env(), { confirm });
     expect(await runCli(['hooks', 'install'], accepted.io)).toBe(0);
     expect(confirm).toHaveBeenCalledOnce();
-    expect(accepted.out()).toContain('Installed the c-board hook for 13 events');
+    expect(accepted.out()).toContain('Installed the Yardmaster hook for 13 events');
+  });
+
+  it('install-hooks replaces the handlers installed under the old c-board name', async () => {
+    const old = {
+      hooks: {
+        Stop: [{ hooks: [{ type: 'command', command: '/opt/old/bin/c-board-hook', async: true }] }],
+      },
+    };
+    await mkdir(join(home, 'cfg'), { recursive: true });
+    await writeFile(settingsAt(), JSON.stringify(old));
+    const status = testIo(env());
+    expect(await runCli(['hooks', 'status'], status.io)).toBe(1);
+    expect(status.out()).toContain('outdated: Stop');
+
+    const run = testIo(env());
+    expect(await runCli(['install-hooks', '--yes'], run.io)).toBe(0);
+    expect(run.out()).toMatch(/Backup: .*settings\.json\.yardmaster-backup-/);
+    const after = await readFile(settingsAt(), 'utf8');
+    expect(after).not.toContain('c-board-hook');
+    expect(JSON.parse(after).hooks.Stop).toHaveLength(1);
+    expect(await runCli(['hooks', 'status'], testIo(env()).io)).toBe(0);
   });
 
   it('installs, reports status, and uninstalls through --settings-path', async () => {
@@ -322,7 +389,7 @@ describe('c-board hooks', () => {
     expect(await runCli(['hooks', 'install', '--away', ...args], away.io)).toBe(0);
     expect(away.out()).toContain('and the away-mode permission hook');
     const handler = JSON.parse(await readFile(path, 'utf8')).hooks.PermissionRequest[0].hooks[0];
-    expect(handler.command).toMatch(/c-board-hook --permission$/);
+    expect(handler.command).toMatch(/yardmaster-hook --permission$/);
     expect(handler.async).toBeUndefined();
     const status = testIo();
     expect(await runCli(['hooks', 'status', '--settings-path', path], status.io)).toBe(0);

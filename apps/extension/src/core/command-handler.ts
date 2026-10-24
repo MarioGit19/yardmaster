@@ -1,4 +1,4 @@
-import type { ServerToEditor } from '@c-board/protocol';
+import type { ServerToEditor } from '@yardmaster/protocol';
 
 /** How long a new terminal gets to activate shell integration before its command is typed in. */
 export const SHELL_INTEGRATION_WAIT_MS = 3_000;

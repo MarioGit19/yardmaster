@@ -31,7 +31,7 @@ import {
   type SessionStatus,
   startBackground,
   toolFamily,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import type { ActionHandlers, ActionResult } from '../actions.js';
@@ -98,7 +98,7 @@ const TEXT_MAX = 4_000;
 const REASON_MAX = 1_000;
 /** Resolved approvals stay in the store this long, so the UI can show the outcome. */
 export const RESOLVED_APPROVAL_TTL_MS = 60_000;
-const DENY_MESSAGE = 'The user denied this action from c-board.';
+const DENY_MESSAGE = 'The user denied this action from Yardmaster.';
 
 /** An async queue the SDK reads user messages from (streaming-input mode). */
 export class MessageQueue<T> implements AsyncIterable<T> {
@@ -1013,7 +1013,7 @@ function clipLine(text: string | undefined, max: number): string | null {
   return clipText(text?.replace(/\s+/g, ' '), max);
 }
 
-/** The SDK runs Claude Code with the local login; c-board never handles credentials. */
+/** The SDK runs Claude Code with the local login; Yardmaster never handles credentials. */
 async function loadSdkQuery(): Promise<QueryFn> {
   const { query } = await import('@anthropic-ai/claude-agent-sdk');
   return query;

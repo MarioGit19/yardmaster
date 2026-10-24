@@ -1,4 +1,4 @@
-# c-board — Product Requirements Document
+# Yardmaster — Product Requirements Document
 
 > A local "mission control" for everything you're running across your projects: every Cursor/VS Code terminal, every dev server, every Claude Code session, all in one live, animated dashboard.
 
@@ -21,7 +21,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 
 1. **One screen, all projects.** Every open project, its terminals, the commands running in them, and its Claude sessions, live.
 2. **Act from the board.** Approve or deny Claude permission requests, chat with Claude, send input or Ctrl+C to terminals, restart commands, start new Claude sessions.
-3. **Zero change to the existing workflow.** People keep using Cursor and its terminals exactly as before. c-board observes and mirrors, and only acts when asked.
+3. **Zero change to the existing workflow.** People keep using Cursor and its terminals exactly as before. Yardmaster observes and mirrors, and only acts when asked.
 4. **Premium, alive UI.** A dashboard that feels like a high-end product: fluid motion, ambient animation tied to real activity, polished micro-interactions, and still fast.
 5. **Private by design and installable by anyone.** Runs entirely on localhost. Each installer uses their **own** Claude Code login or subscription. No telemetry, no cloud, no shared credentials.
 
@@ -38,7 +38,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 
 | # | Scenario | Expected experience |
 |---|---|---|
-| S1 | Morning: opens c-board | Sees every project currently open in Cursor, with what's running and the state of each Claude session. |
+| S1 | Morning: opens Yardmaster | Sees every project currently open in Cursor, with what's running and the state of each Claude session. |
 | S2 | Claude in project B needs approval to run `pnpm test` | The pod for project B pulses amber, the Attention Center shows the request with the exact command, and the user approves from the board. |
 | S3 | Storefront dev server crashes | The terminal lane turns red with the exit code and the last error lines. One click opens the full log, and one click re-runs the command. |
 | S4 | Wants to give Claude a new task in project C without switching windows | Opens project C, starts a headless Claude session (or replies into the existing one), and watches it stream: tool calls, diffs, todos. |
@@ -113,9 +113,9 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 ## 5. Architecture
 
 ```
- Cursor window A ─ c-board extension ─┐
- Cursor window B ─ c-board extension ─┼── WS /ws/editor ──▶┌──────────────────────────────┐
- VS Code window …                     ┘                    │  c-board server (Node, TS)    │◀── WS /ws/ui ──▶ Browser UI
+ Cursor window A ─ Yardmaster extension ─┐
+ Cursor window B ─ Yardmaster extension ─┼── WS /ws/editor ──▶┌──────────────────────────────┐
+ VS Code window …                     ┘                    │  Yardmaster server (Node, TS)    │◀── WS /ws/ui ──▶ Browser UI
                                                            │  127.0.0.1:4317               │                 (React, Vite)
  Every Claude Code session (any terminal, -p, SDK)         │                               │
    └─ hooks (command, async) ─ POST /api/hooks/claude ───▶│  • state store + patches      │
@@ -132,7 +132,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 | Path | Purpose |
 |---|---|
 | `packages/protocol` | Shared TypeScript types plus zod schemas: domain model, WS messages, hook payloads. Single source of truth. |
-| `apps/server` | Fastify HTTP + WebSocket server, state store, ingest, scanners, SDK session runner, CLI (`c-board`). |
+| `apps/server` | Fastify HTTP + WebSocket server, state store, ingest, scanners, SDK session runner, CLI (`yardmaster`). |
 | `apps/web` | React SPA (Vite), the dashboard. Built assets are served by the server in production. |
 | `apps/extension` | VS Code-compatible extension (works in Cursor). Streams terminals and executes remote commands. |
 | `packages/hook` | Hook script plus the settings installer and uninstaller. |
@@ -159,9 +159,9 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 ### 5.3 Ports, files, data
 
-- Default port `4317` (`CBOARD_PORT`). Bind `127.0.0.1` only.
-- Data dir: `~/.c-board/` (`CBOARD_HOME`): `token` (0600, random 32 bytes, base64url), `board.db` (sqlite), `logs/`, `settings.json`.
-- The extension and the hook script locate the server and token through `~/.c-board/`.
+- Default port `4317` (`YARDMASTER_PORT`). Bind `127.0.0.1` only.
+- Data dir: `~/.yardmaster/` (`YARDMASTER_HOME`): `token` (0600, random 32 bytes, base64url), `board.db` (sqlite), `logs/`, `settings.json`.
+- The extension and the hook script locate the server and token through `~/.yardmaster/`.
 
 ## 6. Integrations — verified facts and how we use them
 
@@ -174,17 +174,17 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - `"async": true` command hooks run in the background without blocking Claude. All observer hooks use this.
 - Handler types include `http`, but we use `command` so that we can (a) attach `$PPID` for terminal linking, (b) read the token from a file rather than embedding it in settings, and (c) fail silently.
 
-**Observer hook contract** (`packages/hook/bin/c-board-hook`):
+**Observer hook contract** (`packages/hook/bin/yardmaster-hook`):
 - POSIX `sh` plus `curl`, no Node startup cost.
-- Reads stdin, then POSTs to `http://127.0.0.1:${CBOARD_PORT:-4317}/api/hooks/claude` with headers `X-CBoard-Token` (from `~/.c-board/token`) and `X-CBoard-Claude-Pid: $PPID`. The timeout is `-m 1`.
+- Reads stdin, then POSTs to `http://127.0.0.1:${YARDMASTER_PORT:-4317}/api/hooks/claude` with headers `X-Yardmaster-Token` (from `~/.yardmaster/token`) and `X-Yardmaster-Claude-Pid: $PPID`. The timeout is `-m 1`.
 - If the token file is missing, the server is down, or anything else fails, it exits 0 silently.
 - It must never print to stdout. Output could be interpreted as a hook decision.
 
-**Away-mode permission hook** (`c-board-hook --permission`, sync, not async):
+**Away-mode permission hook** (`yardmaster-hook --permission`, sync, not async):
 - Exits 0 immediately with no output unless the board reports away mode is ON (fast GET, 300 ms timeout).
 - When away mode is on: POST the request, long-poll for a decision (≤ configurable, default 120 s), then print the `PermissionRequest` decision JSON. The exact output schema **must be re-verified against the hooks reference at implementation time**. On timeout or error it exits 0 with no output, and the normal terminal prompt appears.
 
-**Installer** (`c-board hooks install|uninstall|status`): merges idempotently into `~/.claude/settings.json`, identifies its own entries by the `c-board-hook` command path, writes a timestamped backup first, supports `--dry-run` (prints a diff), and never touches other hooks. It always asks for confirmation unless `--yes` is passed.
+**Installer** (`yardmaster hooks install|uninstall|status`): merges idempotently into `~/.claude/settings.json`, identifies its own entries by the `yardmaster-hook` command path, writes a timestamped backup first, supports `--dry-run` (prints a diff), and never touches other hooks. It always asks for confirmation unless `--yes` is passed.
 
 ### 6.2 Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, verified against 0.3.308 typings)
 
@@ -193,7 +193,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - `CanUseTool(toolName, input, { signal, suggestions, blockedPath, … })` returns `{ behavior: 'allow', updatedInput?, updatedPermissions? } | { behavior: 'deny', message, interrupt? }`.
 - `SDKMessage` includes a `system/session_state_changed` message with `state: 'idle' | 'running' | 'requires_action'`, which drives board-session status directly.
 - History helpers: `listSessions({ dir, limit, offset })`, `getSessionInfo`, `getSessionMessages(sessionId, { dir })`, `getSubagentMessages`, `forkSession`, `renameSession`, `tagSession`.
-- **Auth:** the SDK uses the local Claude Code login of whoever runs c-board. c-board never reads, stores or transmits credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead. `doctor` warns about this.
+- **Auth:** the SDK uses the local Claude Code login of whoever runs Yardmaster. Yardmaster never reads, stores or transmits credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead. `doctor` warns about this.
 - Multi-turn: use streaming input mode, where the prompt is an async queue we push user messages into.
 
 ### 6.3 Transcripts (`~/.claude/projects/<encoded-cwd>/<session_id>.jsonl`)
@@ -203,7 +203,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 ### 6.4 Live-session registry (optional enrichment, undocumented)
 
-- Current Claude Code versions write `~/.claude/sessions/<pid>.json` with `pid`, `sessionId`, `cwd`, `status`, `kind`, `entrypoint` and `name`. Use it **only as an optional, feature-detected hint** to discover live sessions that started before c-board did, with a try/catch around every read. Never depend on it. Never read other files in `~/.claude` beyond transcripts and this registry. Never read credentials.
+- Current Claude Code versions write `~/.claude/sessions/<pid>.json` with `pid`, `sessionId`, `cwd`, `status`, `kind`, `entrypoint` and `name`. Use it **only as an optional, feature-detected hint** to discover live sessions that started before Yardmaster did, with a try/catch around every read. Never depend on it. Never read other files in `~/.claude` beyond transcripts and this registry. Never read credentials.
 
 ### 6.5 VS Code / Cursor extension API (verified in `@types/vscode` 1.105)
 
@@ -237,11 +237,11 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 
 1. **Network:** listen on `127.0.0.1` only. Reject requests whose `Host` is not `127.0.0.1:<port>` or `localhost:<port>` (DNS-rebinding defence).
 2. **WebSocket origin check:** `/ws/ui` accepts only `Origin` equal to the board's own origin (plus the Vite dev origin in dev). `/ws/editor` requires the token header.
-3. **Auth:** a per-install random token in `~/.c-board/token` (0600). The browser gets a session cookie (`HttpOnly`, `SameSite=Strict`) by visiting a one-time link `http://127.0.0.1:4317/auth?t=<token>` that the CLI opens. Every state-changing HTTP route requires the cookie or the token header.
-4. **No credentials:** c-board never reads `~/.claude/.credentials*`, the Keychain or `~/.claude.json`, and it never asks for an API key. Each user runs with their own Claude Code login.
+3. **Auth:** a per-install random token in `~/.yardmaster/token` (0600). The browser gets a session cookie (`HttpOnly`, `SameSite=Strict`) by visiting a one-time link `http://127.0.0.1:4317/auth?t=<token>` that the CLI opens. Every state-changing HTTP route requires the cookie or the token header.
+4. **No credentials:** Yardmaster never reads `~/.claude/.credentials*`, the Keychain or `~/.claude.json`, and it never asks for an API key. Each user runs with their own Claude Code login.
 5. **No telemetry,** no external network calls at runtime. Fonts and assets are bundled.
 6. **Rendering safety:** markdown is rendered without raw HTML. Terminal output goes only to xterm (never `innerHTML`).
-7. **Secrets in output:** terminal and transcript data stays in memory and local sqlite under `~/.c-board`. A "redact" setting masks common secret patterns in the UI (`sk-ant-…`, `ghp_…`, `AKIA…`, `-----BEGIN … KEY-----`, `.env`-style `KEY=value` for names containing SECRET|TOKEN|KEY|PASSWORD).
+7. **Secrets in output:** terminal and transcript data stays in memory and local sqlite under `~/.yardmaster`. A "redact" setting masks common secret patterns in the UI (`sk-ant-…`, `ghp_…`, `AKIA…`, `-----BEGIN … KEY-----`, `.env`-style `KEY=value` for names containing SECRET|TOKEN|KEY|PASSWORD).
 8. **Shell safety:** the server never builds shell strings from user input. Use `execFile` with argument arrays. The hook installer writes JSON with a JSON serializer.
 9. **Repository hygiene (public repo):** nothing machine-specific or personal is ever committed. That covers real home paths, usernames, emails other than GitHub noreply, real project names, real transcripts and tokens. Fixtures are synthetic (`/home/dev/acme-shop`). `scripts/privacy-check.sh` runs in pre-commit, in the build loop, and in CI.
 10. **Project library:** the server lists only the top-level directory names of the configured roots and checks `.git` existence. It reads nothing else under a root until a project is opened, and every path from the UI is `realpath`-checked to be inside a root (no `..`, no symlink escape). Editor launches go through `execFile` with the folder as a single argument.
@@ -286,5 +286,5 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 
 ## 13. Open questions
 
-- Should we publish to npm (`npx c-board`) and the VS Code Marketplace / Open VSX, or keep it source-install only for v1? (Default: source install plus a `.vsix` from CI artifacts.)
+- Should we publish to npm (`npx yardmaster`) and the VS Code Marketplace / Open VSX, or keep it source-install only for v1? (Default: source install plus a `.vsix` from CI artifacts.)
 - License choice (MIT suggested), to be decided by the maintainer before the first public release.

@@ -1,4 +1,4 @@
-import { type ActivityEvent, startBackground } from '@c-board/protocol';
+import { type ActivityEvent, startBackground } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { buildTree, type ProcessInfo } from '../processes.js';
 import { BoardStore } from '../store.js';

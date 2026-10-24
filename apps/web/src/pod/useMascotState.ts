@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 import { useEffect, useRef } from 'react';
 import { type CrewTerminal, DONE_MS, type MascotState, mascotStateFor } from '../crew/model.js';
 

@@ -256,11 +256,11 @@ describe('bindPorts', () => {
   });
 
   it("attaches a port to the board terminal whose shell's descendant listens", () => {
-    // The c-board server (100) runs the board terminal's shell; `pnpm dev` starts vite under it.
+    // The Yardmaster server (100) runs the board terminal's shell; `pnpm dev` starts vite under it.
     const tree = buildTree(
       parsePs(
         [
-          '  100     1  0.5  90000 node c-board',
+          '  100     1  0.5  90000 node Yardmaster',
           ' 4242   100  0.0   3000 -zsh',
           ' 4300  4242  0.1  50000 node pnpm dev',
           ' 4301  4300  2.0 120000 node vite',

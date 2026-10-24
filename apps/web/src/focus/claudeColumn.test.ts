@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { claudeColumnSession } from './claudeColumn.js';
 

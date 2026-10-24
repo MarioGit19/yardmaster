@@ -12,7 +12,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const HOOK = fileURLToPath(new URL('../bin/c-board-hook', import.meta.url));
+const HOOK = fileURLToPath(new URL('../bin/yardmaster-hook', import.meta.url));
+const LEGACY_HOOK = fileURLToPath(new URL('../bin/c-board-hook', import.meta.url));
 // Synthetic, shaped like a real token (43 base64url chars).
 const TOKEN = `synthetic_${'x'.repeat(33)}`;
 const PAYLOAD = JSON.stringify({
@@ -34,10 +35,11 @@ function runHook(
   env: Record<string, string>,
   stdin = PAYLOAD,
   args: string[] = [],
+  script = HOOK,
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const started = performance.now();
-    const child = spawn(HOOK, args, {
+    const child = spawn(script, args, {
       env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -87,26 +89,29 @@ async function freePort(): Promise<number> {
 }
 
 let home: string;
-let cboardHome: string;
+let yardmasterHome: string;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), 'c-board-hook-'));
-  cboardHome = join(home, 'board');
-  mkdirSync(cboardHome);
-  writeFileSync(join(cboardHome, 'token'), `${TOKEN}\n`, { mode: 0o600 });
+  home = mkdtempSync(join(tmpdir(), 'yardmaster-hook-'));
+  yardmasterHome = join(home, 'board');
+  mkdirSync(yardmasterHome);
+  writeFileSync(join(yardmasterHome, 'token'), `${TOKEN}\n`, { mode: 0o600 });
 });
 
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-describe('c-board-hook', () => {
+describe('yardmaster-hook', () => {
   it('posts the stdin payload with the token and Claude pid headers', async () => {
     const received: Received[] = [];
     const server = await startServer(received);
     const { port } = server.address() as AddressInfo;
     try {
-      const result = await runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) });
+      const result = await runHook({
+        YARDMASTER_HOME: yardmasterHome,
+        YARDMASTER_PORT: String(port),
+      });
       expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
       expect(received).toHaveLength(1);
       const [req] = received;
@@ -114,28 +119,81 @@ describe('c-board-hook', () => {
       expect(req?.url).toBe('/api/hooks/claude');
       expect(req?.body).toBe(PAYLOAD);
       expect(req?.headers['content-type']).toBe('application/json');
-      expect(req?.headers['x-cboard-token']).toBe(TOKEN);
+      expect(req?.headers['x-yardmaster-token']).toBe(TOKEN);
       // spawn() runs the script directly, so its parent is this test process.
-      expect(req?.headers['x-cboard-claude-pid']).toBe(String(process.pid));
+      expect(req?.headers['x-yardmaster-claude-pid']).toBe(String(process.pid));
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
   });
 
-  it('defaults CBOARD_HOME to ~/.c-board and accepts a token without a newline', async () => {
-    const defaultHome = join(home, '.c-board');
+  it('defaults YARDMASTER_HOME to ~/.yardmaster and accepts a token without a newline', async () => {
+    const defaultHome = join(home, '.yardmaster');
     mkdirSync(defaultHome);
     writeFileSync(join(defaultHome, 'token'), TOKEN);
     const received: Received[] = [];
     const server = await startServer(received);
     const { port } = server.address() as AddressInfo;
     try {
-      const result = await runHook({ CBOARD_PORT: String(port) });
+      const result = await runHook({ YARDMASTER_PORT: String(port) });
       expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
-      expect(received[0]?.headers['x-cboard-token']).toBe(TOKEN);
+      expect(received[0]?.headers['x-yardmaster-token']).toBe(TOKEN);
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  describe('from before the rename to Yardmaster', () => {
+    async function received(env: Record<string, string>, script = HOOK) {
+      const requests: Received[] = [];
+      const server = await startServer(requests);
+      const { port } = server.address() as AddressInfo;
+      try {
+        const result = await runHook(
+          Object.fromEntries(
+            Object.entries(env).map(([key, value]) => [key, value.replace('$PORT', String(port))]),
+          ),
+          PAYLOAD,
+          [],
+          script,
+        );
+        expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
+        return requests;
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+    }
+
+    it('reads CBOARD_HOME and CBOARD_PORT when the new names are unset', async () => {
+      const requests = await received({ CBOARD_HOME: yardmasterHome, CBOARD_PORT: '$PORT' });
+      expect(requests[0]?.headers['x-yardmaster-token']).toBe(TOKEN);
+    });
+
+    it('prefers YARDMASTER_HOME over CBOARD_HOME', async () => {
+      const requests = await received({
+        YARDMASTER_HOME: yardmasterHome,
+        CBOARD_HOME: join(home, 'nowhere'),
+        YARDMASTER_PORT: '$PORT',
+      });
+      expect(requests).toHaveLength(1);
+    });
+
+    it('finds the token in ~/.c-board until the server has moved it', async () => {
+      const legacyHome = join(home, '.c-board');
+      mkdirSync(legacyHome);
+      writeFileSync(join(legacyHome, 'token'), TOKEN);
+      const requests = await received({ YARDMASTER_PORT: '$PORT' });
+      expect(requests[0]?.headers['x-yardmaster-token']).toBe(TOKEN);
+    });
+
+    it('runs from its old path, so handlers installed as c-board-hook keep working', async () => {
+      const requests = await received(
+        { YARDMASTER_HOME: yardmasterHome, YARDMASTER_PORT: '$PORT' },
+        LEGACY_HOOK,
+      );
+      expect(requests[0]?.body).toBe(PAYLOAD);
+      expect(requests[0]?.headers['x-yardmaster-token']).toBe(TOKEN);
+    });
   });
 
   it('keeps the token out of the curl command line', () => {
@@ -146,7 +204,10 @@ describe('c-board-hook', () => {
 
   it('exits 0 silently within about a second when the server is down', async () => {
     const port = await freePort();
-    const result = await runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) });
+    const result = await runHook({
+      YARDMASTER_HOME: yardmasterHome,
+      YARDMASTER_PORT: String(port),
+    });
     expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
     // Generous bound: process startup alone can take ~1 s on a loaded machine or CI runner.
     expect(result.ms).toBeLessThan(3000);
@@ -157,7 +218,10 @@ describe('c-board-hook', () => {
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const { port } = server.address() as AddressInfo;
     try {
-      const result = await runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) });
+      const result = await runHook({
+        YARDMASTER_HOME: yardmasterHome,
+        YARDMASTER_PORT: String(port),
+      });
       expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
       expect(result.ms).toBeLessThan(3000);
     } finally {
@@ -167,12 +231,15 @@ describe('c-board-hook', () => {
   });
 
   it('exits 0 without a request when the token file is missing', async () => {
-    rmSync(join(cboardHome, 'token'));
+    rmSync(join(yardmasterHome, 'token'));
     const received: Received[] = [];
     const server = await startServer(received);
     const { port } = server.address() as AddressInfo;
     try {
-      const result = await runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) });
+      const result = await runHook({
+        YARDMASTER_HOME: yardmasterHome,
+        YARDMASTER_PORT: String(port),
+      });
       expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
       expect(received).toHaveLength(0);
     } finally {
@@ -184,14 +251,14 @@ describe('c-board-hook', () => {
     ['a malformed token', { token: 'bad token\r\nX-Injected: 1' }],
     ['a non-numeric port', { port: '4317; echo pwned' }],
   ])('exits 0 without a request on %s', async (_label, opts: { token?: string; port?: string }) => {
-    if (opts.token) writeFileSync(join(cboardHome, 'token'), opts.token);
+    if (opts.token) writeFileSync(join(yardmasterHome, 'token'), opts.token);
     const received: Received[] = [];
     const server = await startServer(received);
     const { port } = server.address() as AddressInfo;
     try {
       const result = await runHook({
-        CBOARD_HOME: cboardHome,
-        CBOARD_PORT: opts.port ?? String(port),
+        YARDMASTER_HOME: yardmasterHome,
+        YARDMASTER_PORT: opts.port ?? String(port),
       });
       expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
       expect(received).toHaveLength(0);
@@ -268,11 +335,11 @@ async function withBoard(
 }
 
 const runPermission = (port: number) =>
-  runHook({ CBOARD_HOME: cboardHome, CBOARD_PORT: String(port) }, PERMISSION_PAYLOAD, [
+  runHook({ YARDMASTER_HOME: yardmasterHome, YARDMASTER_PORT: String(port) }, PERMISSION_PAYLOAD, [
     '--permission',
   ]);
 
-describe('c-board-hook --permission', () => {
+describe('yardmaster-hook --permission', () => {
   it('exits at once without output or a POST when away mode is off', async () => {
     await withBoard(
       { away: '{"away":false,"timeoutSec":120}', decide: (res) => res.end(DECISION) },
@@ -280,7 +347,7 @@ describe('c-board-hook --permission', () => {
         const result = await runPermission(port);
         expect(result).toMatchObject({ code: 0, stdout: '', stderr: '' });
         expect(received.map((r) => r.url)).toEqual(['/api/away']);
-        expect(received[0]?.headers['x-cboard-token']).toBe(TOKEN);
+        expect(received[0]?.headers['x-yardmaster-token']).toBe(TOKEN);
         expect(result.ms).toBeLessThan(3000);
       },
     );
@@ -309,8 +376,8 @@ describe('c-board-hook --permission', () => {
         const post = received[1];
         expect(post?.method).toBe('POST');
         expect(post?.body).toBe(PERMISSION_PAYLOAD);
-        expect(post?.headers['x-cboard-token']).toBe(TOKEN);
-        expect(post?.headers['x-cboard-claude-pid']).toBe(String(process.pid));
+        expect(post?.headers['x-yardmaster-token']).toBe(TOKEN);
+        expect(post?.headers['x-yardmaster-claude-pid']).toBe(String(process.pid));
       },
     );
   });

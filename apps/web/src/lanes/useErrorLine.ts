@@ -1,4 +1,4 @@
-import type { StreamId } from '@c-board/protocol';
+import type { StreamId } from '@yardmaster/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { useStream } from '../data/index.js';
 import { redact } from '../redact/redact.js';

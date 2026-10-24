@@ -16,7 +16,7 @@ const HOME = '/home/dev';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -26,10 +26,12 @@ const NOW = 1_800_000_000_000;
 const hookSettings = JSON.stringify({
   model: 'opus',
   hooks: {
-    SessionStart: [{ hooks: [{ type: 'command', command: '/opt/c-board/bin/c-board-hook' }] }],
+    SessionStart: [
+      { hooks: [{ type: 'command', command: '/opt/yardmaster/bin/yardmaster-hook' }] },
+    ],
     Stop: [
       { hooks: [{ type: 'command', command: 'say done' }] },
-      { hooks: [{ type: 'command', command: '/opt/c-board/bin/c-board-hook', async: true }] },
+      { hooks: [{ type: 'command', command: '/opt/yardmaster/bin/yardmaster-hook', async: true }] },
     ],
     Notification: [{ hooks: [{ type: 'command', command: 'notify-send hi' }] }],
   },
@@ -48,7 +50,7 @@ interface FakeWorld {
 
 function fakeDeps(world: FakeWorld = {}): DoctorDeps & { requests: [string, unknown][] } {
   const files = world.files ?? {
-    '/home/dev/.c-board/token': { text: `${TOKEN}\n`, mode: 0o100600 },
+    '/home/dev/.yardmaster/token': { text: `${TOKEN}\n`, mode: 0o100600 },
   };
   const requests: [string, unknown][] = [];
   return {
@@ -143,7 +145,7 @@ describe('runDoctor', () => {
       );
       expect(byId(checks, 'server')).toMatchObject({
         level: 'ok',
-        message: 'c-board 1.2.3 is running on 127.0.0.1:4317',
+        message: 'Yardmaster 1.2.3 is running on 127.0.0.1:4317',
       });
     });
 
@@ -184,7 +186,7 @@ describe('runDoctor', () => {
         NOW,
       );
       expect(byId(checks, 'server')).toMatchObject({ level: 'fail' });
-      expect(byId(checks, 'server').hint).toContain('CBOARD_PORT');
+      expect(byId(checks, 'server').hint).toContain('YARDMASTER_PORT');
     });
 
     it('fails when the port is taken and nothing answers HTTP', async () => {
@@ -198,7 +200,7 @@ describe('runDoctor', () => {
       const checks = await runDoctor(config, fakeDeps(), NOW);
       expect(byId(checks, 'token')).toMatchObject({
         level: 'ok',
-        message: '~/.c-board/token (0600)',
+        message: '~/.yardmaster/token (0600)',
       });
     });
 
@@ -209,14 +211,14 @@ describe('runDoctor', () => {
     });
 
     it('warns about an invalid token', async () => {
-      const files = { '/home/dev/.c-board/token': { text: 'not-a-token' } };
+      const files = { '/home/dev/.yardmaster/token': { text: 'not-a-token' } };
       const checks = await runDoctor(config, fakeDeps({ files }), NOW);
       expect(byId(checks, 'token')).toMatchObject({ level: 'warn' });
       expect(byId(checks, 'token').hint).toContain('--rotate');
     });
 
     it('warns about loose permissions', async () => {
-      const files = { '/home/dev/.c-board/token': { text: TOKEN, mode: 0o100644 } };
+      const files = { '/home/dev/.yardmaster/token': { text: TOKEN, mode: 0o100644 } };
       const checks = await runDoctor(config, fakeDeps({ files }), NOW);
       expect(byId(checks, 'token')).toMatchObject({ level: 'warn' });
       expect(byId(checks, 'token').message).toContain('644');
@@ -224,15 +226,15 @@ describe('runDoctor', () => {
   });
 
   describe('hooks', () => {
-    const tokenFile = { '/home/dev/.c-board/token': { text: TOKEN } };
+    const tokenFile = { '/home/dev/.yardmaster/token': { text: TOKEN } };
 
     it('warns when Claude settings are missing', async () => {
       const checks = await runDoctor(config, fakeDeps({ files: tokenFile }), NOW);
       expect(byId(checks, 'hooks')).toMatchObject({ level: 'warn' });
-      expect(byId(checks, 'hooks').hint).toContain('c-board hooks install');
+      expect(byId(checks, 'hooks').hint).toContain('yardmaster hooks install');
     });
 
-    it('warns when no c-board hook is registered', async () => {
+    it('warns when no Yardmaster hook is registered', async () => {
       const files = {
         ...tokenFile,
         '/home/dev/.claude/settings.json': { text: JSON.stringify({ hooks: {} }) },
@@ -294,7 +296,7 @@ describe('runDoctor', () => {
       });
       expect(deps.requests).toContainEqual([
         'http://127.0.0.1:4317/api/status',
-        { 'x-cboard-token': TOKEN },
+        { 'x-yardmaster-token': TOKEN },
       ]);
     });
 
@@ -439,7 +441,7 @@ describe('runDoctor', () => {
 });
 
 describe('helpers', () => {
-  it('finds c-board hook events and ignores malformed entries', () => {
+  it('finds Yardmaster hook events and ignores malformed entries', () => {
     expect(installedHookEvents(JSON.parse(hookSettings))).toEqual(['SessionStart', 'Stop']);
     expect(installedHookEvents(null)).toEqual([]);
     expect(installedHookEvents({ hooks: { Stop: 'x', Start: [null, { hooks: 3 }] } })).toEqual([]);
@@ -453,7 +455,7 @@ describe('helpers', () => {
   });
 
   it('tildifies only paths under home', () => {
-    expect(tildify('/home/dev/.c-board', HOME)).toBe('~/.c-board');
+    expect(tildify('/home/dev/.yardmaster', HOME)).toBe('~/.yardmaster');
     expect(tildify('/home/devops/x', HOME)).toBe('/home/devops/x');
   });
 });
@@ -469,7 +471,7 @@ describe('formatDoctorReport', () => {
   it('prints aligned rows, hints and a summary', () => {
     expect(formatDoctorReport(checks, { version: '1.0.0', color: false })).toBe(
       [
-        'c-board doctor v1.0.0',
+        'yardmaster doctor v1.0.0',
         '',
         '  ✓ Node.js           v22.12.0',
         '  ! Claude hooks      not installed',

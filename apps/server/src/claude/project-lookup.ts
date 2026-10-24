@@ -5,7 +5,7 @@ import {
   type Project,
   type ProjectSource,
   projectIdFromPath,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { BoardStore } from '../store.js';
 
 export type PathResolver = (path: string) => Promise<string>;

@@ -1,4 +1,4 @@
-import { parseToolCall, type TodoStatus, type ToolCall, toolFamily } from '@c-board/protocol';
+import { parseToolCall, type TodoStatus, type ToolCall, toolFamily } from '@yardmaster/protocol';
 import {
   Check,
   ChevronRight,

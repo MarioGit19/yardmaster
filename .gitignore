@@ -11,7 +11,7 @@ test-results/
 playwright-report/
 
 # local runtime data / secrets
-.c-board/
+.yardmaster/
 .env
 .env.*
 !.env.example

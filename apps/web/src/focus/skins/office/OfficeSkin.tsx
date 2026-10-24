@@ -1,5 +1,5 @@
 import './office-skin.css';
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { ArrowLeft, GitBranch } from 'lucide-react';
 import { animate } from 'motion/react';
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from 'react';

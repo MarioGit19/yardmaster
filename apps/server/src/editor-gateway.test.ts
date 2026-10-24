@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { EDITOR_CLOSE_REPLACED, projectIdFromPath } from '@c-board/protocol';
+import { EDITOR_CLOSE_REPLACED, projectIdFromPath } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -13,7 +13,7 @@ import { generateToken } from './token.js';
 const config: ServerConfig = {
   port: 0,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { claudeSettingsPath } from '@c-board/hook';
+import { claudeSettingsPath } from '@yardmaster/hook';
 import {
   applyTaskNotifications,
   type ChatMessage,
@@ -11,7 +11,7 @@ import {
   type TaskNotification,
   type TokenUsage,
   transcriptStreamId,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { watch } from 'chokidar';
 import type { FastifyBaseLogger } from 'fastify';
 import { type ReadResult, RingBuffer } from '../ring-buffer.js';

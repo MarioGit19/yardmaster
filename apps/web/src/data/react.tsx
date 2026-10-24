@@ -1,4 +1,4 @@
-import type { StreamId } from '@c-board/protocol';
+import type { StreamId } from '@yardmaster/protocol';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';

@@ -4,7 +4,7 @@ import {
   isAutomaticSessionName,
   type Terminal,
   toolFamily,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { BoardStoreState } from '../data/index.js';
 import { projectTone, type Tone } from '../status.js';
 

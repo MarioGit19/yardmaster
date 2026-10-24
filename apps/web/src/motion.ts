@@ -97,7 +97,7 @@ export const nextMotion = (setting: MotionSetting): MotionSetting =>
   MOTION_SETTINGS[(MOTION_SETTINGS.indexOf(setting) + 1) % MOTION_SETTINGS.length] ?? 'system';
 
 export const motionPreference = createPreference<MotionSetting>(
-  'cboard.motion',
+  'yardmaster.motion',
   MOTION_SETTINGS,
   'system',
 );

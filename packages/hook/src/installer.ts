@@ -21,14 +21,16 @@ export const OBSERVER_EVENTS = [
 ] as const;
 
 /** Our handlers are recognised by this name in their command. */
-export const HOOK_MARKER = 'c-board-hook';
+export const HOOK_MARKER = 'yardmaster-hook';
+/** The hook's name before the rename to Yardmaster: an install replaces those handlers. */
+export const LEGACY_HOOK_MARKER = 'c-board-hook';
 export const HOOK_TIMEOUT_S = 5;
 /** Away mode's `PermissionRequest` handler. */
 export const AWAY_EVENT = 'PermissionRequest';
 export const AWAY_FLAG = '--permission';
 /** Above the longest wait the board allows (300 s) plus the script's slack. */
 export const AWAY_HOOK_TIMEOUT_S = 330;
-export const DEFAULT_HOOK_PATH = fileURLToPath(new URL('../bin/c-board-hook', import.meta.url));
+export const DEFAULT_HOOK_PATH = fileURLToPath(new URL('../bin/yardmaster-hook', import.meta.url));
 
 export class InvalidSettingsError extends Error {}
 
@@ -54,12 +56,15 @@ const Settings = z.looseObject({
 type Json = Record<string, unknown>;
 type HookMap = Record<string, unknown[]>;
 
+/** True for a handler command that runs our hook script, under its new name or its old one. */
+export function isHookCommand(command: string): boolean {
+  return command.includes(HOOK_MARKER) || command.includes(LEGACY_HOOK_MARKER);
+}
+
 function isOurs(handler: unknown): boolean {
   const parsed = Handler.safeParse(handler);
   return (
-    parsed.success &&
-    typeof parsed.data.command === 'string' &&
-    parsed.data.command.includes(HOOK_MARKER)
+    parsed.success && typeof parsed.data.command === 'string' && isHookCommand(parsed.data.command)
   );
 }
 
@@ -166,7 +171,7 @@ export function planInstall(
   return plan(raw, changed ? { ...settings, hooks } : settings, changed);
 }
 
-/** Removes every c-board handler, including an away-mode `PermissionRequest` one. */
+/** Removes every Yardmaster handler, including an away-mode `PermissionRequest` one. */
 export function planUninstall(raw: string | undefined): Plan {
   const settings = parseSettings(raw);
   const current = settings.hooks as HookMap | undefined;
@@ -246,17 +251,19 @@ export async function applyPlan(
   if (!planned.changed) return undefined;
   const current = await readSettings(path);
   if (current !== planned.before) {
-    throw new InvalidSettingsError('changed while c-board was editing it; run the command again');
+    throw new InvalidSettingsError(
+      'changed while Yardmaster was editing it; run the command again',
+    );
   }
   let backup: string | undefined;
   let mode = 0o600;
   if (current === undefined) await mkdir(dirname(path), { recursive: true });
   else {
     mode = (await stat(path)).mode & 0o777;
-    backup = `${path}.c-board-backup-${stamp(now)}`;
+    backup = `${path}.yardmaster-backup-${stamp(now)}`;
     await copyFile(path, backup);
   }
-  const tmp = `${path}.c-board-tmp-${process.pid}`;
+  const tmp = `${path}.yardmaster-tmp-${process.pid}`;
   await writeFile(tmp, planned.after, { mode });
   await chmod(tmp, mode);
   await rename(tmp, path);

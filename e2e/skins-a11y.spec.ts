@@ -21,7 +21,7 @@ for (const layout of FOCUS_LAYOUTS) {
         test('axe finds nothing in the workspace', async ({ page }) => {
           test.slow();
           await disableWebgl(page);
-          await page.addInitScript(() => localStorage.setItem('cboard.motion', 'off'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'off'));
           const found: string[] = [];
           for (const project of PROJECTS) {
             // The rail (desktop only) names every project's route.

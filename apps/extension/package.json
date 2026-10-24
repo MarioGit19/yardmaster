@@ -1,10 +1,10 @@
 {
-  "name": "c-board-extension",
-  "displayName": "c-board",
-  "description": "Mirrors this window's terminals to the local c-board dashboard.",
+  "name": "yardmaster-extension",
+  "displayName": "Yardmaster",
+  "description": "Mirrors this window's terminals to the local Yardmaster dashboard.",
   "version": "0.1.0",
   "private": true,
-  "publisher": "c-board",
+  "publisher": "yardmaster",
   "engines": {
     "vscode": "^1.93.0"
   },
@@ -29,30 +29,30 @@
   "contributes": {
     "commands": [
       {
-        "command": "c-board.openDashboard",
+        "command": "yardmaster.openDashboard",
         "title": "Open Dashboard",
-        "category": "c-board"
+        "category": "Yardmaster"
       },
       {
-        "command": "c-board.reconnect",
+        "command": "yardmaster.reconnect",
         "title": "Reconnect",
-        "category": "c-board"
+        "category": "Yardmaster"
       }
     ],
     "configuration": {
-      "title": "c-board",
+      "title": "Yardmaster",
       "properties": {
-        "cboard.enabled": {
+        "yardmaster.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Stream this window's terminals to the local c-board server."
+          "description": "Stream this window's terminals to the local Yardmaster server."
         },
-        "cboard.port": {
+        "yardmaster.port": {
           "type": "integer",
           "default": 4317,
           "minimum": 1,
           "maximum": 65535,
-          "description": "Port of the local c-board server (it always listens on 127.0.0.1)."
+          "description": "Port of the local Yardmaster server (it always listens on 127.0.0.1)."
         }
       }
     }
@@ -60,12 +60,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
-    "icon": "pnpm --filter @c-board/web exec tsx scripts/render-icons.ts --strict",
-    "package": "node scripts/build.mjs --production && pnpm run icon && vsce package --no-dependencies --allow-missing-repository --skip-license --out dist/c-board.vsix",
+    "icon": "pnpm --filter @yardmaster/web exec tsx scripts/render-icons.ts --strict",
+    "package": "node scripts/build.mjs --production && pnpm run icon && vsce package --no-dependencies --allow-missing-repository --skip-license --out dist/yardmaster.vsix",
     "test": "vitest run"
   },
   "dependencies": {
-    "@c-board/protocol": "workspace:*",
+    "@yardmaster/protocol": "workspace:*",
     "ws": "^8.22.0"
   },
   "devDependencies": {

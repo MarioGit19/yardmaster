@@ -1,4 +1,4 @@
-import type { Terminal } from '@c-board/protocol';
+import type { Terminal } from '@yardmaster/protocol';
 import { activityKey, useBusyFlags, useLatestActivity, useMaxActivityStep } from '../data/index.js';
 import type { CrewTerminal } from './model.js';
 

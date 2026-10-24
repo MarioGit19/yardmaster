@@ -1,4 +1,4 @@
-import type { ClaudeSession, EditorApp, Project } from '@c-board/protocol';
+import type { ClaudeSession, EditorApp, Project } from '@yardmaster/protocol';
 import { ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { type PointerEvent, useEffect, useRef, useState } from 'react';

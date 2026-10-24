@@ -96,7 +96,7 @@ test.describe('ambient field', () => {
   });
 
   test('reduced', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     await openRoute(page, '/');
     await expect(page.locator('[data-ambient]')).toHaveAttribute('data-ambient', 'css');
     await expect(page.locator('[data-ambient] canvas')).toHaveCount(0);
@@ -126,7 +126,7 @@ test.describe('claude orb', () => {
   }
 
   test('reduced', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     await page.goto('/#/_tokens');
     const section = page.locator('section', {
       has: page.getByRole('heading', { name: 'Claude Orb' }),
@@ -158,7 +158,7 @@ test.describe('crew mascot', () => {
   }
 
   test('reduced', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     await page.goto('/#/_tokens');
     const section = sheet(page);
     await section.scrollIntoViewIfNeeded();
@@ -192,7 +192,7 @@ test.describe('office kit', () => {
   }
 
   test('reduced', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'reduced'));
     await page.goto('/#/_tokens');
     const section = sheet(page);
     await section.scrollIntoViewIfNeeded();
@@ -623,7 +623,7 @@ test.describe('pulse rail', () => {
       test.use({ theme });
 
       test('tooltip', async ({ page }) => {
-        await page.addInitScript(() => localStorage.setItem('cboard.pulse', 'expanded'));
+        await page.addInitScript(() => localStorage.setItem('yardmaster.pulse', 'expanded'));
         await openRoute(page, '/');
         const rail = page.locator('[data-pulse]');
         const canvas = rail.locator('canvas[data-pulse-canvas]');
@@ -955,7 +955,7 @@ test.describe('fx showcase', () => {
   for (const level of ['full', 'reduced', 'off'] as const) {
     test(level, async ({ page }) => {
       test.slow();
-      await page.addInitScript((value) => localStorage.setItem('cboard.motion', value), level);
+      await page.addInitScript((value) => localStorage.setItem('yardmaster.motion', value), level);
       await page.goto('/#/_tokens');
 
       const text = section(page, 'Text effects');
@@ -1010,8 +1010,8 @@ test.describe('fx showcase', () => {
   test('light', async ({ page }) => {
     test.slow();
     await page.addInitScript(() => {
-      localStorage.setItem('cboard.theme', 'light');
-      localStorage.setItem('cboard.motion', 'full');
+      localStorage.setItem('yardmaster.theme', 'light');
+      localStorage.setItem('yardmaster.motion', 'full');
     });
     await page.goto('/#/_tokens');
     const backgrounds = section(page, 'Backgrounds');
@@ -1033,8 +1033,8 @@ test.describe('ambient styles', () => {
   for (const style of ['veil', 'aurora', 'none'] as const) {
     test(style, async ({ page }) => {
       await page.addInitScript((value) => {
-        localStorage.setItem('cboard.ambient', value);
-        localStorage.setItem('cboard.motion', 'full');
+        localStorage.setItem('yardmaster.ambient', value);
+        localStorage.setItem('yardmaster.motion', 'full');
       }, style);
       await openRoute(page, '/');
       if (style !== 'none') {
@@ -1232,7 +1232,7 @@ test.describe('layouts', () => {
       ]) {
         test(`office ${viewport.width}`, async ({ page }) => {
           test.slow();
-          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
           await expect(page.locator('[data-room]').first()).toBeVisible();
@@ -1260,7 +1260,7 @@ test.describe('layouts', () => {
         { width: 390, height: 844 },
       ]) {
         test(`office room ${viewport.width}`, async ({ page }) => {
-          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'office'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
           const room = page
@@ -1292,7 +1292,7 @@ test.describe('layouts', () => {
         test(`grid ${viewport.width}`, async ({ page }) => {
           test.slow();
           await disableWebgl(page);
-          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
           await expect(page.locator('[data-grid-node]').first()).toBeVisible();
@@ -1327,8 +1327,8 @@ test.describe('layouts', () => {
         test(`grid 3d ${viewport.width}`, async ({ page }) => {
           test.slow();
           await page.addInitScript(() => {
-            localStorage.setItem('cboard.layout', 'grid');
-            localStorage.setItem('cboard.motion', 'full');
+            localStorage.setItem('yardmaster.layout', 'grid');
+            localStorage.setItem('yardmaster.motion', 'full');
           });
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
@@ -1387,7 +1387,7 @@ test.describe('layouts', () => {
       ]) {
         test(`transit ${viewport.width}`, async ({ page }) => {
           test.slow();
-          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'transit'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'transit'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
           await expect(page.locator('[data-transit-line]').first()).toBeVisible();
@@ -1435,7 +1435,7 @@ test.describe('layouts', () => {
       ]) {
         test(`retro ${viewport.width}`, async ({ page }) => {
           test.slow();
-          await page.addInitScript(() => localStorage.setItem('cboard.layout', 'retro'));
+          await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'retro'));
           await page.setViewportSize(viewport);
           await openRoute(page, '/');
           await expect(page.locator('[data-retro-frame]').first()).toBeVisible();
@@ -1482,8 +1482,8 @@ test.describe('layouts', () => {
             });
             const page = await context.newPage();
             await page.addInitScript((t) => {
-              localStorage.setItem('cboard.layout', 'retro');
-              localStorage.setItem('cboard.theme', t);
+              localStorage.setItem('yardmaster.layout', 'retro');
+              localStorage.setItem('yardmaster.theme', t);
             }, theme);
             await openRoute(page, '/');
             await expect(page.locator('[data-retro-frame]')).toHaveCount(20);
@@ -1526,7 +1526,7 @@ test.describe('layouts worst case', () => {
         test('overview and enter view', async ({ page }) => {
           test.slow();
           if (layout === 'grid') await disableWebgl(page);
-          await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+          await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout);
           await page.goto('/?worst=1#/');
           await expect(page.locator(item)).toHaveCount(7);
           await page.waitForTimeout(1200);
@@ -1593,9 +1593,9 @@ test.describe('layouts stress', () => {
         });
         const page = await context.newPage();
         await page.addInitScript((l) => {
-          localStorage.setItem('cboard.layout', l);
-          localStorage.setItem('cboard.theme', 'dark');
-          localStorage.setItem('cboard.motion', 'full');
+          localStorage.setItem('yardmaster.layout', l);
+          localStorage.setItem('yardmaster.theme', 'dark');
+          localStorage.setItem('yardmaster.motion', 'full');
         }, layout);
         await openRoute(page, '/');
         await expect(page.locator(LAYOUT_OVERVIEWS[layout])).not.toHaveCount(0);
@@ -1617,9 +1617,9 @@ test.describe('retro amber', () => {
   for (const theme of THEMES) {
     test(theme, async ({ page }) => {
       await page.addInitScript((t) => {
-        localStorage.setItem('cboard.layout', 'retro');
-        localStorage.setItem('cboard.phosphor', 'amber');
-        localStorage.setItem('cboard.theme', t);
+        localStorage.setItem('yardmaster.layout', 'retro');
+        localStorage.setItem('yardmaster.phosphor', 'amber');
+        localStorage.setItem('yardmaster.theme', t);
       }, theme);
       await page.setViewportSize({ width: 1440, height: 900 });
       await openRoute(page, '/');
@@ -1636,8 +1636,8 @@ test.describe('retro amber', () => {
 test.describe('grid reduced', () => {
   test('map', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('cboard.layout', 'grid');
-      localStorage.setItem('cboard.motion', 'reduced');
+      localStorage.setItem('yardmaster.layout', 'grid');
+      localStorage.setItem('yardmaster.motion', 'reduced');
     });
     await page.setViewportSize({ width: 1440, height: 900 });
     await openRoute(page, '/');
@@ -1753,7 +1753,7 @@ test.describe('board terminal', () => {
             storageState: signedInState(board.url, board.cookie),
           });
           const page = await context.newPage();
-          await page.addInitScript((t) => localStorage.setItem('cboard.theme', t), theme);
+          await page.addInitScript((t) => localStorage.setItem('yardmaster.theme', t), theme);
           await page.goto(viewport.width < 768 ? '/#/projects' : '/#/');
           await page.locator('[data-hud="open-project"], [data-phone-open-project]').click();
           const dialog = page.locator('[data-open-project]');
@@ -1809,7 +1809,7 @@ for (const theme of THEMES) {
 
     for (const layout of PHONE_LAYOUTS) {
       test(`overview ${layout}`, async ({ page }) => {
-        await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+        await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout);
         await openRoute(page, '/');
         await expect(page.locator('main [data-layout]').first()).toBeVisible();
         await page.waitForTimeout(1_200);
@@ -2089,7 +2089,7 @@ for (const size of FIT_SIZES) {
           ['grid', '[data-grid-node]'],
           ['retro', '[data-retro-frame]'],
         ] as const) {
-          await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+          await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout);
           await go(page, '/');
           await page.reload();
           await expect(page.locator(ready).first()).toBeVisible({ timeout: 20_000 });
@@ -2103,7 +2103,7 @@ for (const size of FIT_SIZES) {
             await shot(page, tab);
           }
         }
-        await page.addInitScript(() => localStorage.setItem('cboard.layout', 'minimal'));
+        await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'minimal'));
         await go(page, '/');
         await page.reload();
         const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
@@ -2139,7 +2139,7 @@ for (const theme of THEMES) {
           animations: 'disabled',
         });
       const open = async (page: import('@playwright/test').Page, layout: string, ready: string) => {
-        await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+        await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout);
         await openRoute(page, '/');
         await expect(page.locator(ready).first()).toBeVisible({ timeout: 20_000 });
         await page.waitForTimeout(1_200);

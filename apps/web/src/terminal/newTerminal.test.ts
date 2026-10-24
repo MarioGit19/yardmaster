@@ -1,4 +1,4 @@
-import type { BoardState, Execution } from '@c-board/protocol';
+import type { BoardState, Execution } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeTerminal, sampleBoard } from '../test/board.js';
 import { arrivedTerminal, recentCommands, terminalHost } from './newTerminal.js';

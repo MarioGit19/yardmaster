@@ -1,4 +1,4 @@
-import type { BoardState, EditorWindow } from '@c-board/protocol';
+import type { BoardState, EditorWindow } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   createOpeningStore,

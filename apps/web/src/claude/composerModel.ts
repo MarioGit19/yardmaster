@@ -1,4 +1,4 @@
-import type { ClaudeSession, PermissionMode } from '@c-board/protocol';
+import type { ClaudeSession, PermissionMode } from '@yardmaster/protocol';
 
 /** Model aliases the composer offers; `''` leaves the choice to Claude Code's settings. */
 export const MODEL_OPTIONS = [

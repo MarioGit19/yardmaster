@@ -1,4 +1,4 @@
-import { type ChatMessage, sessionIdFromStream, transcriptStreamId } from '@c-board/protocol';
+import { type ChatMessage, sessionIdFromStream, transcriptStreamId } from '@yardmaster/protocol';
 import type { TranscriptFeed } from '../claude/runner.js';
 import { normalizeEntry } from '../claude/transcript-normalize.js';
 import { type ReadResult, RingBuffer } from '../ring-buffer.js';

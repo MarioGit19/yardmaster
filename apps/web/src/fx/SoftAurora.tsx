@@ -1,7 +1,7 @@
 /*
  * Adapted from SoftAurora by React Bits (https://reactbits.dev).
  * Copyright (c) 2026 David Haz. MIT + Commons Clause License Condition v1.0: may be used as part
- * of c-board, but the component must not be sold, sublicensed or redistributed on its own.
+ * of Yardmaster, but the component must not be sold, sublicensed or redistributed on its own.
  * See THIRD_PARTY_NOTICES.md.
  *
  * Changes: the two Perlin aurora bands are mapped onto the ambient field palette (DESIGN.md §4.1,

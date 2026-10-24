@@ -1,7 +1,7 @@
 import type { ClaudeSession, Terminal } from './domain.js';
 
 // What terminals and Claude sessions are called on screen. Editors and Claude Code name
-// things automatically (`zsh`, `c-board-c3`); a name the user gave always wins.
+// things automatically (`zsh`, `yardmaster-c3`); a name the user gave always wins.
 
 export type SessionNameFields = Pick<ClaudeSession, 'title'> &
   Partial<Pick<ClaudeSession, 'customTitle' | 'ordinal'>>;

@@ -22,7 +22,7 @@ async function connectEditor(board: DemoBoard, token: string): Promise<WebSocket
     url: string,
     init: { headers: Record<string, string> },
   ) => WebSocket;
-  const socket = new Ctor(url, { headers: { 'x-cboard-token': token } });
+  const socket = new Ctor(url, { headers: { 'x-yardmaster-token': token } });
   await new Promise<void>((resolve, reject) => {
     socket.addEventListener('open', () => resolve(), { once: true });
     socket.addEventListener('error', () => reject(new Error('editor socket failed')), {
@@ -73,7 +73,7 @@ test('the onboarding steps tick themselves from simulated events', async ({ brow
     await step('hooks').getByRole('button', { name: 'Install hooks' }).click();
     const dialog = page.locator('[data-hooks-dialog]');
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('[data-hooks-diff]')).toContainText('c-board-hook');
+    await expect(dialog.locator('[data-hooks-diff]')).toContainText('yardmaster-hook');
     await dialog.locator('[data-hooks-confirm]').click();
     await expect(dialog).toBeHidden();
     await expect(step('hooks')).toContainText('Installed.');
@@ -83,7 +83,7 @@ test('the onboarding steps tick themselves from simulated events', async ({ brow
     // The first hook event ticks the hooks step.
     const res = await fetch(`${board.url}/api/hooks/claude`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-cboard-token': token },
+      headers: { 'content-type': 'application/json', 'x-yardmaster-token': token },
       body: JSON.stringify(HOOK_EVENT),
     });
     expect(res.status).toBe(204);

@@ -11,19 +11,19 @@ import { generateToken } from './token.js';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
 const token = generateToken();
 const host = '127.0.0.1:4317';
-const INDEX = '<!doctype html><title>c-board</title><div id="root"></div>';
+const INDEX = '<!doctype html><title>Yardmaster</title><div id="root"></div>';
 
 let root: string;
 let app: FastifyInstance | undefined;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'c-board-web-'));
+  root = await mkdtemp(join(tmpdir(), 'yardmaster-web-'));
   await mkdir(join(root, 'assets'));
   await writeFile(join(root, 'index.html'), INDEX);
   await writeFile(join(root, 'assets', 'app-3f9a.js'), 'console.log(1)');
@@ -78,7 +78,7 @@ describe('static web app', () => {
   });
 
   it('never serves the SPA for server paths', async () => {
-    expect((await get('/api/nope', { 'x-cboard-token': token }))?.statusCode).toBe(404);
+    expect((await get('/api/nope', { 'x-yardmaster-token': token }))?.statusCode).toBe(404);
     expect((await get('/api/nope'))?.statusCode).toBe(401);
     expect((await get('/ws/other'))?.statusCode).toBe(404);
     expect((await get('/api/health'))?.json()).toMatchObject({ ok: true });

@@ -1,11 +1,11 @@
-import type { SessionOrigin } from '@c-board/protocol';
+import type { SessionOrigin } from '@yardmaster/protocol';
 import { LayoutDashboard, SquareTerminal } from 'lucide-react';
 import { cx } from '../ui/cx.js';
 
 const ORIGIN = {
   board: {
     label: 'Board',
-    title: 'Board session: runs headless from c-board',
+    title: 'Board session: runs headless from Yardmaster',
     Icon: LayoutDashboard,
   },
   terminal: {

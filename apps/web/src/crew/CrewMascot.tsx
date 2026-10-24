@@ -1,4 +1,4 @@
-import type { BackgroundKind } from '@c-board/protocol';
+import type { BackgroundKind } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { type CSSProperties, useId, useRef } from 'react';
 import { useRateLoop } from '../anim/useRateLoop.js';

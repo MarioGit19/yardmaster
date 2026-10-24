@@ -22,9 +22,9 @@ export const test = base.extend<{ theme: Theme; layout: FocusLayout }>({
   colorScheme: async ({ theme }, use) => use(theme),
   storageState: async ({}, use) => use(signedInState(required(E2E_URL), required(E2E_COOKIE))),
   page: async ({ page, theme, layout }, use) => {
-    await page.addInitScript((value) => localStorage.setItem('cboard.theme', value), theme);
+    await page.addInitScript((value) => localStorage.setItem('yardmaster.theme', value), theme);
     if (layout !== 'minimal') {
-      await page.addInitScript((value) => localStorage.setItem('cboard.layout', value), layout);
+      await page.addInitScript((value) => localStorage.setItem('yardmaster.layout', value), layout);
     }
     await use(page);
   },

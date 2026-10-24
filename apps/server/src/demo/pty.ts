@@ -33,7 +33,7 @@ export class DemoShell implements PtyProcess {
     this.pid = pid;
     this.folder = basename(options.cwd);
     this.cwd = options.cwd;
-    this.emit(`${DIM}c-board demo shell: nothing runs on your machine.${RESET}\r\n`);
+    this.emit(`${DIM}Yardmaster demo shell: nothing runs on your machine.${RESET}\r\n`);
     this.prompt();
   }
 

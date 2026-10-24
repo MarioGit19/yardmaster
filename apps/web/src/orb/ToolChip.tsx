@@ -1,4 +1,4 @@
-import { type ToolFamily, toolFamily } from '@c-board/protocol';
+import { type ToolFamily, toolFamily } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { cx } from '../ui/cx.js';

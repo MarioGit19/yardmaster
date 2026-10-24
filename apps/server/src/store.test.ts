@@ -7,7 +7,7 @@ import {
   type PatchOp,
   type PortBinding,
   type Project,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { execStreamId, terminalStreamId } from './output-buffers.js';
 import { BoardStore, type BoardStoreOptions, commandHeader } from './store.js';

@@ -1,4 +1,4 @@
-import type { SessionStatus, ToolFamily } from '@c-board/protocol';
+import type { SessionStatus, ToolFamily } from '@yardmaster/protocol';
 import { dur, loop, moment } from '../motion.js';
 
 /** The orb's visual states, DESIGN.md §4.2. */

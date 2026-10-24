@@ -1,4 +1,4 @@
-import { type ChatMessage, decodeChatMessage } from '@c-board/protocol';
+import { type ChatMessage, decodeChatMessage } from '@yardmaster/protocol';
 
 interface RowBase {
   /** The `ChatMessage` id; stable, so it keys virtual rows. */

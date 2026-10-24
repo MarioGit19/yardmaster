@@ -1,4 +1,4 @@
-import type { BoardState, ClaudeSession, SessionStatus } from '@c-board/protocol';
+import type { BoardState, ClaudeSession, SessionStatus } from '@yardmaster/protocol';
 import { terminalSession } from '../../data/selectors.js';
 import { laneExecution, laneView } from '../../lanes/lane.js';
 import { podSessions } from '../../pod/model.js';

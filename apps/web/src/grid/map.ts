@@ -1,4 +1,4 @@
-import { toolFamily } from '@c-board/protocol';
+import { toolFamily } from '@yardmaster/protocol';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { loop } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';

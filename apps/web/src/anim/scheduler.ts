@@ -65,7 +65,7 @@ export function createScheduler(host: SchedulerHost): Scheduler {
       try {
         entry.callback(now, dt);
       } catch (error) {
-        console.error('[c-board] frame callback failed', error);
+        console.error('[yardmaster] frame callback failed', error);
       }
     }
     sync();

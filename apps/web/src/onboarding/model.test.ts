@@ -1,4 +1,4 @@
-import type { ServerStatus } from '@c-board/protocol';
+import type { ServerStatus } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { activeStep, hooksInstalled, needsOnboarding, setupSteps } from './model.js';
 

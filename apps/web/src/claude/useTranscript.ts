@@ -1,4 +1,4 @@
-import { transcriptStreamId } from '@c-board/protocol';
+import { transcriptStreamId } from '@yardmaster/protocol';
 import { useEffect, useState } from 'react';
 import { useBoardClient } from '../data/index.js';
 import { TranscriptModel, type TranscriptRow } from './transcript.js';

@@ -1,4 +1,4 @@
-import type { SessionHistoryEntry } from '@c-board/protocol';
+import type { SessionHistoryEntry } from '@yardmaster/protocol';
 
 /** Past sessions not already on the board, newest first. */
 export function pastSessions(

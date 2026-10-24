@@ -4,7 +4,7 @@ import {
   type PortShareUnavailable,
   REMOTE_MAX_HOSTS,
   RemoteHost,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { Smartphone, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -95,7 +95,7 @@ function RemoteHostsRow({ server: { settings, update } }: { server: ServerSettin
       <div className="flex flex-col gap-0.5">
         <h3 className="font-medium text-body text-text-1">Allowed hosts</h3>
         <p className="text-label text-text-2">
-          Off until you add one. c-board still listens only on this Mac;{' '}
+          Off until you add one. Yardmaster still listens only on this Mac;{' '}
           <code className="whitespace-nowrap font-mono text-text-1">tailscale serve</code> brings
           your phone in over HTTPS. Only Tailscale names work: public tunnels are not supported,
           because the board can type into your terminals.

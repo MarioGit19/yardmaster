@@ -4,11 +4,13 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 import { renderLogo } from './src/brand/render.js';
+import { migrateStorage } from './src/storage-migration.js';
 
-// The server's Host/Origin checks admit the dev server through CBOARD_DEV_ORIGINS,
+// The server's Host/Origin checks admit the dev server through YARDMASTER_DEV_ORIGINS,
 // which the server's `dev` scripts set to this origin.
 const DEV_PORT = 5173;
-const serverPort = Number(process.env.CBOARD_PORT) || 4317;
+// CBOARD_PORT is the name from before the rename.
+const serverPort = Number(process.env.YARDMASTER_PORT || process.env.CBOARD_PORT) || 4317;
 const target = `http://127.0.0.1:${serverPort}`;
 
 /**
@@ -31,8 +33,23 @@ function bootMark(): Plugin {
   };
 }
 
+/**
+ * Moves browser storage from the old c-board keys (12.7a) in a classic inline script, which runs
+ * before the app's modules. A module can't: shared chunks run before the entry's own code.
+ */
+function storageMigration(): Plugin {
+  return {
+    name: 'storage-migration',
+    transformIndexHtml: (html) =>
+      html.replace(
+        '<!--storage-migration-->',
+        `<script>(${migrateStorage.toString()})(window)</script>`,
+      ),
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), bootMark()],
+  plugins: [react(), tailwindcss(), bootMark(), storageMigration()],
   server: {
     host: '127.0.0.1',
     port: DEV_PORT,

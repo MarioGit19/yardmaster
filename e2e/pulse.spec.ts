@@ -5,7 +5,7 @@ test.use({ viewport: { width: 1440, height: 900 } });
 test('the Pulse rail renders demo activity, filters it, and navigates on click', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('cboard.pulse', 'expanded'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.pulse', 'expanded'));
   await openRoute(page, '/');
   const rail = page.locator('[data-pulse]');
   await expect(rail).toHaveAttribute('data-pulse', 'expanded');
@@ -71,8 +71,8 @@ test('the collapsed Pulse rail sends a runner along its hairline per new event',
   page,
 }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('cboard.pulse', 'collapsed');
-    localStorage.setItem('cboard.motion', 'full');
+    localStorage.setItem('yardmaster.pulse', 'collapsed');
+    localStorage.setItem('yardmaster.motion', 'full');
   });
   await openRoute(page, '/');
   const ticker = page.locator('[data-pulse="collapsed"] [data-pulse-ticker]');

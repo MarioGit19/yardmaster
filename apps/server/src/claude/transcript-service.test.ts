@@ -6,7 +6,7 @@ import {
   decodeChatMessage,
   startBackground,
   transcriptStreamId,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
 import { FIXTURE_CWD, FIXTURE_SESSION_ID } from './fixtures.test-helpers.js';
@@ -27,7 +27,7 @@ let fixture: string;
 const services: TranscriptService[] = [];
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'c-board-transcripts-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-transcripts-'));
   path = join(dir, `${FIXTURE_SESSION_ID}.jsonl`);
   fixture = await readFile(FIXTURE, 'utf8');
 });

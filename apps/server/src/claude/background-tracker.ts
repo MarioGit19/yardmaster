@@ -6,7 +6,7 @@ import {
   type ClaudeSession,
   endBackground,
   stopAllBackground,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { ProcessTree } from '../processes.js';
 import type { BoardStore } from '../store.js';
 

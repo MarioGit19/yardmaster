@@ -4,14 +4,20 @@ import {
   KnownHookEvent,
   normalizeHookEvent,
   Pid,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
+import { headerValue, LEGACY_CLAUDE_PID_HEADER } from '../legacy.js';
 import type { BoardStore } from '../store.js';
 import { type PathResolver, projectForCwd, resolveDir } from './project-lookup.js';
 import { sessionReducer } from './session-reducer.js';
 
 export const HOOK_ROUTE = '/api/hooks/claude';
-export const CLAUDE_PID_HEADER = 'x-cboard-claude-pid';
+export const CLAUDE_PID_HEADER = 'x-yardmaster-claude-pid';
+
+/** The hook's Claude pid header, also under its old name for one version. */
+export function claudePidHeader(headers: Record<string, string | string[] | undefined>) {
+  return headerValue(headers, CLAUDE_PID_HEADER, LEGACY_CLAUDE_PID_HEADER);
+}
 /** Write and Edit inputs can carry whole files. */
 export const HOOK_BODY_LIMIT = 4 * 1024 * 1024;
 
@@ -128,7 +134,7 @@ export function parseClaudePid(header: string | string[] | undefined): number | 
  */
 export function registerHookRoute(app: FastifyInstance, ingest: HookIngest): void {
   app.post(HOOK_ROUTE, { bodyLimit: HOOK_BODY_LIMIT }, async (request, reply) => {
-    const pid = parseClaudePid(request.headers[CLAUDE_PID_HEADER]);
+    const pid = parseClaudePid(claudePidHeader(request.headers));
     const body = request.body;
     reply.code(204).send();
     setImmediate(() => void ingest.enqueue(body, pid));

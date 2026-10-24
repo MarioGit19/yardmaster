@@ -26,7 +26,7 @@ export const AMBIENT_RESOLUTION: Record<Exclude<AmbientStyle, 'none'>, number> =
 };
 
 export const ambientStylePreference = createPreference<AmbientStyle>(
-  'cboard.ambient',
+  'yardmaster.ambient',
   AMBIENT_STYLES,
   'nebula',
 );

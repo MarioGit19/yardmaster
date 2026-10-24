@@ -1,4 +1,4 @@
-import { type LibraryEntry, projectIdFromPath, type UiAction } from '@c-board/protocol';
+import { type LibraryEntry, projectIdFromPath, type UiAction } from '@yardmaster/protocol';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createLaunchMemory,

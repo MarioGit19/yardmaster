@@ -1,4 +1,4 @@
-import type { EditorTerminal } from '@c-board/protocol';
+import type { EditorTerminal } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { type TerminalLike, type TerminalSink, TerminalTracker } from './terminal-tracker.js';
 

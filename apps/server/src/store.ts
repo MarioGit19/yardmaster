@@ -16,7 +16,7 @@ import {
   type Project,
   type SessionStatus,
   type Terminal,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { OutputBuffers, type OutputBuffersOptions } from './output-buffers.js';
 
 /** Oldest executions (and their output) are dropped past this many per terminal. */

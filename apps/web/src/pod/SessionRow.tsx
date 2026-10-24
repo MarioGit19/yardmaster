@@ -1,4 +1,4 @@
-import { type ClaudeSession, sessionDisplayName } from '@c-board/protocol';
+import { type ClaudeSession, sessionDisplayName } from '@yardmaster/protocol';
 import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { useInView } from '../anim/useFrame.js';

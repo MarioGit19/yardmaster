@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, delimiter, isAbsolute, join } from 'node:path';
-import type { EditorApp } from '@c-board/protocol';
+import type { EditorApp } from '@yardmaster/protocol';
 
 export interface EditorCli {
   path: string;

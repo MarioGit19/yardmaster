@@ -1,24 +1,26 @@
 {
-  "name": "@c-board/server",
+  "name": "@yardmaster/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "c-board": "./dist/cli.js"
+    "yardmaster": "./dist/cli.js",
+    "c-board": "./dist/c-board.js"
   },
   "scripts": {
-    "dev": "CBOARD_WATCH=1 CBOARD_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --no-open",
-    "dev:demo": "CBOARD_WATCH=1 CBOARD_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --demo --no-open",
+    "dev": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --no-open",
+    "dev:demo": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --demo --no-open",
     "start": "node dist/cli.js start",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "cli": "tsx src/cli.ts"
+    "cli": "tsx src/cli.ts",
+    "cli:c-board": "tsx src/c-board.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.308",
-    "@c-board/hook": "workspace:*",
-    "@c-board/protocol": "workspace:*",
+    "@yardmaster/hook": "workspace:*",
+    "@yardmaster/protocol": "workspace:*",
     "@fastify/websocket": "^11.3.4",
     "chokidar": "^6.0.0",
     "fastify": "^5.12.7",

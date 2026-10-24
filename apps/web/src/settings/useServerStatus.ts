@@ -1,4 +1,4 @@
-import type { HooksStatusResponse, ServerStatus } from '@c-board/protocol';
+import type { HooksStatusResponse, ServerStatus } from '@yardmaster/protocol';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
 

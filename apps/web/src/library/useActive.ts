@@ -1,4 +1,4 @@
-import { DEFAULT_IDLE_HIDE_MIN } from '@c-board/protocol';
+import { DEFAULT_IDLE_HIDE_MIN } from '@yardmaster/protocol';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { useNow } from '../anim/clock.js';

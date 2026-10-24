@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { CommandConfidence } from '@c-board/protocol';
+import type { CommandConfidence } from '@yardmaster/protocol';
 import { AltScreenDetector } from './alt-screen.js';
 import { ChunkBatcher, type ChunkBatcherOptions } from './chunk-batcher.js';
 import { localPath, type UriLike } from './terminal-tracker.js';

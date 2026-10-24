@@ -1,5 +1,5 @@
-import type { Project } from '@c-board/protocol';
 import * as Dialog from '@radix-ui/react-dialog';
+import type { Project } from '@yardmaster/protocol';
 import {
   Bell,
   BellOff,

@@ -15,7 +15,7 @@ export const LAYOUT_NAME: Record<LayoutId, string> = {
 };
 
 /** Per browser; an unknown stored value falls back to Minimal. */
-export const layoutPreference = createPreference<LayoutId>('cboard.layout', LAYOUTS, 'minimal');
+export const layoutPreference = createPreference<LayoutId>('yardmaster.layout', LAYOUTS, 'minimal');
 
 type Loader = () => Promise<{ default: ComponentType }>;
 

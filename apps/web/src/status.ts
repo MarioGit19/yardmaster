@@ -1,4 +1,4 @@
-import type { ClaudeSession, SessionStatus, Terminal } from '@c-board/protocol';
+import type { ClaudeSession, SessionStatus, Terminal } from '@yardmaster/protocol';
 
 /** Semantic status tones, DESIGN.md §2. Each maps to a `--st-*` token. */
 export type Tone = 'work' | 'tool' | 'wait' | 'ok' | 'err' | 'idle';

@@ -2,7 +2,7 @@ import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { ActivityEvent, ClaudeSession, Project } from '@c-board/protocol';
+import type { ActivityEvent, ClaudeSession, Project } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from './app.js';
 import type { ServerConfig } from './config.js';
@@ -65,7 +65,7 @@ function restart(db: Persistence, options: PersistenceOptions = {}): Persistence
 }
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'cboard-db-'));
+  home = await mkdtemp(join(tmpdir(), 'yardmaster-db-'));
   clock = T0;
 });
 
@@ -77,7 +77,7 @@ afterEach(async () => {
 
 describe('Persistence', () => {
   it('creates board.db under the home dir, readable only by the owner', async () => {
-    const nested = join(home, 'nested', '.c-board');
+    const nested = join(home, 'nested', '.yardmaster');
     const db = openDb({ home: nested });
     expect(db.path).toBe(join(nested, DB_FILE));
     expect((await stat(db.path)).mode & 0o777).toBe(0o600);
@@ -313,7 +313,7 @@ describe('server boot', () => {
   });
   const token = generateToken();
 
-  it('loads projects and settings from CBOARD_HOME across restarts', async () => {
+  it('loads projects and settings from YARDMASTER_HOME across restarts', async () => {
     let app = await buildServer(config(), { token, processes: false });
     expect(app.store.state.projects).toEqual({});
     app.store.upsertProject(project('acme-shop'));

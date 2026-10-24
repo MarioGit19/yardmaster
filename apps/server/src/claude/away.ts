@@ -10,12 +10,12 @@ import {
   type PermissionRequestOutput,
   PermissionSuggestion,
   type ServerToUi,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { ActionResult } from '../actions.js';
 import type { BoardStore } from '../store.js';
 import {
-  CLAUDE_PID_HEADER,
+  claudePidHeader,
   HOOK_BODY_LIMIT,
   type HookIngest,
   parseClaudePid,
@@ -25,7 +25,7 @@ import { RESOLVED_APPROVAL_TTL_MS, UNKNOWN_APPROVAL } from './runner.js';
 export const AWAY_ROUTE = '/api/away';
 export const PERMISSION_ROUTE = '/api/hooks/permission';
 
-const DENY_MESSAGE = 'Denied from c-board.';
+const DENY_MESSAGE = 'Denied from Yardmaster.';
 const REASON_MAX = 500;
 
 export interface AwayApprovalsOptions {
@@ -240,7 +240,7 @@ export function registerAwayRoutes(app: FastifyInstance, away: AwayApprovals): v
     reply.raw.on('close', () => {
       if (!reply.raw.writableFinished) controller.abort();
     });
-    const pid = parseClaudePid(request.headers[CLAUDE_PID_HEADER]);
+    const pid = parseClaudePid(claudePidHeader(request.headers));
     const output = await away.request(request.body, pid, controller.signal);
     reply.header('cache-control', 'no-store');
     if (output === null) return reply.code(204).send();

@@ -1,4 +1,4 @@
-import type { PortBinding } from '@c-board/protocol';
+import type { PortBinding } from '@yardmaster/protocol';
 import { localUrl, PortButton } from '../ports/PortButton.js';
 import { cx } from '../ui/cx.js';
 

@@ -8,7 +8,7 @@ test.describe.configure({ mode: 'serial' });
 // The default nebula and the two alternative ambient styles (Settings → Appearance → Ambient).
 for (const ambient of ['nebula', 'veil', 'aurora'] as const) {
   test(`30 crew mascots on screen keep the frame rate (${ambient} ambient)`, async ({ page }) => {
-    await page.addInitScript((style) => localStorage.setItem('cboard.ambient', style), ambient);
+    await page.addInitScript((style) => localStorage.setItem('yardmaster.ambient', style), ambient);
     await page.goto('/#/_tokens');
     const section = page.locator('section', {
       has: page.getByRole('heading', { name: 'Crew mascot' }),

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { GitInfo } from '@c-board/protocol';
+import { GitInfo } from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
 import { GIT_LOG_ARGS, GIT_STATUS_ARGS, parseGitLog, parseGitStatus, sameGitInfo } from './git.js';
 import type { BoardStore } from './store.js';

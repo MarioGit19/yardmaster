@@ -1,4 +1,4 @@
-import type { BoardState, ServerStatus, Terminal } from '@c-board/protocol';
+import type { BoardState, ServerStatus, Terminal } from '@yardmaster/protocol';
 import { useSyncExternalStore } from 'react';
 
 /** Chips for the project's recent commands in the new-terminal popover. */
@@ -48,7 +48,7 @@ export function terminalHost(
 
 /** Board terminals are off: why, for the new-terminal popover and the launch sheet. */
 export const BOARD_TERMINALS_OFF =
-  'Board terminals are off on this machine (node-pty did not load; see c-board doctor).';
+  'Board terminals are off on this machine (node-pty did not load; see yardmaster doctor).';
 
 /** The terminal that showed up since `known` was taken: the newest open one not in it. */
 export function arrivedTerminal(

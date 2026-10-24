@@ -36,10 +36,12 @@ describe('the layout preference', () => {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => void store.set(k, v),
     };
-    createPreference('cboard.layout', LAYOUTS, 'minimal', storage).set('grid');
-    expect(store.get('cboard.layout')).toBe('grid');
-    expect(createPreference('cboard.layout', LAYOUTS, 'minimal', storage).get()).toBe('grid');
-    store.set('cboard.layout', 'holodeck');
-    expect(createPreference('cboard.layout', LAYOUTS, 'minimal', storage).get()).toBe('minimal');
+    createPreference('yardmaster.layout', LAYOUTS, 'minimal', storage).set('grid');
+    expect(store.get('yardmaster.layout')).toBe('grid');
+    expect(createPreference('yardmaster.layout', LAYOUTS, 'minimal', storage).get()).toBe('grid');
+    store.set('yardmaster.layout', 'holodeck');
+    expect(createPreference('yardmaster.layout', LAYOUTS, 'minimal', storage).get()).toBe(
+      'minimal',
+    );
   });
 });

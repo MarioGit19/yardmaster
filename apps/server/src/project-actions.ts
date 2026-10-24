@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { accentIndexForProject, type Project, projectIdFromPath } from '@c-board/protocol';
+import { accentIndexForProject, type Project, projectIdFromPath } from '@yardmaster/protocol';
 import type { ActionHandler, ActionHandlers, ActionResult } from './actions.js';
 import type { EditorLauncher } from './editor-cli.js';
 import { type EditorRouter, ROUTE_ERRORS } from './editor-router.js';

@@ -1,5 +1,5 @@
-import type { HooksInstallResponse, HooksPlanResponse } from '@c-board/protocol';
 import * as Dialog from '@radix-ui/react-dialog';
+import type { HooksInstallResponse, HooksPlanResponse } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -41,7 +41,7 @@ function errorMessage(err: unknown): string {
   if (err instanceof ApiRequestError && err.code === 'invalid_settings') {
     return `Claude's settings.json ${err.message}.`;
   }
-  return 'Could not reach c-board. Try again in a moment.';
+  return 'Could not reach Yardmaster. Try again in a moment.';
 }
 
 /**
@@ -85,7 +85,7 @@ export function InstallHooksButton({
       toast.success('Hooks installed', {
         description: result.backup
           ? `Backed up the previous file to ${result.backup}.`
-          : 'Claude Code sessions report to c-board from now on.',
+          : 'Claude Code sessions report to Yardmaster from now on.',
       });
       onInstalled(result);
     } catch (err) {
@@ -127,7 +127,7 @@ export function InstallHooksButton({
                   >
                     <div className="flex flex-col gap-1">
                       <Dialog.Title className="font-medium text-text-1 text-title-sm">
-                        Install the c-board hooks?
+                        Install the Yardmaster hooks?
                       </Dialog.Title>
                       <Dialog.Description className="text-body-sm text-text-2">
                         {stale
@@ -166,7 +166,7 @@ export function InstallHooksButton({
                   >
                     <div className="flex flex-col gap-1">
                       <Dialog.Title className="font-medium text-text-1 text-title-sm">
-                        Install the c-board hooks?
+                        Install the Yardmaster hooks?
                       </Dialog.Title>
                       <Dialog.Description className="text-body-sm text-text-2">
                         {stale

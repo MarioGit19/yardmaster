@@ -1,4 +1,4 @@
-import type { ToastLevel } from '@c-board/protocol';
+import type { ToastLevel } from '@yardmaster/protocol';
 import { useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
 import { useBoardClient, useBoardStore } from '../data/index.js';

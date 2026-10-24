@@ -1,4 +1,4 @@
-import type { Terminal } from '@c-board/protocol';
+import type { Terminal } from '@yardmaster/protocol';
 import { createPreference } from '../prefs.js';
 
 export const STACK_LAYOUTS = ['tabs', 'grid'] as const;
@@ -6,7 +6,7 @@ export type StackLayout = (typeof STACK_LAYOUTS)[number];
 
 /** Tabs or the 2×2 grid, the same for every project. */
 export const stackLayoutPreference = createPreference<StackLayout>(
-  'cboard.terminals.layout',
+  'yardmaster.terminals.layout',
   STACK_LAYOUTS,
   'tabs',
 );
@@ -95,9 +95,9 @@ const ERRORS: Record<string, string> = {
   unknown_terminal: 'The terminal is gone',
   unknown_execution: 'That run is no longer known to the editor',
   nothing_to_rerun: 'Nothing to re-run',
-  offline: 'c-board is offline',
-  disconnected: 'c-board is offline',
-  timeout: 'No answer from c-board',
+  offline: 'Yardmaster is offline',
+  disconnected: 'Yardmaster is offline',
+  timeout: 'No answer from Yardmaster',
   not_implemented: 'Not available yet',
   outside_library: 'That folder is not in your project library',
   unknown_project: 'That project is no longer on the board',
@@ -105,7 +105,7 @@ const ERRORS: Record<string, string> = {
   editor_not_found:
     'No Cursor or VS Code command line found. Install its shell command, or set its path in Settings',
   editor_launch_failed: 'The editor could not be started',
-  pty_unavailable: 'Board terminals are off: node-pty did not load (see c-board doctor)',
+  pty_unavailable: 'Board terminals are off: node-pty did not load (see yardmaster doctor)',
   too_many_terminals: 'Already 16 board terminals running. End one first',
   pty_spawn_failed: 'The shell could not be started',
 };

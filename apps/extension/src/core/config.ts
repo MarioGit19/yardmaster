@@ -1,10 +1,13 @@
-export const CONFIG_SECTION = 'cboard';
+export const CONFIG_SECTION = 'yardmaster';
+/** Settings and extension id from before the rename to Yardmaster, honoured for one version. */
+export const LEGACY_CONFIG_SECTION = 'cboard';
+export const LEGACY_EXTENSION_ID = 'c-board.c-board-extension';
 export const DEFAULT_PORT = 4317;
 export const SERVER_HOST = '127.0.0.1';
 
 export const COMMANDS = {
-  openDashboard: 'c-board.openDashboard',
-  reconnect: 'c-board.reconnect',
+  openDashboard: 'yardmaster.openDashboard',
+  reconnect: 'yardmaster.reconnect',
 } as const;
 
 export interface ExtensionConfig {
@@ -25,10 +28,12 @@ export function parsePort(value: unknown): number {
     : DEFAULT_PORT;
 }
 
-export function resolveConfig(raw: RawConfig): ExtensionConfig {
+/** `raw` holds the values the user set; a setting left unset falls back to its old `cboard.*` key. */
+export function resolveConfig(raw: RawConfig, legacy: RawConfig = {}): ExtensionConfig {
+  const enabled = raw.enabled ?? legacy.enabled;
   return {
-    enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-    port: parsePort(raw.port),
+    enabled: typeof enabled === 'boolean' ? enabled : true,
+    port: parsePort(raw.port ?? legacy.port),
   };
 }
 

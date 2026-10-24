@@ -3,7 +3,7 @@ import {
   type BackgroundTaskStatus,
   type ClaudeSession,
   sameTaskId,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 /** Finished work stays listed this long, then folds into "3 finished". */
 export const FINISHED_VISIBLE_MS = 120_000;

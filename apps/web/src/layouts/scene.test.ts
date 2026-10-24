@@ -1,4 +1,4 @@
-import type { Approval, BoardState, Execution, PortBinding } from '@c-board/protocol';
+import type { Approval, BoardState, Execution, PortBinding } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { SLEEP_AFTER_MS } from '../crew/model.js';
 import type { Pulses } from '../data/activity.js';

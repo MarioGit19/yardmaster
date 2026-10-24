@@ -1,4 +1,4 @@
-import type { BoardState } from '@c-board/protocol';
+import type { BoardState } from '@yardmaster/protocol';
 
 // Per-terminal output rate for the lane sparklines (DESIGN.md §4.3): one timer for the whole
 // board samples each watched terminal's byte counter once per `SAMPLE_MS` into a 60-slot ring.
@@ -137,7 +137,7 @@ export class ThroughputSampler {
         try {
           listener(entry.ring);
         } catch (error) {
-          console.error('[c-board] throughput listener failed', error);
+          console.error('[yardmaster] throughput listener failed', error);
         }
       }
     }

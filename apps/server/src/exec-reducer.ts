@@ -1,4 +1,4 @@
-import type { CommandConfidence, Execution } from '@c-board/protocol';
+import type { CommandConfidence, Execution } from '@yardmaster/protocol';
 import type { BoardStore } from './store.js';
 
 export type ExecEvent =

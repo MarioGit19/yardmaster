@@ -1,4 +1,4 @@
-import type { BoardState } from '@c-board/protocol';
+import type { BoardState } from '@yardmaster/protocol';
 
 // The active-only overview (F26): which projects the overview shows. Everything else stays on
 // the board (the rail, ⌘K, the picker's recents); it just isn't drawn in the layouts.

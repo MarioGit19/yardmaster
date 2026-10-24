@@ -1,4 +1,4 @@
-import { type EditorWindow, emptyBoardState, type Project } from '@c-board/protocol';
+import { type EditorWindow, emptyBoardState, type Project } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeProject, makeSession, makeTerminal } from '../test/board.js';
 import { closePlan, waitForClosed } from './closing.js';

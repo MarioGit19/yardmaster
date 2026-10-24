@@ -15,7 +15,7 @@ export const NEXT_THEME: Record<ThemeSetting, ThemeSetting> = {
 export const PREFERS_LIGHT = '(prefers-color-scheme: light)';
 
 export const themePreference = createPreference<ThemeSetting>(
-  'cboard.theme',
+  'yardmaster.theme',
   THEME_SETTINGS,
   'dark',
 );

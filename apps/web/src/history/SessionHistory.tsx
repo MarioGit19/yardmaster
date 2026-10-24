@@ -1,4 +1,4 @@
-import type { SessionHistoryEntry, UiAction } from '@c-board/protocol';
+import type { SessionHistoryEntry, UiAction } from '@yardmaster/protocol';
 import { GitBranch, Play, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';

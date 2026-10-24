@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@c-board/protocol';
+import type { ChatMessage } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   inheritedRows,

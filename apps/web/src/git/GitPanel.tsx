@@ -1,4 +1,4 @@
-import type { GitCommit, GitFileChange, GitFileStatus, GitInfo } from '@c-board/protocol';
+import type { GitCommit, GitFileChange, GitFileStatus, GitInfo } from '@yardmaster/protocol';
 import { ArrowDown, ArrowUp, Check, GitBranch } from 'lucide-react';
 import { useState } from 'react';
 import { ColumnHeading } from '../focus/ColumnHeading.js';

@@ -7,7 +7,7 @@ import { ensureToken, generateToken, isValidToken, tokenPath, tokensEqual } from
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'cboard-token-'));
+  root = await mkdtemp(join(tmpdir(), 'yardmaster-token-'));
 });
 
 afterEach(async () => {
@@ -27,7 +27,7 @@ describe('generateToken', () => {
 
 describe('ensureToken', () => {
   it('creates the home dir and a 0600 token file when missing', async () => {
-    const home = join(root, 'nested', '.c-board');
+    const home = join(root, 'nested', '.yardmaster');
     const token = await ensureToken(home);
     expect(isValidToken(token)).toBe(true);
     expect((await readFile(tokenPath(home), 'utf8')).trim()).toBe(token);

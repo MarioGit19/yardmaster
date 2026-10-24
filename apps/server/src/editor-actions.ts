@@ -1,4 +1,4 @@
-import { type BoardState, RESUMABLE_SESSION_ID } from '@c-board/protocol';
+import { type BoardState, RESUMABLE_SESSION_ID } from '@yardmaster/protocol';
 import type { ActionHandlers, ActionResult } from './actions.js';
 import type { CommandPayloads } from './editor-gateway.js';
 import type { EditorRouter } from './editor-router.js';

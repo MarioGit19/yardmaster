@@ -13,7 +13,7 @@ export interface DemoBoard {
   url: string;
   /** `name=value` of the session cookie. */
   cookie: string;
-  /** The throwaway `CBOARD_HOME`. */
+  /** The throwaway `YARDMASTER_HOME`. */
   home: string;
   /** The throwaway `CLAUDE_CONFIG_DIR` (inside `home`). */
   claudeDir: string;
@@ -28,7 +28,7 @@ function waitForAuthUrl(child: ChildProcess): Promise<string> {
     const timer = setTimeout(() => fail(new Error('timed out')), BOOT_TIMEOUT_MS);
     const fail = (err: Error) => {
       clearTimeout(timer);
-      reject(new Error(`c-board did not start: ${err.message}\n${output}`));
+      reject(new Error(`Yardmaster did not start: ${err.message}\n${output}`));
     };
     const onData = (chunk: Buffer) => {
       output += chunk.toString();
@@ -45,7 +45,7 @@ function waitForAuthUrl(child: ChildProcess): Promise<string> {
 }
 
 /**
- * Boots `c-board start --demo --no-open` on a random port with a throwaway home, then signs in
+ * Boots `yardmaster start --demo --no-open` on a random port with a throwaway home, then signs in
  * through `/auth?t=` and returns the origin and session cookie.
  */
 export function startDemoBoard(): Promise<DemoBoard> {
@@ -70,7 +70,7 @@ export async function startBoard({
   /** Run the build (`dist/`, as `pnpm board` does) instead of the sources through tsx. */
   built?: boolean;
 }): Promise<DemoBoard> {
-  const home = await mkdtemp(join(tmpdir(), 'c-board-e2e-'));
+  const home = await mkdtemp(join(tmpdir(), 'yardmaster-e2e-'));
   const claudeDir = join(home, 'claude');
   const mode = stress
     ? ['--demo-stress', ...(projects ? ['--demo-projects', String(projects)] : [])]
@@ -78,16 +78,16 @@ export async function startBoard({
       ? ['--demo']
       : [];
   const [command, entry] = built
-    ? [process.execPath, ['--conditions=c-board-build', 'dist/cli.js']]
+    ? [process.execPath, ['--conditions=yardmaster-build', 'dist/cli.js']]
     : [TSX, ['src/cli.ts']];
   const args = [...entry, 'start', ...mode, '--no-open'];
   const child = spawn(command, args, {
     cwd: SERVER_DIR,
     env: {
       ...process.env,
-      CBOARD_PORT: '0',
-      CBOARD_HOME: home,
-      CBOARD_LOG_LEVEL: 'warn',
+      YARDMASTER_PORT: '0',
+      YARDMASTER_HOME: home,
+      YARDMASTER_LOG_LEVEL: 'warn',
       CLAUDE_CONFIG_DIR: claudeDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -4,7 +4,7 @@ import {
   type Project,
   projectIdFromPath,
   type UiAction,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { type FuzzyMatch, fuzzyMatch } from '../palette/fuzzy.js';
 import type { KeyValueStorage } from '../prefs.js';
 
@@ -182,7 +182,7 @@ function parseChoice(value: unknown): LaunchChoice | null {
   };
 }
 
-export const LAUNCH_KEY = 'cboard.launch';
+export const LAUNCH_KEY = 'yardmaster.launch';
 /** Folders whose last choice is kept; the least recently launched go first. */
 export const MAX_REMEMBERED = 50;
 

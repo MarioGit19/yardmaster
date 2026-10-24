@@ -1,4 +1,4 @@
-import type { Approval, NotifyEvent, PushPayload, ServerToUi } from '@c-board/protocol';
+import type { Approval, NotifyEvent, PushPayload, ServerToUi } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APPROVAL_GRACE_MS, formatDuration, Notifier, type NotifierSettings } from './notifier.js';
 import { type PushSender, PushSubscriptions, type SendResult } from './push.js';
@@ -475,7 +475,7 @@ describe('Notifier rules', () => {
     expect(sent).toEqual([
       expect.objectContaining({
         subscriptionId: ids[0],
-        payload: expect.objectContaining({ kind: 'test', title: 'c-board · Test notification' }),
+        payload: expect.objectContaining({ kind: 'test', title: 'Yardmaster · Test notification' }),
       }),
     ]);
   });

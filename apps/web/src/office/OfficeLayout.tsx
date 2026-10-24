@@ -34,7 +34,7 @@ const EAVE = 8;
 /** The phone's room view: the actor list is a bottom sheet (not the inspector's touch rule). */
 const PHONE_QUERY = '(max-width: 767px)';
 /** The history entry a room view pushes, so the back gesture leaves it like Esc. */
-const HISTORY_KEY = 'cboardOfficeRoom';
+const HISTORY_KEY = 'yardmasterOfficeRoom';
 
 export default function OfficeLayout() {
   useOwnBackdrop();

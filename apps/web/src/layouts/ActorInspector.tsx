@@ -100,7 +100,7 @@ export function ActorInspector({
 }
 
 /** The history entry an open sheet pushes, so the back gesture closes it like Esc (§10.1). */
-const HISTORY_KEY = 'cboardInspector';
+const HISTORY_KEY = 'yardmasterInspector';
 let sheetEntries = 0;
 
 /**

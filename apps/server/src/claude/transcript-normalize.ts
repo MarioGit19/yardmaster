@@ -3,7 +3,7 @@ import {
   parseTaskNotifications,
   type TaskNotification,
   type TokenUsage,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { z } from 'zod';
 
 // Defensive normalization of Claude Code transcript lines (PRD §6.3). The format is

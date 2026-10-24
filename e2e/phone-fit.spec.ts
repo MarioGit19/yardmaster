@@ -254,7 +254,7 @@ async function walk(page: Page, query: string, phone: boolean) {
   await disableWebgl(page);
 
   for (const layout of LAYOUTS) {
-    await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout.id);
+    await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout.id);
     await go('/');
     await page.reload();
     await expect(page.locator(layout.ready).first()).toBeVisible({ timeout: 20_000 });
@@ -293,7 +293,7 @@ async function walk(page: Page, query: string, phone: boolean) {
       await dismiss('[data-grid-cockpit]');
     }
   }
-  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'minimal'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'minimal'));
   await go('/');
   await page.reload();
   await expect(page.locator('[data-pod]').first()).toBeVisible();
@@ -427,7 +427,7 @@ async function walk(page: Page, query: string, phone: boolean) {
   // 12.6k: each layout's workspace skin (DESIGN.md §10.8 "Phones"): the hub, an item page and the
   // switcher of the first projects (on the worst board, the longest names and the fleet).
   for (const layout of LAYOUTS.filter((l) => l.id !== 'minimal')) {
-    await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout.id);
+    await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout.id);
     for (const id of ids.slice(0, worst ? 3 : 1)) {
       const n = `${layout.id} ${ids.indexOf(id) + 1}`;
       await go(`/p/${id}`);

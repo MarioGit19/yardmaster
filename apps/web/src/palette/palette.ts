@@ -4,7 +4,7 @@ import { createPreference, type KeyValueStorage } from '../prefs.js';
 const memory: KeyValueStorage = { getItem: () => null, setItem: () => {} };
 
 export const paletteOpen = createPreference<'open' | 'closed'>(
-  'cboard.palette',
+  'yardmaster.palette',
   ['open', 'closed'],
   'closed',
   memory,

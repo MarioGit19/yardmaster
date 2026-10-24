@@ -6,7 +6,7 @@ import {
   sessionDisplayName,
   type Terminal,
   toolFamily,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { backgroundItems } from '../background/model.js';
 import {
   type CrewTerminal,

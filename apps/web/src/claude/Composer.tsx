@@ -4,7 +4,7 @@ import {
   type PermissionMode,
   sessionDisplayName,
   terminalReplyBlock,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import {
   ArrowUp,
   ChevronDown,

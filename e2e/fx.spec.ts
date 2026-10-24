@@ -7,7 +7,7 @@ const section = (page: import('@playwright/test').Page, name: string) =>
   page.locator('section', { has: page.getByRole('heading', { name }) });
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('cboard.motion', 'full'));
+  await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'full'));
 });
 
 test('a WebGL background replaces the ambient field while it is on screen', async ({ page }) => {

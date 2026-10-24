@@ -1,4 +1,4 @@
-import type { HookEventStatus, ServerStatus } from '@c-board/protocol';
+import type { HookEventStatus, ServerStatus } from '@yardmaster/protocol';
 import { createPreference } from '../prefs.js';
 
 export type StepId = 'server' | 'hooks' | 'extension';
@@ -61,16 +61,16 @@ export function needsOnboarding(s: OnboardingSignals): boolean | null {
 
 /** Set once the user finishes or skips the setup guide on the overview. */
 export const onboardingPreference = createPreference<'pending' | 'done'>(
-  'cboard.onboarding',
+  'yardmaster.onboarding',
   ['pending', 'done'],
   'pending',
 );
 
-/** Commands shown in the guide; the user runs them from the c-board checkout. */
+/** Commands shown in the guide; the user runs them from the Yardmaster checkout. */
 export const SETUP_COMMANDS = {
-  hooks: 'pnpm c-board hooks install',
+  hooks: 'pnpm yardmaster hooks install',
   extension: [
-    'pnpm --filter c-board-extension package',
-    'cursor --install-extension apps/extension/dist/c-board.vsix',
+    'pnpm --filter yardmaster-extension package',
+    'cursor --install-extension apps/extension/dist/yardmaster.vsix',
   ],
 } as const;

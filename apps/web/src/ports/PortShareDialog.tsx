@@ -1,5 +1,5 @@
-import type { PortShare } from '@c-board/protocol';
 import * as Dialog from '@radix-ui/react-dialog';
+import type { PortShare } from '@yardmaster/protocol';
 import { Copy, ExternalLink, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
@@ -243,7 +243,7 @@ function SharedLink({ share, qr }: { share: PortShare; qr: boolean }) {
         )}
         {!share.mine && (
           <p className="text-meta text-text-3">
-            You shared this port outside c-board, so it stays shared when the port closes.
+            You shared this port outside Yardmaster, so it stays shared when the port closes.
           </p>
         )}
       </div>

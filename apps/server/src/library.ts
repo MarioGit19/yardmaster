@@ -8,7 +8,7 @@ import type {
   LibraryRootError,
   LibraryRootStatus,
   Project,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 /** Folders listed per root at most; a root with more is cut off (alphabetically). */
 export const LIBRARY_MAX_ENTRIES = 500;

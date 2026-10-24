@@ -129,7 +129,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.warn('[c-board] ambient shader failed to compile', gl.getShaderInfoLog(shader));
+    console.warn('[yardmaster] ambient shader failed to compile', gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }
@@ -162,7 +162,7 @@ export function createFieldRenderer(canvas: HTMLCanvasElement): FieldRenderer | 
   gl.attachShader(program, fragment);
   gl.linkProgram(program);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.warn('[c-board] ambient shader failed to link', gl.getProgramInfoLog(program));
+    console.warn('[yardmaster] ambient shader failed to link', gl.getProgramInfoLog(program));
     return null;
   }
   // biome-ignore lint/correctness/useHookAtTopLevel: WebGL, not a React hook.

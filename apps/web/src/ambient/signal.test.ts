@@ -1,4 +1,4 @@
-import type { Approval, Execution } from '@c-board/protocol';
+import type { Approval, Execution } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession, sampleBoard } from '../test/board.js';
 import {

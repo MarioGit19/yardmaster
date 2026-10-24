@@ -24,7 +24,7 @@ export function phoneTabFor(location: string): PhoneTab | null {
 
 type HistoryLike = Pick<History, 'state' | 'replaceState'> & Partial<Pick<History, 'pushState'>>;
 
-const KEY = 'cboardIndex';
+const KEY = 'yardmasterIndex';
 
 /**
  * Where each history entry of this page load sits, so a workspace's Back can return to the tab it

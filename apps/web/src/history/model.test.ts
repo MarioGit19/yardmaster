@@ -1,4 +1,4 @@
-import type { SessionHistoryEntry } from '@c-board/protocol';
+import type { SessionHistoryEntry } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { historyTitle, historyTokens, pastSessions } from './model.js';
 

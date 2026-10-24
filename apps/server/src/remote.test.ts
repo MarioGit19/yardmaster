@@ -1,4 +1,4 @@
-import { PAIRING_CODE_TTL_MS } from '@c-board/protocol';
+import { PAIRING_CODE_TTL_MS } from '@yardmaster/protocol';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
@@ -12,7 +12,7 @@ import { UI_WS_PATH } from './ui-gateway.js';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -190,6 +190,25 @@ describe('pairing', () => {
       headers: { ...local, cookie },
     });
     expect(onLocal.statusCode).toBe(401);
+  });
+
+  it('keeps a phone paired before the rename signed in and moves its cookie', async () => {
+    const instance = await server();
+    const value = (await pair(instance)).split('=')[1] ?? '';
+    const cookie = `cboard_device=${value}`;
+    const res = await call(instance, 'GET', '/api/settings', { ...remote, cookie });
+    expect(res.statusCode).toBe(200);
+    const set = [res.headers['set-cookie']].flat().map(String);
+    expect(set[0]).toMatch(new RegExp(`^${DEVICE_COOKIE}=${value.replace('.', '\\.')};`));
+    expect(set[0]).toContain('Secure');
+    expect(set[1]).toMatch(/^cboard_device=;.*Max-Age=0/);
+    // A forged old cookie gets nothing, and no new cookie.
+    const forged = await call(instance, 'GET', '/api/settings', {
+      ...remote,
+      cookie: 'cboard_device=forged.secret',
+    });
+    expect(forged.statusCode).toBe(401);
+    expect(forged.headers['set-cookie']).toBeUndefined();
   });
 
   it('spends a code on first use', async () => {

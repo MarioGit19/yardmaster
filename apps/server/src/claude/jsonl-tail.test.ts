@@ -8,7 +8,7 @@ let dir: string;
 let path: string;
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'c-board-tail-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-tail-'));
   path = join(dir, 'session.jsonl');
 });
 

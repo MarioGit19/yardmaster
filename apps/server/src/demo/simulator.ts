@@ -21,7 +21,7 @@ import {
   startBackground,
   type ToolActivity,
   toolFamily,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { ActionHandlers, ActionResult } from '../actions.js';
 import { NOTHING_TO_RERUN, type TerminalActionKind } from '../editor-actions.js';
 import type { BoardStore } from '../store.js';

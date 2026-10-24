@@ -3,7 +3,7 @@ import {
   ClaudeSession as ClaudeSessionSchema,
   HookCommon,
   KnownHookEvent,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_SESSION_ID, type HookFixture, hookFixture } from './fixtures.test-helpers.js';
 import { newSession, type SessionHookEvent, sessionReducer } from './session-reducer.js';

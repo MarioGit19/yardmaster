@@ -30,7 +30,7 @@ const LANGS: Record<Lang, () => LanguageInput> = {
   markdown: () => import('shiki/langs/markdown.mjs'),
 };
 
-const THEME = createCssVariablesTheme({ name: 'c-board', variablePrefix: '--shiki-' });
+const THEME = createCssVariablesTheme({ name: 'yardmaster', variablePrefix: '--shiki-' });
 
 let highlighter: Promise<HighlighterCore> | null = null;
 const loading = new Map<Lang, Promise<void>>();
@@ -58,7 +58,7 @@ async function ready(lang: Lang): Promise<HighlighterCore> {
 async function highlight({ id, code, lang }: HighlightRequest): Promise<HighlightResponse> {
   try {
     const h = await ready(lang);
-    const { tokens } = h.codeToTokens(code, { lang, theme: 'c-board' });
+    const { tokens } = h.codeToTokens(code, { lang, theme: 'yardmaster' });
     const lines: TokenLine[] = tokens.map((line) =>
       line.map((t) => {
         const style = t.fontStyle ? t.fontStyle : 0;

@@ -2,8 +2,8 @@ import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { claudeSettingsPath, HOOK_MARKER } from '@c-board/hook';
-import { HealthResponse, ServerStatus } from '@c-board/protocol';
+import { claudeSettingsPath, isHookCommand } from '@yardmaster/hook';
+import { HealthResponse, ServerStatus } from '@yardmaster/protocol';
 import type { ServerConfig } from './config.js';
 import { findEditorCli, findOnPath } from './editor-cli.js';
 import { loadNodePty } from './pty.js';
@@ -134,7 +134,7 @@ function checkNode(deps: DoctorDeps): DoctorCheck {
     label: 'Node.js',
     level: ok ? 'ok' : 'fail',
     message: ok ? deps.nodeVersion : `${deps.nodeVersion} is too old`,
-    ...(ok ? {} : { hint: `c-board needs Node ${MIN_NODE.join('.')} or newer (node:sqlite).` }),
+    ...(ok ? {} : { hint: `Yardmaster needs Node ${MIN_NODE.join('.')} or newer (node:sqlite).` }),
   };
 }
 
@@ -151,7 +151,7 @@ async function checkToken(config: ServerConfig, deps: DoctorDeps) {
         label,
         level: 'warn',
         message: `${shown} is missing`,
-        hint: 'It is created on the next `c-board start`.',
+        hint: 'It is created on the next `yardmaster start`.',
       } satisfies DoctorCheck,
     };
   }
@@ -164,7 +164,7 @@ async function checkToken(config: ServerConfig, deps: DoctorDeps) {
         label,
         level: 'warn',
         message: `${shown} is not a valid token`,
-        hint: 'Run `c-board token --rotate` to replace it.',
+        hint: 'Run `yardmaster token --rotate` to replace it.',
       } satisfies DoctorCheck,
     };
   }
@@ -176,7 +176,7 @@ async function checkToken(config: ServerConfig, deps: DoctorDeps) {
         label,
         level: 'warn',
         message: `${shown} is readable by other users (mode ${(info.mode & 0o777).toString(8)})`,
-        hint: `Run \`chmod 600 ${shown}\`, or restart c-board to fix it.`,
+        hint: `Run \`chmod 600 ${shown}\`, or restart Yardmaster to fix it.`,
       } satisfies DoctorCheck,
     };
   }
@@ -213,10 +213,10 @@ function checkServer(
         id: 'server',
         label: 'Server',
         level: 'ok',
-        message: `not running (port ${config.port} is free); start it with \`c-board start\``,
+        message: `not running (port ${config.port} is free); start it with \`yardmaster start\``,
       };
     case 'board': {
-      const message = `c-board ${probe.version} is running on ${where}${status?.demo ? ' (demo mode)' : ''}`;
+      const message = `Yardmaster ${probe.version} is running on ${where}${status?.demo ? ' (demo mode)' : ''}`;
       const live = status?.boardSessions ?? 0;
       // Under `pnpm dev` any edit restarts the server, and its board sessions with it.
       if (status?.watched && live > 0) {
@@ -236,7 +236,7 @@ function checkServer(
         label: 'Server',
         level: 'fail',
         message: `port ${config.port} is used by another program`,
-        hint: 'Stop it, or pick another port with CBOARD_PORT.',
+        hint: 'Stop it, or pick another port with YARDMASTER_PORT.',
       };
   }
 }
@@ -255,7 +255,7 @@ async function fetchStatus(
 
 export { claudeSettingsPath };
 
-/** Hook events whose handlers run the c-board hook script. */
+/** Hook events whose handlers run the Yardmaster hook script. */
 export function installedHookEvents(settings: unknown): string[] {
   if (typeof settings !== 'object' || settings === null) return [];
   const hooks = (settings as { hooks?: unknown }).hooks;
@@ -273,7 +273,7 @@ export function installedHookEvents(settings: unknown): string[] {
             typeof hook === 'object' &&
             hook !== null &&
             typeof (hook as { command?: unknown }).command === 'string' &&
-            (hook as { command: string }).command.includes(HOOK_MARKER),
+            isHookCommand((hook as { command: string }).command),
         ),
     );
     if (found) events.push(event);
@@ -302,7 +302,7 @@ async function checkHooks(
     label: 'Claude hooks',
     level: 'warn',
     message,
-    hint: 'Run `c-board hooks install` so Claude sessions show up on the board.',
+    hint: 'Run `yardmaster hooks install` so Claude sessions show up on the board.',
   });
   if (raw === undefined) return notInstalled(`${shown} not found`);
 
@@ -349,7 +349,7 @@ function checkExtensions(
       ...base,
       level: 'warn',
       message: 'the running server rejected the token',
-      hint: 'Restart c-board after rotating the token.',
+      hint: 'Restart Yardmaster after rotating the token.',
     };
   }
   if (status === undefined) {
@@ -360,7 +360,7 @@ function checkExtensions(
       ...base,
       level: 'warn',
       message: 'no Cursor or VS Code window connected',
-      hint: 'Install the c-board extension and open a window.',
+      hint: 'Install the Yardmaster extension and open a window.',
     };
   }
   return {
@@ -410,7 +410,7 @@ async function checkPty(deps: DoctorDeps, status: ServerStatus | undefined): Pro
       ...base,
       level: 'warn',
       message: loaded.reason,
-      hint: 'New terminals need an editor window until node-pty loads. Reinstall c-board (node-pty ships prebuilt binaries; other platforms build it with node-gyp).',
+      hint: 'New terminals need an editor window until node-pty loads. Reinstall Yardmaster (node-pty ships prebuilt binaries; other platforms build it with node-gyp).',
     };
   }
   const live = board ? `; ${board.live} of ${board.max} running` : '';
@@ -494,7 +494,7 @@ export function formatDoctorReport(
   const paint = (code: string, text: string) =>
     options.color ? `\x1b[${code}m${text}\x1b[0m` : text;
   const width = Math.max(...checks.map((check) => check.label.length));
-  const lines = [`${paint('1', 'c-board doctor')} ${paint('90', `v${options.version}`)}`, ''];
+  const lines = [`${paint('1', 'yardmaster doctor')} ${paint('90', `v${options.version}`)}`, ''];
   for (const check of checks) {
     const symbol = paint(COLORS[check.level], SYMBOLS[check.level]);
     lines.push(`  ${symbol} ${check.label.padEnd(width)}  ${check.message}`);

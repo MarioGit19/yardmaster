@@ -195,7 +195,7 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
                   : windows > 1
                     ? `${windows} editor windows connected.`
                     : 'An editor has connected before.'
-                : 'Streams your Cursor or VS Code terminals to the board. Build and install it from the c-board checkout, then reload the editor window.'
+                : 'Streams your Cursor or VS Code terminals to the board. Build and install it from the Yardmaster checkout, then reload the editor window.'
             }
           >
             {SETUP_COMMANDS.extension.map((command) => (

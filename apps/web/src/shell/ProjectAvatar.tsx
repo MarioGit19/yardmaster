@@ -1,4 +1,4 @@
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { cx } from '../ui/cx.js';
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });

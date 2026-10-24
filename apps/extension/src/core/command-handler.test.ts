@@ -1,4 +1,4 @@
-import { makeMessage, type ServerToEditor } from '@c-board/protocol';
+import { makeMessage, type ServerToEditor } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COMMAND_ERRORS,

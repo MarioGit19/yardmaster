@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Options, Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
-import { projectIdFromPath, ServerStatus, SessionHistoryResponse } from '@c-board/protocol';
+import { projectIdFromPath, ServerStatus, SessionHistoryResponse } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import pkg from '../package.json' with { type: 'json' };
@@ -15,7 +15,7 @@ import { generateToken } from './token.js';
 const config: ServerConfig = {
   port: 4317,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -51,7 +51,7 @@ describe('server', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/status',
-      headers: { host, 'x-cboard-token': token },
+      headers: { host, 'x-yardmaster-token': token },
     });
     expect(res.statusCode).toBe(200);
     const body = ServerStatus.parse(res.json());
@@ -90,7 +90,7 @@ describe('server', () => {
       token,
       dbPath: ':memory:',
       processes: { platform: 'darwin', run },
-      discovery: { listHistory: null, registryDir: '/nonexistent/c-board-test' },
+      discovery: { listHistory: null, registryDir: '/nonexistent/yardmaster-test' },
     });
     expect(app.sessionLinker).not.toBeNull();
     app.store.upsertTerminal({ id: 't-1', windowId: 'w-1', name: 'zsh', shellPid: 4242 });
@@ -113,7 +113,7 @@ describe('server', () => {
       processes: false,
       git: false,
       discovery: {
-        registryDir: '/nonexistent/c-board-test',
+        registryDir: '/nonexistent/yardmaster-test',
         listHistory: async (dir) =>
           dir === path
             ? [
@@ -148,7 +148,7 @@ describe('server', () => {
     const res = await app.inject({
       method: 'GET',
       url,
-      headers: { host, 'x-cboard-token': token },
+      headers: { host, 'x-yardmaster-token': token },
     });
     expect(res.statusCode).toBe(200);
     const { sessions } = SessionHistoryResponse.parse(res.json());
@@ -161,7 +161,7 @@ describe('server', () => {
     const missing = await app.inject({
       method: 'GET',
       url: '/api/projects/nope/sessions',
-      headers: { host, 'x-cboard-token': token },
+      headers: { host, 'x-yardmaster-token': token },
     });
     expect(missing.statusCode).toBe(404);
   });
@@ -172,7 +172,7 @@ describe('server', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/projects/${projectId}/sessions`,
-      headers: { host, 'x-cboard-token': token },
+      headers: { host, 'x-yardmaster-token': token },
     });
     const { sessions } = SessionHistoryResponse.parse(res.json());
     expect(sessions.length).toBeGreaterThanOrEqual(5);
@@ -182,7 +182,7 @@ describe('server', () => {
   });
 
   it('lists a board session as interrupted after a restart, and resumes the same id', async () => {
-    tmpHome = await mkdtemp(join(tmpdir(), 'cboard-restart-'));
+    tmpHome = await mkdtemp(join(tmpdir(), 'yardmaster-restart-'));
     const path = '/home/dev/acme-shop';
     const projectId = projectIdFromPath(path);
     const sessionId = '0b6f6a52-3c1e-4d7a-9f0e-5a1b2c3d4e0f';
@@ -215,7 +215,7 @@ describe('server', () => {
         dbPath: join(tmpHome as string, 'board.db'),
         processes: false,
         git: false,
-        discovery: { listHistory: null, registryDir: '/nonexistent/c-board-test' },
+        discovery: { listHistory: null, registryDir: '/nonexistent/yardmaster-test' },
         transcripts: { loadHistory: async () => [], watchFile: () => async () => {} },
         runner: { query, newId: () => sessionId },
       } satisfies BuildOptions);
@@ -274,13 +274,13 @@ describe('server', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/nope',
-      headers: { host, 'x-cboard-token': token },
+      headers: { host, 'x-yardmaster-token': token },
     });
     expect(res.statusCode).toBe(404);
   });
 
   it('listens on loopback and serves health over HTTP', async () => {
-    tmpHome = await mkdtemp(join(tmpdir(), 'cboard-app-'));
+    tmpHome = await mkdtemp(join(tmpdir(), 'yardmaster-app-'));
     app = await startServer({ ...config, port: 0, home: tmpHome }, { processes: false });
     const address = app.server.address();
     if (address === null || typeof address === 'string') throw new Error('expected a TCP address');

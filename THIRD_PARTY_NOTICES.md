@@ -1,6 +1,6 @@
 # Third-party notices
 
-c-board ships a few visual effects adapted from third-party code. Each adapted file keeps the
+Yardmaster ships a few visual effects adapted from third-party code. Each adapted file keeps the
 upstream copyright notice in its header comment.
 
 ## React Bits
@@ -9,11 +9,11 @@ Source: [React Bits](https://reactbits.dev) by David Haz. License: **MIT + Commo
 Condition v1.0**.
 
 The license allows these components to be used, modified and distributed **as part of an
-application, website or product** such as c-board. The Commons Clause forbids selling,
+application, website or product** such as Yardmaster. The Commons Clause forbids selling,
 sublicensing or redistributing **the components themselves**, alone, in a bundle or as a ported
-version. Do not publish or package the files below on their own, outside c-board.
+version. Do not publish or package the files below on their own, outside Yardmaster.
 
-| Component in c-board | Adapted from | Used for |
+| Component in Yardmaster | Adapted from | Used for |
 |---|---|---|
 | `apps/web/src/fx/DecryptedText.tsx` | TextAnimations/DecryptedText | Captions that resolve (Grid, Retro) |
 | `apps/web/src/fx/GlitchText.tsx` | TextAnimations/GlitchText | Error titles (Grid) |

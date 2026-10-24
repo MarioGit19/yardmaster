@@ -1,4 +1,4 @@
-import type { BoardSettings, BoardSettingsPatch } from '@c-board/protocol';
+import type { BoardSettings, BoardSettingsPatch } from '@yardmaster/protocol';
 import { useEffect, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { api } from './api.js';

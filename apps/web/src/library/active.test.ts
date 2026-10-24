@@ -1,4 +1,4 @@
-import { type BoardState, type EditorWindow, emptyBoardState } from '@c-board/protocol';
+import { type BoardState, type EditorWindow, emptyBoardState } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeProject, makeSession, makeTerminal } from '../test/board.js';
 import { type ActiveRule, activeKey, activeProjectIds, closedProjectIds } from './active.js';

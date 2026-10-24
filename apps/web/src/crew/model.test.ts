@@ -1,4 +1,4 @@
-import type { ClaudeSession, SessionStatus } from '@c-board/protocol';
+import type { ClaudeSession, SessionStatus } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   type CrewTerminal,

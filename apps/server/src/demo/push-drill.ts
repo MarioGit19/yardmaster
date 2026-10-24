@@ -1,4 +1,4 @@
-import { BOARD_WINDOW_ID, NOTIFY_LONG_RUN_MS } from '@c-board/protocol';
+import { BOARD_WINDOW_ID, NOTIFY_LONG_RUN_MS } from '@yardmaster/protocol';
 import type { BoardStore } from '../store.js';
 
 const DRILL_PROJECTS = [

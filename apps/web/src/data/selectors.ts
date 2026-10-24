@@ -7,7 +7,7 @@ import type {
   PortBinding,
   Project,
   Terminal,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { BoardStoreState } from './store.js';
 
 // Plain selectors over the store. Single-entity ones return the stored object, so they

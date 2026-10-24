@@ -1,4 +1,4 @@
-import { toolInputDetail } from '@c-board/protocol';
+import { toolInputDetail } from '@yardmaster/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useBoardClient, useBoardStore } from '../data/index.js';

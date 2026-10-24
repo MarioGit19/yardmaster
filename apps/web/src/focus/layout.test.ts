@@ -125,10 +125,10 @@ describe('persistence', () => {
 
   it('keeps only the valid parts of corrupt or partial entries', () => {
     const storage = memoryStorage({
-      'cboard.focus.a': '{not json',
-      'cboard.focus.b': '"280"',
-      'cboard.focus.c': JSON.stringify({ left: 'wide', right: 9000 }),
-      'cboard.focus.d': JSON.stringify({ left: Number.NaN, right: -4 }),
+      'yardmaster.focus.a': '{not json',
+      'yardmaster.focus.b': '"280"',
+      'yardmaster.focus.c': JSON.stringify({ left: 'wide', right: 9000 }),
+      'yardmaster.focus.d': JSON.stringify({ left: Number.NaN, right: -4 }),
     });
     expect(loadSizes('a', storage)).toEqual({});
     expect(loadSizes('b', storage)).toEqual({});

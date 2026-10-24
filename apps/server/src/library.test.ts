@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Project } from '@c-board/protocol';
+import type { Project } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   diskLibraryFs,
@@ -17,7 +17,7 @@ let root: string;
 let outside: string;
 
 beforeEach(async () => {
-  base = await realpath(await mkdtemp(join(tmpdir(), 'cboard-library-')));
+  base = await realpath(await mkdtemp(join(tmpdir(), 'yardmaster-library-')));
   root = join(base, 'Desktop');
   outside = join(base, 'elsewhere');
   await mkdir(root);

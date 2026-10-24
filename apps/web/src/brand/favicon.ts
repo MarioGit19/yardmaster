@@ -1,4 +1,4 @@
-import type { BoardState } from '@c-board/protocol';
+import type { BoardState } from '@yardmaster/protocol';
 import { projectTone, sessionStatusView } from '../status.js';
 import logoSource from './logo.svg?raw';
 import { BRAND_NAME } from './name.js';

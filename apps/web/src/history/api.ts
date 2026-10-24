@@ -1,4 +1,4 @@
-import { type SessionHistoryEntry, SessionHistoryResponse } from '@c-board/protocol';
+import { type SessionHistoryEntry, SessionHistoryResponse } from '@yardmaster/protocol';
 import { useEffect, useState } from 'react';
 
 export type HistoryState =

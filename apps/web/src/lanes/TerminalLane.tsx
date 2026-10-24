@@ -1,4 +1,4 @@
-import { type ClaudeSession, sessionSubtitle, type Terminal } from '@c-board/protocol';
+import { type ClaudeSession, sessionSubtitle, type Terminal } from '@yardmaster/protocol';
 import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';

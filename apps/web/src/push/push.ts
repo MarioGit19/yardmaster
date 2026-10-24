@@ -1,4 +1,4 @@
-import { PushSubscribeResponse } from '@c-board/protocol';
+import { PushSubscribeResponse } from '@yardmaster/protocol';
 import { useEffect, useSyncExternalStore } from 'react';
 import type { BoardClient } from '../data/client.js';
 import { useBoardClient } from '../data/index.js';
@@ -8,8 +8,8 @@ import { api } from '../settings/api.js';
 
 export const SW_URL = '/sw.js';
 /** `sw-logic`'s message to open a route. Not imported: that would pull it into a shared chunk. */
-export const OPEN_MESSAGE = 'cboard.open';
-const PUSH_ID_KEY = 'cboard.push.id';
+export const OPEN_MESSAGE = 'yardmaster.open';
+const PUSH_ID_KEY = 'yardmaster.push.id';
 
 /**
  * Why push can't be turned on here, or 'ok'. iOS only offers it to a board added to the home

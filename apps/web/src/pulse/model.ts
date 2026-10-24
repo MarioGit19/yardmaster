@@ -3,7 +3,7 @@ import {
   type BoardState,
   type ClaudeSession,
   PULSE_WINDOW_MS,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { terminalSession } from '../data/selectors.js';
 import { projectHref, sessionHref } from '../routes.js';
 import type { Tone } from '../status.js';

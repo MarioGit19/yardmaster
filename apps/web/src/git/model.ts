@@ -1,4 +1,4 @@
-import type { GitFileChange, GitFileStatus, GitInfo } from '@c-board/protocol';
+import type { GitFileChange, GitFileStatus, GitInfo } from '@yardmaster/protocol';
 
 export interface FileGroup {
   status: GitFileStatus;

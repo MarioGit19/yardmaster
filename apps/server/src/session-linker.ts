@@ -1,4 +1,4 @@
-import type { BoardState, ClaudeSession, PatchOp } from '@c-board/protocol';
+import type { BoardState, ClaudeSession, PatchOp } from '@yardmaster/protocol';
 import { type ProcessTree, terminalForPid } from './processes.js';
 import type { BoardStore } from './store.js';
 

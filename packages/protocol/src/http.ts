@@ -11,7 +11,7 @@ export const HealthResponse = z.object({
 });
 export type HealthResponse = z.infer<typeof HealthResponse>;
 
-/** `GET /api/status` (authenticated): what `c-board doctor` reports about a running board. */
+/** `GET /api/status` (authenticated): what `yardmaster doctor` reports about a running board. */
 export const ServerStatus = z.object({
   ok: z.literal(true),
   version: z.string(),
@@ -183,7 +183,7 @@ export const LibraryResponse = z.object({
 });
 export type LibraryResponse = z.infer<typeof LibraryResponse>;
 
-/** `GET /api/away` (token): polled by `c-board-hook --permission` before it waits on the board. */
+/** `GET /api/away` (token): polled by `yardmaster-hook --permission` before it waits on the board. */
 export const AwayStatusResponse = z.object({
   away: z.boolean(),
   timeoutSec: AwayTimeoutSec,
@@ -199,7 +199,7 @@ export const HookEventStatus = z.object({
 });
 export type HookEventStatus = z.infer<typeof HookEventStatus>;
 
-/** `GET /api/hooks` (authenticated): the c-board hooks in Claude's settings.json. */
+/** `GET /api/hooks` (authenticated): the Yardmaster hooks in Claude's settings.json. */
 export const HooksStatusResponse = z.object({
   /** The settings file, with the home directory shortened to `~`. */
   path: z.string(),

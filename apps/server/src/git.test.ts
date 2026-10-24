@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { GIT_MAX_COMMITS, GIT_MAX_FILES, GitInfo } from '@c-board/protocol';
+import { GIT_MAX_COMMITS, GIT_MAX_FILES, GitInfo } from '@yardmaster/protocol';
 import { afterAll, describe, expect, it } from 'vitest';
 import { GIT_LOG_ARGS, GIT_STATUS_ARGS, parseGitLog, parseGitStatus, sameGitInfo } from './git.js';
 import { runGit } from './git-scanner.js';
@@ -220,7 +220,7 @@ const hasGit = (() => {
 })();
 
 describe.skipIf(!hasGit)('git output against a real repository', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'c-board-git-'));
+  const dir = mkdtempSync(join(tmpdir(), 'yardmaster-git-'));
   const env = {
     ...process.env,
     GIT_AUTHOR_NAME: 'Dev One',
@@ -270,7 +270,7 @@ describe.skipIf(!hasGit)('git output against a real repository', () => {
   });
 
   it('reports a folder outside git', async () => {
-    const plain = mkdtempSync(join(tmpdir(), 'c-board-plain-'));
+    const plain = mkdtempSync(join(tmpdir(), 'yardmaster-plain-'));
     try {
       await expect(runGit(plain, GIT_STATUS_ARGS)).rejects.toMatchObject({
         stderr: expect.stringMatching(/not a git repository/i),

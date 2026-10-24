@@ -5,7 +5,7 @@ import {
   isBoardTerminal,
   MAX_BOARD_TERMINALS,
   type Terminal,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { ActionHandler, ActionHandlers, ActionResult } from './actions.js';
 import { NOTHING_TO_RERUN, type TerminalActionKind } from './editor-actions.js';
 import { ROUTE_ERRORS } from './editor-router.js';

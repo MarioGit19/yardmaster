@@ -12,7 +12,7 @@ import {
   type PushSubscribeResponse,
   PushSubscriptionInput,
   PushTestRequest,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import webpush from 'web-push';
 import { z } from 'zod';
@@ -22,7 +22,7 @@ import { deviceName } from './remote.js';
 export const SUBSCRIPTIONS_KEY = 'push.subscriptions';
 export const VAPID_FILE = 'vapid.json';
 /** The VAPID `sub` claim: a contact for the push services, never a real person's address. */
-const VAPID_SUBJECT = 'mailto:c-board@users.noreply.github.com';
+const VAPID_SUBJECT = 'mailto:yardmaster@users.noreply.github.com';
 /** A push the device can't take within this long is dropped by the push service. */
 const PUSH_TTL_SEC = 60 * 60;
 const OUTBOX_MAX = 200;

@@ -1,9 +1,9 @@
 import '@xterm/xterm/css/xterm.css';
-import type { StreamId } from '@c-board/protocol';
 import { FitAddon } from '@xterm/addon-fit';
 import { type ISearchOptions, SearchAddon } from '@xterm/addon-search';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
+import type { StreamId } from '@yardmaster/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { RESIZE_END, resizingAncestor } from '../anim/resizing.js';
 import { useBoardClient } from '../data/index.js';

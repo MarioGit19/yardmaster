@@ -7,7 +7,7 @@ import {
   HISTORY_WINDOW_MS,
   type PatchOp,
   type ServerToUi,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { pino } from 'pino';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ import { UI_WS_PATH, UiGateway } from './ui-gateway.js';
 const config: ServerConfig = {
   port: 0,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -108,7 +108,7 @@ class Client {
 async function connect(port: number, origin: string): Promise<Client> {
   const client = new Client(port, {
     origin,
-    cookie: `cboard_session=${createSessionValue(token)}`,
+    cookie: `yardmaster_session=${createSessionValue(token)}`,
   });
   await client.opened();
   return client;
@@ -146,7 +146,7 @@ describe('/ws/ui connection', () => {
 
   it('rejects a foreign origin', async () => {
     const { port } = await boot();
-    const cookie = `cboard_session=${createSessionValue(token)}`;
+    const cookie = `yardmaster_session=${createSessionValue(token)}`;
     expect(await rejection(port, { origin: 'http://evil.example', cookie })).toBe(403);
   });
 
@@ -158,13 +158,13 @@ describe('/ws/ui connection', () => {
   it('rejects a missing or forged session', async () => {
     const { port, origin } = await boot();
     expect(await rejection(port, { origin })).toBe(401);
-    const forged = `cboard_session=${createSessionValue(generateToken())}`;
+    const forged = `yardmaster_session=${createSessionValue(generateToken())}`;
     expect(await rejection(port, { origin, cookie: forged })).toBe(401);
   });
 
   it('rejects a foreign Host header', async () => {
     const { port, origin } = await boot();
-    const cookie = `cboard_session=${createSessionValue(token)}`;
+    const cookie = `yardmaster_session=${createSessionValue(token)}`;
     expect(await rejection(port, { origin, cookie, host: `rebind.example:${port}` })).toBe(403);
   });
 });

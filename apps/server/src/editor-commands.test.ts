@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { decodeServerToEditor, type ServerToEditor, type ServerToUi } from '@c-board/protocol';
+import { decodeServerToEditor, type ServerToEditor, type ServerToUi } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -17,7 +17,7 @@ import { UI_WS_PATH } from './ui-gateway.js';
 const config: ServerConfig = {
   port: 0,
   host: '127.0.0.1',
-  home: '/home/dev/.c-board',
+  home: '/home/dev/.yardmaster',
   logLevel: 'silent',
   devOrigins: [],
 };
@@ -125,7 +125,7 @@ async function ui(port: number): Promise<Peer<ServerToUi>> {
   const socket = new WebSocket(`ws://127.0.0.1:${port}${UI_WS_PATH}`, {
     headers: {
       origin: `http://127.0.0.1:${port}`,
-      cookie: `cboard_session=${createSessionValue(token)}`,
+      cookie: `yardmaster_session=${createSessionValue(token)}`,
     },
   });
   const peer = new Peer<ServerToUi>(socket, (data) => {

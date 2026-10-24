@@ -1,4 +1,4 @@
-You are one iteration of an unattended build loop for the c-board repository. Do exactly one task, then stop.
+You are one iteration of an unattended build loop for the Yardmaster repository. Do exactly one task, then stop.
 
 1. Read `CLAUDE.md`, then open `PLAN.md` and find the **first** line starting with `- [ ]`. That is your task. Do not work on any other task.
    - If it is tagged `[HUMAN]`, change nothing, write `HUMAN: <task id>` to `loop/.state/BLOCKED`, and stop.

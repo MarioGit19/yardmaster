@@ -3,7 +3,7 @@ import {
   type Project,
   sessionDisplayName,
   sessionSubtitle,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { LoaderCircle, Play, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';

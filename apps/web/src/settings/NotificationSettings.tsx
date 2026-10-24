@@ -3,7 +3,7 @@ import {
   NOTIFY_EVENTS,
   type NotifyEvent,
   type PushDevice,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { BellRing } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';

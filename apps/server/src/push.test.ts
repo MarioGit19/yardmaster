@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PushInfoResponse, PushOutboxResponse } from '@c-board/protocol';
+import { PushInfoResponse, PushOutboxResponse } from '@yardmaster/protocol';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from './app.js';
@@ -36,7 +36,7 @@ afterEach(async () => {
 async function server(
   options: { demo?: boolean; send?: PushSender } = {},
 ): Promise<FastifyInstance> {
-  home = await mkdtemp(join(tmpdir(), 'cboard-push-'));
+  home = await mkdtemp(join(tmpdir(), 'yardmaster-push-'));
   const config: ServerConfig = {
     port: 4317,
     host: '127.0.0.1',

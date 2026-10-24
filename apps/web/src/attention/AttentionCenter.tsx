@@ -3,7 +3,7 @@ import {
   type ClaudeSession,
   sessionDisplayName,
   sessionSubtitle,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';

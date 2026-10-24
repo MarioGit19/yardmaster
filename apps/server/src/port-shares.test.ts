@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import type { PortBinding } from '@c-board/protocol';
+import type { PortBinding } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from './app.js';
@@ -95,7 +95,7 @@ const serveCalls = async () =>
   (await readStub()).calls.filter((c) => c[0] === 'serve' && c[1] !== 'status');
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'c-board-ts-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-ts-'));
   stateFile = join(dir, 'state.json');
   const bin = join(dir, 'bin');
   await import('node:fs/promises').then((fs) => fs.mkdir(bin));
@@ -377,7 +377,7 @@ describe('port share routes', () => {
   const config: ServerConfig = {
     port: BOARD_PORT,
     host: '127.0.0.1',
-    home: '/home/dev/.c-board',
+    home: '/home/dev/.yardmaster',
     logLevel: 'silent',
     devOrigins: [],
   };

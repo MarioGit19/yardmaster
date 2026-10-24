@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { EDITOR_CLOSE_REPLACED } from '@c-board/protocol';
+import { EDITOR_CLOSE_REPLACED } from '@yardmaster/protocol';
 import { afterEach, describe, expect, it } from 'vitest';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { backoffDelay, EditorLink, type HelloPayload, type LinkStatus } from './editor-link.js';
@@ -19,7 +19,7 @@ interface Received {
   payload: Record<string, unknown>;
 }
 
-/** A stand-in for the c-board server's `/ws/editor`. */
+/** A stand-in for the Yardmaster server's `/ws/editor`. */
 class FakeServer {
   readonly wss: WebSocketServer;
   readonly received: Received[] = [];
@@ -32,7 +32,7 @@ class FakeServer {
     wss.on('connection', (socket, request) => {
       this.connections += 1;
       this.sockets.push(socket);
-      this.headers.push(request.headers['x-cboard-token'] as string | undefined);
+      this.headers.push(request.headers['x-yardmaster-token'] as string | undefined);
       socket.on('message', (data) => this.received.push(JSON.parse(data.toString())));
     });
   }

@@ -1,4 +1,4 @@
-import type { BackgroundKind, ClaudeSession } from '@c-board/protocol';
+import type { BackgroundKind, ClaudeSession } from '@yardmaster/protocol';
 import { Bot, ChevronRight, CircleDashed, Radar, SquareTerminal } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useId, useMemo } from 'react';

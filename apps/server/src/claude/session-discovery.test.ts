@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { projectIdFromPath } from '@c-board/protocol';
+import { projectIdFromPath } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
 import { type HistoryLister, processAlive, SessionDiscovery } from './session-discovery.js';
@@ -18,7 +18,7 @@ let registry: string;
 const services: SessionDiscovery[] = [];
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'c-board-registry-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-registry-'));
   registry = join(dir, 'sessions');
   await mkdir(registry);
 });

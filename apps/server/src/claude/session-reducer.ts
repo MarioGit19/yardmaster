@@ -19,7 +19,7 @@ import {
   type ToolActivity,
   toolFamily,
   toolInputDetail,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 
 /** One hook delivery, already parsed. `hook` is null for events we don't recognise. */
 export interface SessionHookEvent {

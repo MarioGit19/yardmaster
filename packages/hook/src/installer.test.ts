@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,7 +18,7 @@ import {
   unifiedDiff,
 } from './installer.js';
 
-const COMMAND = '/home/dev/tools/c-board/packages/hook/bin/c-board-hook';
+const COMMAND = '/home/dev/tools/yardmaster/packages/hook/bin/yardmaster-hook';
 const NOW = new Date('2026-03-04T05:06:07.890Z');
 
 const THIRD_PARTY = {
@@ -41,7 +41,7 @@ let dir: string;
 let path: string;
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'c-board-installer-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-installer-'));
   path = join(dir, '.claude', 'settings.json');
 });
 
@@ -93,7 +93,7 @@ describe('hook installer', () => {
     await chmod(path, 0o640);
 
     const backup = await install();
-    expect(backup).toBe(`${path}.c-board-backup-20260304T050607Z`);
+    expect(backup).toBe(`${path}.yardmaster-backup-20260304T050607Z`);
     expect(await readFile(backup as string, 'utf8')).toBe(original);
     expect((await stat(path)).mode & 0o777).toBe(0o640);
 
@@ -132,17 +132,17 @@ describe('hook installer', () => {
     expect(planInstall(raw, COMMAND).changed).toBe(false);
   });
 
-  it('replaces an outdated or duplicated c-board handler with exactly one', async () => {
+  it('replaces an outdated or duplicated Yardmaster handler with exactly one', async () => {
     const stale = {
       hooks: {
         Stop: [
           {
             hooks: [
               { type: 'command', command: 'say done' },
-              { type: 'command', command: '/old/place/c-board-hook' },
+              { type: 'command', command: '/old/place/yardmaster-hook' },
             ],
           },
-          { hooks: [{ type: 'command', command: '/old/place/c-board-hook', async: true }] },
+          { hooks: [{ type: 'command', command: '/old/place/yardmaster-hook', async: true }] },
         ],
       },
     };
@@ -150,6 +150,42 @@ describe('hook installer', () => {
     expect(hookStatus(raw, COMMAND).outdated).toEqual(['Stop']);
     const hooks = JSON.parse(planInstall(raw, COMMAND).after).hooks;
     expect(hooks.Stop).toEqual([{ hooks: [{ type: 'command', command: 'say done' }] }, ours]);
+  });
+
+  it('replaces the hooks installed under the old c-board name, with a backup', async () => {
+    const legacy = '/home/dev/tools/yardmaster/packages/hook/bin/c-board-hook';
+    const old: { hooks: Record<string, unknown[]> } = structuredClone(THIRD_PARTY);
+    for (const event of OBSERVER_EVENTS) {
+      old.hooks[event] = [
+        ...(old.hooks[event] ?? []),
+        { hooks: [{ type: 'command', command: legacy, async: true, timeout: HOOK_TIMEOUT_S }] },
+      ];
+    }
+    old.hooks.PermissionRequest?.push({
+      hooks: [{ type: 'command', command: `${legacy} --permission`, timeout: 330 }],
+    });
+    const raw = `${JSON.stringify(old, null, 2)}\n`;
+    await mkdir(join(dir, '.claude'), { recursive: true });
+    await writeFile(path, raw);
+    expect(hookStatus(raw, COMMAND).outdated).toEqual([...OBSERVER_EVENTS]);
+    expect(awayHookStatus(raw, COMMAND)).toBe('outdated');
+
+    const backup = await applyPlan(
+      path,
+      planInstall(await readSettings(path), COMMAND, { away: true }),
+      NOW,
+    );
+    expect(await readFile(backup as string, 'utf8')).toBe(raw);
+    const after = await readSettings(path);
+    expect(after).not.toContain('c-board-hook');
+    expect(hookStatus(after, COMMAND).installed).toEqual([...OBSERVER_EVENTS]);
+    expect(awayHookStatus(after, COMMAND)).toBe('installed');
+    // Other tools' hooks stay, and nothing is doubled.
+    expect(JSON.parse(after as string).hooks.PreToolUse).toEqual([
+      THIRD_PARTY.hooks.PreToolUse[0],
+      ours,
+    ]);
+    expect(planUninstall(after).after).not.toContain('-hook');
   });
 
   it('uninstall restores exactly the other hooks', async () => {
@@ -163,7 +199,7 @@ describe('hook installer', () => {
     });
     await writeFile(path, JSON.stringify(current));
 
-    expect(await uninstall()).toMatch(/\.c-board-backup-/);
+    expect(await uninstall()).toMatch(/\.yardmaster-backup-/);
     expect(await settings()).toEqual(THIRD_PARTY);
     expect(planUninstall(await readSettings(path)).changed).toBe(false);
   });
@@ -253,13 +289,13 @@ describe('helpers', () => {
   });
 
   it('quotes script paths the shell would split', () => {
-    expect(hookCommand('/home/dev/c-board/bin/c-board-hook')).toBe(
-      '/home/dev/c-board/bin/c-board-hook',
+    expect(hookCommand('/home/dev/yardmaster/bin/yardmaster-hook')).toBe(
+      '/home/dev/yardmaster/bin/yardmaster-hook',
     );
-    expect(hookCommand("/home/dev/My Tools/it's/c-board-hook")).toBe(
-      `'/home/dev/My Tools/it'\\''s/c-board-hook'`,
+    expect(hookCommand("/home/dev/My Tools/it's/yardmaster-hook")).toBe(
+      `'/home/dev/My Tools/it'\\''s/yardmaster-hook'`,
     );
-    expect(hookCommand()).toMatch(/c-board-hook'?$/);
+    expect(hookCommand()).toMatch(/yardmaster-hook'?$/);
   });
 
   it('prints a unified diff with context and separate hunks', () => {

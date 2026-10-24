@@ -63,7 +63,7 @@ test('the Waiting count opens the Attention Center', async ({ page }) => {
 // Full slides the sheet in, Reduced only fades it, Off shows it at once.
 for (const level of ['full', 'reduced', 'off'] as const) {
   test(`the Attention Center at ${level} motion`, async ({ page }) => {
-    await page.addInitScript((value) => localStorage.setItem('cboard.motion', value), level);
+    await page.addInitScript((value) => localStorage.setItem('yardmaster.motion', value), level);
     await openRoute(page, '/');
     const button = page.locator('[data-hud="waiting"]');
     await expect(button).toBeVisible();

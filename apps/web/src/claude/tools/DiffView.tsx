@@ -9,7 +9,7 @@ import { useStickyFlag } from './viewState.js';
 export const DIFF_LAYOUTS = ['unified', 'split'] as const;
 export type DiffLayout = (typeof DIFF_LAYOUTS)[number];
 export const diffLayoutPreference = createPreference<DiffLayout>(
-  'cboard.diff.layout',
+  'yardmaster.diff.layout',
   DIFF_LAYOUTS,
   'unified',
 );

@@ -10,7 +10,7 @@ import {
   planInstall,
   readSettings,
   unifiedDiff,
-} from '@c-board/hook';
+} from '@yardmaster/hook';
 import {
   AwayTimeoutSec,
   type BoardSettings,
@@ -32,7 +32,7 @@ import {
   NotifyEvent,
   ProjectId,
   RetentionDays,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
 import type { Persistence } from './persistence.js';
@@ -87,12 +87,12 @@ export function memoryHookSettings(initial?: string): HookSettingsFile {
   let text = initial;
   return {
     displayPath: '~/.claude/settings.json',
-    command: '/opt/c-board/bin/c-board-hook',
+    command: '/opt/yardmaster/bin/yardmaster-hook',
     read: async () => text,
     apply: async (plan) => {
       if (!plan.changed) return undefined;
       if (text !== plan.before)
-        throw new InvalidSettingsError('changed while c-board was editing it');
+        throw new InvalidSettingsError('changed while Yardmaster was editing it');
       text = plan.after;
       return undefined;
     },

@@ -1,4 +1,4 @@
-import type { GitFileChange } from '@c-board/protocol';
+import type { GitFileChange } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { groupFiles, splitPath, syncState, unlistedCount } from './model.js';
 

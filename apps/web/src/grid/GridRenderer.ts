@@ -1,4 +1,4 @@
-import { toolFamily } from '@c-board/protocol';
+import { toolFamily } from '@yardmaster/protocol';
 import {
   AdditiveBlending,
   type Blending,
@@ -407,7 +407,7 @@ export class GridRenderer {
     try {
       return new GridRenderer(options, palette);
     } catch (error) {
-      console.warn('[c-board] the Grid falls back to the 2D map:', (error as Error).message);
+      console.warn('[yardmaster] the Grid falls back to the 2D map:', (error as Error).message);
       return null;
     }
   }

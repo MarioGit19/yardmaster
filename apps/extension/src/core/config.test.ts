@@ -58,3 +58,16 @@ describe('dashboardUrl', () => {
     expect(dashboardUrl(4317)).toBe('http://127.0.0.1:4317/');
   });
 });
+
+describe('settings from before the rename', () => {
+  it('fall back to the old cboard.* keys when the new ones are unset', () => {
+    expect(resolveConfig({}, { enabled: false, port: 5123 })).toEqual({
+      enabled: false,
+      port: 5123,
+    });
+    expect(resolveConfig({ enabled: true, port: 6000 }, { enabled: false, port: 5123 })).toEqual({
+      enabled: true,
+      port: 6000,
+    });
+  });
+});

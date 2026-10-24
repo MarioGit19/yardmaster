@@ -1,5 +1,5 @@
-import { parseToolCall, type TodoStatus } from '@c-board/protocol';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { parseToolCall, type TodoStatus } from '@yardmaster/protocol';
 import { ArrowDown, ChevronRight, Eye, EyeOff, GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {

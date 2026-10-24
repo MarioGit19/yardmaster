@@ -1,10 +1,10 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import {
   type ClaudeSession,
   type Project,
   sessionDisplayName,
   type Terminal,
-} from '@c-board/protocol';
-import * as Dialog from '@radix-ui/react-dialog';
+} from '@yardmaster/protocol';
 import {
   ArrowLeft,
   ChevronDown,
@@ -97,7 +97,7 @@ import {
 } from './model.js';
 
 /** The hub's one-line hint, until it is dismissed in this browser. */
-const hintPreference = createPreference('cboard.hubHint', ['show', 'hidden'] as const, 'show');
+const hintPreference = createPreference('yardmaster.hubHint', ['show', 'hidden'] as const, 'show');
 
 const PAGE_TITLE: Record<HubPage, string> = {
   git: 'Git',

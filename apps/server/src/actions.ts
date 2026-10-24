@@ -1,4 +1,4 @@
-import type { EditorApp, UiAction, UiActionKind } from '@c-board/protocol';
+import type { EditorApp, UiAction, UiActionKind } from '@yardmaster/protocol';
 
 /**
  * `sessionId`: the session an action started (`session.create`, a forked resume). `editor`: the

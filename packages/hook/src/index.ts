@@ -1,3 +1,3 @@
-export const PACKAGE_NAME = '@c-board/hook';
+export const PACKAGE_NAME = '@yardmaster/hook';
 
 export * from './installer.js';

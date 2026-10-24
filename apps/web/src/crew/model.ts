@@ -1,4 +1,4 @@
-import { type ClaudeSession, type Terminal, toolFamily } from '@c-board/protocol';
+import { type ClaudeSession, type Terminal, toolFamily } from '@yardmaster/protocol';
 import { runningBackground } from '../background/model.js';
 import type { OrbState } from '../orb/model.js';
 

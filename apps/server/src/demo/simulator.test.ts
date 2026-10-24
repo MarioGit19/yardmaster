@@ -10,7 +10,7 @@ import {
   type ServerToUi,
   type SessionStatusKind,
   transcriptStreamId,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
 import type { ServerConfig } from '../config.js';
@@ -740,7 +740,7 @@ describe('demo server', () => {
   const config: ServerConfig = {
     port: 4317,
     host: '127.0.0.1',
-    home: '/home/dev/.c-board',
+    home: '/home/dev/.yardmaster',
     logLevel: 'silent',
     devOrigins: [],
   };

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
 import {
@@ -13,7 +13,7 @@ import {
   planUninstall,
   readSettings,
   unifiedDiff,
-} from '@c-board/hook';
+} from '@yardmaster/hook';
 import type { FastifyInstance } from 'fastify';
 import type { BuildOptions } from './app.js';
 import { ConfigError, loadConfig, type ServerConfig } from './config.js';
@@ -26,6 +26,7 @@ import {
   runDoctor,
   tildify,
 } from './doctor.js';
+import { envValue, LEGACY_COMMAND, LEGACY_NOTICE, legacyHomeFor, migrateHome } from './legacy.js';
 import { openBrowser } from './open-browser.js';
 import { DEFAULT_WEB_ROOT, hasWebBuild } from './static.js';
 import { ensureToken, generateToken, tokenPath, writeToken } from './token.js';
@@ -44,9 +45,11 @@ export interface CliIo {
   onStarted?: (app: FastifyInstance) => void;
   /** Asks a yes/no question. Absent when there is no terminal to ask on. */
   confirm?: (question: string) => Promise<boolean>;
+  /** The name the CLI was run as; the old `c-board` prints a deprecation notice. */
+  invokedAs?: string;
 }
 
-export const USAGE = `Usage: c-board <command> [options]
+export const USAGE = `Usage: yardmaster <command> [options]
 
 Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
@@ -55,14 +58,15 @@ Commands:
   doctor                       Check the setup and print a report
   token --rotate               Replace the install token (signs out every browser)
   hooks install|uninstall|status [--away] [--dry-run] [--yes] [--settings-path <file>]
-                               Manage the c-board hooks in Claude's settings.json.
+                               Manage the Yardmaster hooks in Claude's settings.json.
                                --away also installs the away-mode permission hook
+  install-hooks [--away] …     Same as hooks install
 
 Options:
   -h, --help                   Show this help
   -v, --version                Print the version
 
-Environment: CBOARD_PORT (4317), CBOARD_HOME (~/.c-board), CBOARD_HOST (127.0.0.1),
+Environment: YARDMASTER_PORT (4317), YARDMASTER_HOME (~/.yardmaster), YARDMASTER_HOST (127.0.0.1),
   CLAUDE_CONFIG_DIR (~/.claude)
 `;
 
@@ -114,12 +118,12 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
       token,
       demo,
       webRoot,
-      watched: io.env.CBOARD_WATCH === '1',
+      watched: envValue(io.env, 'WATCH') === '1',
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw err;
     io.stderr.write(
-      `c-board: port ${config.port} is already in use. Is c-board running? Try \`c-board doctor\`.\n`,
+      `yardmaster: port ${config.port} is already in use. Is Yardmaster running? Try \`yardmaster doctor\`.\n`,
     );
     return 1;
   }
@@ -128,20 +132,20 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
   const url = baseUrl({ host: config.host, port: listeningPort(app, config.port) });
   const authUrl = `${url}/auth?t=${encodeURIComponent(token)}`;
   if (demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
-  if (io.env.CBOARD_WATCH === '1') {
+  if (envValue(io.env, 'WATCH') === '1') {
     io.stdout.write(
       'Watching for changes: an edit restarts the server and interrupts board sessions. Use `pnpm board` for a board that stays up.\n',
     );
   }
   if (!hasWebBuild(webRoot)) {
-    io.stdout.write('The web app is not built yet; run `pnpm --filter @c-board/web build`.\n');
+    io.stdout.write('The web app is not built yet; run `pnpm --filter @yardmaster/web build`.\n');
   }
 
   const opened = !flags['no-open'] && (await (io.openBrowser ?? openBrowser)(authUrl));
   if (opened) {
-    io.stdout.write(`c-board is running at ${url} (opened in your browser)\n`);
+    io.stdout.write(`Yardmaster is running at ${url} (opened in your browser)\n`);
   } else {
-    io.stdout.write(`c-board is running at ${url}\nSign in with: ${authUrl}\n`);
+    io.stdout.write(`Yardmaster is running at ${url}\nSign in with: ${authUrl}\n`);
   }
   return null;
 }
@@ -158,12 +162,14 @@ async function token(args: string[], config: ServerConfig, io: CliIo): Promise<n
   const flags = parse(args, { rotate: { type: 'boolean' } });
   const shown = tildify(tokenPath(config.home), io.home);
   if (!flags.rotate) {
-    io.stderr.write(`The token lives in ${shown}. Use \`c-board token --rotate\` to replace it.\n`);
+    io.stderr.write(
+      `The token lives in ${shown}. Use \`yardmaster token --rotate\` to replace it.\n`,
+    );
     return 2;
   }
   await writeToken(config.home, generateToken());
   io.stdout.write(
-    `New token written to ${shown}. Restart c-board and sign in again with \`c-board start\`.\n`,
+    `New token written to ${shown}. Restart Yardmaster and sign in again with \`yardmaster start\`.\n`,
   );
   return 0;
 }
@@ -198,10 +204,10 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
       io.stdout.write(
         away === 'installed'
           ? 'Away-mode permission hook installed\n'
-          : `Away-mode permission hook ${away === 'missing' ? 'not installed' : 'outdated'} (optional: \`c-board hooks install --away\`)\n`,
+          : `Away-mode permission hook ${away === 'missing' ? 'not installed' : 'outdated'} (optional: \`yardmaster hooks install --away\`)\n`,
       );
       if (status.installed.length === total) return 0;
-      io.stdout.write('Run `c-board hooks install` to fix this.\n');
+      io.stdout.write('Run `yardmaster hooks install` to fix this.\n');
       return 1;
     }
 
@@ -213,8 +219,8 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
     if (!plan.changed) {
       io.stdout.write(
         install
-          ? `The c-board hooks are already installed in ${shown}. Nothing changed.\n`
-          : `No c-board hooks found in ${shown}. Nothing changed.\n`,
+          ? `The Yardmaster hooks are already installed in ${shown}. Nothing changed.\n`
+          : `No Yardmaster hooks found in ${shown}. Nothing changed.\n`,
       );
       return 0;
     }
@@ -225,7 +231,9 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
     }
     if (!flags.yes) {
       if (!io.confirm) {
-        io.stderr.write(`c-board hooks: no terminal to confirm on; pass --yes to edit ${shown}.\n`);
+        io.stderr.write(
+          `yardmaster hooks: no terminal to confirm on; pass --yes to edit ${shown}.\n`,
+        );
         return 1;
       }
       io.stdout.write(diff);
@@ -237,22 +245,46 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
     const backup = await applyPlan(path, plan);
     io.stdout.write(
       install
-        ? `Installed the c-board hook for ${OBSERVER_EVENTS.length} events${flags.away ? ' and the away-mode permission hook' : ''} in ${shown}.\n`
-        : `Removed the c-board hooks from ${shown}.\n`,
+        ? `Installed the Yardmaster hook for ${OBSERVER_EVENTS.length} events${flags.away ? ' and the away-mode permission hook' : ''} in ${shown}.\n`
+        : `Removed the Yardmaster hooks from ${shown}.\n`,
     );
     if (backup) io.stdout.write(`Backup: ${tildify(backup, io.home)}\n`);
     return 0;
   } catch (err) {
     if (!(err instanceof InvalidSettingsError)) throw err;
-    io.stderr.write(`c-board hooks: ${shown} ${err.message}. Nothing was written.\n`);
+    io.stderr.write(`yardmaster hooks: ${shown} ${err.message}. Nothing was written.\n`);
     return 1;
   }
 }
 
-const COMMANDS = { start, doctor, token, hooks } as const;
+const COMMANDS = {
+  start,
+  doctor,
+  token,
+  hooks,
+  'install-hooks': (args: string[], config: ServerConfig, io: CliIo) =>
+    hooks(['install', ...args], config, io),
+} as const;
+
+/** Commands that read the data dir, so they move the old one first. */
+const USES_HOME = new Set(['start', 'doctor', 'token']);
+
+async function migrateLegacyHome(config: ServerConfig, io: CliIo): Promise<void> {
+  const legacy = legacyHomeFor(io.env, io.home);
+  if (legacy === null || resolve(legacy) === resolve(config.home)) return;
+  const result = await migrateHome(config.home, legacy);
+  const from = result.kind === 'none' ? '' : tildify(result.from, io.home);
+  const to = tildify(config.home, io.home);
+  if (result.kind === 'moved') {
+    io.stdout.write(`Moved your data from ${from} to ${to} (the old path links to it).\n`);
+  } else if (result.kind === 'failed') {
+    io.stderr.write(`yardmaster: could not move ${from} to ${to}: ${result.error}\n`);
+  }
+}
 
 /** Runs one CLI invocation. Resolves to an exit code, or null when the server keeps running. */
 export async function runCli(argv: string[], io: CliIo): Promise<number | null> {
+  if (io.invokedAs === LEGACY_COMMAND) io.stderr.write(LEGACY_NOTICE);
   const [command = 'start', ...rest] = argv;
   if (command === '-h' || command === '--help' || command === 'help') {
     io.stdout.write(USAGE);
@@ -262,23 +294,24 @@ export async function runCli(argv: string[], io: CliIo): Promise<number | null> 
     io.stdout.write(`${VERSION}\n`);
     return 0;
   }
-  // `c-board --demo` is shorthand for `c-board start --demo`.
+  // `yardmaster --demo` is shorthand for `yardmaster start --demo`.
   const [name, args] = command.startsWith('-') ? ['start', argv] : [command, rest];
   if (!Object.hasOwn(COMMANDS, name)) {
-    io.stderr.write(`c-board: unknown command "${name}"\n\n${USAGE}`);
+    io.stderr.write(`yardmaster: unknown command "${name}"\n\n${USAGE}`);
     return 2;
   }
 
   try {
     const config = loadConfig(io.env, io.home);
+    if (USES_HOME.has(name)) await migrateLegacyHome(config, io);
     return await COMMANDS[name as keyof typeof COMMANDS](args, config, io);
   } catch (err) {
     if (err instanceof UsageError) {
-      io.stderr.write(`c-board ${name}: ${err.message}\n\n${USAGE}`);
+      io.stderr.write(`yardmaster ${name}: ${err.message}\n\n${USAGE}`);
       return 2;
     }
     if (err instanceof ConfigError) {
-      io.stderr.write(`c-board: ${err.message}\n`);
+      io.stderr.write(`yardmaster: ${err.message}\n`);
       return 1;
     }
     throw err;
@@ -300,6 +333,7 @@ export function processIo(): CliIo {
     stderr: process.stderr,
     env: process.env,
     home: homedir(),
+    invokedAs: basename(process.argv[1] ?? '', extname(process.argv[1] ?? '')),
     ...(process.stdin.isTTY && process.stdout.isTTY ? { confirm: askTty } : {}),
   };
 }

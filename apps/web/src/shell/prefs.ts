@@ -1,7 +1,7 @@
 import { createPreference } from '../prefs.js';
 
 export const railPreference = createPreference<'expanded' | 'collapsed'>(
-  'cboard.rail',
+  'yardmaster.rail',
   ['expanded', 'collapsed'],
   'expanded',
 );

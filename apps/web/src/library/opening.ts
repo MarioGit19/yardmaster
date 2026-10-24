@@ -1,4 +1,4 @@
-import type { BoardState, EditorApp } from '@c-board/protocol';
+import type { BoardState, EditorApp } from '@yardmaster/protocol';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ActionListener } from '../data/index.js';
 import { useBoard, useBoardClient } from '../data/index.js';
@@ -49,7 +49,7 @@ export function hasWindow(windows: BoardState['windows'], projectId: string): bo
 
 /** The hint once a launched window is slow to show up on the board. */
 export function slowHint(editor: EditorApp): string {
-  return `${editor} hasn't connected yet. Is the c-board extension installed in it?`;
+  return `${editor} hasn't connected yet. Is the Yardmaster extension installed in it?`;
 }
 
 export function openingPhase(opening: Opening, now: number): OpeningPhase | null {

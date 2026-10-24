@@ -41,7 +41,7 @@ export function Wordmark({
 
 /** Set when the brand moment plays, so it greets each browser once. */
 export const brandIntroPreference = createPreference<'pending' | 'seen'>(
-  'cboard.brandIntro',
+  'yardmaster.brandIntro',
   ['pending', 'seen'],
   'pending',
 );

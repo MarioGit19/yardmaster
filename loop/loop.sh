@@ -7,9 +7,9 @@
 #   loop/loop.sh --resume <id>   first finish an interrupted iteration (its session id is in its log)
 #
 # Env:
-#   CBOARD_LOOP_PERMISSION_MODE  permission mode for claude -p (default: auto)
-#   CBOARD_LOOP_MODEL            model alias/name (default: your Claude Code default)
-#   CBOARD_LOOP_PUSH             1 = push after each successful iteration (default: 1)
+#   YARDMASTER_LOOP_PERMISSION_MODE  permission mode for claude -p (default: auto)
+#   YARDMASTER_LOOP_MODEL            model alias/name (default: your Claude Code default)
+#   YARDMASTER_LOOP_PUSH             1 = push after each successful iteration (default: 1)
 #   MAX_ITERS                    default 200
 #   MAX_STALLS                   consecutive iterations without a ticked task before stopping (default 2)
 set -uo pipefail
@@ -24,12 +24,14 @@ if [ "${1:-}" = --resume ]; then
   [[ "$resume_id" =~ ^[0-9a-f-]{36}$ ]] || { echo "✗ --resume needs a session id"; exit 1; }
 fi
 
-MODE="${CBOARD_LOOP_PERMISSION_MODE:-auto}"
-PUSH="${CBOARD_LOOP_PUSH:-1}"
+# The CBOARD_LOOP_* names from before the rename still work.
+MODE="${YARDMASTER_LOOP_PERMISSION_MODE:-${CBOARD_LOOP_PERMISSION_MODE:-auto}}"
+PUSH="${YARDMASTER_LOOP_PUSH:-${CBOARD_LOOP_PUSH:-1}}"
 MAX_ITERS="${MAX_ITERS:-200}"
 MAX_STALLS="${MAX_STALLS:-2}"
 model_args=()
-[ -n "${CBOARD_LOOP_MODEL:-}" ] && model_args=(--model "$CBOARD_LOOP_MODEL")
+model="${YARDMASTER_LOOP_MODEL:-${CBOARD_LOOP_MODEL:-}}"
+[ -n "$model" ] && model_args=(--model "$model")
 
 next_task() { grep -m1 -E '^- \[ \] ' PLAN.md || true; }
 done_count() { grep -cE '^- \[x\] ' PLAN.md || true; }

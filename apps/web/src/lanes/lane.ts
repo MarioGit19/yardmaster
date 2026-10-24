@@ -5,7 +5,7 @@ import {
   type Terminal,
   type TerminalDisplayName,
   terminalDisplayName,
-} from '@c-board/protocol';
+} from '@yardmaster/protocol';
 import type { BoardStoreState } from '../data/store.js';
 import type { Tone } from '../status.js';
 

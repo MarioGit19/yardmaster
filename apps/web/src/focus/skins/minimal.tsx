@@ -1,4 +1,4 @@
-import type { ClaudeSession } from '@c-board/protocol';
+import type { ClaudeSession } from '@yardmaster/protocol';
 import { ArrowLeft, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'wouter';

@@ -1,4 +1,4 @@
-import { type ActivityEvent, HISTORY_WINDOW_MS } from '@c-board/protocol';
+import { type ActivityEvent, HISTORY_WINDOW_MS } from '@yardmaster/protocol';
 import { isCrashExit } from '../data/selectors.js';
 import {
   type ActorState,

@@ -1,5 +1,5 @@
 {
-  "name": "c-board",
+  "name": "yardmaster",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
@@ -8,20 +8,21 @@
   },
   "scripts": {
     "prepare": "simple-git-hooks",
-    "dev": "pnpm --parallel --filter @c-board/server --filter @c-board/web dev",
-    "dev:demo": "pnpm --parallel --filter @c-board/server --filter @c-board/web dev:demo",
-    "c-board": "pnpm --silent --filter @c-board/server cli",
-    "board": "pnpm --filter \"@c-board/server...\" --filter @c-board/web build && node --conditions=c-board-build apps/server/dist/cli.js start --no-open",
+    "dev": "pnpm --parallel --filter @yardmaster/server --filter @yardmaster/web dev",
+    "dev:demo": "pnpm --parallel --filter @yardmaster/server --filter @yardmaster/web dev:demo",
+    "yardmaster": "pnpm --silent --filter @yardmaster/server cli",
+    "c-board": "pnpm --silent --filter @yardmaster/server cli:c-board",
+    "board": "pnpm --filter \"@yardmaster/server...\" --filter @yardmaster/web build && node --conditions=yardmaster-build apps/server/dist/cli.js start --no-open",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck && tsc -p e2e",
     "build": "pnpm -r build",
-    "brand:build": "pnpm --filter @c-board/web brand:build",
+    "brand:build": "pnpm --filter @yardmaster/web brand:build",
     "check": "scripts/privacy-check.sh && pnpm lint && pnpm typecheck && pnpm test",
-    "e2e": "pnpm --filter @c-board/web build && playwright test -c e2e --project=e2e",
-    "shots": "pnpm --filter @c-board/web build && playwright test -c e2e --project=shots",
-    "motion:record": "pnpm --filter @c-board/web build && tsx e2e/motion/record.ts"
+    "e2e": "pnpm --filter @yardmaster/web build && playwright test -c e2e --project=e2e",
+    "shots": "pnpm --filter @yardmaster/web build && playwright test -c e2e --project=shots",
+    "motion:record": "pnpm --filter @yardmaster/web build && tsx e2e/motion/record.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

@@ -1,4 +1,4 @@
-import type { EditorTerminal, Terminal } from '@c-board/protocol';
+import type { EditorTerminal, Terminal } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { linkTerminalProject, type TerminalContext, terminalReducer } from './terminal-reducer.js';
 

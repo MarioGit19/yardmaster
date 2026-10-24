@@ -1,6 +1,6 @@
 # Use it from your phone
 
-c-board only ever listens on `127.0.0.1`. To reach it from your phone, you bring the phone into your own private network with [Tailscale](https://tailscale.com), and Tailscale forwards HTTPS to the board on your Mac. Nothing is exposed to the internet.
+Yardmaster only ever listens on `127.0.0.1`. To reach it from your phone, you bring the phone into your own private network with [Tailscale](https://tailscale.com), and Tailscale forwards HTTPS to the board on your Mac. Nothing is exposed to the internet.
 
 ## 1. Install Tailscale on both devices
 
@@ -8,7 +8,7 @@ Install Tailscale on your Mac and on your phone, and sign in to the **same tailn
 
 ## 2. Forward HTTPS to the board
 
-On the Mac, with c-board running:
+On the Mac, with Yardmaster running:
 
 ```bash
 tailscale serve --bg 4317
@@ -16,17 +16,17 @@ tailscale serve --bg 4317
 
 The first time, Tailscale may answer "Serve is not enabled on your tailnet" with a link: open it, approve Serve (and HTTPS certificates if asked), and the command finishes on its own. Then Tailscale prints the address it serves, such as `https://my-mac.tailnet-name.ts.net`. It terminates HTTPS with a real certificate and forwards to `127.0.0.1:4317`. `tailscale serve status` shows it again; `tailscale serve reset` stops it.
 
-If you run c-board on another port (`CBOARD_PORT`), use that port instead of `4317`.
+If you run Yardmaster on another port (`YARDMASTER_PORT`), use that port instead of `4317`.
 
-## 3. Add the host in c-board
+## 3. Add the host in Yardmaster
 
-On the Mac, open c-board → **Settings → Phone → Allowed hosts** and add the name, without `https://`: `my-mac.tailnet-name.ts.net`. Only `*.ts.net` names are accepted, and the board answers on them over HTTPS only.
+On the Mac, open Yardmaster → **Settings → Phone → Allowed hosts** and add the name, without `https://`: `my-mac.tailnet-name.ts.net`. Only `*.ts.net` names are accepted, and the board answers on them over HTTPS only.
 
 ## 4. Scan the QR code
 
 Still on the Mac, click **Show pairing code**. Point your phone's camera at the QR code and open the link. The code works once and expires after 5 minutes; it signs that browser in with its own device key. The access token never leaves the Mac.
 
-Your phone now appears under **Paired devices**. It stays signed in until you **revoke** it there, which also disconnects it right away. Add c-board to your home screen for a full-screen board.
+Your phone now appears under **Paired devices**. It stays signed in until you **revoke** it there, which also disconnects it right away. Add Yardmaster to your home screen for a full-screen board.
 
 ## Dev servers on your phone
 
@@ -39,7 +39,7 @@ tailscale serve --bg --https=3000 http://127.0.0.1:3000
 and shows the address, `https://my-mac.tailnet-name.ts.net:3000`, with Copy, Open and a QR code. On the phone itself, tapping a port chip opens that address straight away, sharing the port first if needed. A shared port carries a small phone mark wherever its chip appears.
 
 - **Tailnet only.** The board uses `tailscale serve`, never Funnel, so only devices signed in to your tailnet can open the address.
-- **It cleans up after itself.** The board remembers which serve entries it created, in its data folder, and removes only those: when the port stops listening, when you click **Stop sharing**, and when c-board stops. It never touches its own `4317` entry or anything you served yourself; those show up as shared, but stay.
+- **It cleans up after itself.** The board remembers which serve entries it created, in its data folder, and removes only those: when the port stops listening, when you click **Stop sharing**, and when Yardmaster stops. It never touches its own `4317` entry or anything you served yourself; those show up as shared, but stay.
 - **Hidden** until Tailscale is installed (on `PATH`, or the app in `/Applications`) and phone access is set up (an allowed host in step 3). **Settings → Phone → Dev servers on your phone** says what's missing and lists what is shared.
 
 Common snags:
@@ -50,7 +50,7 @@ Common snags:
 
 ## Why not ngrok or Cloudflare Tunnel?
 
-Public tunnels put the board on the internet. The board can type into your terminals and start Claude sessions, so a leaked link or a weak spot in a tunnel would be a remote shell on your Mac. c-board refuses any host that isn't on your allowed list, and the docs only support Tailscale, where the only devices that can reach the board are the ones you signed in to your tailnet.
+Public tunnels put the board on the internet. The board can type into your terminals and start Claude sessions, so a leaked link or a weak spot in a tunnel would be a remote shell on your Mac. Yardmaster refuses any host that isn't on your allowed list, and the docs only support Tailscale, where the only devices that can reach the board are the ones you signed in to your tailnet.
 
 ## Troubleshooting
 

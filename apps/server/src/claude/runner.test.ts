@@ -7,7 +7,7 @@ import {
   query,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { ActivityEvent, ClaudeSession, Project, ServerToUi } from '@c-board/protocol';
+import type { ActivityEvent, ClaudeSession, Project, ServerToUi } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
 import {
@@ -60,7 +60,7 @@ const cleanups: (() => Promise<void>)[] = [];
 beforeEach(async () => {
   queries = [];
   ids = [];
-  dir = await mkdtemp(join(tmpdir(), 'c-board-runner-'));
+  dir = await mkdtemp(join(tmpdir(), 'yardmaster-runner-'));
   vi.mocked(query).mockImplementation(({ prompt, options }) => {
     const outbox = new MessageQueue<{ message?: unknown; error?: Error }>();
     const fake: FakeQuery = {

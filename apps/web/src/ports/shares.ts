@@ -1,4 +1,4 @@
-import type { PortShare, PortSharesResponse } from '@c-board/protocol';
+import type { PortShare, PortSharesResponse } from '@yardmaster/protocol';
 import { useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { api } from '../settings/api.js';

@@ -1,4 +1,4 @@
-import type { ActivityEvent, BoardState, PatchOp } from '@c-board/protocol';
+import type { ActivityEvent, BoardState, PatchOp } from '@yardmaster/protocol';
 
 // Activity levels, DESIGN.md §4.10: one exponentially decaying event rate per project, session
 // and terminal. Animations read the level (0..1) instead of reacting to single events, so they

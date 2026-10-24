@@ -7,6 +7,6 @@ export default defineProject({
     name: 'server',
     include: ['src/**/*.test.ts'],
     // Servers built in tests must never read the real ~/.claude (registry, transcripts).
-    env: { CLAUDE_CONFIG_DIR: join(tmpdir(), 'c-board-test-no-claude') },
+    env: { CLAUDE_CONFIG_DIR: join(tmpdir(), 'yardmaster-test-no-claude') },
   },
 });

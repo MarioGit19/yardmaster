@@ -1,7 +1,7 @@
 /*
  * Adapted from SwipeRow by React Bits (https://reactbits.dev).
  * Copyright (c) 2026 David Haz. MIT + Commons Clause License Condition v1.0: may be used as part
- * of c-board, but the component must not be sold, sublicensed or redistributed on its own.
+ * of Yardmaster, but the component must not be sold, sublicensed or redistributed on its own.
  * See THIRD_PARTY_NOTICES.md.
  *
  * Changes: two directions with one committing action each (swipe right to Allow, left to Deny)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs / refreshes the third-party agent skills used to build c-board into .claude/skills/
+# Installs / refreshes the third-party agent skills used to build Yardmaster into .claude/skills/
 # (project scope, git-ignored, so third-party content is never committed). Re-run any time to update.
 #
 # Also fetches read-only references into .claude/references/ (git-ignored): source the build loop

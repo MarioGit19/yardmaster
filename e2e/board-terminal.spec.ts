@@ -140,7 +140,7 @@ test('a command in a board terminal shows as running, in the focus view and ever
 
     const actor = page.locator(`[data-scene-actor="t:${terminalId}"]`);
     const overview = async (id: string) => {
-      await page.evaluate((layout) => localStorage.setItem('cboard.layout', layout), id);
+      await page.evaluate((layout) => localStorage.setItem('yardmaster.layout', layout), id);
       await page.goto('/#/');
       await page.reload();
       await expect(
