@@ -106,8 +106,18 @@ export function verticalFrame(lines: number, width: number): TransitFrame {
   };
 }
 
+/** Lines on one phone screen; more go to the next screen, a swipe away (§10.1). */
+export const PHONE_LINES = 4;
+
 export const transitFrame = (axis: TransitAxis, lines: number, width: number) =>
-  axis === 'vertical' ? verticalFrame(lines, width) : horizontalFrame(lines);
+  axis === 'vertical' ? verticalFrame(Math.min(PHONE_LINES, lines), width) : horizontalFrame(lines);
+
+/** The phone's screens of lines, in order: at most `PHONE_LINES` each. */
+export function lineGroups<T>(lines: readonly T[], size = PHONE_LINES): T[][] {
+  const groups: T[][] = [];
+  for (let i = 0; i < lines.length; i += size) groups.push(lines.slice(i, i + size));
+  return groups;
+}
 
 /** Where a moment sits along the lines; later than now is now. */
 export function alongAt(ts: number, now: number, frame: TransitFrame): number {

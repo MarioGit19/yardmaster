@@ -2687,6 +2687,44 @@ main[data-office-zoom] {
   }
 }
 
+/* A row of full-width screens you swipe through (ui/SwipePager): the row runs to the screen's
+   edges so a page slides off the glass, not off the gutter, and the next page stays out of view. */
+.swipe-pager {
+  display: flex;
+  gap: 16px;
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 16px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.swipe-pager::-webkit-scrollbar {
+  display: none;
+}
+.swipe-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.swipe-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-3);
+  opacity: 0.45;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.swipe-dot[data-active] {
+  background: var(--text-1);
+  opacity: 1;
+  transform: scale(1.35);
+}
+
 /* The flat cockpit: glass screens with a neon hairline. */
 .grid-screen {
   border: 1px solid color-mix(in srgb, var(--grid-neon) 22%, transparent);
@@ -2703,23 +2741,6 @@ main[data-office-zoom] {
 .grid-screen[data-tone="err"] {
   border-color: color-mix(in srgb, var(--st-err) 55%, transparent);
 }
-.grid-cockpit-stack {
-  display: flex;
-  gap: 12px;
-  margin: 0 -16px;
-  padding: 0 16px 8px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-padding: 0 16px;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-}
-.grid-cockpit-card {
-  flex: 0 0 calc(100% - 24px);
-  min-width: 0;
-  scroll-snap-align: center;
-}
-
 /* The cockpit takes focus as a landing spot when it opens: no ring round the whole of it. */
 .grid-cockpit:focus-visible {
   box-shadow: none;
@@ -2973,12 +2994,11 @@ main[data-office-zoom] {
 /* A phone column is 44–60 px: the name takes two lines, breaking after a hyphen where it can, so
    "ledger-sync" reads whole instead of "led…". */
 .transit-name-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 16px;
 }
 .transit-name:focus-visible {
   box-shadow: var(--focus-ring);

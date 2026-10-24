@@ -52,6 +52,21 @@ const RACK_STAND = 36;
 
 /** The whiteboard on the back wall, right of the door, under the nameplate. */
 export const WHITEBOARD = { x: 62, y: 60, scale: 0.9 } as const;
+/** The whiteboard's width in room units at scale 1 (`kit/Whiteboard`). */
+const WHITEBOARD_W = 136;
+/** The rack's port tag, in the rack's own units: from 10 left of it to 54 right (`kit/furniture`). */
+const RACK_TAG = { from: -10, to: 54 } as const;
+
+/**
+ * Whether a rack at `x` (room units, its left edge) can show its port tag on top: not when the tag
+ * would land on the whiteboard's bottom line. The room's port sign lists every port anyway.
+ */
+export function rackTagClear(x: number, whiteboard: boolean): boolean {
+  if (!whiteboard) return true;
+  const left = x + RACK_TAG.from * FURNITURE_SCALE;
+  const right = x + RACK_TAG.to * FURNITURE_SCALE;
+  return right <= WHITEBOARD.x || left >= WHITEBOARD.x + WHITEBOARD_W * WHITEBOARD.scale;
+}
 
 export interface PlacedStation {
   /** Stable per room: `desk:<actor>`, `rack:<actor>`, `bench:<actor>`, `couch:0`, `side-desk`. */

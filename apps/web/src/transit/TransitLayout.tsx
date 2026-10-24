@@ -25,12 +25,14 @@ import { toneLabel } from '../status.js';
 import { terminalTarget } from '../terminal/target.js';
 import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
+import { SwipePager } from '../ui/SwipePager.js';
 import {
   type Branch,
   branchPoints,
   buildBranches,
   buildStations,
   lineAcross,
+  lineGroups,
   placeStops,
   placeTrains,
   point,
@@ -64,8 +66,9 @@ interface Tip {
  * DESIGN.md §10.5: the board as a metro map. Each project is a line in its accent across the last
  * hour, notable events are its stations (merged into a count when crowded), subagent runs branch
  * off it, and every session and terminal is a train at the "now" end. The map scrolls through
- * time with "now" pinned at the right; on a phone the lines run top to bottom, now on top. The
- * map draws its own ground, so the ambient field steps out while it's shown.
+ * time with "now" pinned at the right; on a phone the lines run top to bottom, now on top, four to
+ * a screen with a swipe between screens. The map draws its own ground, so the ambient field steps
+ * out while it's shown.
  */
 export default function TransitLayout() {
   useOwnBackdrop();
@@ -167,48 +170,62 @@ function TransitMap({ projects, frame, now, stations, branches }: TransitMapProp
   };
   const hideTip = (id: string) => setTip((current) => (current?.id === id ? null : current));
 
+  const map = (lines: readonly SceneProject[]) => (
+    <div
+      data-transit-map
+      className="relative"
+      style={{ width, height, minWidth: horizontal ? undefined : '100%' }}
+    >
+      <TimeAxis frame={frame} now={now} offset={offset} width={width} height={height} />
+      <ul aria-label="Lines" className="contents">
+        {lines.map((project, index) => (
+          <TransitLine
+            key={project.id}
+            project={project}
+            index={index}
+            frame={frame}
+            now={now}
+            stations={stations.get(project.id) ?? []}
+            branches={branches.get(project.id) ?? []}
+            showTip={showTip}
+            hideTip={hideTip}
+          />
+        ))}
+      </ul>
+      {!horizontal && (
+        // On the phone the labels cross the lines: drawn over them, haloed in the ground.
+        <TimeAxis frame={frame} now={now} offset={offset} width={width} height={height} labels />
+      )}
+    </div>
+  );
+  // A phone shows up to four lines a screen, so names read whole; more are a swipe away.
+  const groups = horizontal ? [] : lineGroups(projects);
+
   return (
     <div ref={stage} className="relative">
-      <div
-        ref={scroller}
-        onScroll={onScroll}
-        data-transit-scroller
-        className="transit-scroller overflow-x-auto overflow-y-hidden"
-      >
+      {horizontal ? (
         <div
-          data-transit-map
-          className="relative"
-          style={{ width, height, minWidth: horizontal ? undefined : '100%' }}
+          ref={scroller}
+          onScroll={onScroll}
+          data-transit-scroller
+          className="transit-scroller overflow-x-auto overflow-y-hidden"
         >
-          <TimeAxis frame={frame} now={now} offset={offset} width={width} height={height} />
-          <ul aria-label="Lines" className="contents">
-            {projects.map((project, index) => (
-              <TransitLine
-                key={project.id}
-                project={project}
-                index={index}
-                frame={frame}
-                now={now}
-                stations={stations.get(project.id) ?? []}
-                branches={branches.get(project.id) ?? []}
-                showTip={showTip}
-                hideTip={hideTip}
-              />
-            ))}
-          </ul>
-          {!horizontal && (
-            // On the phone the labels cross the lines: drawn over them, haloed in the ground.
-            <TimeAxis
-              frame={frame}
-              now={now}
-              offset={offset}
-              width={width}
-              height={height}
-              labels
-            />
-          )}
+          {map(projects)}
         </div>
-      </div>
+      ) : groups.length > 1 ? (
+        <SwipePager
+          label="Lines"
+          nav="top"
+          data-transit-groups={String(groups.length)}
+          pages={groups.map((group, i) => ({
+            key: group[0]?.id ?? String(i),
+            label: group.map((p) => p.name).join(', '),
+            node: map(group),
+          }))}
+        />
+      ) : (
+        map(projects)
+      )}
       {tip && (
         <div
           role="tooltip"

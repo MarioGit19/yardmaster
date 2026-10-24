@@ -2028,3 +2028,84 @@ for (const size of FIT_SIZES) {
     });
   }
 }
+
+// 12.6d: every layout's phone version inside the phone shell at 360, 390 and 412 in both themes:
+// the overview, the Transit's next screen of lines, the Office room and the Grid cockpit with its
+// next screen, and the inspector sheet.
+for (const theme of THEMES) {
+  for (const width of [360, 390, 412] as const) {
+    test.describe(`phone layouts ${theme} ${width}`, () => {
+      test.use({ ...galaxy, theme, viewport: { width, height: width === 412 ? 915 : 844 } });
+      const shot = (page: import('@playwright/test').Page, name: string) =>
+        page.screenshot({
+          path: new URL(`phone-layout-${name}-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      const open = async (page: import('@playwright/test').Page, layout: string, ready: string) => {
+        await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+        await openRoute(page, '/');
+        await expect(page.locator(ready).first()).toBeVisible({ timeout: 20_000 });
+        await page.waitForTimeout(1_200);
+      };
+
+      test('minimal', async ({ page }) => {
+        await open(page, 'minimal', '[data-pod]');
+        await shot(page, 'minimal');
+      });
+
+      test('retro', async ({ page }) => {
+        await open(page, 'retro', '[data-retro-frame]');
+        await shot(page, 'retro');
+        await page.locator('main [data-layout] [data-scene-actor]').first().tap();
+        await expect(page.locator('[data-actor-inspector][data-sheet]')).toBeVisible();
+        await page.waitForTimeout(700);
+        await shot(page, 'retro-inspector');
+      });
+
+      test('transit', async ({ page }) => {
+        await open(page, 'transit', '[data-transit-line]');
+        await shot(page, 'transit');
+        const groups = page.locator('[data-transit-groups]');
+        await groups.getByRole('button', { name: 'Next screen', exact: true }).tap();
+        await expect(groups.locator('[data-swipe-position]')).toHaveAttribute(
+          'data-swipe-position',
+          '1',
+        );
+        await page.waitForTimeout(700);
+        await shot(page, 'transit-next');
+      });
+
+      test('office', async ({ page }) => {
+        await open(page, 'office', '[data-room]');
+        await shot(page, 'office');
+        await page
+          .locator('[data-room]')
+          .first()
+          .tap({ position: { x: 60, y: 6 } });
+        await expect(page.locator('[data-office]')).toHaveAttribute('data-office-entered', /.+/);
+        await page.waitForTimeout(1_000);
+        await shot(page, 'office-room');
+      });
+
+      test('grid', async ({ page }) => {
+        await open(page, 'grid', '[data-grid-node]');
+        await shot(page, 'grid');
+        await page
+          .locator('[data-grid-node]')
+          .first()
+          .tap({ position: { x: 100, y: 10 } });
+        const cockpit = page.locator('[data-grid-cockpit]');
+        await expect(cockpit.locator('[data-swipe-pager]')).toBeVisible();
+        await page.waitForTimeout(1_000);
+        await shot(page, 'grid-cockpit');
+        await cockpit.getByRole('button', { name: 'Next screen', exact: true }).tap();
+        await expect(cockpit.locator('[data-swipe-position]')).toHaveAttribute(
+          'data-swipe-position',
+          '1',
+        );
+        await page.waitForTimeout(700);
+        await shot(page, 'grid-cockpit-next');
+      });
+    });
+  }
+}

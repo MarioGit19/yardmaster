@@ -1,4 +1,10 @@
-import { type Browser, type BrowserContextOptions, devices, type Page } from '@playwright/test';
+import {
+  type Browser,
+  type BrowserContextOptions,
+  devices,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import { startBoard, startDemoBoard } from './board.js';
 import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures.js';
 
@@ -663,7 +669,7 @@ test.describe('the Grid map', () => {
     }
   });
 
-  test('on a touch phone: one trunk, 44 px satellites, the cockpit as a swipeable row', async ({
+  test('on a touch phone: one trunk, 44 px satellites, the cockpit as a swipeable stack', async ({
     browser,
   }) => {
     const { page, stop } = await openBoard(browser, {
@@ -698,9 +704,10 @@ test.describe('the Grid map', () => {
 
       await page.locator(`[data-grid-node="${nodeId}"]`).tap({ position: { x: 100, y: 10 } });
       await expect(grid).toHaveAttribute('data-grid-entered', nodeId ?? '');
-      const stack = page.locator(`[data-grid-cockpit="${nodeId}"] .grid-cockpit-stack`);
+      const cockpit = page.locator(`[data-grid-cockpit="${nodeId}"]`);
+      const stack = cockpit.locator('[data-swipe-pager]');
       await expect(stack).toBeVisible();
-      // More screens than fit: the row scrolls sideways, one screen at a time.
+      // A stack of full-width screens, one per swipe, inside the 16 px gutters.
       const scroll = await stack.evaluate((el) => ({
         width: el.scrollWidth,
         client: el.clientWidth,
@@ -708,6 +715,27 @@ test.describe('the Grid map', () => {
       }));
       expect(scroll.width).toBeGreaterThan(scroll.client);
       expect(scroll.snap).toContain('mandatory');
+      const first = await cockpit.locator('[data-swipe-page="0"]').boundingBox();
+      expect(first?.x).toBeCloseTo(16, 0);
+      expect(first?.width).toBeCloseTo(390 - 32, 0);
+      const position = cockpit.locator('[data-swipe-position]');
+      await expect(position).toHaveAttribute('data-swipe-position', '0');
+      // A swipe to the left brings the next screen in, whole.
+      const from = { x: 300, y: (first?.y ?? 0) + 40 };
+      const client = await page.context().newCDPSession(page);
+      await client.send('Input.synthesizeScrollGesture', {
+        x: from.x,
+        y: from.y,
+        xDistance: -220,
+        yDistance: 0,
+        gestureSourceType: 'touch',
+        speed: 1200,
+      });
+      await expect(position).not.toHaveAttribute('data-swipe-position', '0');
+      await restsOnAPage(cockpit);
+      // The pager's buttons do the same for anyone who doesn't swipe.
+      await cockpit.getByRole('button', { name: 'Previous screen', exact: true }).tap();
+      await expect(position).toHaveAttribute('data-swipe-position', '0');
       await page.locator('[data-cockpit-back]').tap();
       await expect(grid).not.toHaveAttribute('data-grid-entered', /.+/);
       await expect(grid).toHaveAttribute('data-grid-view', 'trunk');
@@ -716,6 +744,21 @@ test.describe('the Grid map', () => {
     }
   });
 });
+
+/** A swipe pager settles with one whole page inside the 16 px gutters, and says which. */
+async function restsOnAPage(scope: Locator) {
+  const pager = scope.locator('[data-swipe-pager]');
+  await expect
+    .poll(async () => {
+      const at = await pager.evaluate((el) => el.scrollLeft);
+      await scope.page().waitForTimeout(200);
+      return at === (await pager.evaluate((el) => el.scrollLeft));
+    })
+    .toBe(true);
+  const index = await scope.locator('[data-swipe-position]').getAttribute('data-swipe-position');
+  const box = await scope.locator(`[data-swipe-page="${index}"]`).boundingBox();
+  expect(box?.x).toBeCloseTo(16, 0);
+}
 
 interface GridCamera {
   azimuth: number;
@@ -1160,7 +1203,16 @@ test.describe('the Transit map', () => {
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(overflow).toBeLessThanOrEqual(0);
-      // The line names read whole: two lines at most, nothing clipped (the demo's names fit).
+      // At most four lines a screen, the rest a swipe away.
+      const groups = page.locator('[data-transit-groups]');
+      await expect(groups).toHaveAttribute('data-transit-groups', '2');
+      const firstPage = groups.locator('[data-swipe-page="0"]');
+      await expect(firstPage.locator('[data-transit-line]')).toHaveCount(4);
+      await expect(groups.locator('[data-swipe-page="1"] [data-transit-line]')).toHaveCount(2);
+      const pageBox = await firstPage.boundingBox();
+      expect(pageBox?.x).toBeCloseTo(16, 0);
+      expect(pageBox?.width).toBeCloseTo(390 - 32, 0);
+      // The line names read whole on one line, nothing clipped (the demo's names fit).
       const clipped = await page
         .locator('[data-transit-name] .transit-name-text')
         .evaluateAll((names) =>
@@ -1185,6 +1237,20 @@ test.describe('the Transit map', () => {
       await expect(sheet).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
+      // A swipe brings the next screen of lines in.
+      const position = groups.locator('[data-swipe-position]');
+      await expect(position).toHaveAttribute('data-swipe-position', '0');
+      const client = await page.context().newCDPSession(page);
+      await client.send('Input.synthesizeScrollGesture', {
+        x: 300,
+        y: 420,
+        xDistance: -220,
+        yDistance: 0,
+        gestureSourceType: 'touch',
+        speed: 1200,
+      });
+      await expect(position).toHaveAttribute('data-swipe-position', '1');
+      await restsOnAPage(groups);
     } finally {
       await stop();
     }

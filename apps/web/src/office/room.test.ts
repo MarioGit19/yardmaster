@@ -7,6 +7,7 @@ import {
   MAX_CHARACTERS,
   planRoom,
   READ_TRIP_MS,
+  rackTagClear,
   walkSeconds,
 } from './room.js';
 
@@ -167,5 +168,17 @@ describe('walkSeconds', () => {
     expect(walkSeconds(0)).toBeCloseTo(0.6);
     expect(walkSeconds(120)).toBeGreaterThan(0.6);
     expect(walkSeconds(1000)).toBeCloseTo(0.9);
+  });
+});
+
+describe('rackTagClear', () => {
+  it('drops the port tag of a rack standing under the whiteboard', () => {
+    expect(rackTagClear(150, true)).toBe(false);
+    expect(rackTagClear(30, true)).toBe(false);
+  });
+
+  it('keeps it clear of the whiteboard, or when there is none', () => {
+    expect(rackTagClear(200, true)).toBe(true);
+    expect(rackTagClear(150, false)).toBe(true);
   });
 });

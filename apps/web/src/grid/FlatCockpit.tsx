@@ -37,11 +37,14 @@ import { CommandLine, useTerminalAction, useTerminalView } from '../terminal/Ter
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
+import { SwipePager } from '../ui/SwipePager.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { ARC_DROP, planCockpit } from './map.js';
 
 /** Messages the Claude screen keeps: the newest few, like a monitor's last lines. */
 const MESSAGE_ROWS = 5;
+
+const SMALL_LABEL: Record<string, string> = { git: 'Git', ports: 'Ports', todo: 'Todo' };
 
 /** The centered terminal mounts xterm only when it's asked for: one at a time. */
 const XtermView = lazy(() => import('../terminal/XtermView.js'));
@@ -70,7 +73,7 @@ export interface FlatCockpitProps {
  * the Claude screen in the middle with its live messages, terminal screens to the sides with
  * their live tails, ports and uptime, and small git, ports and todo screens above. Every screen's
  * title opens the Actor inspector; "Open workspace" goes to the focus view. On a phone the
- * screens are a row you swipe through.
+ * screens are a stack of full-width pages you swipe through.
  */
 export function FlatCockpit({ project, now, narrow, deep = false, onBack }: FlatCockpitProps) {
   const plan = planCockpit(project.actors);
@@ -203,18 +206,24 @@ export function FlatCockpit({ project, now, narrow, deep = false, onBack }: Flat
         className="grid-cockpit-arc"
       >
         {narrow ? (
-          <ul aria-label={`${project.name} screens`} className="grid-cockpit-stack">
-            {[...(plan.center ? [plan.center] : []), ...plan.right, ...plan.left].map((actor) => (
-              <li key={actor.id} className="grid-cockpit-card">
-                {screen(actor)}
-              </li>
-            ))}
-            {small.map((element) => (
-              <li key={element.key} className="grid-cockpit-card">
-                {element}
-              </li>
-            ))}
-          </ul>
+          <SwipePager
+            label={`${project.name} screens`}
+            data-cockpit-stack=""
+            pages={[
+              ...[...(plan.center ? [plan.center] : []), ...plan.right, ...plan.left].map(
+                (actor) => ({
+                  key: actor.id,
+                  label: `${actor.label}, ${actorKindName(actor.kind)}`,
+                  node: screen(actor),
+                }),
+              ),
+              ...small.map((element) => ({
+                key: String(element.key),
+                label: SMALL_LABEL[String(element.key)] ?? String(element.key),
+                node: element,
+              })),
+            ]}
+          />
         ) : (
           <>
             <div data-cockpit-small className="grid grid-cols-3 gap-4 px-[12%]">

@@ -9,7 +9,9 @@ import {
   buildStations,
   horizontalFrame,
   lineAcross,
+  lineGroups,
   MERGE_PX,
+  PHONE_LINES,
   placeStops,
   placeTrains,
   point,
@@ -18,6 +20,7 @@ import {
   TRAIN,
   TRANSIT_WINDOW_MS,
   trainMotion,
+  transitFrame,
   verticalFrame,
 } from './map.js';
 
@@ -295,5 +298,21 @@ describe('trains', () => {
     expect(up.trains).toHaveLength(3);
     expect(up.trains[0]?.along).toBe(phone.platformAt - TRAIN.len / 2);
     expect(up.moreAt).toBeGreaterThan(0);
+  });
+});
+
+describe('the phone screens of lines', () => {
+  it('groups lines four to a screen, in order', () => {
+    expect(PHONE_LINES).toBe(4);
+    expect(lineGroups([1, 2, 3, 4, 5, 6])).toEqual([
+      [1, 2, 3, 4],
+      [5, 6],
+    ]);
+    expect(lineGroups([])).toEqual([]);
+  });
+
+  it('sizes the columns for a full screen, so every screen lines up', () => {
+    expect(transitFrame('vertical', 6, 358).lineGap).toBe(transitFrame('vertical', 4, 358).lineGap);
+    expect(transitFrame('vertical', 2, 358).lineGap).toBeGreaterThan(80);
   });
 });

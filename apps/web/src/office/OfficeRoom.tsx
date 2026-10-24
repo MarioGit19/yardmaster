@@ -25,6 +25,7 @@ import {
   type PlacedStation,
   planRoom,
   ROOM_HEIGHT,
+  rackTagClear,
   WHITEBOARD,
   type WorkStation,
 } from './room.js';
@@ -91,6 +92,7 @@ export const OfficeRoom = memo(function OfficeRoom({
   }, [plan]);
 
   const actors = useMemo(() => new Map(project.actors.map((a) => [a.id, a])), [project.actors]);
+  const whiteboard = project.todos.length > 0 || Boolean(project.summary);
   // The main session (the oldest) wears the project's accent; everyone else the status colors.
   const main = project.actors
     .filter((a) => a.kind === 'claude')
@@ -166,7 +168,7 @@ export const OfficeRoom = memo(function OfficeRoom({
         w={width}
         h={ROOM_HEIGHT}
       >
-        {(project.todos.length > 0 || project.summary) && (
+        {whiteboard && (
           <div className="absolute" style={{ left: WHITEBOARD.x, top: WHITEBOARD.y }}>
             <Whiteboard items={project.todos} summary={project.summary} scale={WHITEBOARD.scale} />
           </div>
@@ -186,6 +188,7 @@ export const OfficeRoom = memo(function OfficeRoom({
               <StationArt
                 station={station}
                 owner={station.owner ? actors.get(station.owner) : undefined}
+                whiteboard={whiteboard}
               />
             </StationSlot>
           ))}
@@ -243,7 +246,15 @@ function StationSlot({ station, children }: { station: PlacedStation; children: 
   );
 }
 
-function StationArt({ station, owner }: { station: PlacedStation; owner?: SceneActor }) {
+function StationArt({
+  station,
+  owner,
+  whiteboard,
+}: {
+  station: PlacedStation;
+  owner?: SceneActor;
+  whiteboard: boolean;
+}) {
   const scale = FURNITURE_SCALE;
   switch (station.kind) {
     case 'desk':
@@ -251,7 +262,13 @@ function StationArt({ station, owner }: { station: PlacedStation; owner?: SceneA
     case 'side-desk':
       return <SideDesk scale={scale} />;
     case 'rack':
-      return <ServerRack scale={scale} rate={owner?.activity ?? 0} ports={owner?.ports ?? []} />;
+      return (
+        <ServerRack
+          scale={scale}
+          rate={owner?.activity ?? 0}
+          ports={rackTagClear(station.x + RACK_OFFSET, whiteboard) ? (owner?.ports ?? []) : []}
+        />
+      );
     case 'bench':
       return (
         <Workbench scale={scale} running={owner?.state === 'running'} rate={owner?.activity ?? 0} />
