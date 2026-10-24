@@ -774,6 +774,36 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
       await page.waitForTimeout(600);
     });
+
+    // Transit's workspace skin (DESIGN.md §10.8): the line's sign opens the workspace, the line
+    // grows from the map into the header band as the panels rise in (smooth); Esc returns to the
+    // map with the line's sign lit.
+    await page.evaluate(() => localStorage.setItem('cboard.layout', 'transit'));
+    await page.reload();
+    const sign = page.locator(`[data-transit-name="${id}"]`);
+    await sign.waitFor();
+    await page.waitForTimeout(1200);
+    await r.moment(
+      'transit-open',
+      'transition',
+      'Transit: the line grows from the map into the header band as the panels rise in (smooth)',
+      async () => {
+        await sign.click();
+        await page.locator(`[data-focus="${id}"]`).waitFor();
+        await page.waitForTimeout(900);
+      },
+    );
+    await r.moment(
+      'transit-close',
+      'transition',
+      "Esc fades back to the map, the line's sign lit for a moment",
+      async () => {
+        await page.locator(`[data-focus="${id}"] h1`).focus();
+        await page.keyboard.press('Escape');
+        await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+        await page.waitForTimeout(1400);
+      },
+    );
     await page.evaluate(() => localStorage.removeItem('cboard.layout'));
   },
 

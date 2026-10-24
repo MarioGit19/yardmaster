@@ -1,0 +1,396 @@
+/* Transit's workspace skin (DESIGN.md §10.8): wayfinding signage. It ships with the skin's chunk,
+   and every rule is scoped to the Transit workspace. The §10.5 grounds, flat panels with no
+   glass, the project's line in the header band, station signs for the column headings, route
+   roundels for the terminal tabs, and the session list as a departures board. Shared pieces
+   (the line's renderer, the board's Night ink in Daylight) live with the layout in index.css. */
+
+.focus[data-layout="transit"] {
+  --route: var(--accent);
+  --ts-radius: 12px;
+  --ts-board-rule: rgb(255 255 255 / 0.06);
+
+  background: var(--transit-ground);
+}
+.focus[data-layout="transit"]:not([data-workspace="phone"]) {
+  border-color: var(--line);
+}
+
+/* ── Header band: the project's line ──────────────────────────────────────────────────────── */
+
+.ts-band {
+  position: relative;
+  /* Over the columns, so the hover card below a station isn't covered. */
+  z-index: 2;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 112px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.ts-band-sign {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 19rem;
+  align-items: center;
+  gap: 12px;
+}
+.ts-band-name {
+  font-weight: 650;
+  font-size: 20px;
+  line-height: 24px;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+}
+.ts-band[data-tone="wait"] .ts-band-sign .transit-roundel {
+  box-shadow:
+    0 0 0 2px var(--transit-ground),
+    0 0 0 4px var(--st-wait),
+    0 0 12px var(--st-wait-glow);
+}
+.ts-band[data-tone="err"] .ts-band-sign .transit-roundel {
+  box-shadow:
+    0 0 0 2px var(--transit-ground),
+    0 0 0 4px var(--st-err);
+}
+.ts-band-sign .transit-roundel {
+  font-size: 15px;
+}
+/* The line: the map's own renderer, its sign row left out (the band's sign stands beside it). */
+.ts-band-line {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 240px;
+  align-self: stretch;
+  margin: 6px 0;
+  border-radius: 8px;
+  outline: none;
+}
+.ts-band-line:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.ts-band-track {
+  position: absolute;
+  right: 0;
+  left: 0;
+}
+/* The caption takes what it needs (a short "Idle", or an approval with its buttons), so the line
+   keeps the rest. */
+.ts-band-caption {
+  flex: 0 1 auto;
+  max-width: 24rem;
+}
+/* The session the workspace shows: its station lit in the line's color. */
+.ts-band .transit-station[aria-current] {
+  background: color-mix(in srgb, var(--route) 18%, transparent);
+  box-shadow: inset 0 -2px 0 var(--route);
+}
+
+/* ── Panels: flat signage ─────────────────────────────────────────────────────────────────── */
+
+.focus[data-layout="transit"] .focus-col {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 6px 10px;
+  overflow: visible;
+}
+.focus[data-layout="transit"] [role="tabpanel"].focus-col {
+  padding: 12px;
+}
+.focus[data-layout="transit"] [role="tabpanel"].focus-col[hidden] {
+  display: none;
+}
+.focus[data-layout="transit"] .focus-col-max {
+  background: var(--transit-ground);
+}
+.ts-panel {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--ts-radius);
+  background: var(--bg-1);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* The platform edge: a strip in the line's color along the top. */
+.ts-panel::before {
+  content: "";
+  flex: none;
+  height: 4px;
+  background: var(--route);
+}
+.ts-panel[data-tone="wait"]::before {
+  background: var(--st-wait);
+}
+.ts-panel[data-tone="err"]::before {
+  background: var(--st-err);
+}
+.ts-panel-body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ts-panel-body:has(> .claude-panel) {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Column headings as station signs: the line's color, the roundel's ink, rounded and bold. */
+.focus[data-layout="transit"] [data-column-heading] > span:first-child {
+  padding: 1px 10px;
+  border-radius: 6px;
+  background: var(--route);
+  color: var(--transit-on-route);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Terminal tabs as route roundels ──────────────────────────────────────────────────────── */
+
+.focus[data-layout="transit"] [role="tablist"]:has(> [data-tab]) {
+  counter-reset: ts-route;
+}
+.focus[data-layout="transit"] [role="tab"][data-tab] {
+  counter-increment: ts-route;
+  border-radius: 9999px;
+  padding-left: 4px;
+}
+.focus[data-layout="transit"] [role="tab"][data-tab]::before {
+  content: counter(ts-route) / "";
+  position: relative;
+  /* Over the selected tab's indicator. */
+  z-index: 1;
+  display: grid;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--route);
+  color: var(--transit-on-route);
+  font-weight: 750;
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.focus[data-layout="transit"] [role="tab"][data-tab][aria-selected="true"]::before {
+  opacity: 1;
+}
+.focus[data-layout="transit"] [data-tab] > [data-tab-indicator] {
+  border-color: color-mix(in srgb, var(--route) 45%, transparent);
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--route) 12%, var(--bg-1));
+  box-shadow: none;
+}
+/* The narrow view's panel tabs: a thick underline in the line's color. */
+.focus[data-layout="transit"] [id^="focus-tab-"] > [data-tab-indicator] {
+  height: 3px;
+  background: var(--route);
+}
+
+/* ── The session list as a departures board ───────────────────────────────────────────────── */
+
+.focus[data-layout="transit"] [data-session-list] {
+  gap: 0;
+  margin-inline: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--transit-board);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+  color-scheme: dark;
+}
+.focus[data-layout="transit"] [data-session-list] > li + li {
+  border-top: 1px solid var(--ts-board-rule);
+}
+.focus[data-layout="transit"] [data-session-list] a[data-session] {
+  min-height: 48px;
+  padding: 6px 12px;
+  border-radius: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .focus[data-layout="transit"] [data-session-list] a[data-session]:hover {
+    background: rgb(255 255 255 / 0.04);
+  }
+}
+.focus[data-layout="transit"] [data-session-list] [data-session-pill] {
+  border-radius: 0;
+  background: rgb(255 255 255 / 0.07);
+  box-shadow: inset 3px 0 0 var(--route);
+}
+.focus[data-layout="transit"] [data-session-list] [data-session-name] {
+  font-weight: 600;
+}
+/* The status in the board's words, in its tone; it keeps its room before the token count. */
+.focus[data-layout="transit"] [data-session-list] [data-status] {
+  flex: none;
+  max-width: 100%;
+}
+.focus[data-layout="transit"] [data-session-list] [data-status] + span {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus[data-layout="transit"] [data-session-list] [data-status] > span:last-child {
+  font-weight: 600;
+}
+.focus[data-layout="transit"]
+  :is([data-session-list], [data-hub-group] > ul)
+  [data-status="wait"]
+  > span:last-child {
+  color: var(--st-wait-ink);
+}
+.focus[data-layout="transit"]
+  :is([data-session-list], [data-hub-group] > ul)
+  [data-status="err"]
+  > span:last-child {
+  color: var(--st-err-ink);
+}
+.focus[data-layout="transit"]
+  :is([data-session-list], [data-hub-group] > ul)
+  [data-status="work"]
+  > span:last-child {
+  color: var(--st-work-ink);
+}
+.focus[data-layout="transit"]
+  :is([data-session-list], [data-hub-group] > ul)
+  [data-status="tool"]
+  > span:last-child {
+  color: var(--st-tool-ink);
+}
+/* What needs you carries the board's edge bar, amber breathing or rose. */
+.focus[data-layout="transit"] [data-session-list] a[data-session]:has([data-status="wait"])::after,
+.focus[data-layout="transit"] [data-session-list] a[data-session]:has([data-status="err"])::after,
+.focus[data-layout="transit"] [data-hub-group="needs"] [data-hub-item]::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--st-err);
+}
+.focus[data-layout="transit"] [data-session-list] a[data-session]:has([data-status="wait"])::after,
+.focus[data-layout="transit"] [data-hub-group="needs"] [data-hub-item]::after {
+  background: var(--st-wait);
+  box-shadow: 0 0 8px var(--st-wait-glow);
+}
+[data-motion="full"]
+  .focus[data-layout="transit"]
+  :is(
+    [data-session-list] a[data-session]:has([data-status="wait"]),
+    [data-hub-group="needs"] [data-hub-item]
+  )::after {
+  animation: transit-due var(--dur-breathe) var(--ease-in-out) infinite;
+}
+
+/* ── Entry: the line grows into the band ──────────────────────────────────────────────────── */
+
+.ts-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  list-style: none;
+}
+[data-motion="off"] .ts-entry {
+  display: none;
+}
+
+/* ── Phones: the hub as a departures board, the project's line in the app bar ─────────────── */
+
+.focus[data-layout="transit"][data-workspace="phone"] {
+  background: var(--transit-ground);
+}
+.focus[data-layout="transit"] :is([data-workspace-appbar], [data-item-header]) {
+  background: var(--bg-1);
+  box-shadow: inset 0 -4px 0 var(--route);
+}
+.focus[data-layout="transit"] [data-hub-group] > h2 {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.focus[data-layout="transit"] [data-hub-group] > ul {
+  gap: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--transit-board);
+  color-scheme: dark;
+}
+.focus[data-layout="transit"] [data-hub-group] > ul > li + li {
+  border-top: 1px solid var(--ts-board-rule);
+}
+.focus[data-layout="transit"] [data-hub-item] {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.focus[data-layout="transit"] [data-hub-item][data-last] {
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 3px 0 0 var(--route);
+}
+.focus[data-layout="transit"] [data-hub-item] [data-hub-name] {
+  font-weight: 600;
+}
+.ts-hub-line {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+}
+/* The track under the stops, a terminus bar at each end. */
+.ts-hub-line::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background: var(--route);
+}
+.ts-hub-stop {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.ts-hub-stop .transit-mark {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2px var(--transit-ink);
+}
+.ts-hub-stop .transit-mark[data-kind="terminal"] {
+  border-radius: 3px;
+}
+.ts-hub-stop[data-actor-state="waiting"] .transit-mark {
+  box-shadow:
+    0 0 0 2px var(--st-wait),
+    0 0 8px var(--st-wait-glow);
+}
+.ts-hub-stop[data-actor-state="error"] .transit-mark {
+  box-shadow: 0 0 0 2px var(--st-err);
+}

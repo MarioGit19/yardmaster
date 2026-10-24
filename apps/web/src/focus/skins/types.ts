@@ -1,4 +1,4 @@
-import type { ClaudeSession, Project } from '@c-board/protocol';
+import type { ClaudeSession, Project, SessionStatus } from '@c-board/protocol';
 import type { ComponentType, ReactNode, RefObject } from 'react';
 import type { CrewView } from '../../pod/SessionCrew.js';
 import type { Tone } from '../../status.js';
@@ -33,6 +33,11 @@ export interface HubCrewProps {
   projectId: string;
 }
 
+/** What a status reads as, for skins that word it their own way (Transit's departures board). */
+export type StatusWordInput =
+  | { kind: 'session'; status: SessionStatus }
+  | { kind: 'terminal'; running: boolean; exit: number | null; closed: boolean };
+
 export interface EntryTransitionProps {
   projectId: string;
 }
@@ -54,4 +59,9 @@ export interface WorkspaceSkin {
   EntryTransition: ComponentType<EntryTransitionProps> | null;
   /** Beside the project's name in the phone hub's app bar (Office's crew), when the skin has one. */
   HubCrew?: ComponentType<HubCrewProps>;
+  /**
+   * The words a session row or a hub card shows for its status, when the skin has its own. The
+   * tone (color and mark) never changes, only the words.
+   */
+  statusWord?: (input: StatusWordInput) => string;
 }

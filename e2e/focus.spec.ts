@@ -44,6 +44,11 @@ const OPENERS: Record<
     },
     link: (id) => `[data-grid-cockpit="${id}"] [data-cockpit-open]`,
   },
+  transit: {
+    item: '[data-transit-line]',
+    id: 'data-transit-line',
+    link: (id) => `[data-transit-name="${id}"]`,
+  },
   retro: {
     item: '[data-retro-frame]',
     id: 'data-retro-frame',
@@ -604,5 +609,138 @@ test.describe('office at 1440', () => {
     await expect(card).toHaveAttribute('data-layout', 'office');
     await expect(card.locator('[data-office-entry]')).toHaveCount(0);
     await expect(card.locator('[data-office-band]')).toBeVisible();
+  });
+});
+
+// Transit's workspace skin (DESIGN.md §10.8): the line grows from the map into the header band,
+// its stations select what they are, its log bins jump to their events, and Esc returns to the
+// map with the line's sign focused and lit.
+test.describe('transit at 1440', () => {
+  test.use({ viewport: { width: 1440, height: 900 }, layout: 'transit' });
+
+  /** Opens the first line that has a terminal from its sign on the map. */
+  async function openLine(page: Page) {
+    await openRoute(page, '/');
+    const line = page
+      .locator('[data-transit-line]', {
+        has: page.locator('[data-transit-station][data-actor-kind="terminal"]'),
+      })
+      .first();
+    await expect(line).toBeVisible();
+    const id = await line.getAttribute('data-transit-line');
+    if (!id) throw new Error('line without an id');
+    return { id, sign: page.locator(`[data-transit-name="${id}"]`) };
+  }
+
+  test('the line grows into the header band, and Esc returns to the map with the line lit', async ({
+    page,
+  }) => {
+    const { id, sign } = await openLine(page);
+    await sign.click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    // The card is there at once; a still copy of the line moves into the band, then goes.
+    await expect(card.locator('[data-transit-entry]')).toBeAttached();
+    expect(await card.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+    await expect(card.locator('[data-transit-entry]')).toHaveCount(0);
+    await expect(card).toHaveAttribute('data-layout', 'transit');
+    const band = card.locator(`[data-transit-band="${id}"]`);
+    await expect(band).toBeVisible();
+    await expect(band.locator('h1')).toHaveText(
+      await sign.locator('.transit-name-text').innerText(),
+    );
+    // The project's own line: its stations with their trains, and the hour's service log.
+    await expect(band.locator('[data-transit-station]').first()).toBeVisible();
+    await expect(band.locator('[data-transit-log]')).toBeVisible();
+    for (const panel of ['Sessions', 'Claude', 'Terminals']) {
+      await expect(card.locator(`[data-transit-panel="${panel}"]`)).toBeVisible();
+    }
+    // Station signs over the columns, and the session list in the board's words.
+    const heading = card.locator('[data-column-heading] > span').first();
+    expect(await heading.evaluate((el) => getComputedStyle(el).fontWeight)).toBe('700');
+    await expect(card.locator('[data-session-list]')).toBeVisible();
+    await expect(card.locator('[data-session-list] [data-status]').first()).toHaveText(
+      /At platform|Departing|Due · needs you|Cancelled|In service|Out of service|Held/,
+    );
+
+    await card.locator('h1').focus();
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await expect(sign).toBeFocused();
+    await expect(page.locator(`[data-transit-line="${id}"]`)).toHaveAttribute(
+      'data-returned',
+      'true',
+    );
+  });
+
+  test('a station in the band selects its terminal, and a log bin jumps to its event', async ({
+    page,
+  }) => {
+    const { id, sign } = await openLine(page);
+    await sign.click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    const band = card.locator('[data-transit-band]');
+    await expect(card.locator('[data-transit-entry]')).toHaveCount(0);
+
+    // A terminal's station selects its tab in the stack, as the tab itself would.
+    const station = band.locator('[data-transit-station][data-actor-kind="terminal"]').first();
+    const actor = await station.getAttribute('data-transit-station');
+    const terminal = actor?.replace(/^t:/, '');
+    if (!terminal) throw new Error('station without a terminal');
+    await station.click();
+    await expect(card.locator(`[role="tab"][data-tab="${terminal}"]`)).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    // A Claude station selects its session.
+    const claude = band.locator('[data-transit-station][data-actor-kind="claude"]').first();
+    if ((await claude.count()) > 0) {
+      const session = (await claude.getAttribute('data-transit-station'))?.replace(/^s:/, '');
+      await claude.click();
+      await expect(page).toHaveURL(new RegExp(`/s/${session}`));
+      await expect(claude).toHaveAttribute('aria-current', 'true');
+    }
+
+    // A log bin of a finished turn jumps to its session, like a Pulse dot.
+    const bin = band.locator('[data-transit-event][data-session]').last();
+    await expect(bin).toBeVisible({ timeout: 20_000 });
+    const target = await bin.getAttribute('data-session');
+    await bin.click();
+    await expect(page).toHaveURL(new RegExp(`/s/${target}`));
+    await expect(card.locator(`a[data-session="${target}"]`)).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  test('the line is one Tab stop, and the arrows move along it', async ({ page }) => {
+    const { id, sign } = await openLine(page);
+    await sign.click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    await expect(card.locator('[data-transit-entry]')).toHaveCount(0);
+    const line = card.locator('[data-band-line]');
+    const items = line.locator('[data-transit-item]');
+    // Its first station is the Tab stop; the rest wait for the arrows.
+    await expect(line.locator('[tabindex="0"]')).toHaveCount(1);
+    await items.first().focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(items.last()).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(items.first()).toBeFocused();
+    // Esc still leaves the workspace from inside the line.
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+  });
+
+  test('at Reduced the workspace cross-fades in: no line moving into the band', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    const { id, sign } = await openLine(page);
+    await sign.click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    await expect(card).toHaveAttribute('data-layout', 'transit');
+    await expect(card.locator('[data-transit-entry]')).toHaveCount(0);
+    await expect(card.locator('[data-transit-band]')).toBeVisible();
   });
 });

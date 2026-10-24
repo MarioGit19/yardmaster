@@ -54,7 +54,7 @@ import { NewSessionPanel } from './NewSessionPanel.js';
 import { PhoneWorkspace } from './phone/PhoneWorkspace.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
-import { SkinContext } from './skins/registry.js';
+import { SkinContext, useStatusWord } from './skins/registry.js';
 import type { PanelFrameProps } from './skins/types.js';
 import { type ActiveSkin, useWorkspaceSkin } from './skins/useWorkspaceSkin.js';
 
@@ -529,7 +529,7 @@ function SessionsColumn({
         {ordered.length === 0 ? (
           <p className="text-body-sm text-text-2">No Claude sessions</p>
         ) : (
-          <ul className="-mx-2 flex flex-col gap-0.5">
+          <ul data-session-list className="-mx-2 flex flex-col gap-0.5">
             <AnimatePresence initial={false}>
               {ordered.map((s) => (
                 <motion.li
@@ -593,6 +593,7 @@ function SessionLink({
   onPick: (byKeyboard: boolean) => void;
 }) {
   const status = sessionStatusView(session.status);
+  const word = useStatusWord();
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
@@ -651,7 +652,7 @@ function SessionLink({
           <span className="flex min-w-0 items-center justify-between gap-2">
             <StatusDot
               tone={status.tone}
-              label={status.label}
+              label={word({ kind: 'session', status: session.status }, status.label)}
               showLabel
               className="min-w-0 text-meta text-text-2"
             />

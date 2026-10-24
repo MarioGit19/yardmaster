@@ -2261,6 +2261,7 @@ const SKIN_WAITING: Record<FocusLayout, { item: string; id: string }> = {
   minimal: { item: '[data-pod][data-tone="wait"]', id: 'data-pod' },
   office: { item: '[data-room][data-tone="wait"]', id: 'data-room' },
   grid: { item: '[data-grid-node][data-tone="wait"]', id: 'data-grid-node' },
+  transit: { item: '[data-transit-line][data-tone="wait"]', id: 'data-transit-line' },
   retro: { item: '[data-retro-frame][data-tone="wait"]', id: 'data-retro-frame' },
 };
 

@@ -1,12 +1,4 @@
-import {
-  type RefObject,
-  useCallback,
-  useContext,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type RefObject, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
@@ -18,7 +10,7 @@ import { cx } from '../ui/cx.js';
 import { DeparturesBoard } from './DeparturesBoard.js';
 import { buildServiceLog, busiestLine, type ServiceEvent, transitMode } from './map.js';
 import { PhoneLine } from './PhoneLine.js';
-import { type Tip, type TipApi, TipContext } from './shared.js';
+import { TipCard, TipContext, useTipLayer } from './shared.js';
 import { ROW, TransitLine } from './TransitLine.js';
 
 /** Departures on the board, per layout; beside the map, as many as the window holds. */
@@ -49,7 +41,6 @@ export default function TransitLayout() {
   const mapRef = useRef<HTMLUListElement>(null);
   const [width, setWidth] = useState(0);
   const [viewport, setViewport] = useState(0);
-  const [tip, setTip] = useState<Tip | null>(null);
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -76,17 +67,7 @@ export default function TransitLayout() {
   const log = useMemo(() => buildServiceLog(activity, projects, now), [activity, projects, now]);
   const mapWidth = mode === 'wide' ? width - BOARD_W - GAP : width;
 
-  const show = useCallback<TipApi['show']>((target, next) => {
-    const box = ref.current?.getBoundingClientRect();
-    if (!box) return;
-    const rect = target.getBoundingClientRect();
-    setTip({ ...next, x: rect.left + rect.width / 2 - box.left, y: rect.top - box.top });
-  }, []);
-  const hide = useCallback<TipApi['hide']>(
-    (id) => setTip((current) => (current?.id === id ? null : current)),
-    [],
-  );
-  const tipApi = useMemo(() => ({ show, hide }), [show, hide]);
+  const { api: tipApi, tip } = useTipLayer(ref);
 
   return (
     <>
@@ -130,24 +111,7 @@ export default function TransitLayout() {
                 log={log}
               />
             </div>
-            {tip && (
-              <div
-                role="tooltip"
-                data-transit-tip={tip.id}
-                className="transit-tip pointer-events-none absolute z-20 w-max max-w-70 rounded-control border border-line bg-bg-2 px-3 py-1.5 text-label shadow-raised"
-                style={{ left: tip.x, top: tip.y }}
-              >
-                <p className="flex items-baseline gap-2">
-                  <span className="font-medium text-text-1">{tip.title}</span>
-                  {tip.meta && <span className="tabular text-text-2">{tip.meta}</span>}
-                </p>
-                {tip.detail && (
-                  <p className="mt-0.5 line-clamp-2 break-words font-mono text-meta text-text-2">
-                    {tip.detail}
-                  </p>
-                )}
-              </div>
-            )}
+            {tip && <TipCard tip={tip} />}
           </TipContext.Provider>
         )}
       </div>

@@ -6,12 +6,13 @@ import { LAYOUT_SKIN, loadedSkin, loadSkin } from './registry.js';
 import { KEY_TARGETS, numberTargets } from './retro/RetroSkin.js';
 
 describe('workspace skins', () => {
-  it('gives every layout a skin, Minimal for those without their own yet', () => {
+  it('gives every layout its own skin', () => {
     for (const layout of LAYOUTS) expect(LAYOUT_SKIN[layout]).toBeDefined();
     expect(LAYOUT_SKIN.minimal).toBe('minimal');
     expect(LAYOUT_SKIN.retro).toBe('retro');
     expect(LAYOUT_SKIN.grid).toBe('grid');
     expect(LAYOUT_SKIN.office).toBe('office');
+    expect(LAYOUT_SKIN.transit).toBe('transit');
   });
 
   it('has Minimal at once and keeps today’s view: no frame, no entry of its own', async () => {
@@ -46,6 +47,19 @@ describe('workspace skins', () => {
     expect(office.PanelFrame).toBeTypeOf('function');
     expect(office.EntryTransition).toBeTypeOf('function');
     expect(office.HubCrew).toBeTypeOf('function');
+  });
+});
+
+describe('Transit skin', () => {
+  it('loads with its line band, flat panels, the line entry, the hub line and board words', async () => {
+    const transit = await loadSkin('transit');
+    expect(loadedSkin('transit')).toBe(transit);
+    expect(transit.HeaderBand).toBeTypeOf('function');
+    expect(transit.PanelFrame).toBeTypeOf('function');
+    expect(transit.EntryTransition).toBeTypeOf('function');
+    expect(transit.HubCrew).toBeTypeOf('function');
+    expect(transit.statusWord?.({ kind: 'session', status: { kind: 'idle' } })).toBe('At platform');
+    expect(minimalSkin.statusWord).toBeUndefined();
   });
 });
 

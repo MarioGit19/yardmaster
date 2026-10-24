@@ -18,7 +18,7 @@ import {
   trainMotion,
 } from './map.js';
 import { ServiceLog } from './ServiceLog.js';
-import { lineKeys, tipHandlers, useFresh, useTip } from './shared.js';
+import { lineKeys, tipHandlers, useFresh, useReturned, useTip } from './shared.js';
 import { TrainCar } from './TrainCar.js';
 
 /** A line's band on the desktop map, top to bottom: its sign, the stations, the spurs, the log. */
@@ -71,6 +71,7 @@ export function LineSign({
       <Link
         href={projectHref(project.id)}
         data-transit-name={project.id}
+        data-focus-return={project.id}
         aria-label={`${project.name} line, ${toneLabel(project.tone)}, ${counts}. Arrow keys move through its stations and service log.`}
         className={cx(
           'transit-name group flex min-w-0 items-center gap-2.5 outline-none',
@@ -125,15 +126,8 @@ export function TransitLine({
   now: number;
   events: readonly ServiceEvent[];
 }) {
-  const track = width - FIRST - END;
-  const slots = slotCount(track, busiest);
-  const slot = track / slots;
-  const { stations, hidden } = lineStations(project.actors, slots);
-  const fresh = useFresh(stations.map((s) => s.actor.id));
   const counts = trainCount(project.actors);
-  const accent = `var(--accent-${project.accent})`;
-  const x = (i: number) => FIRST + i * slot;
-
+  const returned = useReturned(project.id);
   return (
     <motion.li
       layout="position"
@@ -142,16 +136,54 @@ export function TransitLine({
       data-transit-line={project.id}
       data-tone={project.tone}
       data-dim={project.dim || undefined}
+      data-returned={returned || undefined}
       data-scene-leaving={project.leaving}
       inert={project.leaving}
       onKeyDown={lineKeys}
       className="transit-line relative"
-      style={{ '--route': accent, height: ROW.height } as CSSProperties}
+      style={{ '--route': `var(--accent-${project.accent})`, height: ROW.height } as CSSProperties}
     >
       <div className="flex h-7 min-w-0 items-center justify-between gap-3 pr-1">
         <LineSign project={project} counts={counts} />
         <span className="shrink-0 text-meta text-text-3 tabular">{counts}</span>
       </div>
+      <LineBody project={project} width={width} busiest={busiest} now={now} events={events} />
+    </motion.li>
+  );
+}
+
+/**
+ * A line's track, stations, spurs and service log, placed on `ROW` inside a positioned box
+ * `width` wide: the map's band and the workspace's header band (§10.8) draw the same line. With
+ * `select`, a station picks what it is (the workspace) instead of opening the Actor inspector.
+ */
+export function LineBody({
+  project,
+  width,
+  busiest,
+  now,
+  events,
+  select,
+  selected,
+}: {
+  project: SceneProject;
+  width: number;
+  busiest: number;
+  now: number;
+  events: readonly ServiceEvent[];
+  select?: (actor: SceneActor) => void;
+  /** The station already picked (the workspace's session). */
+  selected?: string | null;
+}) {
+  const track = width - FIRST - END;
+  const slots = slotCount(track, busiest);
+  const slot = track / slots;
+  const { stations, hidden } = lineStations(project.actors, slots);
+  const fresh = useFresh(stations.map((s) => s.actor.id));
+  const x = (i: number) => FIRST + i * slot;
+
+  return (
+    <>
       <svg
         aria-hidden
         className="pointer-events-none absolute top-0 left-0 overflow-visible"
@@ -192,21 +224,35 @@ export function TransitLine({
           left={x(i)}
           slot={slot}
           fresh={fresh.has(station.actor.id)}
+          tabbable={select !== undefined && i === 0}
+          select={select}
+          selected={selected === station.actor.id}
         />
       ))}
-      {hidden > 0 && (
-        <Link
-          href={projectHref(project.id)}
-          tabIndex={-1}
-          data-transit-item
-          data-transit-more={hidden}
-          aria-label={`${hidden} more in ${project.name}: open the project`}
-          className="transit-more absolute"
-          style={{ left: x(stations.length), top: ROW.line - 12 }}
-        >
-          +{hidden}
-        </Link>
-      )}
+      {hidden > 0 &&
+        (select ? (
+          <span
+            role="img"
+            data-transit-more={hidden}
+            aria-label={`${hidden} more in ${project.name}`}
+            className="transit-more absolute"
+            style={{ left: x(stations.length), top: ROW.line - 12 }}
+          >
+            +{hidden}
+          </span>
+        ) : (
+          <Link
+            href={projectHref(project.id)}
+            tabIndex={-1}
+            data-transit-item
+            data-transit-more={hidden}
+            aria-label={`${hidden} more in ${project.name}: open the project`}
+            className="transit-more absolute"
+            style={{ left: x(stations.length), top: ROW.line - 12 }}
+          >
+            +{hidden}
+          </Link>
+        ))}
       <ServiceLog
         events={events}
         now={now}
@@ -214,7 +260,7 @@ export function TransitLine({
         height={ROW.log}
         style={{ position: 'absolute', left: END, top: ROW.logTop }}
       />
-    </motion.li>
+    </>
   );
 }
 
@@ -231,55 +277,69 @@ function Station({
   left,
   slot,
   fresh,
+  tabbable,
+  select,
+  selected,
 }: {
   station: LineStation;
   projectName: string;
   left: number;
   slot: number;
   fresh: boolean;
+  /** The line's Tab stop (the band's first station; on the map the line's sign is). */
+  tabbable: boolean;
+  select?: (actor: SceneActor) => void;
+  selected: boolean;
 }) {
   const { actor, minis } = station;
   const tip = useTip();
   const motion = trainMotion(actor.state);
   const status = boardStatus(actor);
+  const button = (
+    <button
+      type="button"
+      tabIndex={tabbable ? 0 : -1}
+      aria-label={actor.name}
+      aria-current={selected || undefined}
+      onClick={select ? () => select(actor) : undefined}
+      data-transit-item
+      data-transit-station={actor.id}
+      data-scene-actor={actor.id}
+      data-actor-state={actor.state}
+      data-actor-kind={actor.kind}
+      data-train={motion}
+      data-tone={actor.tone}
+      {...tipHandlers(tip, actor.id, () => ({
+        id: actor.id,
+        title: actor.label,
+        meta: `${actorKindName(actor.kind)} · ${status.word}`,
+        detail: actor.caption.text,
+      }))}
+      className="transit-station"
+    >
+      <span className="transit-station-name" data-tone={status.tone}>
+        {actor.label}
+      </span>
+      <span aria-hidden className="transit-mark" data-kind={actor.kind} />
+      <TrainCar kind={actor.kind} motion={motion} />
+    </button>
+  );
   return (
     <>
       <div
         className={cx('transit-station-slot absolute', fresh && 'transit-pop')}
         style={{ left: left - 6, top: ROW.stationTop, width: slot - 12 }}
       >
-        <ActorInspector
-          projectId={actor.projectId}
-          actorId={actor.id}
-          label={`${projectName}, ${actor.label}`}
-          trigger={
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-label={actor.name}
-              data-transit-item
-              data-transit-station={actor.id}
-              data-scene-actor={actor.id}
-              data-actor-state={actor.state}
-              data-actor-kind={actor.kind}
-              data-train={motion}
-              data-tone={actor.tone}
-              {...tipHandlers(tip, actor.id, () => ({
-                id: actor.id,
-                title: actor.label,
-                meta: `${actorKindName(actor.kind)} · ${status.word}`,
-                detail: actor.caption.text,
-              }))}
-              className="transit-station"
-            >
-              <span className="transit-station-name" data-tone={status.tone}>
-                {actor.label}
-              </span>
-              <span aria-hidden className="transit-mark" data-kind={actor.kind} />
-              <TrainCar kind={actor.kind} motion={motion} />
-            </button>
-          }
-        />
+        {select ? (
+          button
+        ) : (
+          <ActorInspector
+            projectId={actor.projectId}
+            actorId={actor.id}
+            label={`${projectName}, ${actor.label}`}
+            trigger={button}
+          />
+        )}
       </div>
       {minis.slice(0, MINIS).map((mini, i) => (
         <MiniTrain
@@ -287,6 +347,7 @@ function Station({
           actor={mini}
           projectName={projectName}
           left={miniAt(left + 8, i)}
+          select={select}
         />
       ))}
       {minis.length > MINIS && (
@@ -308,42 +369,50 @@ function MiniTrain({
   actor,
   projectName,
   left,
+  select,
 }: {
   actor: SceneActor;
   projectName: string;
   left: number;
+  select?: (actor: SceneActor) => void;
 }) {
   const tip = useTip();
   const motion = trainMotion(actor.state);
+  const button = (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={actor.name}
+      onClick={select ? () => select(actor) : undefined}
+      data-transit-item
+      data-scene-actor={actor.id}
+      data-actor-state={actor.state}
+      data-actor-kind={actor.kind}
+      data-train={motion}
+      data-tone={actor.tone}
+      {...tipHandlers(tip, actor.id, () => ({
+        id: actor.id,
+        title: actor.label,
+        meta: actorKindName(actor.kind),
+        detail: actor.caption.text,
+      }))}
+      className="transit-mini"
+    >
+      <TrainCar kind={actor.kind} motion={motion} mini />
+    </button>
+  );
   return (
     <div className="transit-mini-slot absolute" style={{ left: left - 12, top: ROW.spur - 12 }}>
-      <ActorInspector
-        projectId={actor.projectId}
-        actorId={actor.id}
-        label={`${projectName}, ${actor.label}`}
-        trigger={
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label={actor.name}
-            data-transit-item
-            data-scene-actor={actor.id}
-            data-actor-state={actor.state}
-            data-actor-kind={actor.kind}
-            data-train={motion}
-            data-tone={actor.tone}
-            {...tipHandlers(tip, actor.id, () => ({
-              id: actor.id,
-              title: actor.label,
-              meta: actorKindName(actor.kind),
-              detail: actor.caption.text,
-            }))}
-            className="transit-mini"
-          >
-            <TrainCar kind={actor.kind} motion={motion} mini />
-          </button>
-        }
-      />
+      {select ? (
+        button
+      ) : (
+        <ActorInspector
+          projectId={actor.projectId}
+          actorId={actor.id}
+          label={`${projectName}, ${actor.label}`}
+          trigger={button}
+        />
+      )}
     </div>
   );
 }

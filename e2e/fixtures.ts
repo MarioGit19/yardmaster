@@ -10,7 +10,7 @@ function required(name: string): string {
 }
 
 /** The layouts whose workspace skin the focus specs run in (DESIGN.md §10.8); later skins join. */
-export const FOCUS_LAYOUTS = ['minimal', 'office', 'grid', 'retro'] as const;
+export const FOCUS_LAYOUTS = ['minimal', 'office', 'grid', 'transit', 'retro'] as const;
 export type FocusLayout = (typeof FOCUS_LAYOUTS)[number];
 
 /** Tests get a page that is already signed in to the demo board. */

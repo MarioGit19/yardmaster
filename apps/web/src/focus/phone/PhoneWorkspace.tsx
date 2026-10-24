@@ -76,6 +76,7 @@ import { cx } from '../../ui/cx.js';
 import { StatusDot } from '../../ui/StatusDot.js';
 import { EmptyState } from '../../views/Page.js';
 import { NewSessionPanel } from '../NewSessionPanel.js';
+import { useStatusWord } from '../skins/registry.js';
 import type { HubCrewProps } from '../skins/types.js';
 import { useTabSwipe } from '../swipe.js';
 import { WorkspaceMenu } from '../WorkspaceMenu.js';
@@ -432,7 +433,10 @@ function ItemGroups({
 interface ItemView {
   name: string;
   tone: Tone;
+  /** The status in the skin's words. */
   status: string;
+  /** The status in the standard words, which a caption saying the same repeats. */
+  label: string;
   caption: Caption | null;
   session: ClaudeSession | undefined;
   terminal: Terminal | undefined;
@@ -448,12 +452,14 @@ function useItemView(item: HubItem): ItemView {
   const approval = useBoard(selectApproval(approvalId ?? ''));
   const terminal = useBoard(selectTerminal(item.terminalId ?? ''));
   const execution = useBoardShallow(selectLaneExecution(terminal ?? NO_TERMINAL));
+  const word = useStatusWord();
   if (item.kind === 'session' && session) {
     const status = sessionStatusView(session.status);
     return {
       name: sessionDisplayName(session),
       tone: status.tone,
-      status: status.label,
+      status: word({ kind: 'session', status: session.status }, status.label),
+      label: status.label,
       caption: sessionCaption(session, approval),
       session,
       terminal,
@@ -474,7 +480,16 @@ function useItemView(item: HubItem): ItemView {
     return {
       name: display.name,
       tone: view.tone,
-      status,
+      status: word(
+        {
+          kind: 'terminal',
+          running: view.running,
+          exit: view.exit?.code ?? null,
+          closed: terminal.state === 'closed',
+        },
+        status,
+      ),
+      label: status,
       caption:
         view.command && view.command !== display.name
           ? { glyph: null, text: view.command, tone: 'rest' }
@@ -487,6 +502,7 @@ function useItemView(item: HubItem): ItemView {
     name: 'Unavailable',
     tone: 'idle',
     status: 'Gone',
+    label: 'Gone',
     caption: null,
     session: undefined,
     terminal: undefined,
@@ -551,7 +567,7 @@ function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; 
           showLabel
           className="min-w-0 text-meta text-text-2"
         />
-        {view.caption && view.caption.text !== view.status && (
+        {view.caption && view.caption.text !== view.label && (
           <LiveCaption caption={view.caption} className="text-body-sm" />
         )}
         {ports.length > 0 && (

@@ -65,14 +65,17 @@ const BRIGHT_BLACK: Record<SkinId, string> = {
   minimal: '--text-2',
   office: '--text-2',
   grid: '--text-2',
+  transit: '--text-2',
   retro: '--retro-dim-ink',
 };
 
-// Office's monitors show the standard terminal: the room is in the frame, not in the text.
+// Office's monitors and Transit's panels show the standard terminal: the world is in the frame,
+// not in the text.
 const PALETTES: Record<SkinId, Palette> = {
   minimal: MINIMAL,
   office: MINIMAL,
   grid: GRID,
+  transit: MINIMAL,
   retro: RETRO,
 };
 
@@ -80,6 +83,7 @@ const SELECTION: Record<SkinId, string> = {
   minimal: '--st-work',
   office: '--st-work',
   grid: '--grid-neon',
+  transit: '--st-work',
   retro: '--retro-ink',
 };
 

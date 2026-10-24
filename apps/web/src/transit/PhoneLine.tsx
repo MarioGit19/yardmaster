@@ -15,7 +15,7 @@ import {
   trainMotion,
 } from './map.js';
 import { ServiceLog } from './ServiceLog.js';
-import { lineKeys, useFresh } from './shared.js';
+import { lineKeys, useFresh, useReturned } from './shared.js';
 import { TrainCar } from './TrainCar.js';
 import { LineSign, trainCount } from './TransitLine.js';
 
@@ -42,6 +42,7 @@ export function PhoneLine({
   const { stations, hidden } = lineStations(project.actors, PHONE_STATIONS);
   const fresh = useFresh(stations.map((s) => s.actor.id));
   const counts = trainCount(project.actors);
+  const returned = useReturned(project.id);
   return (
     <motion.li
       layout="position"
@@ -50,6 +51,7 @@ export function PhoneLine({
       data-transit-line={project.id}
       data-tone={project.tone}
       data-dim={project.dim || undefined}
+      data-returned={returned || undefined}
       data-scene-leaving={project.leaving}
       inert={project.leaving}
       onKeyDown={lineKeys}

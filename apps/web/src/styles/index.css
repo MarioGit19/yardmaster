@@ -2962,7 +2962,15 @@ main[data-office-zoom] {
     0 0 0 1px rgb(255 255 255 / 0.06);
   color-scheme: dark;
 }
-[data-theme="light"] .transit-board {
+/* The board's Night ink, kept in Daylight wherever a board stands (the concourse's, and the
+   Transit workspace's session list and phone hub, §10.8). */
+[data-theme="light"]
+  :is(
+    .transit-board,
+    .focus[data-layout="transit"] :is([data-session-list], [data-hub-group] > ul)
+  ) {
+  --bg-2: #232a40;
+  --line: rgb(255 255 255 / 0.08);
   --text-1: #edeff5;
   --text-2: #a3a9b8;
   --text-3: #8a90a2;
@@ -2978,6 +2986,8 @@ main[data-office-zoom] {
   --st-ok-ink: #3ddc97;
   --st-err-ink: #ff5c7a;
   --line-strong: rgb(255 255 255 / 0.14);
+}
+[data-theme="light"] .transit-board {
   box-shadow: 0 12px 32px -18px rgb(14 17 22 / 0.5);
 }
 .transit-board-item {
@@ -3058,9 +3068,25 @@ main[data-office-zoom] {
 
 /* A line's sign: roundel and name, ringed in amber or rose when the line needs you. */
 .transit-name {
+  position: relative;
+  isolation: isolate;
   margin-left: -3px;
   padding: 2px 8px 2px 3px;
   border-radius: 9999px;
+}
+/* The line a workspace just closed onto (§10.8): its sign lit in the line's color for a moment. */
+.transit-name::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--route) 24%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.transit-line[data-returned] .transit-name::before {
+  opacity: 1;
 }
 .transit-name:focus-visible {
   box-shadow: var(--focus-ring);
@@ -3526,6 +3552,9 @@ main[data-office-zoom] {
 /* Hover card: above its station or bin. */
 .transit-tip {
   transform: translate(-50%, calc(-100% - 8px));
+}
+.transit-tip[data-placement="below"] {
+  transform: translate(-50%, 8px);
 }
 
 /* ── Retro (DESIGN.md §10.6): a phosphor text console on one character grid ────────────────── */
