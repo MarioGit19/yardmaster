@@ -9,14 +9,23 @@ function required(name: string): string {
   return value;
 }
 
+/** The layouts whose workspace skin the focus specs run in (DESIGN.md §10.8); later skins join. */
+export const FOCUS_LAYOUTS = ['minimal', 'retro'] as const;
+export type FocusLayout = (typeof FOCUS_LAYOUTS)[number];
+
 /** Tests get a page that is already signed in to the demo board. */
-export const test = base.extend<{ theme: Theme }>({
+export const test = base.extend<{ theme: Theme; layout: FocusLayout }>({
   theme: ['dark', { option: true }],
+  // Minimal is the app's default: only another layout is stored, so specs that set their own keep it.
+  layout: ['minimal', { option: true }],
   baseURL: async ({}, use) => use(required(E2E_URL)),
   colorScheme: async ({ theme }, use) => use(theme),
   storageState: async ({}, use) => use(signedInState(required(E2E_URL), required(E2E_COOKIE))),
-  page: async ({ page, theme }, use) => {
+  page: async ({ page, theme, layout }, use) => {
     await page.addInitScript((value) => localStorage.setItem('cboard.theme', value), theme);
+    if (layout !== 'minimal') {
+      await page.addInitScript((value) => localStorage.setItem('cboard.layout', value), layout);
+    }
     await use(page);
   },
 });

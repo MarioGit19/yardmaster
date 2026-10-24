@@ -13,6 +13,7 @@ export function Chip({ children, icon, mono, title, className }: ChipProps) {
   return (
     <span
       title={title}
+      data-chip
       className={cx(
         'inline-flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2 text-label text-text-2',
         mono && 'font-mono tabular',

@@ -1257,6 +1257,12 @@
   background: var(--accent, transparent);
   opacity: 0.7;
 }
+/* A layout switch inside the workspace cross-fades its skin (§10.1, §10.8). */
+:root[data-skin-swap]::view-transition-old(root),
+:root[data-skin-swap]::view-transition-new(root) {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease-in-out);
+}
 .focus-col {
   min-width: 0;
   min-height: 0;
@@ -3270,12 +3276,29 @@ main[data-office-zoom] {
 
 /* ── Retro (DESIGN.md §10.6): a phosphor text console on one character grid ────────────────── */
 
+/* The phosphor and its dimmed status tones, shared by the console and Retro's workspace skin
+   (§10.8, `focus/skins/retro`). */
 .retro,
-.retro-ground {
+.retro-ground,
+.focus[data-layout="retro"] {
   --retro-ink: var(--retro-fg);
 }
-:is(.retro, .retro-ground)[data-phosphor="amber"] {
+:is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="amber"] {
   --retro-ink: var(--retro-amber);
+}
+:is(.retro, .focus[data-layout="retro"]) {
+  /* Status colors at reduced saturation (§10.6), read against the phosphor. */
+  --retro-gray: #9ba39d;
+  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 58%, var(--retro-bg));
+  --retro-tone-work: color-mix(in oklch, var(--st-work-ink) 75%, var(--retro-gray));
+  --retro-tone-tool: color-mix(in oklch, var(--st-tool-ink) 75%, var(--retro-gray));
+  --retro-tone-wait: color-mix(in oklch, var(--st-wait-ink) 80%, var(--retro-gray));
+  --retro-tone-ok: color-mix(in oklch, var(--st-ok-ink) 75%, var(--retro-gray));
+  --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
+}
+[data-theme="light"] :is(.retro, .focus[data-layout="retro"]) {
+  --retro-gray: #5d625e;
+  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 62%, var(--retro-bg));
 }
 
 /* The tube: the phosphor's faint bloom in the middle, the curvature darkening the edges. */
@@ -3295,14 +3318,6 @@ main[data-office-zoom] {
 }
 
 .retro {
-  /* Status colors at reduced saturation (§10.6), read against the phosphor. */
-  --retro-gray: #9ba39d;
-  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 58%, var(--retro-bg));
-  --retro-tone-work: color-mix(in oklch, var(--st-work-ink) 75%, var(--retro-gray));
-  --retro-tone-tool: color-mix(in oklch, var(--st-tool-ink) 75%, var(--retro-gray));
-  --retro-tone-wait: color-mix(in oklch, var(--st-wait-ink) 80%, var(--retro-gray));
-  --retro-tone-ok: color-mix(in oklch, var(--st-ok-ink) 75%, var(--retro-gray));
-  --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
   --retro-line: 14px;
   --retro-glow: 0 0 6px;
   font-family: var(--font-mono);
@@ -3318,8 +3333,6 @@ main[data-office-zoom] {
   font-size: 12px;
 }
 [data-theme="light"] .retro {
-  --retro-gray: #5d625e;
-  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 62%, var(--retro-bg));
   text-shadow: none;
 }
 

@@ -42,13 +42,19 @@ export function StatusDot({ tone, label, showLabel = false, className }: StatusD
   );
   if (!showLabel) {
     return (
-      <span role="img" aria-label={label} title={label} className={cx('inline-flex', className)}>
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        data-status={tone}
+        className={cx('inline-flex', className)}
+      >
         {dot}
       </span>
     );
   }
   return (
-    <span className={cx('inline-flex min-w-0 items-center gap-2', className)}>
+    <span data-status={tone} className={cx('inline-flex min-w-0 items-center gap-2', className)}>
       {dot}
       <span className="truncate">{label}</span>
     </span>

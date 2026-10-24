@@ -300,6 +300,7 @@ function RetroFrame({ project, number, width, body, stacked, fresh }: FrameProps
       <Link
         href={projectHref(project.id)}
         data-retro-name={project.id}
+        data-focus-return={project.id}
         aria-label={`[${number}] ${project.name}, ${toneLabel(project.tone)}, ${count}. Open with Enter, or type an actor's number.`}
         className="retro-hit block"
       >

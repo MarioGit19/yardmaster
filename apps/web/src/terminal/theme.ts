@@ -1,10 +1,11 @@
 import type { ITheme } from '@xterm/xterm';
+import type { SkinId } from '../focus/skins/registry.js';
 
 /**
  * Tokens behind each xterm color. The 8 basic colors follow the lane peek (`lanes/ansi.ts`);
  * bright variants are the same hues mixed toward the foreground.
  */
-const TOKENS = {
+const MINIMAL = {
   background: '--bg-0',
   foreground: '--text-1',
   cursor: '--text-2',
@@ -19,25 +20,54 @@ const TOKENS = {
   white: '--text-2',
 } as const satisfies Partial<Record<keyof ITheme, string>>;
 
+type Palette = Record<keyof typeof MINIMAL, string>;
+
+/**
+ * Retro's workspace (DESIGN.md §10.8): phosphor on the tube's black (ink on paper in Daylight),
+ * the ANSI hues at the console's reduced saturation. Tokens from the skin's scope.
+ */
+const RETRO: Palette = {
+  background: '--retro-bg',
+  foreground: '--retro-ink',
+  cursor: '--retro-ink',
+  cursorAccent: '--retro-bg',
+  black: '--retro-dim-ink',
+  red: '--retro-tone-err',
+  green: '--retro-tone-ok',
+  yellow: '--retro-tone-wait',
+  blue: '--retro-tone-work',
+  magenta: '--retro-tone-edit',
+  cyan: '--retro-tone-tool',
+  white: '--retro-ink',
+};
+
+/** Bright black: the dim text of each skin. */
+const BRIGHT_BLACK: Record<SkinId, string> = { minimal: '--text-2', retro: '--retro-dim-ink' };
+
+const PALETTES: Record<SkinId, Palette> = { minimal: MINIMAL, retro: RETRO };
+
 const BRIGHT = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'] as const;
 
 /** Resolves a CSS color expression (tokens, `color-mix`) to something canvas understands. */
 export type ColorResolver = (expression: string) => string;
 
-export function xtermTheme(resolve: ColorResolver): ITheme {
+/** The terminal colors of a workspace skin (Minimal's outside the workspace). */
+export function xtermTheme(resolve: ColorResolver, skin: SkinId = 'minimal'): ITheme {
+  const tokens = PALETTES[skin];
   const theme: ITheme = {};
-  for (const [key, token] of Object.entries(TOKENS)) {
-    theme[key as keyof typeof TOKENS] = resolve(`var(${token})`);
+  for (const [key, token] of Object.entries(tokens)) {
+    theme[key as keyof Palette] = resolve(`var(${token})`);
   }
   for (const name of BRIGHT) {
     const key = `bright${name[0]?.toUpperCase()}${name.slice(1)}` as keyof ITheme;
     const mix =
       name === 'black'
-        ? 'var(--text-2)'
-        : `color-mix(in srgb, var(${TOKENS[name]}) 80%, var(--text-1))`;
+        ? `var(${BRIGHT_BLACK[skin]})`
+        : `color-mix(in srgb, var(${tokens[name]}) 80%, var(${tokens.foreground}))`;
     (theme as Record<string, string>)[key] = resolve(mix);
   }
-  theme.selectionBackground = resolve('color-mix(in srgb, var(--st-work) 30%, transparent)');
+  const selection = skin === 'retro' ? '--retro-ink' : '--st-work';
+  theme.selectionBackground = resolve(`color-mix(in srgb, var(${selection}) 30%, transparent)`);
   theme.selectionInactiveBackground = resolve('color-mix(in srgb, var(--text-3) 25%, transparent)');
   theme.scrollbarSliderBackground = resolve('var(--line-strong)');
   theme.scrollbarSliderHoverBackground = resolve(

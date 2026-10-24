@@ -349,6 +349,7 @@ export function Pill<V extends string>({
   return (
     <label
       title={disabled ? `${name}: the session isn't running` : name}
+      data-pill
       className={cx(
         'relative inline-flex h-6 min-w-0 items-center gap-1.5 rounded-chip border border-line bg-bg-1 px-2 text-label text-text-2 transition-[border-color,color] duration-fast touch:h-11 touch:px-3',
         'has-[select:focus-visible]:shadow-focus',
@@ -420,6 +421,7 @@ function SendButton({
         aria-label={SEND_LABEL[mode]}
         aria-busy={mode === 'sending'}
         data-mode={mode}
+        data-send
         disabled={disabled || mode === 'sending'}
         className={cx(
           buttonClass(mode === 'stop' ? 'secondary' : 'primary', 'sm', { square: !labelled }),

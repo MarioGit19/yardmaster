@@ -672,6 +672,43 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
       await page.waitForTimeout(900);
     });
+
+    // Retro's workspace skin (DESIGN.md §10.8): the frame opens into the workspace, a layout
+    // switch swaps the skin in place, and Esc returns to the same frame.
+    await page.evaluate(() => localStorage.setItem('cboard.layout', 'retro'));
+    await page.reload();
+    const name = page.locator(`[data-retro-name="${id}"]`);
+    await name.waitFor();
+    await page.waitForTimeout(1200);
+    await r.moment(
+      'retro-open',
+      'transition',
+      "Retro: the frame's text opens into the workspace line by line (dur.base)",
+      async () => {
+        await name.focus();
+        await page.keyboard.press('Enter');
+        await page.locator(`[data-focus="${id}"]`).waitFor();
+        await page.waitForTimeout(700);
+      },
+    );
+    await r.moment(
+      'skin-swap',
+      'transition',
+      '⌥1 in the workspace: Retro cross-fades to Minimal in place (dur.slow), then ⌥5 back',
+      async () => {
+        await page.locator(`[data-focus="${id}"] h1`).focus();
+        await page.keyboard.press('Alt+Digit1');
+        await page.waitForTimeout(900);
+        await page.keyboard.press('Alt+Digit5');
+        await page.waitForTimeout(900);
+      },
+    );
+    await r.moment('retro-close', 'transition', 'Esc fades back to the Retro frame', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(600);
+    });
+    await page.evaluate(() => localStorage.removeItem('cboard.layout'));
   },
 
   async chrome(r: Recorder) {

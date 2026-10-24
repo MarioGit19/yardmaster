@@ -1,4 +1,5 @@
 import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
+import { LAYOUT_SKIN, loadSkin } from '../focus/skins/registry.js';
 import { createPreference } from '../prefs.js';
 
 /** DESIGN.md §10: the overview's layouts, in switcher and `⌥1`…`⌥5` order. */
@@ -49,9 +50,12 @@ export function layoutComponent(id: LayoutId): ComponentType {
   return loaded[id] ?? LAZY[id];
 }
 
-/** Starts loading a layout's chunk early (the stored one at startup), so it rarely suspends. */
+/**
+ * Starts loading a layout's chunk early (the stored one at startup), so it rarely suspends, along
+ * with its workspace skin (DESIGN.md §10.8).
+ */
 export function preloadLayout(id: LayoutId): Promise<void> {
-  return load(id).then(
+  return Promise.all([load(id), loadSkin(LAYOUT_SKIN[id])]).then(
     () => undefined,
     () => {
       // The lazy component retries and shows the error where it renders.

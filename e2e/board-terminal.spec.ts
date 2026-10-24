@@ -143,10 +143,9 @@ test('a command in a board terminal shows as running, in the focus view and ever
       await page.evaluate((layout) => localStorage.setItem('cboard.layout', layout), id);
       await page.goto('/#/');
       await page.reload();
-      await expect(page.locator('main [data-layout]:not([aria-hidden])')).toHaveAttribute(
-        'data-layout',
-        id,
-      );
+      await expect(
+        page.locator('main [data-layout]:not([aria-hidden], [data-focus])'),
+      ).toHaveAttribute('data-layout', id);
     };
 
     await overview('minimal');

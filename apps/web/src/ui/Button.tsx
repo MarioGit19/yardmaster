@@ -28,6 +28,8 @@ export function buttonClass(
   { square = false } = {},
 ) {
   return cx(
+    // `btn`/`btn-icon`: hooks for the workspace skins (DESIGN.md §10.8).
+    square ? 'btn btn-icon' : 'btn',
     'inline-flex shrink-0 select-none items-center justify-center whitespace-nowrap rounded-control font-medium',
     'transition-[background-color,border-color,color,scale] duration-fast ease-out moving:active:scale-[0.97]',
     'disabled:pointer-events-none disabled:opacity-50',

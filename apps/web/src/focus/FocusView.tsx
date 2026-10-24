@@ -4,22 +4,18 @@ import {
   sessionDisplayName,
   sessionSubtitle,
 } from '@c-board/protocol';
-import { ArrowLeft, GitBranch, LoaderCircle, Play, Plus } from 'lucide-react';
+import { LoaderCircle, Play, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import { BackgroundLine } from '../background/BackgroundLine.js';
-import { runningHelpers } from '../background/model.js';
 import { useBackgroundRequests } from '../background/open.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
-import { CrewMascot } from '../crew/CrewMascot.js';
-import { miniCrewCount } from '../crew/model.js';
 import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
-  activityKey,
   selectApproval,
   selectHydrated,
   selectProject,
@@ -37,39 +33,33 @@ import { SessionHistory } from '../history/SessionHistory.js';
 import { markOpened } from '../library/useActive.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
 import { podSessions } from '../pod/model.js';
-import { DoneSweep } from '../pod/PodActivity.js';
 import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
-import { useMascotState } from '../pod/useMascotState.js';
-import { useMediaQuery } from '../prefs.js';
+import { useMediaQuery, usePreference } from '../prefs.js';
+import { phosphorPreference } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
-import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
 import { terminalTarget, useTerminalTarget } from '../terminal/target.js';
-import { buttonClass } from '../ui/Button.js';
-import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
-import { Tooltip } from '../ui/Tooltip.js';
 import { EmptyState } from '../views/Page.js';
 import { ColumnHeading } from './ColumnHeading.js';
 import { claudeColumnSession } from './claudeColumn.js';
-import { FocusCaption } from './FocusCaption.js';
 import { NewSessionPanel } from './NewSessionPanel.js';
 import { PhoneWorkspace } from './phone/PhoneWorkspace.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
+import { SkinContext } from './skins/registry.js';
+import { type ActiveSkin, useWorkspaceSkin } from './skins/useWorkspaceSkin.js';
 
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
 
 const LABELS = { left: 'Sessions, history and git', center: 'Claude', right: 'Terminals' } as const;
-/** The header's crew member: full acting with props in detail (DESIGN.md §4.11). */
-const HEADER_CREW_PX = 120;
 /** Sleeping crews only need to notice five quiet minutes. */
 const IDLE_CLOCK_MS = 15_000;
 
@@ -108,11 +98,12 @@ export function FocusView({
       if (store.getState().board.projects[projectId]?.closedAt == null) markOpened(projectId);
     };
   }, [known, projectId, store]);
+  const skin = useWorkspaceSkin();
 
-  if (!project) {
+  if (!project || !skin) {
     return (
       <div className="focus-card flex h-full items-center justify-center rounded-panel border border-line bg-bg-1 shadow-raised">
-        {hydrated ? (
+        {hydrated && skin ? (
           <EmptyState title="Project not found">
             It may have been closed.{' '}
             <Link href={routes.overview} className="text-text-1 underline underline-offset-2">
@@ -127,6 +118,7 @@ export function FocusView({
   }
   return (
     <ProjectFocus
+      skin={skin}
       project={project}
       sessionId={sessionId}
       terminalId={terminalId}
@@ -168,6 +160,7 @@ export function columnSettle(still: boolean, delay: number): HTMLMotionProps<'di
 }
 
 function ProjectFocus({
+  skin,
   project,
   sessionId,
   terminalId,
@@ -175,6 +168,7 @@ function ProjectFocus({
   shared,
   fade,
 }: {
+  skin: ActiveSkin;
   project: Project;
   sessionId?: string;
   terminalId?: string;
@@ -182,6 +176,8 @@ function ProjectFocus({
   shared: boolean;
   fade: boolean;
 }) {
+  const { HeaderBand, PanelFrame, EntryTransition } = skin.skin;
+  const phosphor = usePreference(phosphorPreference);
   // Phones: a full-bleed workspace organised as a project hub (DESIGN.md §11).
   const phone = useMediaQuery(NARROW_QUERY);
   // A terminal deep link asks the stack for that tab, like a terminal picked in ⌘K. The phone
@@ -225,8 +221,14 @@ function ProjectFocus({
   }, [sessionId]);
   const now = useNow(IDLE_CLOCK_MS);
   const crew = useCrewTerminals(terminals);
-  const still = useMotionLevel() !== 'full';
+  const level = useMotionLevel();
+  const still = level !== 'full';
   const settle = columnSettle(still, shared ? dur.base : 0);
+  // The skin's own entry replaces the cross-fade when the view opens from its overview at Full;
+  // decided once, so a skin switched to later doesn't play it.
+  const [entering] = useState(() => fade && level === 'full' && EntryTransition !== null);
+  const framed = (title: string, content: ReactNode) =>
+    PanelFrame ? <PanelFrame title={title}>{content}</PanelFrame> : content;
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -272,109 +274,83 @@ function ProjectFocus({
     <motion.div
       layoutId={shared ? sharedId.container(project.id) : undefined}
       transition={spring.smooth}
-      {...(fade && cardFade)}
+      {...(fade && (entering ? { exit: cardFade.exit } : cardFade))}
       data-focus={project.id}
+      data-layout={skin.id}
+      data-phosphor={skin.id === 'retro' ? phosphor : undefined}
       data-workspace={phone ? 'phone' : undefined}
       style={{ borderRadius: phone ? 0 : 16, '--accent': accent } as never}
       className={cx(
-        'focus-card relative flex h-full min-h-0 flex-col overflow-hidden bg-bg-1',
+        'focus focus-card relative flex h-full min-h-0 flex-col overflow-hidden bg-bg-1',
         !phone && 'border border-line shadow-raised',
       )}
     >
-      {phone ? (
-        <PhoneWorkspace
-          project={project}
-          sessionId={sessionId}
-          terminalId={terminalId}
-          page={page}
-          headingRef={headingRef}
-        />
-      ) : (
-        <motion.header
-          layoutId={shared ? sharedId.header(project.id) : undefined}
-          transition={spring.smooth}
-          className="relative flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-4 py-3 md:px-5"
-        >
-          {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
-          <Tooltip content="Back to the overview" shortcut="Esc">
-            <Link
-              href={routes.overview}
-              aria-label="Back to the overview"
-              className={buttonClass('ghost', 'sm', { square: true })}
-            >
-              <ArrowLeft className="size-4" strokeWidth={1.5} />
-            </Link>
-          </Tooltip>
-          <ProjectAvatar project={project} size="lg" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1
-              ref={headingRef}
-              tabIndex={-1}
-              title={project.name}
-              className="truncate font-medium text-title text-text-1 outline-none focus-visible:shadow-none"
-            >
-              {project.name}
-            </h1>
-            <p className="truncate font-mono text-meta text-text-2" title={project.path}>
-              {project.path}
-            </p>
-          </div>
-          <HeaderCrew
-            key={composing ? 'new' : (session?.id ?? 'project')}
+      <SkinContext.Provider value={skin.id}>
+        {phone ? (
+          <PhoneWorkspace
+            project={project}
+            sessionId={sessionId}
+            terminalId={terminalId}
+            page={page}
+            headingRef={headingRef}
+          />
+        ) : (
+          <HeaderBand
+            project={project}
             session={composing ? null : (session ?? null)}
+            composing={composing}
             accent={accent}
             crew={crew}
             now={now}
+            headingRef={headingRef}
+            shared={shared}
           />
-          {session && session.status.kind !== 'ended' && (
-            <div className="hidden min-w-0 max-w-[32rem] flex-[1.4] md:block">
-              <FocusCaption session={session} />
-            </div>
-          )}
-          {project.git?.branch && (
-            <span className="hidden min-w-0 max-w-60 sm:flex">
-              <Chip mono icon={<GitBranch />} title={project.git.branch}>
-                {project.git.branch}
-              </Chip>
-            </span>
-          )}
-        </motion.header>
-      )}
+        )}
 
-      {!phone && (
-        <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
-          {tabs ? (
-            <FocusTabs
-              settle={settle}
-              show={
-                composing
-                  ? 'claude'
-                  : terminalRequested
-                    ? 'terminals'
-                    : backgroundAsked
-                      ? 'claude'
-                      : null
-              }
-              showNonce={backgroundAsked}
-              panels={[
-                { id: 'sessions', label: 'Sessions', content: sessionsColumn },
-                { id: 'claude', label: 'Claude', content: claudeColumn },
-                { id: 'terminals', label: 'Terminals', content: terminalsColumn },
-              ]}
-            />
-          ) : (
-            <ResizableColumns
-              projectId={project.id}
-              labels={LABELS}
-              left={sessionsColumn}
-              center={claudeColumn}
-              right={terminalsColumn}
-              rightMaximized={maximized}
-              settle={settle}
-            />
-          )}
-        </motion.div>
-      )}
+        {!phone && (
+          <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
+            {tabs ? (
+              <FocusTabs
+                settle={settle}
+                show={
+                  composing
+                    ? 'claude'
+                    : terminalRequested
+                      ? 'terminals'
+                      : backgroundAsked
+                        ? 'claude'
+                        : null
+                }
+                showNonce={backgroundAsked}
+                panels={[
+                  {
+                    id: 'sessions',
+                    label: 'Sessions',
+                    content: framed('Sessions', sessionsColumn),
+                  },
+                  { id: 'claude', label: 'Claude', content: framed('Claude', claudeColumn) },
+                  {
+                    id: 'terminals',
+                    label: 'Terminals',
+                    content: framed('Terminals', terminalsColumn),
+                  },
+                ]}
+              />
+            ) : (
+              <ResizableColumns
+                projectId={project.id}
+                labels={LABELS}
+                left={framed('Sessions', sessionsColumn)}
+                center={framed('Claude', claudeColumn)}
+                right={framed('Terminals', terminalsColumn)}
+                rightMaximized={maximized}
+                settle={settle}
+              />
+            )}
+          </motion.div>
+        )}
+      </SkinContext.Provider>
+      {entering && EntryTransition && <EntryTransition projectId={project.id} />}
     </motion.div>
   );
 }
@@ -700,42 +676,6 @@ function RowResume({ session }: { session: ClaudeSession }) {
         )
       }
     />
-  );
-}
-
-/**
- * The focused session's crew member at full size (DESIGN.md §4.11), acting out the turn with its
- * props and playing the done sparkle when it finishes. The project's own crew while composing.
- */
-function HeaderCrew({
-  session,
-  accent,
-  crew,
-  now,
-}: {
-  session: ClaudeSession | null;
-  accent: string;
-  crew: CrewView;
-  now: number;
-}) {
-  const state = useMascotState(session, crew.terminals, now);
-  const subagents = session?.subagents.filter((a) => a.status === 'running').length ?? 0;
-  // Mini crew members stand to the right at 46% size; keep room for them.
-  const minis = miniCrewCount(state, subagents);
-  const mini = HEADER_CREW_PX * 0.46;
-  const room = minis > 0 ? mini + (minis - 1) * mini * 0.62 : 0;
-  return (
-    <span data-focus-crew className="-my-2 hidden shrink-0 md:flex" style={{ marginRight: room }}>
-      <CrewMascot
-        state={state}
-        size={HEADER_CREW_PX}
-        color={accent}
-        tool={session?.status.kind === 'tool' ? session.status.tool : null}
-        subagents={subagents}
-        helpers={session ? runningHelpers(session) : undefined}
-        activity={crew.activity}
-      />
-    </span>
   );
 }
 

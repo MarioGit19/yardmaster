@@ -10,7 +10,7 @@ import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-const layout = (page: Page) => page.locator('main [data-layout]:not([aria-hidden])');
+const layout = (page: Page) => page.locator('main [data-layout]:not([aria-hidden], [data-focus])');
 
 test('the layout switches from shortcuts, ⌘K and Settings, and survives a reload', async ({
   page,

@@ -237,7 +237,9 @@ function Card({
       <span className="shrink-0 font-medium text-text-1">{label}</span>
       <span className="flex min-w-0 flex-1 items-center gap-2 truncate">{summary}</span>
       {extra}
-      <span className="flex shrink-0 items-center">{status}</span>
+      <span data-tool-status className="flex shrink-0 items-center">
+        {status}
+      </span>
     </>
   );
   const headClass =

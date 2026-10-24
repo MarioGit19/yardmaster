@@ -7,6 +7,7 @@ import { Terminal } from '@xterm/xterm';
 import { useEffect, useRef, useState } from 'react';
 import { RESIZE_END, resizingAncestor } from '../anim/resizing.js';
 import { useBoardClient } from '../data/index.js';
+import { useSkinId } from '../focus/skins/registry.js';
 import { StreamRedactor } from '../redact/redact.js';
 import { ctrlLatch } from './keyBar.js';
 import { domColorResolver, xtermTheme } from './theme.js';
@@ -62,6 +63,15 @@ export default function XtermView({
   const [renderer, setRenderer] = useState<'webgl' | 'dom' | null>(null);
   const onControllerRef = useRef(onController);
   onControllerRef.current = onController;
+  // The workspace skin's colors (DESIGN.md §10.8); a skin switch re-themes the open terminal.
+  const skin = useSkinId();
+  const skinRef = useRef(skin);
+  skinRef.current = skin;
+  const rethemeRef = useRef<(() => void) | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new skin is the reason to re-theme.
+  useEffect(() => {
+    rethemeRef.current?.();
+  }, [skin]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -81,7 +91,14 @@ export default function XtermView({
       cursorBlink: false,
       cursorInactiveStyle: input ? 'outline' : 'none',
       allowProposedApi: true,
-      theme: xtermTheme(colors.resolve),
+      theme: xtermTheme(colors.resolve, skinRef.current),
+    });
+    const retheme = () => {
+      term.options.theme = xtermTheme(colors.resolve, skinRef.current);
+    };
+    rethemeRef.current = retheme;
+    cleanups.push(() => {
+      rethemeRef.current = null;
     });
     cleanups.push(() => term.dispose());
     const fit = new FitAddon();
@@ -204,10 +221,12 @@ export default function XtermView({
       });
 
       // The light/dark switch only flips an attribute on <html>; re-read the tokens then.
-      const mo = new MutationObserver(() => {
-        term.options.theme = xtermTheme(colors.resolve);
-      });
+      const mo = new MutationObserver(retheme);
       mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      // So does Retro's phosphor (green or amber) on the workspace.
+      const workspace = host.closest('.focus');
+      if (workspace)
+        mo.observe(workspace, { attributes: true, attributeFilter: ['data-phosphor'] });
       cleanups.push(() => mo.disconnect());
 
       onControllerRef.current?.({

@@ -3,6 +3,8 @@ import { startBoard } from './board.js';
 import {
   disableWebgl,
   expect,
+  FOCUS_LAYOUTS,
+  type FocusLayout,
   firstProjectRoute,
   openRoute,
   signedInState,
@@ -2246,3 +2248,77 @@ for (const theme of THEMES) {
     });
   }
 }
+
+// 12.6g: each layout's workspace skin (DESIGN.md §10.8, §10.7) at 1440 and 390 in both themes: the
+// project at rest with its running terminal, a Claude session streaming, and a waiting approval.
+const SKIN_WAITING: Record<FocusLayout, { item: string; id: string }> = {
+  minimal: { item: '[data-pod][data-tone="wait"]', id: 'data-pod' },
+  retro: { item: '[data-retro-frame][data-tone="wait"]', id: 'data-retro-frame' },
+};
+
+test.describe('workspace skins', () => {
+  for (const layout of FOCUS_LAYOUTS) {
+    for (const theme of THEMES) {
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test.describe(`${layout} ${theme} ${viewport.width}`, () => {
+          test.use({ theme, viewport, layout });
+          test('workspace', async ({ page }) => {
+            test.slow();
+            const phone = viewport.width < 768;
+            const shot = (moment: string) =>
+              page.screenshot({
+                path: new URL(`skin-${layout}-${moment}-${viewport.width}-${theme}.png`, OUT_DIR)
+                  .pathname,
+                animations: 'disabled',
+              });
+            await openRoute(page, '/');
+            await openRoute(page, await firstProjectRoute(page));
+            const card = page.locator('[data-focus]');
+            await expect(card).toHaveAttribute('data-layout', layout);
+            await page.waitForTimeout(900);
+            await shot('rest');
+            if (phone) {
+              // The running dev server's own page.
+              await page.locator('[data-hub] a[data-hub-kind="terminal"]').first().click();
+              await expect(card.locator('[data-xterm]').first()).toBeVisible();
+              await page.waitForTimeout(700);
+              await shot('terminal');
+            }
+
+            await newSession(page, phone);
+            const input = page.getByRole('textbox', { name: 'First message for a new session' });
+            await input.fill('Tidy up the cart totals and keep the public API the same.');
+            await input.press('Enter');
+            await expect(page.locator('[data-session-panel] [data-row="tail"]')).toBeVisible({
+              timeout: 15_000,
+            });
+            await page.waitForTimeout(1_200);
+            await shot('streaming');
+
+            // A project whose Claude waits for an approval, opened on that session.
+            await openRoute(page, '/');
+            const waiting = page.locator(SKIN_WAITING[layout].item).first();
+            await expect(waiting).toBeVisible({ timeout: 40_000 });
+            const id = await waiting.getAttribute(SKIN_WAITING[layout].id);
+            await openRoute(page, `/p/${id}`);
+            if (phone) {
+              await page.locator('[data-hub-group="needs"] a[data-hub-item]').first().click();
+            } else {
+              await card.locator('a[data-session]:has([data-status="wait"])').first().click();
+            }
+            await expect(
+              card
+                .locator('[data-terminal-approval], [data-approval], [data-focus-caption]')
+                .first(),
+            ).toBeVisible();
+            await page.waitForTimeout(800);
+            await shot('waiting');
+          });
+        });
+      }
+    }
+  }
+});

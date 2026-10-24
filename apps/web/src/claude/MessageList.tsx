@@ -481,6 +481,7 @@ function UserBubble({
     <div className="flex justify-end">
       <div
         title={fullTime(row.ts)}
+        data-user-bubble
         className="max-w-[min(85%,36rem)] rounded-panel rounded-br-chip border border-line bg-bg-2 px-4 py-2 text-body text-text-1 shadow-raised"
       >
         <p className="whitespace-pre-wrap break-words">{shown}</p>

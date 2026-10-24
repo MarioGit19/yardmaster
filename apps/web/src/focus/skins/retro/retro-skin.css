@@ -1,0 +1,532 @@
+/* Retro's workspace skin (DESIGN.md §10.8): the focus view in text mode. It ships with the skin's
+   chunk, and every rule is scoped to the Retro workspace, so the same components read as a
+   phosphor console here and stay untouched everywhere else. The phosphor and its dimmed status
+   tones (`--retro-ink`, `--retro-tone-*`) come from index.css, shared with the overview. */
+
+.focus[data-layout="retro"] {
+  --retro-tone-edit: color-mix(in oklch, var(--orb-edit) 75%, var(--retro-gray));
+  --retro-faint-ink: color-mix(in oklch, var(--retro-ink) 50%, var(--retro-bg));
+
+  /* The workspace's tokens, in phosphor. */
+  --bg-0: var(--retro-bg);
+  --bg-1: var(--retro-bg);
+  --bg-2: color-mix(in srgb, var(--retro-ink) 8%, var(--retro-bg));
+  --glass: transparent;
+  --line: color-mix(in srgb, var(--retro-ink) 24%, transparent);
+  --line-strong: color-mix(in srgb, var(--retro-ink) 42%, transparent);
+  --text-1: var(--retro-ink);
+  --text-2: var(--retro-dim-ink);
+  --text-3: var(--retro-faint-ink);
+  --st-work: var(--retro-tone-work);
+  --st-tool: var(--retro-tone-tool);
+  --st-wait: var(--retro-tone-wait);
+  --st-ok: var(--retro-tone-ok);
+  --st-err: var(--retro-tone-err);
+  --st-idle: var(--retro-dim-ink);
+  --st-work-ink: var(--retro-tone-work);
+  --st-tool-ink: var(--retro-tone-tool);
+  --st-wait-ink: var(--retro-tone-wait);
+  --st-ok-ink: var(--retro-tone-ok);
+  --st-err-ink: var(--retro-tone-err);
+  --st-work-glow: transparent;
+  --st-tool-glow: transparent;
+  --st-wait-glow: transparent;
+  --st-ok-glow: transparent;
+  --st-err-glow: transparent;
+  --st-idle-glow: transparent;
+  --highlight-inset: 0 0 #0000;
+  --spotlight: transparent;
+  --focus-ring: 0 0 0 1px var(--retro-ink);
+  --shiki-token-keyword: var(--retro-tone-work);
+  --shiki-token-string: var(--retro-tone-ok);
+  --shiki-token-string-expression: var(--retro-tone-ok);
+  --shiki-token-function: var(--retro-ink);
+  --shiki-token-constant: var(--retro-tone-wait);
+  --shiki-token-parameter: var(--retro-dim-ink);
+  --shiki-token-punctuation: var(--retro-dim-ink);
+  --shiki-token-comment: var(--retro-faint-ink);
+  --shiki-token-link: var(--retro-tone-tool);
+
+  counter-reset: rs-key;
+  border-color: var(--line-strong);
+  border-radius: 0 !important;
+  background: var(--retro-bg);
+  color: var(--retro-ink);
+  font-variant-ligatures: none;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--retro-ink) 35%, transparent);
+}
+/* Geist Mono only. */
+.focus[data-layout="retro"],
+.focus[data-layout="retro"] * {
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+}
+.focus[data-layout="retro"]
+  :where(.rounded-chip, .rounded-control, .rounded-panel, .rounded-modal, .btn, [data-pill]) {
+  border-radius: 0;
+}
+/* Cards that keep their radius inline for layout animations. */
+.focus[data-layout="retro"] [data-approval] {
+  border-radius: 0 !important;
+}
+.focus[data-layout="retro"].focus-card::before {
+  display: none;
+}
+
+/* The tube: faint scanlines over everything, the curvature darkening the edges. Daylight is a
+   line printer: ink on warm paper, no glow and no tube. */
+.focus[data-layout="retro"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.14) 0 1px, transparent 1px 3px),
+    radial-gradient(130% 120% at 50% 45%, transparent 60%, rgb(0 0 0 / 0.5) 100%);
+}
+[data-theme="light"] .focus[data-layout="retro"] {
+  text-shadow: none;
+}
+[data-theme="light"] .focus[data-layout="retro"]::after {
+  display: none;
+}
+
+/* ── Header band: a console status line over a double rule ─────────────────────────────────── */
+
+.rs-band {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px 10px;
+  border-bottom: 3px double var(--line-strong);
+  font-size: 13px;
+  line-height: 20px;
+}
+.rs-band-line {
+  display: flex;
+  min-width: 0;
+  min-height: 28px;
+  align-items: center;
+  gap: 1ch;
+}
+.rs-band-name {
+  min-width: 0;
+  max-width: 50%;
+  flex: none;
+  color: var(--retro-ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rs-dim {
+  color: var(--retro-dim-ink);
+}
+.rs-tag {
+  font-weight: 600;
+}
+.rs-tag[data-tone="work"],
+.rs-tag[data-tone="tool"] {
+  color: var(--retro-tone-work);
+}
+.rs-tag[data-tone="wait"] {
+  color: var(--retro-tone-wait);
+}
+.rs-tag[data-tone="err"] {
+  color: var(--retro-tone-err);
+}
+.rs-tag[data-tone="ok"] {
+  color: var(--retro-tone-ok);
+}
+.rs-tag[data-tone="idle"] {
+  color: var(--retro-dim-ink);
+}
+/* The block cursor stands right after the caption. */
+.rs-band .retro-cursor {
+  margin-left: 1px;
+  color: var(--retro-ink);
+}
+.focus[data-layout="retro"] .rs-band .progress-shimmer {
+  display: none;
+}
+
+/* ── Panel frames: `┌─ CLAUDE ──┐` ──────────────────────────────────────────────────────────── */
+
+.focus[data-layout="retro"] .focus-col {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 6px 6px;
+  overflow: hidden;
+}
+.rs-frame {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+}
+.rs-frame-title {
+  position: absolute;
+  top: -8px;
+  left: 2ch;
+  z-index: 1;
+  padding: 0 1ch;
+  background: var(--retro-bg);
+  color: var(--retro-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+}
+.rs-frame-body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 16px 14px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rs-frame-body:has(> .claude-panel) {
+  padding: 4px 0 0;
+  overflow: hidden;
+}
+/* The maximized stack covers the other frames, so its frame fills the view. */
+.focus[data-layout="retro"] .focus-col-max {
+  background: var(--retro-bg);
+}
+
+/* ── Controls: `[ SEND ]` buttons, `<opus>` pills, `[RUN]` tags ─────────────────────────────── */
+
+.focus[data-layout="retro"] :is(.btn:not(.btn-icon), .rs-key),
+.focus[data-layout="retro"] [data-send] {
+  gap: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--retro-ink);
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: pre;
+}
+.focus[data-layout="retro"] :is(.btn:not(.btn-icon), .rs-key)::before {
+  content: "[ " / "";
+}
+.focus[data-layout="retro"] :is(.btn:not(.btn-icon), .rs-key)::after {
+  content: " ]" / "";
+}
+.focus[data-layout="retro"] .btn:not(.btn-icon) svg {
+  display: none;
+}
+.focus[data-layout="retro"] :is(.btn, .rs-key, [data-send]):hover {
+  background: color-mix(in srgb, var(--retro-ink) 12%, transparent);
+}
+/* Focus is inverse video, the console's own cursor. */
+.focus[data-layout="retro"] :is(.btn, .rs-key, [data-send], [role="tab"]):focus-visible {
+  background: var(--retro-ink);
+  box-shadow: none;
+  color: var(--retro-bg);
+  text-shadow: none;
+}
+.rs-key {
+  display: inline-flex;
+  flex: none;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 0.5ch;
+  outline: none;
+}
+@media (pointer: coarse) {
+  .rs-key {
+    min-height: 44px;
+  }
+}
+
+.focus[data-layout="retro"] [data-send] {
+  width: auto;
+  padding: 0 0.5ch;
+}
+.focus[data-layout="retro"] [data-send] > span {
+  display: none;
+}
+.focus[data-layout="retro"] [data-send].btn::before {
+  content: none;
+}
+.focus[data-layout="retro"] [data-send].btn::after {
+  content: "[ SEND ]" / "";
+}
+.focus[data-layout="retro"] [data-send].btn[data-mode="sending"]::after {
+  content: "[ SENDING ]" / "";
+}
+.focus[data-layout="retro"] [data-send].btn[data-mode="stop"]::after {
+  content: "[ STOP ]" / "";
+}
+
+.focus[data-layout="retro"] :is([data-chip], [data-pill]) {
+  gap: 0;
+  border-color: transparent;
+  background: transparent;
+  padding-inline: 0;
+}
+.focus[data-layout="retro"] [data-chip] > span:first-child:has(svg),
+.focus[data-layout="retro"] [data-pill] > :is(span:first-child, svg) {
+  display: none;
+}
+.focus[data-layout="retro"] [data-chip]::before,
+.focus[data-layout="retro"] [data-pill] > span:nth-child(2)::before {
+  content: "<" / "";
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] [data-chip]::after,
+.focus[data-layout="retro"] [data-pill] > span:nth-child(2)::after {
+  content: ">" / "";
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] [data-pill]:hover {
+  color: var(--retro-ink);
+}
+
+/* Status as tags plus the dimmed status colors; the label stays in words beside it. */
+.focus[data-layout="retro"] [data-status] > [data-mark] {
+  display: none;
+}
+.focus[data-layout="retro"] [data-status]::before {
+  flex: none;
+  font-weight: 600;
+}
+.focus[data-layout="retro"] [data-status="work"]::before,
+.focus[data-layout="retro"] [data-status="tool"]::before {
+  content: "[RUN]" / "";
+  color: var(--retro-tone-work);
+}
+.focus[data-layout="retro"] [data-status="wait"]::before {
+  content: "[WAIT]" / "";
+  color: var(--retro-tone-wait);
+}
+.focus[data-layout="retro"] [data-status="err"]::before {
+  content: "[ERR]" / "";
+  color: var(--retro-tone-err);
+}
+.focus[data-layout="retro"] [data-status="ok"]::before {
+  content: "[OK]" / "";
+  color: var(--retro-tone-ok);
+}
+.focus[data-layout="retro"] [data-status="idle"]::before {
+  content: "[IDLE]" / "";
+  color: var(--retro-dim-ink);
+}
+
+/* ── Number shortcuts: `[1]` on each session row, then on each terminal tab ────────────────── */
+
+.focus[data-layout="retro"] :is(a[data-session], [role="tab"][data-tab]) {
+  counter-increment: rs-key;
+}
+.focus[data-layout="retro"] :is(a[data-session], [role="tab"][data-tab])::before {
+  content: "[" counter(rs-key) "]";
+  position: relative;
+  z-index: 1;
+  flex: none;
+  color: var(--retro-ink);
+  font-weight: 600;
+}
+.focus[data-layout="retro"] [role="tab"][data-tab] {
+  max-width: 18rem;
+}
+/* A tab's status mark grows into its tag. */
+.focus[data-layout="retro"] [role="tab"][data-tab] > span:has(> [data-status]) {
+  width: auto;
+  height: auto;
+}
+
+/* ── Chat as a console transcript ────────────────────────────────────────────────────────── */
+
+.focus[data-layout="retro"] div:has(> [data-user-bubble]) {
+  justify-content: flex-start;
+}
+.focus[data-layout="retro"] [data-user-bubble] {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.focus[data-layout="retro"] [data-user-bubble] > p::before {
+  content: "> you: " / "";
+  color: var(--retro-dim-ink);
+  font-weight: 600;
+}
+.focus[data-layout="retro"] :is([data-row="assistant"], [data-row="tail"]) .md::before {
+  content: "claude:" / "";
+  display: block;
+  color: var(--retro-dim-ink);
+  font-weight: 600;
+}
+/* The streaming caret is the console's blinking block cursor (held lit at Reduced). */
+.focus[data-layout="retro"] .md[data-streaming] > :last-child::after {
+  width: 0.62em;
+  height: 1.15em;
+  margin-left: 1px;
+  vertical-align: -0.2em;
+  border-radius: 0;
+  background: var(--retro-ink);
+  box-shadow: none;
+  animation: retro-blink var(--dur-blink) steps(1, end) infinite;
+}
+[data-motion="reduced"] .focus[data-layout="retro"] .md[data-streaming] > :last-child::after {
+  animation: none;
+}
+
+/* Tool cards are tree lines, `├─ Bash pnpm test [RUN] [+]`, that open in place under a `│`. */
+.focus[data-layout="retro"] .tool-card {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+.focus[data-layout="retro"] .tool-card > :first-child {
+  padding-inline: 0;
+}
+.focus[data-layout="retro"] .tool-card > :first-child::before {
+  content: "├─" / "";
+  flex: none;
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] .tool-card > :first-child > svg {
+  display: none;
+}
+.focus[data-layout="retro"] .tool-card > button:first-child::after {
+  content: "[+]" / "";
+  flex: none;
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] .tool-card[data-open] > button:first-child::after {
+  content: "[-]" / "";
+}
+.focus[data-layout="retro"] .tool-card > :nth-child(2) {
+  margin-left: calc(1ch - 0.5px);
+  border-top: 0;
+  border-left: 1px solid var(--line-strong);
+}
+.focus[data-layout="retro"] [data-tool-status] > * {
+  display: none;
+}
+.focus[data-layout="retro"] [data-tool-status]::before {
+  font-weight: 600;
+}
+.focus[data-layout="retro"]
+  .tool-card[data-state="running"]
+  > :first-child
+  > [data-tool-status]::before {
+  content: "[RUN]";
+  color: var(--retro-tone-tool);
+}
+.focus[data-layout="retro"]
+  .tool-card[data-state="error"]
+  > :first-child
+  > [data-tool-status]::before {
+  content: "[ERR]";
+  color: var(--retro-tone-err);
+}
+.focus[data-layout="retro"]
+  .tool-card[data-state="done"]:not([data-tool="TodoWrite"])
+  > :first-child
+  > [data-tool-status]::before {
+  content: "[OK]";
+  color: var(--retro-tone-ok);
+}
+/* Compact tool rows (search, fetch) read as the same tree lines. */
+.focus[data-layout="retro"] [data-tool]:not(.tool-card) .tool-head::before {
+  content: "├─" / "";
+  flex: none;
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] [data-tool]:not(.tool-card) .tool-head > svg:first-child {
+  display: none;
+}
+
+/* TodoWrite as checklist lines. */
+.focus[data-layout="retro"] [data-todo] > svg {
+  display: none;
+}
+.focus[data-layout="retro"] [data-todo]::before {
+  content: "[ ]" / "to do";
+  flex: none;
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] [data-todo="in_progress"]::before {
+  content: "[>]" / "in progress";
+  color: var(--retro-tone-work);
+  font-weight: 600;
+}
+.focus[data-layout="retro"] [data-todo="completed"]::before {
+  content: "[x]" / "done";
+  color: var(--retro-tone-ok);
+}
+
+/* ── Entry: the frame's text opens into the workspace, line by line (`dur.base`) ──────────── */
+
+.rs-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.rs-entry > span {
+  flex: 1;
+  background: var(--retro-bg);
+  animation: rs-entry-line var(--dur-fast) var(--ease-out) both;
+}
+@keyframes rs-entry-line {
+  to {
+    opacity: 0;
+  }
+}
+[data-motion="off"] .rs-entry {
+  display: none;
+}
+
+/* ── Phones: the project hub as a text menu with numbered items ───────────────────────────── */
+
+.focus[data-layout="retro"] [data-hub] {
+  counter-reset: rs-hub;
+}
+.focus[data-layout="retro"] [data-workspace-appbar] {
+  border-bottom: 3px double var(--line-strong);
+}
+.focus[data-layout="retro"] :is([data-hub-item], [data-hub-row]) {
+  counter-increment: rs-hub;
+  align-items: baseline;
+}
+.focus[data-layout="retro"] [data-hub-item] {
+  border-color: var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+.focus[data-layout="retro"] [data-hub-item][data-last] {
+  border-color: var(--line-strong);
+}
+.focus[data-layout="retro"] :is([data-hub-item], [data-hub-row])::before {
+  content: "[" counter(rs-hub) "]";
+  flex: none;
+  color: var(--retro-ink);
+  font-weight: 600;
+}
+/* The kind icons and chevrons give way to the number; the tag and the kind's word stay. */
+.focus[data-layout="retro"] [data-hub-item] > span:first-child,
+.focus[data-layout="retro"] :is([data-hub-item], [data-hub-row]) > svg:last-child,
+.focus[data-layout="retro"] [data-hub-row] > span:first-child {
+  display: none;
+}
+.focus[data-layout="retro"] [data-hub-group] > h2::before {
+  content: "── " / "";
+  color: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] [data-hub-new] {
+  height: 48px;
+}
