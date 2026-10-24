@@ -8,8 +8,11 @@ const marker = (name: string) => `${name}-${Math.random().toString(36).slice(2, 
 async function startBoardSession(page: Page, narrow = false) {
   await openRoute(page, '/');
   await openRoute(page, await firstProjectRoute(page));
-  if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-  await page.locator('[data-new-session]').click();
+  if (narrow) {
+    // The phone hub: + New, then Claude session.
+    await page.locator('[data-hub-new]').click();
+    await page.locator('[data-new-claude]').click();
+  } else await page.locator('[data-new-session]').click();
   const input = page.getByRole('textbox', { name: 'First message for a new session' });
   await expect(input).toBeVisible();
   await input.fill(marker('first'));
@@ -84,26 +87,21 @@ test.describe('drafts', () => {
   test.describe('phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('a draft survives switching tabs and a reload', async ({ page }) => {
+    test('a draft survives going back to the hub and a reload', async ({ page }) => {
       test.slow();
       const sessionId = await startBoardSession(page, true);
-      const tabs = page.getByRole('tablist', { name: 'Focus view panels' });
-      await tabs.getByRole('tab', { name: 'Claude' }).click();
       const input = composerOf(page, sessionId);
       const draft = marker('phone');
       await input.fill(draft);
 
-      await tabs.getByRole('tab', { name: 'Terminals' }).click();
+      await page.locator('[data-workspace-page="item"] [data-workspace-back]').click();
       await expect(input).toBeHidden();
-      await tabs.getByRole('tab', { name: 'Sessions' }).click();
-      await expect(
-        page.locator(`[data-focus] a[data-session="${sessionId}"] [data-draft-marker]`),
-      ).toBeVisible();
-      await tabs.getByRole('tab', { name: 'Claude' }).click();
+      const card = page.locator(`[data-hub-item="s:${sessionId}"]`);
+      await expect(card.locator('[data-draft-marker]')).toBeVisible();
+      await card.click();
       await expect(input).toHaveValue(draft);
 
       await page.reload();
-      await tabs.getByRole('tab', { name: 'Claude' }).click();
       await expect(input).toHaveValue(draft);
     });
   });

@@ -14,6 +14,8 @@ export interface FocusRoute {
   sessionId?: string;
   /** A terminal deep link: the stack opens with this terminal's tab active. */
   terminalId?: string;
+  /** A phone workspace page (`/p/:projectId/:page`): git, history, ports or a new session. */
+  page?: string;
 }
 
 /** The project (and session or terminal) of a focus route, or null elsewhere. */
@@ -21,9 +23,11 @@ export function useFocusRoute(): FocusRoute | null {
   const [inSession, session] = useRoute(routes.session);
   const [inTerminal, terminal] = useRoute(routes.terminal);
   const [inProject, project] = useRoute(routes.project);
+  const [inPage, page] = useRoute(routes.projectPage);
   if (inSession) return { projectId: session.projectId, sessionId: session.sessionId };
   if (inTerminal) return { projectId: terminal.projectId, terminalId: terminal.terminalId };
   if (inProject) return { projectId: project.projectId };
+  if (inPage) return { projectId: page.projectId, page: page.page };
   return null;
 }
 
@@ -120,6 +124,7 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
               projectId={focus.projectId}
               sessionId={focus.sessionId}
               terminalId={focus.terminalId}
+              page={focus.page}
               shared={shared}
               fade={fade}
             />

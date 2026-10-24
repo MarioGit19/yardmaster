@@ -20,6 +20,32 @@ const THEMES: readonly Theme[] = ['dark', 'light'];
 const SCREENS = ['overview', 'focus', 'settings', 'welcome'] as const;
 const OUT_DIR = new URL('../artifacts/shots/', import.meta.url);
 
+type Page = import('@playwright/test').Page;
+
+/** A project's session links: rows in the focus view, or cards on a phone's project hub. */
+const sessionLinks = (page: Page, phone: boolean) =>
+  phone
+    ? page.locator('[data-hub] a[data-hub-kind="session"]')
+    : page.locator('[data-focus] a[data-session]');
+
+/** A terminal session that is running (not a board one, not ended), on either. */
+const runningTerminalSession = (page: Page, phone: boolean) =>
+  (phone
+    ? page.locator('[data-hub] a[data-hub-kind="session"][data-origin="terminal"]')
+    : sessionLinks(page, false).filter({ hasNot: page.locator('[data-origin="board"]') })
+  )
+    .filter({ hasNotText: 'Ended' })
+    .first();
+
+/** Opens the blank new-session composer: the column's button, or + New on a phone. */
+async function newSession(page: Page, phone: boolean) {
+  if (!phone) return page.locator('[data-new-session]').click();
+  const back = page.locator('[data-workspace-page] [data-workspace-back]');
+  if (await back.isVisible()) await back.click();
+  await page.locator('[data-hub-new]').click();
+  await page.locator('[data-new-claude]').click();
+}
+
 for (const theme of THEMES) {
   for (const viewport of VIEWPORTS) {
     test.describe(`${theme} ${viewport.width}x${viewport.height}`, () => {
@@ -339,8 +365,8 @@ test.describe('names', () => {
             await expect(page.locator('[data-focus]')).toHaveCount(1);
           };
           await open('pixel-studio');
-          if (viewport.width < 768) await page.getByRole('tab', { name: 'Sessions' }).click();
-          const names = page.locator('[data-focus] [data-session-name]');
+          // Phones list the sessions on the project hub's cards.
+          const names = page.locator('[data-focus] :is([data-session-name], [data-hub-name])');
           await expect(names.filter({ hasText: /^Claude 2$/ })).toHaveCount(1, {
             timeout: 15_000,
           });
@@ -348,7 +374,6 @@ test.describe('names', () => {
           await shot('names-sessions');
 
           await open('ledger-sync');
-          if (viewport.width < 768) await page.getByRole('tab', { name: 'Sessions' }).click();
           await expect(names.filter({ hasText: 'retry-backoff' })).toHaveCount(1, {
             timeout: 15_000,
           });
@@ -356,9 +381,12 @@ test.describe('names', () => {
           await shot('names-renamed-session');
 
           await open('orbit-api');
-          if (viewport.width < 768) await page.getByRole('tab', { name: 'Terminals' }).click();
           await expect(
-            page.locator('[data-terminal-stack] [data-terminal-name="backend"]'),
+            page.locator(
+              viewport.width < 768
+                ? '[data-hub] [data-hub-kind="terminal"] [data-hub-name]:text-is("backend")'
+                : '[data-terminal-stack] [data-terminal-name="backend"]',
+            ),
           ).toBeVisible({ timeout: 30_000 });
           await page.waitForTimeout(600);
           await shot('names-terminals');
@@ -644,15 +672,21 @@ test.describe('git and history', () => {
 
   test.describe('phone', () => {
     test.use({ theme: 'dark', viewport: { width: 390, height: 844 } });
-    test('sessions tab', async ({ page }) => {
+    test('history and git pages', async ({ page }) => {
       await openRoute(page, '/');
-      await openRoute(page, await firstProjectRoute(page));
-      await page.getByRole('tab', { name: 'Sessions' }).click();
+      const project = (await firstProjectRoute(page)).replace(/^#/, '');
+      await openRoute(page, `${project}/history`);
       await expect(page.locator('[data-history]').first()).toBeVisible();
       await page.waitForTimeout(400);
       await page.screenshot({
         path: new URL('git-history-390-dark.png', OUT_DIR).pathname,
-        fullPage: true,
+        animations: 'disabled',
+      });
+      await openRoute(page, `${project}/git`);
+      await expect(page.locator('[data-git-panel]')).toBeVisible();
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: new URL('git-panel-390-dark.png', OUT_DIR).pathname,
         animations: 'disabled',
       });
     });
@@ -790,17 +824,10 @@ test.describe('composer', () => {
             });
           await openRoute(page, '/');
           await openRoute(page, await firstProjectRoute(page));
-          const narrow = viewport.width < 1024;
-          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
+          const phone = viewport.width < 768;
           // Parallel shots start board sessions in this project too, and the demo's Claude
           // sometimes exits (then relaunches): pick a terminal session that is running.
-          const forkable = page
-            .locator('[data-focus] a[data-session]')
-            .filter({ hasNot: page.locator('[data-origin="board"]') })
-            .filter({ hasNotText: 'Ended' })
-            .first();
-          await forkable.click({ timeout: 40_000 });
-          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
+          await runningTerminalSession(page, phone).click({ timeout: 40_000 });
           // Typing into the terminal, or (mid-request) the approval in its place.
           await expect(
             page
@@ -810,8 +837,7 @@ test.describe('composer', () => {
           await page.waitForTimeout(600);
           await shot('composer-terminal');
 
-          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-          await page.locator('[data-new-session]').click();
+          await newSession(page, phone);
           const input = page.getByRole('textbox', { name: 'First message for a new session' });
           await input.fill('Tidy up the cart totals and keep the public API the same.');
           await page.waitForTimeout(300);
@@ -835,16 +861,8 @@ test.describe('composer', () => {
           });
           await openRoute(page, '/');
           await openRoute(page, await firstProjectRoute(page));
-          const narrow = viewport.width < 1024;
-          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-          await page
-            .locator('[data-focus] a[data-session]')
-            .filter({ hasNot: page.locator('[data-origin="board"]') })
-            .filter({ hasNotText: 'Ended' })
-            .first()
-            .click({ timeout: 40_000 });
-          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
-          // On phones the Terminals tab holds the same chat, hidden.
+          const phone = viewport.width < 768;
+          await runningTerminalSession(page, phone).click({ timeout: 40_000 });
           await expect(page.locator('[data-fork-bar]').filter({ visible: true })).toBeVisible();
           await page.waitForTimeout(600);
           await page.screenshot({
@@ -876,10 +894,9 @@ test.describe('composer', () => {
             .first()
             .getAttribute('href');
           await openRoute(page, (href ?? '#/').slice(1));
-          const narrow = viewport.width < 1024;
-          if (narrow) await page.getByRole('tab', { name: 'Sessions' }).click();
-          const row = page.locator('[data-focus] a[data-session]', { hasText: 'Interrupted' });
-          if (!narrow) {
+          const phone = viewport.width < 768;
+          const row = sessionLinks(page, phone).filter({ hasText: 'Interrupted' });
+          if (!phone) {
             await page.waitForTimeout(400);
             await page.screenshot({
               path: new URL(`session-interrupted-row-${viewport.width}-${theme}.png`, OUT_DIR)
@@ -888,7 +905,6 @@ test.describe('composer', () => {
             });
           }
           await row.click();
-          if (narrow) await page.getByRole('tab', { name: 'Claude' }).click();
           await expect(page.locator('[data-resume-bar]').filter({ visible: true })).toBeVisible();
           await page.waitForTimeout(600);
           await page.screenshot({
@@ -1029,8 +1045,8 @@ test.describe('ambient styles', () => {
   }
 });
 
-// A terminal running claude (10.9): its tab, its chat (beside, or in the pane on phones), the raw
-// TUI, and the new-terminal popover.
+// A terminal running claude (10.9): its tab, its chat (beside, or its page on phones), the raw
+// TUI, and the new-terminal popover (the + New sheet on phones).
 test.describe('claude terminals', () => {
   for (const theme of THEMES) {
     for (const viewport of [
@@ -1047,14 +1063,32 @@ test.describe('claude terminals', () => {
             });
           await openRoute(page, '/');
           await openRoute(page, await firstProjectRoute(page));
-          if (viewport.width < 1024) await page.getByRole('tab', { name: 'Terminals' }).click();
+          if (viewport.width < 768) {
+            // Phones: the Claude terminal is one card on the hub; its page toggles chat and TUI.
+            const card = page.locator('[data-hub] [data-hub-kind="session"][data-hub-terminal]');
+            await expect(card.first()).toBeVisible({ timeout: 30_000 });
+            await card.first().click();
+            const item = page.locator('[data-workspace-page="item"]');
+            await expect(item.locator('[data-session-panel]')).toBeVisible();
+            await page.waitForTimeout(1200);
+            await shot('claude-terminal');
+            await item.locator('[data-item-view] [data-view="raw"]').click();
+            await page.waitForTimeout(800);
+            await shot('claude-terminal-raw');
+            await item.locator('[data-item-view] [data-view="chat"]').click();
+            await item.locator('[data-workspace-back]').click();
+            await page.locator('[data-hub-new]').click();
+            await expect(page.locator('[data-new-sheet]')).toBeVisible();
+            await page.waitForTimeout(600);
+            await shot('new-terminal');
+            return;
+          }
           const stack = page.locator('[data-terminal-stack]');
           const tab = stack.locator('[data-claude-tab]').first();
           await expect(tab).toBeVisible({ timeout: 30_000 });
           const sessionId = await tab.getAttribute('data-claude-tab');
-          const wide = viewport.width >= 1024;
           // The Claude column on a new session's composer, so the stack shows the chat itself.
-          if (wide) await page.locator('[data-new-session]').click();
+          await page.locator('[data-new-session]').click();
           await tab.click();
           await expect(
             stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`),
@@ -1063,18 +1097,16 @@ test.describe('claude terminals', () => {
           await page.waitForTimeout(1200);
           await shot('claude-terminal');
 
-          if (wide) {
-            // Its row moves the chat to the Claude column; the stack points there.
-            await page.locator(`[data-focus] a[data-session="${sessionId}"]`).click();
-            await expect(stack.locator('[data-chat-beside]')).toBeVisible();
-            await page.mouse.move(viewport.width / 2, viewport.height - 4);
-            await page.waitForTimeout(800);
-            await shot('claude-terminal-beside');
-            await stack.getByRole('button', { name: 'Show here instead' }).click();
-            await expect(
-              stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`),
-            ).toBeVisible();
-          }
+          // Its row moves the chat to the Claude column; the stack points there.
+          await page.locator(`[data-focus] a[data-session="${sessionId}"]`).click();
+          await expect(stack.locator('[data-chat-beside]')).toBeVisible();
+          await page.mouse.move(viewport.width / 2, viewport.height - 4);
+          await page.waitForTimeout(800);
+          await shot('claude-terminal-beside');
+          await stack.getByRole('button', { name: 'Show here instead' }).click();
+          await expect(
+            stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`),
+          ).toBeVisible();
 
           await stack.getByRole('button', { name: 'Raw terminal' }).click();
           await page.waitForTimeout(800);
@@ -1135,7 +1167,9 @@ test.describe('background work', () => {
           await page.waitForTimeout(800);
           await shot('background-focus');
           if (narrow) {
-            await page.getByRole('tab', { name: 'Sessions' }).click();
+            // Back on the project hub.
+            await page.locator('[data-workspace-page] [data-workspace-back]').click();
+            await expect(page.locator('[data-hub]')).toBeVisible();
             await page.waitForTimeout(600);
             await shot('background-sessions');
           }
@@ -1719,12 +1753,18 @@ test.describe('board terminal', () => {
           await sheet.getByRole('textbox', { name: 'Command to run (optional)' }).fill('pnpm dev');
           await sheet.getByRole('button', { name: 'Open project' }).click();
           await expect(dialog).toHaveCount(0);
-          const tabs = page.getByRole('tab', { name: /^Terminals/ });
-          if (await tabs.isVisible()) await tabs.click();
-          const stack = page.locator('[data-terminal-stack]');
-          await expect(stack.locator('[role="tab"][data-origin="board"]')).toBeVisible({
-            timeout: 10_000,
-          });
+          if (viewport.width < 768) {
+            // Phones: the board terminal's card on the hub opens its page, with the key bar.
+            const card = page.locator('[data-hub] [data-hub-kind="terminal"]').first();
+            await expect(card).toBeVisible({ timeout: 10_000 });
+            await card.click();
+            await expect(page.locator('[data-key-bar]')).toBeVisible();
+          } else {
+            const stack = page.locator('[data-terminal-stack]');
+            await expect(stack.locator('[role="tab"][data-origin="board"]')).toBeVisible({
+              timeout: 10_000,
+            });
+          }
           await page.waitForTimeout(900);
           await page.screenshot({
             path: new URL(`board-terminal-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
@@ -1780,17 +1820,14 @@ for (const theme of THEMES) {
       await shot(page, 'launch-sheet');
     });
 
-    test('focus tabs and composer', async ({ page }) => {
+    test('project hub and composer', async ({ page }) => {
       test.slow();
       await openRoute(page, '/');
       await openRoute(page, await firstProjectRoute(page));
-      for (const tab of ['Sessions', 'Claude', 'Terminals'] as const) {
-        await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).tap();
-        await page.waitForTimeout(700);
-        await shot(page, `focus-${tab.toLowerCase()}`);
-      }
-      await page.getByRole('tab', { name: /^Sessions/ }).tap();
-      await page.locator('[data-new-session]').tap();
+      await expect(page.locator('[data-hub]')).toBeVisible();
+      await page.waitForTimeout(700);
+      await shot(page, 'focus-hub');
+      await newSession(page, true);
       const input = page.getByRole('textbox', { name: 'First message for a new session' });
       await input.fill('Tidy up the cart totals and keep the public API the same.');
       await page.waitForTimeout(400);
@@ -1906,8 +1943,8 @@ for (const theme of THEMES) {
   });
 }
 
-// 12.6b: the phone shell (DESIGN.md §11) at 360, 390 and 412: each tab, the workspace and its
-// overflow sheet, on an Android-like touch profile.
+// 12.6b: the phone shell (DESIGN.md §11) at 360, 390 and 412: each tab and the workspace, on an
+// Android-like touch profile.
 const { defaultBrowserType: _android, ...galaxy } = devices['Galaxy S24'];
 const SHELL_TABS = [
   { tab: 'overview', route: '/', ready: '[data-pod]' },
@@ -1938,18 +1975,66 @@ for (const theme of THEMES) {
         }
       });
 
+      // 12.6e4: the project hub, each kind of item page, the switcher, + New and the pages.
       test('workspace', async ({ page }) => {
         test.slow();
+        await disableWebgl(page);
         await openRoute(page, '/projects');
         await page.locator('[data-phone-project]').first().tap();
         const workspace = page.locator('[data-workspace="phone"]');
-        await expect(workspace).toBeVisible();
-        for (const tab of ['Claude', 'Sessions', 'Terminals'] as const) {
-          await workspace.getByRole('tab', { name: tab, exact: true }).tap();
+        const hub = workspace.locator('[data-hub]');
+        await expect(hub).toBeVisible();
+        await page.waitForTimeout(700);
+        await shot(page, 'workspace-hub');
+
+        const item = workspace.locator('[data-workspace-page="item"]');
+        const open = async (card: string, name: string) => {
+          const target = hub.locator(card).first();
+          if ((await target.count()) === 0) return false;
+          await target.tap();
+          await expect(item.locator('[data-item-header]')).toBeVisible();
+          await page.waitForTimeout(900);
+          await shot(page, `workspace-${name}`);
+          return true;
+        };
+        const back = async () => {
+          await item.locator('[data-workspace-back]').tap();
+          await expect(hub).toBeVisible();
+        };
+        if (await open('[data-hub-kind="session"]:not([data-hub-terminal])', 'chat')) await back();
+        if (await open('[data-hub-kind="session"][data-hub-terminal]', 'claude-terminal')) {
+          await item.locator('[data-item-view] [data-view="raw"]').tap();
           await page.waitForTimeout(700);
-          await shot(page, `workspace-${tab.toLowerCase()}`);
+          await shot(page, 'workspace-claude-terminal-raw');
+          await item.locator('[data-item-view] [data-view="chat"]').tap();
+          await back();
         }
-        await workspace.locator('[data-workspace-menu-trigger]').tap();
+        await open('[data-hub-kind="terminal"]', 'terminal');
+        await item.locator('[data-item-switch]').tap();
+        await expect(page.locator('[data-switcher-sheet]')).toBeVisible();
+        await page.waitForTimeout(600);
+        await shot(page, 'workspace-switcher');
+        await page.keyboard.press('Escape');
+        await back();
+
+        await hub.locator('[data-hub-new]').tap();
+        await expect(page.locator('[data-new-sheet]')).toBeVisible();
+        await page.waitForTimeout(600);
+        await shot(page, 'workspace-new');
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-new-sheet]')).toHaveCount(0);
+
+        for (const row of ['git', 'history', 'ports'] as const) {
+          await hub.locator(`[data-hub-row="${row}"]`).tap();
+          const sub = workspace.locator(`[data-workspace-page="${row}"]`);
+          await expect(sub).toBeVisible();
+          await page.waitForTimeout(700);
+          await shot(page, `workspace-${row}`);
+          await sub.locator('[data-workspace-back]').tap();
+          await expect(hub).toBeVisible();
+        }
+
+        await hub.locator('[data-workspace-menu-trigger]').tap();
         await expect(page.locator('[data-workspace-menu]')).toBeVisible();
         await page.waitForTimeout(600);
         await shot(page, 'workspace-menu');

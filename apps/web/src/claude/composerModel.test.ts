@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   composerKey,
+  composerSentence,
   isSessionLive,
   isTurnRunning,
   modelLabel,
@@ -62,5 +63,20 @@ describe('composer model', () => {
     expect(composerKey(key('Enter', false, true), false)).toBeNull();
     expect(composerKey(key('Escape'), true)).toBe('interrupt');
     expect(composerKey(key('Escape'), false)).toBeNull();
+  });
+});
+
+describe('composerSentence', () => {
+  it('says what Claude does and what a reply does now', () => {
+    expect(composerSentence({ kind: 'working' }, false)).toBe(
+      'Claude is working, you can reply when it’s done.',
+    );
+    expect(composerSentence({ kind: 'tool', tool: 'Bash', toolUseId: 'tu-1' }, true)).toBe(
+      'Claude is working. A reply waits until it’s done.',
+    );
+    expect(composerSentence({ kind: 'waiting_input' }, true)).toBe(
+      'Claude is waiting for your answer.',
+    );
+    expect(composerSentence({ kind: 'idle' }, true)).toBe('Claude is idle. Reply to carry on.');
   });
 });

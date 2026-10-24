@@ -61,13 +61,13 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
 
   return (
     <div className="md-code group relative my-3 rounded-control border border-line bg-bg-0/60">
-      <div className="flex h-7 items-center justify-between gap-2 border-line border-b pr-1 pl-3">
+      <div className="flex h-7 items-center justify-between gap-2 border-line border-b pr-1 pl-3 max-md:h-11">
         <span className="font-mono text-meta text-text-3">{info || 'text'}</span>
         <button
           type="button"
           onClick={copy}
           aria-label={copied ? 'Copied' : 'Copy code'}
-          className="flex size-6 items-center justify-center rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100 moving:active:scale-[0.97]"
+          className="flex size-6 items-center justify-center gap-1 rounded-chip text-text-3 opacity-0 transition-[opacity,color,background-color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-hover:opacity-100 max-md:h-11 max-md:w-auto max-md:min-w-11 max-md:px-2.5 max-md:text-meta max-md:opacity-100 moving:active:scale-[0.97]"
         >
           <span className="copy-swap grid place-items-center" data-state={copied ? 'done' : 'idle'}>
             <Copy aria-hidden className="copy-swap-idle size-3.5" strokeWidth={1.5} />
@@ -76,6 +76,10 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
               className="copy-swap-done size-3.5 text-st-ok-ink"
               strokeWidth={1.75}
             />
+          </span>
+          {/* Phones have no hover: the button shows, with its word (DESIGN.md §11). */}
+          <span aria-hidden className="hidden max-md:inline">
+            {copied ? 'Copied' : 'Copy'}
           </span>
         </button>
       </div>

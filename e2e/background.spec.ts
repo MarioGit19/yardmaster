@@ -53,7 +53,8 @@ test.describe('background work', () => {
   });
 
   test.describe('narrow', () => {
-    test.use({ viewport: { width: 390, height: 844 } });
+    // Tablets keep the focus view's tabs; phones have the project hub (below).
+    test.use({ viewport: { width: 900, height: 900 } });
 
     test('the line in the Sessions tab opens the list in the Claude tab', async ({ page }) => {
       test.slow();
@@ -71,6 +72,24 @@ test.describe('background work', () => {
       await expect(
         page.locator(`[data-background-panel="${sessionId}"] [data-background-list]`),
       ).toBeVisible({ timeout: 15_000 });
+    });
+  });
+
+  test.describe('phone', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test("the Claude card's page lists its background work", async ({ page }) => {
+      test.slow();
+      await openRoute(page, '/');
+      await page.locator(POD, { hasText: 'acme-shop' }).locator('header a').first().click();
+      const card = page.locator('[data-hub] [data-hub-kind="session"]').first();
+      await card.click();
+      const panel = page.locator('[data-workspace-page="item"] [data-background-panel]');
+      await expect(panel.locator('[data-background-toggle]')).toBeVisible({ timeout: 30_000 });
+      if ((await panel.locator('[data-background-list]').count()) === 0) {
+        await panel.locator('[data-background-toggle]').click();
+      }
+      await expect(panel.locator('[data-background-list]')).toBeVisible();
     });
   });
 });

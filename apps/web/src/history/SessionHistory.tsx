@@ -7,6 +7,8 @@ import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { formatCount } from '../status.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { formatDateTime, formatWhen } from '../time.js';
+import { buttonClass } from '../ui/Button.js';
+import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { useSessionHistory } from './api.js';
@@ -23,10 +25,18 @@ export interface SessionHistoryProps {
   refreshKey: unknown;
   /** The project's current branch; a row names its branch only when it differs. */
   branch: string | null;
+  /** Phones: no heading (the page has one), every row shown, and actions in words. */
+  page?: boolean;
 }
 
 /** Past Claude sessions of a project with resume actions (F17). */
-export function SessionHistory({ projectId, knownIds, refreshKey, branch }: SessionHistoryProps) {
+export function SessionHistory({
+  projectId,
+  knownIds,
+  refreshKey,
+  branch,
+  page = false,
+}: SessionHistoryProps) {
   const { state, retry } = useSessionHistory(projectId, refreshKey);
   const [expanded, setExpanded] = useState(false);
   const editor = useBoard(
@@ -35,13 +45,13 @@ export function SessionHistory({ projectId, knownIds, refreshKey, branch }: Sess
   );
 
   const sessions = state.status === 'ready' ? pastSessions(state.sessions, knownIds) : [];
-  const shown = expanded ? sessions : sessions.slice(0, HISTORY_SHOWN);
+  const shown = expanded || page ? sessions : sessions.slice(0, HISTORY_SHOWN);
   const hidden = sessions.length - shown.length;
   const now = Date.now();
 
   return (
     <section aria-label="Session history" data-history-list>
-      <ColumnHeading meta={sessions.length || undefined}>History</ColumnHeading>
+      {!page && <ColumnHeading meta={sessions.length || undefined}>History</ColumnHeading>}
       {state.status === 'loading' ? (
         <div aria-busy className="flex flex-col gap-3">
           {[0, 1, 2].map((i) => (
@@ -66,10 +76,16 @@ export function SessionHistory({ projectId, knownIds, refreshKey, branch }: Sess
         <p className="text-body-sm text-text-2">No past sessions</p>
       ) : (
         <>
-          <ul className="-mx-2 flex flex-col gap-0.5">
+          <ul className={page ? 'flex flex-col gap-2' : '-mx-2 flex flex-col gap-0.5'}>
             {shown.map((entry) => (
               <li key={entry.id}>
-                <HistoryRow entry={entry} now={now} editor={editor} branch={branch} />
+                <HistoryRow
+                  entry={entry}
+                  now={now}
+                  editor={editor}
+                  branch={branch}
+                  labelled={page}
+                />
               </li>
             ))}
           </ul>
@@ -94,11 +110,13 @@ function HistoryRow({
   now,
   editor,
   branch,
+  labelled,
 }: {
   entry: SessionHistoryEntry;
   now: number;
   editor: string | null;
   branch: string | null;
+  labelled: boolean;
 }) {
   const client = useBoardClient();
   const title = historyTitle(entry);
@@ -111,10 +129,26 @@ function HistoryRow({
     else toast.error(actionErrorText(result.error, 'Could not resume the session'));
   };
 
+  const resume = () =>
+    run(
+      { kind: 'session.resume', sessionId: entry.id, projectId: entry.projectId },
+      `Resuming “${title}”`,
+    );
+  const resumeInEditor = () =>
+    run(
+      { kind: 'session.resumeInEditor', projectId: entry.projectId, sessionId: entry.id },
+      `Opened a terminal in ${editorName}`,
+    );
+
   return (
     <div
       data-history={entry.id}
-      className="group relative flex min-w-0 items-center gap-2 rounded-control px-2 py-1.5 transition-colors duration-fast focus-within:bg-bg-2 hover:bg-bg-2"
+      className={cx(
+        'group relative flex min-w-0 rounded-control transition-colors duration-fast',
+        labelled
+          ? 'flex-col gap-2 border border-line bg-bg-1 p-3'
+          : 'items-center gap-2 px-2 py-1.5 focus-within:bg-bg-2 hover:bg-bg-2',
+      )}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
@@ -150,33 +184,46 @@ function HistoryRow({
           )}
         </span>
       </div>
-      <div className="history-actions flex shrink-0 items-center">
-        <IconButton
-          size="sm"
-          label="Resume in board"
-          icon={<Play strokeWidth={1.5} />}
-          tooltipSide="top"
-          onClick={() =>
-            run(
-              { kind: 'session.resume', sessionId: entry.id, projectId: entry.projectId },
-              `Resuming “${title}”`,
-            )
-          }
-        />
-        <IconButton
-          size="sm"
-          label={`Resume in ${editorName}`}
-          icon={<SquareTerminal strokeWidth={1.5} />}
-          tooltipSide="top"
-          data-resume-editor={entry.id}
-          onClick={() =>
-            run(
-              { kind: 'session.resumeInEditor', projectId: entry.projectId, sessionId: entry.id },
-              `Opened a terminal in ${editorName}`,
-            )
-          }
-        />
-      </div>
+      {labelled ? (
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={resume}
+            data-resume-board={entry.id}
+            className={buttonClass('secondary', 'sm')}
+          >
+            <Play aria-hidden className="size-3.5" strokeWidth={1.5} />
+            Resume here
+          </button>
+          <button
+            type="button"
+            onClick={resumeInEditor}
+            data-resume-editor={entry.id}
+            className={buttonClass('ghost', 'sm')}
+          >
+            <SquareTerminal aria-hidden className="size-3.5" strokeWidth={1.5} />
+            Resume in {editor ?? 'Cursor'}
+          </button>
+        </div>
+      ) : (
+        <div className="history-actions flex shrink-0 items-center">
+          <IconButton
+            size="sm"
+            label="Resume in board"
+            icon={<Play strokeWidth={1.5} />}
+            tooltipSide="top"
+            onClick={resume}
+          />
+          <IconButton
+            size="sm"
+            label={`Resume in ${editorName}`}
+            icon={<SquareTerminal strokeWidth={1.5} />}
+            tooltipSide="top"
+            data-resume-editor={entry.id}
+            onClick={resumeInEditor}
+          />
+        </div>
+      )}
     </div>
   );
 }

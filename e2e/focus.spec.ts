@@ -217,8 +217,8 @@ for (const viewport of [
   });
 }
 
-test('stacked tabs at 390', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('stacked tabs at 900', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
   const { card } = await openFirstPod(page);
   // The view's own tabs; the terminal stack inside has tabs of its own.
   const panels = card.getByRole('tablist', { name: 'Focus view panels' });
@@ -232,7 +232,14 @@ test('stacked tabs at 390', async ({ page }) => {
   await expect(card.locator('[id^="focus-panel-"]:visible')).toHaveCount(1);
   await expect(card.locator('#focus-panel-terminals')).toContainText('Terminals');
   await expect(card.locator('#focus-panel-terminals [data-terminal-stack]')).toBeVisible();
-  // Phones get the full-bleed workspace (DESIGN.md §11): edge to edge, no card inset.
+});
+
+test('a project hub at 390', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { card } = await openFirstPod(page);
+  // Phones get the full-bleed workspace (DESIGN.md §11): edge to edge, a hub instead of tabs.
+  await expect(card.locator('[data-hub]')).toBeVisible();
+  await expect(card.getByRole('tablist', { name: 'Focus view panels' })).toHaveCount(0);
   const box = await card.boundingBox();
   expect(Math.round(box?.x ?? -1)).toBe(0);
   expect(Math.round(box?.width ?? 0)).toBe(390);

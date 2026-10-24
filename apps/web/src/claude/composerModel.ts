@@ -51,6 +51,29 @@ export function isSessionLive(status: ClaudeSession['status']): boolean {
   return true;
 }
 
+/**
+ * The phone composer's state as a sentence (DESIGN.md §11): what Claude is doing and what a reply
+ * does now. `queues`: a board session takes a follow-up mid-turn; a terminal one waits.
+ */
+export function composerSentence(status: ClaudeSession['status'], queues: boolean): string {
+  switch (status.kind) {
+    case 'working':
+    case 'tool':
+    case 'compacting':
+      return queues
+        ? 'Claude is working. A reply waits until it’s done.'
+        : 'Claude is working, you can reply when it’s done.';
+    case 'waiting_permission':
+      return 'Claude is waiting for your approval.';
+    case 'waiting_input':
+      return 'Claude is waiting for your answer.';
+    case 'error':
+      return 'Claude stopped with an error. A reply tries again.';
+    default:
+      return 'Claude is idle. Reply to carry on.';
+  }
+}
+
 export type SendButtonMode = 'send' | 'sending' | 'stop';
 
 /** Stop while a turn runs and nothing is typed; otherwise send (a typed prompt queues). */

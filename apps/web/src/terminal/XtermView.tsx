@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RESIZE_END, resizingAncestor } from '../anim/resizing.js';
 import { useBoardClient } from '../data/index.js';
 import { StreamRedactor } from '../redact/redact.js';
+import { ctrlLatch } from './keyBar.js';
 import { domColorResolver, xtermTheme } from './theme.js';
 
 /** What the stack's toolbar can do to a mounted terminal. */
@@ -129,7 +130,9 @@ export default function XtermView({
       refit();
 
       if (input) {
-        const keys = term.onData((data) => client.terminalInput(terminalId, data));
+        const keys = term.onData((data) =>
+          client.terminalInput(terminalId, ctrlLatch.apply(terminalId, data)),
+        );
         const sized = term.onResize(({ cols, rows }) =>
           client.terminalResize(terminalId, cols, rows),
         );

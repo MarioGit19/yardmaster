@@ -3569,3 +3569,53 @@ main[data-office-zoom] {
 [data-workspace="phone"] [data-composer] {
   padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
+
+/* A row that scrolls sideways inside its own box (DESIGN.md §11): a soft fade on the edge that
+   has more, driven by its own scroll; without scroll timelines, no fade. */
+@property --fade-l {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-fade-x {
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-l),
+    #000 calc(100% - var(--fade-r)),
+    transparent
+  );
+}
+.scroll-fade-x::-webkit-scrollbar {
+  display: none;
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-fade-x {
+    animation: scroll-fade-x linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes scroll-fade-x {
+  from {
+    --fade-l: 0px;
+    --fade-r: 24px;
+  }
+  1% {
+    --fade-l: 24px;
+    --fade-r: 24px;
+  }
+  99% {
+    --fade-l: 24px;
+    --fade-r: 24px;
+  }
+  to {
+    --fade-l: 24px;
+    --fade-r: 0px;
+  }
+}

@@ -973,32 +973,41 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor();
       await page.waitForTimeout(1200);
     });
-    await r.moment('workspace-swipe', 'transition', 'swipe the workspace tabs', async () => {
-      const area = await page.locator('[data-tab-swipe]').boundingBox();
-      if (!area) return;
-      const y = area.y + 48;
-      const cdp = await page.context().newCDPSession(page);
-      for (const [x0, x1] of [
-        [area.width * 0.8, area.width * 0.2],
-        [area.width * 0.2, area.width * 0.8],
-      ] as const) {
-        await cdp.send('Input.dispatchTouchEvent', {
-          type: 'touchStart',
-          touchPoints: [{ x: x0, y }],
-        });
-        await cdp.send('Input.dispatchTouchEvent', {
-          type: 'touchMove',
-          touchPoints: [{ x: (x0 + x1) / 2, y }],
-        });
-        await cdp.send('Input.dispatchTouchEvent', {
-          type: 'touchMove',
-          touchPoints: [{ x: x1, y }],
-        });
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await r.moment(
+      'hub-item',
+      'transition',
+      'the hub: a card opens its page, a swipe moves to the next item, back',
+      async () => {
+        await page.locator('[data-hub-item]').first().tap();
+        const header = page.locator('[data-workspace-page="item"] [data-item-header]');
+        await header.waitFor();
+        await page.waitForTimeout(900);
+        const area = await header.boundingBox();
+        if (area) {
+          const y = area.y + area.height / 2;
+          const [x0, x1] = [area.width * 0.85, area.width * 0.15];
+          const cdp = await page.context().newCDPSession(page);
+          await cdp.send('Input.dispatchTouchEvent', {
+            type: 'touchStart',
+            touchPoints: [{ x: x0, y }],
+          });
+          await cdp.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x: (x0 + x1) / 2, y }],
+          });
+          await cdp.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x: x1, y }],
+          });
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          await cdp.detach();
+          await page.waitForTimeout(900);
+        }
+        await page.locator('[data-workspace-page="item"] [data-workspace-back]').tap();
+        await page.locator('[data-hub]').waitFor();
         await page.waitForTimeout(700);
-      }
-      await cdp.detach();
-    });
+      },
+    );
     await r.moment('focus-close', 'transition', 'back: the focus view closes', async () => {
       await page.goBack();
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });

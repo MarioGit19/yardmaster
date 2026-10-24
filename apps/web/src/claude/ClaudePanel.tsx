@@ -37,8 +37,11 @@ export function ClaudePanel({
   session,
   defer = false,
   compact = false,
+  header = true,
 }: {
   session: ClaudeSession;
+  /** Off on the phone's item page, whose own header names the session. */
+  header?: boolean;
   /** Hold the transcript back until the pod-to-focus morph has settled. */
   defer?: boolean;
   compact?: boolean;
@@ -78,7 +81,7 @@ export function ClaudePanel({
         data-session-panel={session.id}
         data-density={compact ? 'compact' : undefined}
       >
-        {!compact && (
+        {!compact && header && (
           <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
             <div className="flex min-w-0 flex-1 items-baseline gap-2">
               <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">

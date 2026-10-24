@@ -9,13 +9,20 @@ function fakeHistory() {
     get state() {
       return entries[index]?.state ?? null;
     },
-    replaceState(state: unknown) {
+    replaceState(state: unknown, _unused: string, url?: string | URL | null) {
       const entry = entries[index];
       if (entry) entry.state = state;
+      if (entry && typeof url === 'string') entry.location = url.replace(/^#/, '');
+    },
+    pushState(state: unknown, _unused: string, url?: string | URL | null) {
+      entries.splice(index + 1);
+      entries.push({ state, location: typeof url === 'string' ? url.replace(/^#/, '') : '' });
+      index++;
     },
   };
   return {
     history,
+    entries,
     push(location: string) {
       entries.splice(index + 1);
       entries.push({ state: null, location });
@@ -67,6 +74,22 @@ describe('createHistoryTrack', () => {
     track.visit(browser.push('/pulse'));
     track.visit(browser.push('/p/b'));
     expect(track.stepsToLeaveWorkspace()).toBe(-1);
+  });
+
+  it('slides the hub under a deep-linked item page, so back lands on it', () => {
+    const browser = fakeHistory();
+    const track = createHistoryTrack(browser.history);
+    track.visit(browser.push('/'));
+    track.visit(browser.push('/p/a/s/1'));
+    track.placeBelow('/p/a');
+    expect(browser.entries.map((e) => e.location)).toEqual(['/', '/p/a', '/p/a/s/1']);
+    expect(track.previous()).toBe('/p/a');
+    expect(track.stepsToLeaveWorkspace()).toBe(-2);
+    track.visit(browser.go(-1));
+    expect(track.stepsToLeaveWorkspace()).toBe(-1);
+    // Already on the hub: nothing to slide under it.
+    track.placeBelow('/p/a');
+    expect(browser.entries).toHaveLength(3);
   });
 
   it('has nowhere to go back to after a direct link into a workspace', () => {

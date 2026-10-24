@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   Maximize2,
   Minimize2,
+  OctagonX,
   Plus,
   Power,
   RotateCcw,
@@ -32,6 +33,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
+import { useComposerLift } from '../claude/composerLift.js';
 import {
   selectApproval,
   selectPortsByTerminal,
@@ -71,6 +73,7 @@ import {
   claudeTerminalView,
   useClaudeTerminalView,
 } from './claudeTerminal.js';
+import { BAR_KEYS, ctrlLatch, useCtrlLatched } from './keyBar.js';
 import { NewTerminalPopover } from './NewTerminalPopover.js';
 import { arrivedTerminal, newTerminalRequest, useNewTerminalRequest } from './newTerminal.js';
 import {
@@ -429,6 +432,47 @@ export function useTerminalView(terminal: Terminal) {
   return { execution, session, display, view: laneView(terminal, execution, display.name) };
 }
 
+/**
+ * One terminal full screen, the phone workspace's terminal page (DESIGN.md §11): the same pane as
+ * the stack, with labelled actions and, for a board terminal, a key bar.
+ */
+export function TerminalItem({ terminal, accent }: { terminal: Terminal; accent: string }) {
+  const controller = useRef<XtermController | null>(null);
+  const session = useBoard(selectTerminalSession(terminal.id));
+  const getController = useCallback(() => controller.current, []);
+  return (
+    <div
+      data-terminal-item={terminal.id}
+      className="flex h-full min-h-0 flex-col gap-2 px-3 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]"
+    >
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+        <Pane
+          bare
+          terminal={terminal}
+          accent={accent}
+          besideSessionId={undefined}
+          onShowChatHere={undefined}
+          compactChat={false}
+          inGrid={false}
+          active
+          wide={false}
+          renderer
+          onActivate={() => {}}
+          onController={(c) => {
+            controller.current = c;
+          }}
+        />
+      </div>
+      <ActiveControls
+        terminal={terminal}
+        claude={session !== undefined}
+        controller={getController}
+        labelled
+      />
+    </div>
+  );
+}
+
 function LayoutToggle({ layout }: { layout: StackLayout }) {
   const next: StackLayout = layout === 'grid' ? 'tabs' : 'grid';
   return (
@@ -601,9 +645,12 @@ function Pane({
   renderer,
   onActivate,
   onController,
+  bare = false,
 }: {
   terminal: Terminal;
   accent: string;
+  /** No Claude pane header: the phone item page has the chat / terminal toggle in its own. */
+  bare?: boolean;
   besideSessionId: string | undefined;
   onShowChatHere: ((sessionId: string) => void) | undefined;
   compactChat: boolean;
@@ -638,7 +685,7 @@ function Pane({
         wide && 'col-span-2',
       )}
     >
-      {session ? (
+      {bare ? null : session ? (
         <ClaudePaneHeader
           terminal={terminal}
           name={name}
@@ -905,11 +952,14 @@ function ActiveControls({
   terminal,
   claude,
   controller,
+  labelled = false,
 }: {
   terminal: Terminal;
   /** A Claude terminal: its composer is the input while the chat shows. */
   claude: boolean;
   controller: () => XtermController | null;
+  /** Phones: every action with a word (DESIGN.md §11), and a key bar for a board terminal. */
+  labelled?: boolean;
 }) {
   const { execution, view } = useTerminalView(terminal);
   const editor = useEditorName(terminal);
@@ -929,6 +979,117 @@ function ActiveControls({
   const rerunnable = open && !view.running && execution.id !== null && Boolean(view.command);
   const board = isBoardTerminal(terminal);
   const [port, ...morePorts] = useBoardList(selectPortsByTerminal(terminal.id));
+  const lift = useComposerLift();
+  const status = view.running
+    ? 'running'
+    : view.exit
+      ? `exit ${view.exit.code}`
+      : board && terminal.exitCode !== null
+        ? `exit ${terminal.exitCode}`
+        : null;
+  const input = board ? (
+    <BoardTerminalNote terminal={terminal} controller={controller} />
+  ) : (
+    !chat && (
+      <CommandLine
+        terminal={terminal}
+        running={view.running ? view.command : null}
+        onInterrupt={interrupt}
+      />
+    )
+  );
+  const search = searching && !interactive && (
+    <SearchBar controller={controller} onClose={() => setSearching(false)} />
+  );
+
+  if (labelled) {
+    // Toasts on a phone sit above these, as above a composer.
+    return (
+      <div ref={lift} className="flex shrink-0 flex-col gap-2" data-terminal-actions={terminal.id}>
+        {(port || status) && (
+          <div className="flex min-w-0 items-center gap-2">
+            {port && (
+              <span className="flex min-w-0" data-focus-port="">
+                <PortChip port={port} others={morePorts} />
+              </span>
+            )}
+            {status && (
+              <span className="ml-auto min-w-0 truncate font-mono text-meta text-text-2">
+                {status}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="scroll-fade-x -mx-3 flex min-w-0 gap-2 overflow-x-auto px-3">
+          <LabelledAction
+            icon={<OctagonX />}
+            disabled={!open}
+            onClick={interrupt}
+            title="Send Ctrl+C"
+          >
+            Stop
+          </LabelledAction>
+          {board ? (
+            <LabelledAction
+              icon={open ? <Power /> : <X />}
+              data-end-terminal
+              onClick={() => act({ kind: 'terminal.close', terminalId: terminal.id })}
+            >
+              {open ? 'End' : 'Remove'}
+            </LabelledAction>
+          ) : (
+            <>
+              <LabelledAction
+                icon={<RotateCcw />}
+                disabled={!rerunnable}
+                title={view.command ? `Re-run ${view.command}` : undefined}
+                onClick={() =>
+                  execution.id && act({ kind: 'terminal.rerun', execId: execution.id })
+                }
+              >
+                Restart
+              </LabelledAction>
+              <LabelledAction
+                icon={<ExternalLink />}
+                disabled={!open}
+                onClick={() => act({ kind: 'terminal.focus', terminalId: terminal.id })}
+              >
+                Open in {editor}
+              </LabelledAction>
+            </>
+          )}
+          <LabelledAction
+            icon={<Search />}
+            aria-pressed={searching}
+            disabled={interactive}
+            onClick={() => setSearching((s) => !s)}
+          >
+            Find
+          </LabelledAction>
+          <LabelledAction
+            icon={<Eraser />}
+            disabled={interactive}
+            onClick={() => controller()?.clear()}
+          >
+            Clear
+          </LabelledAction>
+          {redactOn && (
+            <LabelledAction
+              icon={masked ? <Eye /> : <EyeOff />}
+              aria-pressed={!masked}
+              disabled={interactive}
+              onClick={() => reveal.toggle(`term:${terminal.id}`)}
+            >
+              {masked ? 'Show secrets' : 'Hide secrets'}
+            </LabelledAction>
+          )}
+        </div>
+        {search}
+        {board && open && !interactive && <KeyBar terminalId={terminal.id} />}
+        {input}
+      </div>
+    );
+  }
 
   return (
     <div className="flex shrink-0 flex-col gap-2">
@@ -1020,29 +1181,92 @@ function ActiveControls({
             port ? 'max-sm:hidden' : 'ml-auto',
           )}
         >
-          {view.running
-            ? 'running'
-            : view.exit
-              ? `exit ${view.exit.code}`
-              : board && terminal.exitCode !== null
-                ? `exit ${terminal.exitCode}`
-                : null}
+          {status}
         </span>
       </div>
-      {searching && !interactive && (
-        <SearchBar controller={controller} onClose={() => setSearching(false)} />
+      {search}
+      {input}
+    </div>
+  );
+}
+
+/** A toolbar action with its word beside the icon (DESIGN.md §11, "Words over icons"). */
+function LabelledAction({
+  icon,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<'button'> & {
+  icon: React.ReactNode;
+  [data: `data-${string}`]: unknown;
+}) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={cx(
+        buttonClass('secondary', 'sm'),
+        'aria-pressed:border-line-strong aria-pressed:bg-text-1 aria-pressed:text-bg-0 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.5]',
       )}
-      {board ? (
-        <BoardTerminalNote terminal={terminal} controller={controller} />
-      ) : (
-        !chat && (
-          <CommandLine
-            terminal={terminal}
-            running={view.running ? view.command : null}
-            onInterrupt={interrupt}
-          />
-        )
-      )}
+    >
+      <span aria-hidden className="flex">
+        {icon}
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Keys a phone keyboard lacks, for a board terminal: Tab, Esc, a latching Ctrl and the arrows.
+ * Pressing them keeps the focus (and the on-screen keyboard) where it is.
+ */
+function KeyBar({ terminalId }: { terminalId: string }) {
+  const client = useBoardClient();
+  const ctrl = useCtrlLatched(terminalId);
+  const keep = (e: React.PointerEvent) => e.preventDefault();
+  const key =
+    'h-11 min-w-11 shrink-0 rounded-control border border-line bg-bg-2 px-3 font-mono text-label text-text-1 transition-[background-color,border-color,scale] duration-fast ease-out moving:active:scale-[0.97]';
+  return (
+    <div
+      role="toolbar"
+      aria-label="Terminal keys"
+      data-key-bar={terminalId}
+      className="scroll-fade-x -mx-3 flex min-w-0 gap-2 overflow-x-auto px-3"
+    >
+      {BAR_KEYS.slice(0, 2).map((k) => (
+        <button
+          key={k.name}
+          type="button"
+          aria-label={k.name}
+          onPointerDown={keep}
+          onClick={() => client.terminalInput(terminalId, ctrlLatch.apply(terminalId, k.data))}
+          className={key}
+        >
+          {k.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        aria-pressed={ctrl}
+        aria-label="Ctrl, for the next key"
+        onPointerDown={keep}
+        onClick={() => ctrlLatch.toggle(terminalId)}
+        className={cx(key, ctrl && 'border-line-strong bg-text-1 text-bg-0')}
+      >
+        Ctrl
+      </button>
+      {BAR_KEYS.slice(2).map((k) => (
+        <button
+          key={k.name}
+          type="button"
+          aria-label={k.name}
+          onPointerDown={keep}
+          onClick={() => client.terminalInput(terminalId, ctrlLatch.apply(terminalId, k.data))}
+          className={key}
+        >
+          {k.label}
+        </button>
+      ))}
     </div>
   );
 }

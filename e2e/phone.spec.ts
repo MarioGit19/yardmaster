@@ -28,19 +28,6 @@ async function noSideScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-/** A real touch swipe across `x0 → x1` at height `y` (CDP touch events, as a finger sends). */
-async function swipe(page: Page, y: number, x0: number, x1: number) {
-  const cdp = await page.context().newCDPSession(page);
-  const steps = 3;
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });
-  for (let i = 1; i <= steps; i++) {
-    const x = x0 + ((x1 - x0) * i) / steps;
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
-  }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await cdp.detach();
-}
-
 for (const profile of PROFILES) {
   test.describe(`phone shell on ${profile.name}`, () => {
     test.use(profile.device);
@@ -106,7 +93,7 @@ for (const profile of PROFILES) {
       await expect(bar.locator('[data-tab="pulse"]')).toHaveAttribute('aria-current', 'page');
     });
 
-    test('a workspace: full-bleed, swipeable tabs, a reply above the keyboard, and back', async ({
+    test('a workspace: full-bleed, a hub, a reply above the keyboard, and back', async ({
       page,
     }) => {
       test.slow();
@@ -139,25 +126,22 @@ for (const profile of PROFILES) {
       await page.keyboard.press('Escape');
       await expect(menu).toHaveCount(0);
 
-      // Swipes switch the workspace tabs: Claude first, left to Terminals, right twice to Sessions.
-      const tabs = workspace.getByRole('tablist', { name: 'Focus view panels' });
-      const selected = (name: string) =>
-        expect(tabs.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
-      await selected('Claude');
-      const area = await workspace.locator('[data-tab-swipe]').boundingBox();
-      if (!area) throw new Error('no swipe area');
-      const y = area.y + 48;
-      await swipe(page, y, width * 0.8, width * 0.2);
-      await selected('Terminals');
-      await swipe(page, y, width * 0.2, width * 0.8);
-      await selected('Claude');
-      await swipe(page, y, width * 0.2, width * 0.8);
-      await selected('Sessions');
-      await tabs.getByRole('tab', { name: 'Claude' }).tap();
-      await selected('Claude');
+      // The project hub lists everything; a session's card opens its chat full screen.
+      const hub = workspace.locator('[data-hub]');
+      await expect(hub.locator('[data-hub-summary]')).toBeVisible();
+      await hub.locator('[data-hub-kind="session"]').first().tap();
+      const chat = workspace.locator('[data-workspace-page="item"]');
+      await expect(chat.locator('[data-session-panel]')).toBeVisible();
+      await chat.locator('[data-workspace-back]').tap();
+      await expect(hub).toBeVisible();
+
+      // + New, Claude session: a blank chat whose composer always takes text.
+      await hub.locator('[data-hub-new]').tap();
+      await page.locator('[data-new-claude]').tap();
+      const item = workspace.locator('[data-workspace-page="new"]');
 
       // The keyboard takes the bottom of the screen: the field and Send stay in view.
-      const composer = workspace.locator('#focus-panel-claude [data-composer]').first();
+      const composer = item.locator('[data-composer]').first();
       const field = composer.locator('textarea');
       await field.tap();
       const keyboard = Math.round(height * 0.45);
@@ -171,6 +155,9 @@ for (const profile of PROFILES) {
       }
       await field.fill('');
       await page.setViewportSize({ width, height });
+      // Back from the item is the hub.
+      await item.locator('[data-workspace-back]').tap();
+      await expect(hub).toBeVisible();
 
       // Back returns to the tab it was opened from, and the bars come back.
       await appBar.getByRole('button', { name: 'Back' }).tap();

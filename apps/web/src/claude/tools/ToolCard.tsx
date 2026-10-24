@@ -595,9 +595,13 @@ function ChipCard({
             target="_blank"
             rel="noreferrer noopener"
             aria-label={`Open ${urlParts(href)?.host ?? 'link'}`}
-            className="flex h-full shrink-0 items-center border-line border-l px-1.5 text-text-3 touch:min-h-11 touch:min-w-11 touch:justify-center transition-colors duration-fast hover:bg-bg-2 hover:text-text-1"
+            className="flex h-full shrink-0 items-center gap-1 border-line border-l px-1.5 text-text-3 touch:min-h-11 touch:min-w-11 touch:justify-center transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 max-md:px-2.5 max-md:text-meta"
           >
             <ExternalLink aria-hidden className="size-3" strokeWidth={1.75} />
+            {/* Phones show the word (DESIGN.md §11). */}
+            <span aria-hidden className="hidden max-md:inline">
+              Open
+            </span>
           </a>
         )}
       </div>

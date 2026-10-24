@@ -5,10 +5,9 @@ import { expect, firstProjectRoute, openRoute, test } from './fixtures.js';
 const marker = (name: string) => `${name}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** The first demo project (acme-shop: dev server, tests, zsh and a terminal running claude). */
-async function openProject(page: Page, narrow = false) {
+async function openProject(page: Page) {
   await openRoute(page, '/');
   await openRoute(page, await firstProjectRoute(page));
-  if (narrow) await page.getByRole('tab', { name: 'Terminals' }).click();
   const stack = page.locator('[data-terminal-stack]');
   await expect(stack).toBeVisible();
   return stack;
@@ -201,22 +200,29 @@ test.describe('Claude terminals', () => {
   test.describe('phone', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
-    test('the tab shows the chat; long and multi-line replies from its composer are submitted in the terminal', async ({
+    test('the card opens the chat; long and multi-line replies from its composer are submitted in the terminal', async ({
       page,
     }) => {
       // The reply waits for the demo session to finish its turn, or a permission request to expire
       // (approving it here would take it from the attention tests running alongside), twice.
       test.setTimeout(480_000);
-      const stack = await openProject(page, true);
-      const { tab, sessionId } = await claudeTab(stack);
-      await tab.click();
-      const chat = stack.locator(`[data-pane] [data-session-panel="${sessionId}"]`);
+      // On the phone hub the Claude terminal is one card; its page opens on the chat.
+      await openRoute(page, '/');
+      await openRoute(page, await firstProjectRoute(page));
+      const card = page.locator('[data-hub] [data-hub-kind="session"][data-hub-terminal]').first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      const sessionId = (await card.getAttribute('data-hub-item'))?.slice(2);
+      await card.click();
+      const stack = page.locator('[data-workspace-page="item"]');
+      const chat = stack.locator(`[data-session-panel="${sessionId}"]`);
       await expect(chat).toBeVisible();
+      const raw = stack.locator('[data-item-view] [data-view="raw"]');
+      const chatView = stack.locator('[data-item-view] [data-view="chat"]');
 
-      await stack.getByRole('button', { name: 'Raw terminal' }).click();
+      await raw.click();
       await expect(stack.locator('[data-xterm]')).toBeVisible();
       await expect(chat).toHaveCount(0);
-      await stack.getByRole('button', { name: 'Chat' }).click();
+      await chatView.click();
       await expect(chat).toBeVisible();
 
       const input = chat.getByRole('textbox', { name: /^Message / });
@@ -268,11 +274,11 @@ test.describe('Claude terminals', () => {
       ).toBeVisible();
       expect(await laterCopies()).toBe(0);
 
-      await stack.getByRole('button', { name: 'Raw terminal' }).click();
+      await raw.click();
       await expect(stack.locator('[data-xterm] .xterm-rows')).toContainText(end);
 
       // A multi-line reply keeps its lines.
-      await stack.getByRole('button', { name: 'Chat' }).click();
+      await chatView.click();
       await atPrompt();
       const first = marker('first');
       const second = marker('second');
@@ -282,7 +288,7 @@ test.describe('Claude terminals', () => {
       const lines = chat.locator('[data-row="user"]', { hasText: first });
       await expect(lines).toBeVisible();
       await expect(lines).toContainText(second);
-      await stack.getByRole('button', { name: 'Raw terminal' }).click();
+      await raw.click();
       const rows = stack.locator('[data-xterm] .xterm-rows');
       await expect(rows).toContainText(`Then ${first}`);
       await expect(rows).toContainText(`and ${second}`);

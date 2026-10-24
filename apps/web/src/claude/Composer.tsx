@@ -27,8 +27,10 @@ import { type AttentionDecision, canAlwaysAllow } from '../attention/attention.j
 import { selectApproval, useBoard, useBoardClient } from '../data/index.js';
 import { draftKey, drafts, useDraftText } from '../drafts/drafts.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { useMediaQuery } from '../prefs.js';
 import { sessionHref } from '../routes.js';
 import { useBoardSettings } from '../settings/boardSettings.js';
+import { NARROW_QUERY } from '../shell/prefs.js';
 import { ESC } from '../terminal/claudeTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { buttonClass } from '../ui/Button.js';
@@ -39,6 +41,7 @@ import { Tooltip } from '../ui/Tooltip.js';
 import { useComposerLift } from './composerLift.js';
 import {
   composerKey,
+  composerSentence,
   isSessionLive,
   isTurnRunning,
   MODEL_OPTIONS,
@@ -101,6 +104,7 @@ function LiveBoardComposer({ session }: { session: ClaudeSession }) {
       draft={draftKey.session(session.id)}
       label={`Message ${sessionDisplayName(session)}`}
       placeholder={running ? 'Queue a follow-up…' : 'Reply to Claude…'}
+      sentence={composerSentence(session.status, true)}
       running={running}
       model={session.model}
       permissionMode={session.permissionMode}
@@ -136,6 +140,7 @@ export function NewSessionComposer({ projectId }: { projectId: string }) {
       draft={draftKey.newSession(projectId)}
       label="First message for a new session"
       placeholder="Ask Claude to…"
+      sentence="Claude starts when you send the first message."
       autoFocus
       running={false}
       model={model || null}
@@ -183,6 +188,8 @@ interface ComposerProps {
   sendBlocked?: boolean;
   /** Replaces the keyboard hint beside the send button. */
   hint?: string;
+  /** Phones: the state as a sentence above the field (DESIGN.md §11). */
+  sentence?: string;
 }
 
 function Composer({
@@ -201,7 +208,9 @@ function Composer({
   menu,
   sendBlocked = false,
   hint,
+  sentence,
 }: ComposerProps) {
+  const phone = useMediaQuery(NARROW_QUERY);
   const [text, setText] = useState(() => drafts.get(draft));
   const [sending, setSending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -244,6 +253,15 @@ function Composer({
       }}
       className={column.dock}
     >
+      {phone && sentence && (
+        <p
+          data-composer-state
+          aria-live="polite"
+          className="mx-auto mb-1.5 w-full max-w-3xl truncate px-1 text-meta text-text-2"
+        >
+          {sentence}
+        </p>
+      )}
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-control border border-line bg-bg-2 px-3 pt-2.5 pb-2 shadow-raised transition-[border-color] duration-fast focus-within:border-line-strong">
         <textarea
           ref={inputRef}
@@ -302,6 +320,7 @@ function Composer({
           </span>
           <SendButton
             mode={mode}
+            labelled={phone}
             disabled={mode === 'send' && (text.trim() === '' || sendBlocked)}
           />
         </div>
@@ -367,8 +386,24 @@ const SEND_LABEL: Record<SendButtonMode, string> = {
   stop: 'Stop Claude',
 };
 
+/** The words a phone's send button shows (DESIGN.md §11). */
+const SEND_WORD: Record<SendButtonMode, string> = {
+  send: 'Send',
+  sending: 'Sending',
+  stop: 'Stop',
+};
+
 /** One button that morphs between send, sending and stop, so the target never moves. */
-function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolean }) {
+function SendButton({
+  mode,
+  disabled,
+  labelled = false,
+}: {
+  mode: SendButtonMode;
+  disabled: boolean;
+  /** Phones: the icon with its word, a pill instead of a circle. */
+  labelled?: boolean;
+}) {
   const still = useMotionLevel() !== 'full';
   const icon =
     mode === 'stop' ? (
@@ -387,8 +422,9 @@ function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolea
         data-mode={mode}
         disabled={disabled || mode === 'sending'}
         className={cx(
-          buttonClass(mode === 'stop' ? 'secondary' : 'primary', 'sm', { square: true }),
+          buttonClass(mode === 'stop' ? 'secondary' : 'primary', 'sm', { square: !labelled }),
           'relative overflow-hidden rounded-full disabled:opacity-40',
+          labelled && 'ml-auto gap-1.5 px-4',
           mode === 'sending' && 'disabled:opacity-100',
         )}
       >
@@ -407,6 +443,7 @@ function SendButton({ mode, disabled }: { mode: SendButtonMode; disabled: boolea
             transition={spring.snappy}
           >
             {icon}
+            {labelled && <span className="ml-1.5">{SEND_WORD[mode]}</span>}
           </motion.span>
         </AnimatePresence>
       </button>
@@ -448,6 +485,7 @@ function TerminalSessionComposer({ session }: { session: ClaudeSession }) {
       label={`Message ${sessionDisplayName(session)}`}
       placeholder={ready ? 'Reply to Claude…' : 'Claude is working, reply when it’s idle'}
       running={busy}
+      sentence={composerSentence(session.status, false)}
       sendBlocked={!ready}
       model={session.model}
       permissionMode={session.permissionMode}
@@ -543,6 +581,7 @@ function ForkIcon({ forking }: { forking: boolean }) {
 /** The terminal composer's secondary actions: for now, the fork. */
 function ComposerMenu({ fork }: { fork: Fork }) {
   const [open, setOpen] = useState(false);
+  const phone = useMediaQuery(NARROW_QUERY);
   return (
     <Popover
       open={open}
@@ -553,13 +592,25 @@ function ComposerMenu({ fork }: { fork: Fork }) {
       className="flex w-72 max-w-[calc(100vw-32px)] flex-col gap-2"
       data-composer-menu
       trigger={
-        <IconButton
-          size="sm"
-          label="More actions"
-          aria-expanded={open}
-          icon={<Ellipsis className="size-4" strokeWidth={1.5} />}
-          tooltipSide="top"
-        />
+        phone ? (
+          <button
+            type="button"
+            aria-label="More actions"
+            aria-expanded={open}
+            className={buttonClass('ghost', 'sm')}
+          >
+            <Ellipsis aria-hidden className="size-4" strokeWidth={1.5} />
+            More
+          </button>
+        ) : (
+          <IconButton
+            size="sm"
+            label="More actions"
+            aria-expanded={open}
+            icon={<Ellipsis className="size-4" strokeWidth={1.5} />}
+            tooltipSide="top"
+          />
+        )
       }
     >
       <button

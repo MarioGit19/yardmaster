@@ -352,36 +352,77 @@ async function walk(page: Page, query: string, phone: boolean) {
   // Every worst-case project (the fleet of terminals and sessions, the longest names); on the
   // demo board the first three, whose chats hold diffs and wide tool output.
   let diffs = 0;
+  const openToolCards = async (root: ReturnType<Page['locator']>) => {
+    // Open the tool cards in place (a streaming chat re-renders under a pointer click).
+    await root.evaluate((el) => {
+      const closed = el.querySelectorAll<HTMLButtonElement>(
+        '[data-tool-kind] button[aria-expanded="false"]:not([disabled])',
+      );
+      for (const button of [...closed].slice(0, 12)) button.click();
+    });
+    return root.locator('[data-diff-view]').count();
+  };
   for (const id of worst ? ids : ids.slice(0, 3)) {
+    const n = ids.indexOf(id) + 1;
     await go(`/p/${id}`);
     const focus = page.locator(`[data-focus="${id}"]`);
     await expect(focus).toBeVisible();
-    const tabs = focus.getByRole('tablist', { name: 'Focus view panels' });
-    const tabbed = (await tabs.count()) > 0;
-    for (const tab of tabbed ? (['Sessions', 'Claude', 'Terminals'] as const) : [null]) {
-      if (tab) await tabs.getByRole('tab', { name: tab, exact: true }).click();
-      if (tab === 'Claude' || tab === null) {
-        // Open the tool cards in place (a streaming chat re-renders under a pointer click).
-        await focus.evaluate((root) => {
-          const closed = root.querySelectorAll<HTMLButtonElement>(
-            '[data-tool-kind] button[aria-expanded="false"]:not([disabled])',
-          );
-          for (const button of [...closed].slice(0, 12)) button.click();
-        });
-        diffs += await focus.locator('[data-diff-view]').count();
+    const hub = focus.locator('[data-hub]');
+    if ((await hub.count()) > 0) {
+      // Phones: the project hub, every item's page, the switcher, + New and the pages.
+      await check(`hub (${n})`);
+      const hrefs = await hub
+        .locator('[data-hub-item]')
+        .evaluateAll((cards) => cards.map((c) => c.getAttribute('href') ?? ''));
+      for (const href of hrefs.slice(0, worst ? 8 : 6)) {
+        await go(href.replace(/^#/, ''));
+        const item = focus.locator('[data-workspace-page="item"]');
+        await expect(item.locator('[data-item-header]')).toBeVisible();
+        diffs += await openToolCards(item);
+        await check(`item ${href.split('/').slice(-2).join('/')} (${n})`);
+        const terminalView = item.locator('[data-item-view] [data-view="raw"]');
+        if ((await terminalView.count()) > 0) {
+          await terminalView.click();
+          await check(`item terminal view (${n})`);
+          await item.locator('[data-item-view] [data-view="chat"]').click();
+        }
       }
-      await check(`workspace ${tab ?? 'columns'} (${ids.indexOf(id) + 1})`);
+      if (hrefs[0]) {
+        await go(hrefs[0].replace(/^#/, ''));
+        await focus.locator('[data-item-switch]').click();
+        await expect(page.locator('[data-switcher-sheet]')).toBeVisible();
+        await check(`switcher (${n})`);
+        await dismiss('[data-switcher-sheet]');
+      }
+      for (const sub of ['git', 'history', 'ports', 'new'] as const) {
+        await go(`/p/${id}/${sub}`);
+        await expect(focus.locator(`[data-workspace-page="${sub}"]`)).toBeVisible();
+        await check(`${sub} page (${n})`);
+      }
+      await go(`/p/${id}`);
+      await hub.locator('[data-hub-new]').click();
+      await expect(page.locator('[data-new-sheet]')).toBeVisible();
+      await check(`+ New sheet (${n})`);
+      await dismiss('[data-new-sheet]');
+    } else {
+      const tabs = focus.getByRole('tablist', { name: 'Focus view panels' });
+      const tabbed = (await tabs.count()) > 0;
+      for (const tab of tabbed ? (['Sessions', 'Claude', 'Terminals'] as const) : [null]) {
+        if (tab) await tabs.getByRole('tab', { name: tab, exact: true }).click();
+        if (tab === 'Claude' || tab === null) diffs += await openToolCards(focus);
+        await check(`workspace ${tab ?? 'columns'} (${n})`);
+      }
     }
-    const menu = focus.locator('[data-workspace-menu-trigger]');
+    const menu = focus.locator('[data-workspace-menu-trigger]:visible');
     if ((await menu.count()) > 0) {
       await menu.click();
       await expect(page.locator('[data-workspace-menu]')).toBeVisible();
-      await check(`workspace menu (${ids.indexOf(id) + 1})`);
+      await check(`workspace menu (${n})`);
       await dismiss('[data-workspace-menu]');
     }
   }
 
-  // The phone's Claude tab shows the chat whole; the landscape columns may virtualize it.
+  // The phone's chat page shows the chat whole; the landscape columns may virtualize it.
   if (!worst && phone) expect(diffs, 'no diff was opened in a chat').toBeGreaterThan(0);
   expect(problems, problems.join('\n')).toEqual([]);
 }

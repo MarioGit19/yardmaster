@@ -13,7 +13,7 @@ import { BackgroundLine } from '../background/BackgroundLine.js';
 import { runningHelpers } from '../background/model.js';
 import { useBackgroundRequests } from '../background/open.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
-import { NewSessionComposer, useResume } from '../claude/Composer.js';
+import { useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
 import { CrewMascot } from '../crew/CrewMascot.js';
 import { miniCrewCount } from '../crew/model.js';
@@ -43,7 +43,6 @@ import { useMascotState } from '../pod/useMascotState.js';
 import { useMediaQuery } from '../prefs.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
-import { leaveWorkspace } from '../shell/phoneNav.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
@@ -60,10 +59,10 @@ import { EmptyState } from '../views/Page.js';
 import { ColumnHeading } from './ColumnHeading.js';
 import { claudeColumnSession } from './claudeColumn.js';
 import { FocusCaption } from './FocusCaption.js';
+import { NewSessionPanel } from './NewSessionPanel.js';
+import { PhoneWorkspace } from './phone/PhoneWorkspace.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
-import { useTabSwipe } from './swipe.js';
-import { WorkspaceMenu } from './WorkspaceMenu.js';
 
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
@@ -79,6 +78,8 @@ export interface FocusViewProps {
   sessionId?: string;
   /** Opens the terminal stack on this terminal (`/p/:projectId/t/:terminalId`). */
   terminalId?: string;
+  /** A phone workspace page (git, history, ports, new); the columns ignore it. */
+  page?: string;
   /** Morph out of (and back into) the project's pod. Off for a direct load of the route. */
   shared: boolean;
   /** Cross-fade in and out instead (opened from a layout without pods, or at Reduced). */
@@ -90,6 +91,7 @@ export function FocusView({
   projectId,
   sessionId,
   terminalId,
+  page,
   shared,
   fade = false,
 }: FocusViewProps) {
@@ -128,6 +130,7 @@ export function FocusView({
       project={project}
       sessionId={sessionId}
       terminalId={terminalId}
+      page={page}
       shared={shared}
       fade={fade}
     />
@@ -168,19 +171,24 @@ function ProjectFocus({
   project,
   sessionId,
   terminalId,
+  page,
   shared,
   fade,
 }: {
   project: Project;
   sessionId?: string;
   terminalId?: string;
+  page?: string;
   shared: boolean;
   fade: boolean;
 }) {
-  // A terminal deep link asks the stack for that tab, like a terminal picked in ⌘K.
+  // Phones: a full-bleed workspace organised as a project hub (DESIGN.md §11).
+  const phone = useMediaQuery(NARROW_QUERY);
+  // A terminal deep link asks the stack for that tab, like a terminal picked in ⌘K. The phone
+  // workspace opens the terminal's own page from the route instead.
   useEffect(() => {
-    if (terminalId) terminalTarget.set({ projectId: project.id, terminalId });
-  }, [project.id, terminalId]);
+    if (terminalId && !phone) terminalTarget.set({ projectId: project.id, terminalId });
+  }, [project.id, terminalId, phone]);
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const selected = useBoard(selectSession(sessionId ?? ''));
@@ -204,8 +212,6 @@ function ProjectFocus({
   };
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
-  // Phones: a full-bleed workspace with its own app bar (DESIGN.md §11).
-  const phone = useMediaQuery(NARROW_QUERY);
   // A terminal picked in ⌘K, or a new one asked for there or in the pod's menu.
   const terminalTargeted = useTerminalTarget(project.id) !== null;
   const newTerminalRequested = useNewTerminalRequest(project.id);
@@ -276,42 +282,13 @@ function ProjectFocus({
       )}
     >
       {phone ? (
-        <motion.header
-          layoutId={shared ? sharedId.header(project.id) : undefined}
-          transition={spring.smooth}
-          data-workspace-appbar=""
-          className="relative flex min-w-0 shrink-0 items-center gap-2 border-line border-b px-1 pt-[env(safe-area-inset-top)]"
-          style={{ minHeight: 'calc(56px + env(safe-area-inset-top))' }}
-        >
-          {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
-          <button
-            type="button"
-            aria-label="Back"
-            aria-keyshortcuts="Escape"
-            data-workspace-back=""
-            onClick={() => leaveWorkspace(navigate)}
-            className="grid size-11 shrink-0 place-items-center rounded-control text-text-2 transition-[background-color,color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 moving:active:scale-[0.97]"
-          >
-            <ArrowLeft aria-hidden className="size-5" strokeWidth={1.5} />
-          </button>
-          <ProjectAvatar project={project} />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1
-              ref={headingRef}
-              tabIndex={-1}
-              title={project.name}
-              className="truncate font-medium text-body text-text-1 outline-none focus-visible:shadow-none"
-            >
-              {project.name}
-            </h1>
-            {project.git?.branch && (
-              <p className="truncate font-mono text-label text-text-2" title={project.git.branch}>
-                {project.git.branch}
-              </p>
-            )}
-          </div>
-          <WorkspaceMenu project={project} onNewSession={() => setComposing(true)} />
-        </motion.header>
+        <PhoneWorkspace
+          project={project}
+          sessionId={sessionId}
+          terminalId={terminalId}
+          page={page}
+          headingRef={headingRef}
+        />
       ) : (
         <motion.header
           layoutId={shared ? sharedId.header(project.id) : undefined}
@@ -364,39 +341,40 @@ function ProjectFocus({
         </motion.header>
       )}
 
-      <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
-        {tabs ? (
-          <FocusTabs
-            phone={phone}
-            settle={settle}
-            show={
-              composing
-                ? 'claude'
-                : terminalRequested
-                  ? 'terminals'
-                  : backgroundAsked
-                    ? 'claude'
-                    : null
-            }
-            showNonce={backgroundAsked}
-            panels={[
-              { id: 'sessions', label: 'Sessions', content: sessionsColumn },
-              { id: 'claude', label: 'Claude', content: claudeColumn },
-              { id: 'terminals', label: 'Terminals', content: terminalsColumn },
-            ]}
-          />
-        ) : (
-          <ResizableColumns
-            projectId={project.id}
-            labels={LABELS}
-            left={sessionsColumn}
-            center={claudeColumn}
-            right={terminalsColumn}
-            rightMaximized={maximized}
-            settle={settle}
-          />
-        )}
-      </motion.div>
+      {!phone && (
+        <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
+          {tabs ? (
+            <FocusTabs
+              settle={settle}
+              show={
+                composing
+                  ? 'claude'
+                  : terminalRequested
+                    ? 'terminals'
+                    : backgroundAsked
+                      ? 'claude'
+                      : null
+              }
+              showNonce={backgroundAsked}
+              panels={[
+                { id: 'sessions', label: 'Sessions', content: sessionsColumn },
+                { id: 'claude', label: 'Claude', content: claudeColumn },
+                { id: 'terminals', label: 'Terminals', content: terminalsColumn },
+              ]}
+            />
+          ) : (
+            <ResizableColumns
+              projectId={project.id}
+              labels={LABELS}
+              left={sessionsColumn}
+              center={claudeColumn}
+              right={terminalsColumn}
+              rightMaximized={maximized}
+              settle={settle}
+            />
+          )}
+        </motion.div>
+      )}
     </motion.div>
   );
 }
@@ -413,10 +391,7 @@ function FocusTabs({
   show,
   showNonce = 0,
   settle,
-  phone = false,
 }: {
-  /** Full-width tabs, and a horizontal swipe on the panel switches to the next one. */
-  phone?: boolean;
   panels: TabPanel[];
   show: string | null;
   /** Changes when the same panel is asked for again. */
@@ -445,12 +420,6 @@ function FocusTabs({
     setActive(panels[next]?.id ?? active);
     tabRefs.current[next]?.focus();
   };
-  const swipe = useTabSwipe((step) => {
-    const next = panels[index + step];
-    if (!next) return;
-    setByKeyboard(false);
-    setActive(next.id);
-  });
 
   return (
     <>
@@ -458,7 +427,7 @@ function FocusTabs({
         role="tablist"
         aria-label="Focus view panels"
         onKeyDown={onKeyDown}
-        className={cx('flex shrink-0 gap-1 border-line border-b', phone ? 'px-1' : 'px-3')}
+        className="flex shrink-0 gap-1 border-line border-b px-3"
       >
         {panels.map((panel, i) => {
           const selected = panel.id === active;
@@ -481,7 +450,7 @@ function FocusTabs({
               }}
               className={cx(
                 'relative rounded-control px-3 text-body-sm transition-colors duration-fast',
-                phone ? 'h-11 min-w-0 flex-1' : 'h-10 touch:h-11',
+                'h-10 touch:h-11',
                 selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
               )}
             >
@@ -498,11 +467,7 @@ function FocusTabs({
           );
         })}
       </div>
-      <div
-        className="flex min-h-0 flex-1 flex-col"
-        data-tab-swipe={phone ? '' : undefined}
-        {...(phone ? swipe : {})}
-      >
+      <div className="flex min-h-0 flex-1 flex-col">
         {panels.map((panel) => (
           <motion.div
             {...settle}
@@ -785,25 +750,7 @@ function ClaudeColumn({
   missing: boolean;
   defer: boolean;
 }) {
-  if (!session) {
-    return (
-      <div className="claude-panel flex h-full min-h-0 flex-col" data-new-session-panel>
-        <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
-          <h2 className="min-w-0 flex-1 truncate font-medium text-body text-text-1 leading-7">
-            New session
-          </h2>
-          <OriginBadge origin="board" />
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5">
-          <EmptyState title={missing ? 'This session is no longer available' : 'Start a session'}>
-            Claude runs headless from the board in {project.name}, with your own Claude Code login.
-            Pick a model and how much it may do without asking.
-          </EmptyState>
-        </div>
-        <NewSessionComposer projectId={project.id} />
-      </div>
-    );
-  }
+  if (!session) return <NewSessionPanel project={project} missing={missing} />;
   return <ClaudePanel session={session} defer={defer} />;
 }
 

@@ -22,7 +22,7 @@ export function phoneTabFor(location: string): PhoneTab | null {
   return null;
 }
 
-type HistoryLike = Pick<History, 'state' | 'replaceState'>;
+type HistoryLike = Pick<History, 'state' | 'replaceState'> & Partial<Pick<History, 'pushState'>>;
 
 const KEY = 'cboardIndex';
 
@@ -60,6 +60,31 @@ export function createHistoryTrack(history: HistoryLike) {
       current = index;
       seen.set(index, location);
     },
+    /** The location one entry back, if this page load has seen it. */
+    previous(): string | null {
+      return seen.get(current - 1) ?? null;
+    },
+    /**
+     * Slides `below` under the current entry: the entry becomes `below` and the current location
+     * is pushed again on top, so the next back lands on `below`. A deep link into a workspace's
+     * item page puts the project hub under it this way (DESIGN.md §11). The URL ends where it
+     * was, so the router sees no change.
+     */
+    placeBelow(below: string) {
+      const here = seen.get(current);
+      if (here === undefined || here === below || !history.pushState) return;
+      const state: unknown = history.state;
+      try {
+        history.replaceState({ ...(state as object | null), [KEY]: current }, '', `#${below}`);
+        history.pushState({ [KEY]: current + 1 }, '', `#${here}`);
+      } catch {
+        return;
+      }
+      for (const key of seen.keys()) if (key > current) seen.delete(key);
+      seen.set(current, below);
+      current += 1;
+      seen.set(current, here);
+    },
     /**
      * How many steps back (a negative `history.go` delta) reach the nearest entry outside a
      * workspace, or null when this page load has none (a direct link into the workspace).
@@ -82,7 +107,8 @@ export const historyTrack = createHistoryTrack(
         get state() {
           return window.history.state;
         },
-        replaceState: (data, unused) => window.history.replaceState(data, unused),
+        replaceState: (data, unused, url) => window.history.replaceState(data, unused, url),
+        pushState: (data, unused, url) => window.history.pushState(data, unused, url),
       },
 );
 
