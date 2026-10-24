@@ -1,9 +1,23 @@
 import { randomUUID } from 'node:crypto';
-import { BOARD_WINDOW_ID, isBoardTerminal, MAX_BOARD_TERMINALS } from '@c-board/protocol';
+import {
+  type ActivityEvent,
+  BOARD_WINDOW_ID,
+  isBoardTerminal,
+  MAX_BOARD_TERMINALS,
+  type Terminal,
+} from '@c-board/protocol';
 import type { ActionHandler, ActionHandlers, ActionResult } from './actions.js';
-import type { TerminalActionKind } from './editor-actions.js';
+import { NOTHING_TO_RERUN, type TerminalActionKind } from './editor-actions.js';
 import { ROUTE_ERRORS } from './editor-router.js';
+import type { ProcessTree } from './processes.js';
 import type { PtyLoad, PtyProcess } from './pty.js';
+import {
+  type IntegratedShell,
+  integrateShell,
+  integrationFor,
+  writeShellIntegration,
+} from './shell-integration.js';
+import { createMarkerParser, type MarkerParser, type ShellMarker } from './shell-markers.js';
 import type { BoardStore } from './store.js';
 
 export const PTY_ERRORS = {
@@ -11,6 +25,8 @@ export const PTY_ERRORS = {
   unavailable: 'pty_unavailable',
   tooMany: 'too_many_terminals',
   spawnFailed: 'pty_spawn_failed',
+  /** A command is running: a re-run would type into it. */
+  busy: 'terminal_busy',
 } as const;
 
 /** Output is batched for this long (or 16 KB), like the extension's `exec.data`. */
@@ -18,6 +34,10 @@ export const PTY_FLUSH_MS = 8;
 const FLUSH_BYTES = 16 * 1024;
 /** Exited board terminals kept for their output; the oldest go first. */
 export const MAX_CLOSED_BOARD_TERMINALS = 16;
+/** A zsh or bash whose markers haven't arrived by then is treated like a shell without them. */
+export const MARKER_TIMEOUT_MS = 5_000;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching escape sequences is the point.
+const ALT_SCREEN = /\x1b\[\?(?:1049|1047|47)h/;
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 30;
 
@@ -32,6 +52,14 @@ export interface PtyManagerOptions {
   now?: () => number;
   newId?: () => string;
   flushMs?: number;
+  /**
+   * Where the zsh/bash integration files go (rewritten once per server start). Without it the
+   * shells start plain and their commands are inferred from the process table.
+   */
+  integrationDir?: string;
+  markerTimeoutMs?: number;
+  /** Receives `exec.start` / `exec.end` for the Pulse timeline. */
+  onActivity?: (event: ActivityEvent) => void;
 }
 
 export interface PtyCreateOptions {
@@ -42,11 +70,32 @@ export interface PtyCreateOptions {
   command?: string;
 }
 
+interface Running {
+  execId: string;
+  /** The process an inferred execution stands for; null when the shell reported it. */
+  pid: number | null;
+}
+
 interface Live {
   pty: PtyProcess;
+  /** Output not yet written, for the current target (the running execution, else the terminal). */
   pending: string;
   timer: NodeJS.Timeout | undefined;
   dispose: () => void;
+  parser: MarkerParser;
+  integration: IntegratedShell | null;
+  /** A marker arrived: the shell reports its own commands. */
+  reporting: boolean;
+  /** No markers to expect, or they never came: the process table stands in for them. */
+  inferring: boolean;
+  markerTimer: NodeJS.Timeout | undefined;
+  /** The launch command, typed at the first prompt. */
+  queued: string | null;
+  /** From the last `633;E`, for the next execution. */
+  commandLine: string | null;
+  cwd: string;
+  running: Running | null;
+  execCount: number;
 }
 
 /** The server's environment for a new shell, without what marks it as an editor's terminal. */
@@ -83,6 +132,10 @@ export class PtyManager {
   private readonly now: () => number;
   private readonly newId: () => string;
   private readonly flushMs: number;
+  private readonly integrationDir: string | undefined;
+  private readonly markerTimeoutMs: number;
+  private readonly onActivity: ((event: ActivityEvent) => void) | undefined;
+  private integrationReady: Promise<boolean> | null = null;
   private readonly live = new Map<string, Live>();
   /** Spawns in flight count against the limit too. */
   private starting = 0;
@@ -97,6 +150,9 @@ export class PtyManager {
     this.now = options.now ?? Date.now;
     this.newId = options.newId ?? (() => `board-${randomUUID()}`);
     this.flushMs = options.flushMs ?? PTY_FLUSH_MS;
+    this.integrationDir = options.integrationDir;
+    this.markerTimeoutMs = options.markerTimeoutMs ?? MARKER_TIMEOUT_MS;
+    this.onActivity = options.onActivity;
   }
 
   get liveCount(): number {
@@ -120,8 +176,10 @@ export class PtyManager {
     if (this.live.size + this.starting >= this.max) return { ok: false, error: PTY_ERRORS.tooMany };
     this.starting++;
     let loaded: PtyLoad;
+    let integrated: boolean;
     try {
       loaded = await this.load();
+      integrated = loaded.ok && (await this.prepareIntegration());
     } finally {
       this.starting--;
     }
@@ -129,13 +187,17 @@ export class PtyManager {
     if (this.stopped) return { ok: false, error: PTY_ERRORS.unavailable };
     if (this.live.size >= this.max) return { ok: false, error: PTY_ERRORS.tooMany };
 
+    const launch =
+      integrated && this.integrationDir !== undefined
+        ? integrateShell(this.shell, this.env(), this.integrationDir)
+        : { ...this.shell, env: this.env(), integration: null };
     let pty: PtyProcess;
     try {
-      pty = loaded.spawn(this.shell.file, this.shell.args, {
+      pty = loaded.spawn(launch.file, launch.args, {
         cwd: options.cwd,
         cols: DEFAULT_COLS,
         rows: DEFAULT_ROWS,
-        env: this.env(),
+        env: launch.env,
       });
     } catch {
       return { ok: false, error: PTY_ERRORS.spawnFailed };
@@ -166,7 +228,23 @@ export class PtyManager {
     });
     this.store.touchProject(options.projectId);
 
-    const entry: Live = { pty, pending: '', timer: undefined, dispose: () => {} };
+    const command = options.command?.trim() || null;
+    const entry: Live = {
+      pty,
+      pending: '',
+      timer: undefined,
+      dispose: () => {},
+      parser: createMarkerParser(),
+      integration: launch.integration,
+      reporting: false,
+      inferring: launch.integration === null,
+      markerTimer: undefined,
+      queued: command,
+      commandLine: null,
+      cwd: options.cwd,
+      running: null,
+      execCount: 0,
+    };
     const data = pty.onData((chunk) => this.onData(id, entry, chunk));
     const exit = pty.onExit(({ exitCode }) => this.onExit(id, entry, exitCode));
     entry.dispose = () => {
@@ -174,9 +252,40 @@ export class PtyManager {
       exit.dispose();
     };
     this.live.set(id, entry);
-    const command = options.command?.trim();
-    if (command) pty.write(`${command}\r`);
+    if (entry.inferring) {
+      this.typeQueued(entry);
+    } else {
+      // An rc file that never gets to the hooks (or replaces them) leaves the shell unreported.
+      entry.markerTimer = setTimeout(() => {
+        entry.markerTimer = undefined;
+        if (entry.reporting) return;
+        entry.inferring = true;
+        this.typeQueued(entry);
+      }, this.markerTimeoutMs);
+      entry.markerTimer.unref?.();
+    }
     return { ok: true, terminalId: id };
+  }
+
+  /**
+   * The process sampler's tick: a terminal without shell markers runs a command while its shell
+   * has a child. The newest child stands for it (argv as the command line, no exit code).
+   */
+  sample(tree: ProcessTree): void {
+    if (this.stopped) return;
+    for (const [id, entry] of this.live) {
+      if (!entry.inferring || entry.reporting || entry.pty.pid <= 0) continue;
+      const children = (tree.children.get(entry.pty.pid) ?? []).filter((pid) =>
+        tree.procs.has(pid),
+      );
+      const running = entry.running;
+      if (running?.pid != null && children.includes(running.pid)) continue;
+      this.flush(id, entry);
+      if (running) this.endExecution(id, entry, null);
+      const pid = children.length > 0 ? Math.max(...children) : undefined;
+      const proc = pid === undefined ? undefined : tree.procs.get(pid);
+      if (proc) this.startExecution(id, entry, proc.command, proc.pid);
+    }
   }
 
   /** `terminal.create` for a project no editor window has: a shell in its folder. */
@@ -245,6 +354,7 @@ export class PtyManager {
     this.stopped = true;
     for (const [, entry] of this.live) {
       clearTimeout(entry.timer);
+      clearTimeout(entry.markerTimer);
       entry.dispose();
       try {
         entry.pty.kill();
@@ -275,8 +385,12 @@ export class PtyManager {
         board(action.terminalId)
           ? this.interrupt(action.terminalId)
           : editor['terminal.interrupt'](action),
-      // Board terminals have no executions to re-run.
-      'terminal.rerun': (action) => editor['terminal.rerun'](action),
+      'terminal.rerun': (action) => {
+        const execution = this.store.state.executions[action.execId];
+        return execution && board(execution.terminalId)
+          ? this.rerun(action.execId)
+          : editor['terminal.rerun'](action);
+      },
       // Nothing to bring forward: the board's own view is the terminal.
       'terminal.focus': (action) =>
         board(action.terminalId)
@@ -285,6 +399,17 @@ export class PtyManager {
       'terminal.close': (action) =>
         board(action.terminalId) ? this.close(action.terminalId) : editor['terminal.close'](action),
     };
+  }
+
+  /** Types an earlier command again, once the shell is back at its prompt. */
+  rerun(execId: string): ActionResult {
+    const execution = this.store.state.executions[execId];
+    if (!execution) return { ok: false, error: ROUTE_ERRORS.unknownExecution };
+    const entry = this.live.get(execution.terminalId);
+    if (!entry) return this.missing(execution.terminalId);
+    if (execution.commandLine.trim() === '') return { ok: false, error: NOTHING_TO_RERUN };
+    if (entry.running) return { ok: false, error: PTY_ERRORS.busy };
+    return this.sendText(execution.terminalId, execution.commandLine, true);
   }
 
   private focusable(terminalId: string): ActionResult {
@@ -299,9 +424,37 @@ export class PtyManager {
     };
   }
 
+  /** Writes the integration files once per server start; false when there are none to use. */
+  private prepareIntegration(): Promise<boolean> {
+    if (this.integrationDir === undefined || integrationFor(this.shell.file) === null) {
+      return Promise.resolve(false);
+    }
+    const dir = this.integrationDir;
+    this.integrationReady ??= writeShellIntegration(dir).then(
+      () => true,
+      () => false,
+    );
+    return this.integrationReady;
+  }
+
+  private typeQueued(entry: Live): void {
+    const command = entry.queued;
+    entry.queued = null;
+    if (command) entry.pty.write(`${command}\r`);
+  }
+
   private onData(id: string, entry: Live, chunk: string): void {
     if (this.stopped) return;
-    entry.pending += chunk;
+    for (const token of entry.parser.push(chunk)) {
+      if ('text' in token) {
+        entry.pending += token.text;
+      } else {
+        // Output before the marker belongs to what ran before it.
+        this.flush(id, entry);
+        this.onMarker(id, entry, token.marker);
+      }
+    }
+    if (entry.pending === '') return;
     if (entry.pending.length >= FLUSH_BYTES) {
       this.flush(id, entry);
       return;
@@ -315,14 +468,115 @@ export class PtyManager {
     const chunk = entry.pending;
     entry.pending = '';
     if (chunk === '') return;
-    this.store.output.appendTerminal(id, chunk);
+    const running = entry.running;
+    if (running) {
+      this.store.appendExecOutput(running.execId, chunk);
+      if (ALT_SCREEN.test(chunk)) this.store.markExecInteractive(running.execId);
+    } else {
+      this.store.output.appendTerminal(id, chunk);
+    }
     const projectId = this.store.state.terminals[id]?.projectId;
     if (projectId) this.store.touchProject(projectId);
   }
 
+  private onMarker(id: string, entry: Live, marker: ShellMarker): void {
+    if (!entry.reporting) {
+      entry.reporting = true;
+      entry.inferring = false;
+      clearTimeout(entry.markerTimer);
+      entry.markerTimer = undefined;
+      if (entry.running) this.endExecution(id, entry, null);
+      this.patchTerminal(id, { shellIntegration: true });
+    }
+    switch (marker.kind) {
+      case 'prompt':
+        // A prompt while a command runs: its end marker got lost.
+        if (entry.running) this.endExecution(id, entry, null);
+        this.typeQueued(entry);
+        return;
+      case 'commandLine':
+        entry.commandLine = marker.commandLine;
+        return;
+      case 'executed': {
+        if (entry.running) this.endExecution(id, entry, null);
+        const commandLine = entry.commandLine;
+        entry.commandLine = null;
+        this.startExecution(id, entry, commandLine ?? '', null);
+        return;
+      }
+      case 'finished':
+        if (entry.running) this.endExecution(id, entry, marker.exitCode);
+        return;
+      case 'cwd':
+        if (marker.cwd !== entry.cwd) {
+          entry.cwd = marker.cwd;
+          this.patchTerminal(id, { cwd: marker.cwd });
+        }
+        return;
+      case 'input':
+        return;
+    }
+  }
+
+  private startExecution(id: string, entry: Live, commandLine: string, pid: number | null): void {
+    const execution = this.store.startExec({
+      execId: `${id}-e${++entry.execCount}`,
+      terminalId: id,
+      commandLine,
+      confidence: pid === null && commandLine !== '' ? 'high' : 'low',
+      cwd: entry.cwd,
+      startedAt: this.now(),
+      // The shell echoed the command line itself.
+      header: false,
+      ...(pid !== null ? { inferred: true } : {}),
+    });
+    if (!execution) return;
+    entry.running = { execId: execution.id, pid };
+    this.activity('exec.start', execution.id, {});
+  }
+
+  private endExecution(id: string, entry: Live, exitCode: number | null): void {
+    const running = entry.running;
+    if (!running) return;
+    entry.running = null;
+    this.store.endExec(running.execId, exitCode, this.now());
+    if (this.store.state.terminals[id]) {
+      this.activity('exec.end', running.execId, { exitCode });
+    }
+  }
+
+  private activity(
+    kind: 'exec.start' | 'exec.end',
+    execId: string,
+    data: Record<string, unknown>,
+  ): void {
+    const execution = this.store.state.executions[execId];
+    if (!execution || !this.onActivity) return;
+    this.onActivity({
+      id: randomUUID(),
+      ts: this.now(),
+      kind,
+      projectId: this.store.state.terminals[execution.terminalId]?.projectId ?? null,
+      sessionId: null,
+      terminalId: execution.terminalId,
+      execId,
+      summary: execution.commandLine.slice(0, 200) || null,
+      data,
+    });
+  }
+
+  private patchTerminal(id: string, patch: Partial<Pick<Terminal, 'cwd' | 'shellIntegration'>>) {
+    const terminal = this.store.state.terminals[id];
+    if (!terminal) return;
+    this.store.upsertTerminal({ id, windowId: terminal.windowId, name: terminal.name, ...patch });
+  }
+
   private onExit(id: string, entry: Live, exitCode: number): void {
     if (this.stopped || this.live.get(id) !== entry) return;
+    entry.pending += entry.parser.flush();
     this.flush(id, entry);
+    this.endExecution(id, entry, null);
+    clearTimeout(entry.markerTimer);
     entry.dispose();
     this.live.delete(id);
     this.store.closeTerminal(id, exitCode, this.now());

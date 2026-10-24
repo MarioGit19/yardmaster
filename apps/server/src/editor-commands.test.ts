@@ -331,6 +331,8 @@ describe('editor commands', () => {
     const ptys: { cwd: string; writes: string[]; sizes: [number, number][] }[] = [];
     app = await startServer(config, {
       pty: {
+        // A shell without the integration: the launch command is typed at once.
+        shell: { file: '/bin/sh', args: [] },
         load: async () => ({
           ok: true,
           spawn: (_file, _args, options) => {

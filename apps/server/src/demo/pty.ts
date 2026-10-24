@@ -5,6 +5,10 @@ const DIM = '\x1b[2m';
 const ACCENT = '\x1b[36m';
 const RESET = '\x1b[0m';
 
+/** Shell integration markers, as the real shells' injected hooks print them (12.6a). */
+const mark = (body: string) => `\x1b]${body}\x07`;
+const escapeValue = (value: string) => value.replaceAll('\\', '\\\\').replaceAll(';', '\\x3b');
+
 type DataListener = (data: string) => void;
 type ExitListener = (event: { exitCode: number; signal?: number }) => void;
 
@@ -15,6 +19,7 @@ type ExitListener = (event: { exitCode: number; signal?: number }) => void;
 export class DemoShell implements PtyProcess {
   readonly pid: number;
   private readonly folder: string;
+  private readonly cwd: string;
   private readonly dataListeners = new Set<DataListener>();
   private readonly exitListeners = new Set<ExitListener>();
   private line = '';
@@ -27,6 +32,7 @@ export class DemoShell implements PtyProcess {
   constructor(pid: number, options: Pick<PtySpawnOptions, 'cwd'>) {
     this.pid = pid;
     this.folder = basename(options.cwd);
+    this.cwd = options.cwd;
     this.emit(`${DIM}c-board demo shell: nothing runs on your machine.${RESET}\r\n`);
     this.prompt();
   }
@@ -66,9 +72,10 @@ export class DemoShell implements PtyProcess {
       return;
     }
     if (char === '\x03') {
+      const wasRunning = this.running;
       this.running = false;
       this.line = '';
-      this.emit('^C\r\n');
+      this.emit(`^C\r\n${wasRunning ? mark('133;D;130') : ''}`);
       this.prompt();
       return;
     }
@@ -99,6 +106,7 @@ export class DemoShell implements PtyProcess {
       this.prompt();
       return;
     }
+    this.emit(mark(`633;E;${escapeValue(line)}`) + mark('133;C'));
     if (command === 'exit') {
       const code = Number.parseInt(args[0] ?? '0', 10);
       this.emit('exit\r\n');
@@ -116,14 +124,20 @@ export class DemoShell implements PtyProcess {
           `  ${DIM}➜  press Ctrl+C to stop${RESET}\r\n`,
       );
       return;
-    } else
+    } else {
       this.emit(
         `${DIM}${command}: the demo shell only knows echo, pwd, clear and exit${RESET}\r\n`,
       );
+      this.emit(mark('133;D;127'));
+      this.prompt();
+      return;
+    }
+    this.emit(mark('133;D;0'));
     this.prompt();
   }
 
   private prompt(): void {
+    this.emit(mark(`633;P;Cwd=${escapeValue(this.cwd)}`) + mark('133;A'));
     this.emit(`${ACCENT}${this.folder}${RESET} $ `);
   }
 

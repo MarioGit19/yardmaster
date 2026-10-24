@@ -42,6 +42,9 @@ export interface ExecStartInput {
   confidence: CommandConfidence;
   cwd: string | null;
   startedAt?: number;
+  /** Write the `$ command` header into the terminal's stream (default). Off when the shell echoes it. */
+  header?: boolean;
+  inferred?: boolean;
 }
 
 export type SessionInput = Pick<ClaudeSession, 'id'> & Partial<Omit<ClaudeSession, 'id'>>;
@@ -186,9 +189,10 @@ export class BoardStore {
       outputBytes: 0,
       truncated: false,
       interactive: false,
+      ...(input.inferred ? { inferred: true } : {}),
     };
     this.put('executions', execution.id, execution);
-    const header = commandHeader(execution.commandLine);
+    const header = input.header === false ? null : commandHeader(execution.commandLine);
     if (header !== null) this.output.appendTerminalLine(terminal.id, header);
 
     const ids = [...terminal.executionIds, execution.id];

@@ -254,4 +254,27 @@ describe('bindPorts', () => {
   it('is empty without listeners', () => {
     expect(bindPorts([], owner, terminals, T0)).toEqual([]);
   });
+
+  it("attaches a port to the board terminal whose shell's descendant listens", () => {
+    // The c-board server (100) runs the board terminal's shell; `pnpm dev` starts vite under it.
+    const tree = buildTree(
+      parsePs(
+        [
+          '  100     1  0.5  90000 node c-board',
+          ' 4242   100  0.0   3000 -zsh',
+          ' 4300  4242  0.1  50000 node pnpm dev',
+          ' 4301  4300  2.0 120000 node vite',
+        ].join('\n'),
+      ),
+    );
+    const { owner: boardOwner } = attributeTerminals(
+      tree,
+      [{ id: 'board-t1', shellPid: 4242, state: 'open' }],
+      T0,
+    );
+    const vite: Listener = { pid: 4301, command: 'node', address: '127.0.0.1', port: 5173 };
+    expect(bindPorts([vite], boardOwner, { 'board-t1': { projectId: 'p-shop' } }, T0)).toEqual([
+      expect.objectContaining({ port: 5173, terminalId: 'board-t1', projectId: 'p-shop' }),
+    ]);
+  });
 });

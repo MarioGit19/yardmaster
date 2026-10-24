@@ -177,6 +177,11 @@ export const Execution = z.object({
   truncated: z.boolean(),
   /** The command switched to the alternate screen (a TUI such as htop or claude). */
   interactive: z.boolean(),
+  /**
+   * Seen in the process table, not reported by the shell (a board terminal without shell
+   * integration): the command line is the process's, and the exit code is never known.
+   */
+  inferred: z.boolean().optional(),
 });
 export type Execution = z.infer<typeof Execution>;
 

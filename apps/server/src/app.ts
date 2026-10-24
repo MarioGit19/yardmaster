@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import {
   type ActivityEvent,
   type HealthResponse,
@@ -113,7 +114,7 @@ export interface BuildOptions {
   /** Editor CLI lookup and spawning, for tests (they never launch an editor). */
   editorCli?: Omit<EditorLauncherOptions, 'configured'>;
   /** Board terminal tuning: tests inject the pty loader and shell. The demo uses a synthetic shell. */
-  pty?: Pick<PtyManagerOptions, 'load' | 'shell' | 'env' | 'max'>;
+  pty?: Pick<PtyManagerOptions, 'load' | 'shell' | 'env' | 'max' | 'integrationDir'>;
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -293,6 +294,7 @@ export async function buildServer(
             processOptions.onSample?.(tree);
             sessionLinker?.link();
             background.sample(tree);
+            ptyManager.sample(tree);
           },
         });
   const sessionLinker = processScanner
@@ -325,6 +327,9 @@ export async function buildServer(
   const ptyManager = new PtyManager({
     store,
     load: options.demo ? async () => demoPty() : loadNodePty,
+    // The demo's shell reports its commands itself; it never runs a real one.
+    ...(options.demo ? {} : { integrationDir: join(config.home, 'shell-integration') }),
+    onActivity: recordActivity,
     ...options.pty,
   });
   app.decorate('ptyManager', ptyManager);

@@ -1,6 +1,12 @@
-import { BOARD_WINDOW_ID, type Project } from '@c-board/protocol';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { BOARD_WINDOW_ID, type Execution, type Project } from '@c-board/protocol';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type { ActionResult } from './actions.js';
+import { runCommand } from './process-scanner.js';
+import { buildTree, parsePs } from './processes.js';
 import { loadNodePty, type PtyLoad } from './pty.js';
 import { PTY_ERRORS, PtyManager, type PtyManagerOptions, shellEnv } from './pty-manager.js';
 import { BoardStore } from './store.js';
@@ -45,6 +51,36 @@ afterEach(() => {
 
 const output = (store: BoardStore, id: string) =>
   (store.output.read(`term:${id}`)?.chunks ?? []).map((c) => c.chunk).join('');
+
+const executions = (store: BoardStore, id: string): Execution[] =>
+  (store.state.terminals[id]?.executionIds ?? []).flatMap((execId) => {
+    const execution = store.state.executions[execId];
+    return execution ? [execution] : [];
+  });
+
+const execOutput = (store: BoardStore, execId: string) =>
+  (store.output.read(`exec:${execId}`)?.chunks ?? []).map((c) => c.chunk).join('');
+
+/** The shell's children, so an interrupt can't land before the command forked. */
+const children = (pid: number) => {
+  try {
+    return execFileSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+};
+
+const processTree = async () =>
+  buildTree(
+    parsePs(
+      await runCommand(
+        'ps',
+        process.platform === 'linux'
+          ? ['-eo', 'pid=,ppid=,pcpu=,rss=,args=']
+          : ['-axo', 'pid=,ppid=,pcpu=,rss=,command='],
+      ),
+    ),
+  );
 
 async function created(manager: PtyManager, command?: string): Promise<string> {
   const result = await manager.create({
@@ -151,6 +187,171 @@ realPty('PtyManager with a real pty', () => {
   });
 });
 
+// A throwaway home with no dotfiles stands in for the user's (like `zsh -f` / `bash --norc`),
+// so only the injected integration loads.
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'c-board-shells-')));
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+
+const SHELLS = [
+  { name: 'zsh', file: '/bin/zsh' },
+  { name: 'bash', file: '/bin/bash' },
+].filter((shell) => existsSync(shell.file));
+
+realPty.each(SHELLS)('PtyManager with $name and the shell integration', ({ name, file }) => {
+  const home = join(scratch, name);
+  const project = join(home, 'acme-shop');
+  mkdirSync(join(project, 'web'), { recursive: true });
+
+  const integrated = (command?: string, args: string[] = []) => {
+    const { store, manager } = setup({
+      shell: { file, args },
+      env: () => ({
+        PATH: '/usr/bin:/bin',
+        TERM: 'xterm-256color',
+        HOME: home,
+        LANG: 'C',
+        BASH_SILENCE_DEPRECATION_WARNING: '1',
+      }),
+      integrationDir: join(home, '.c-board', 'shell-integration'),
+    });
+    const id = manager.create({
+      projectId: PROJECT.id,
+      cwd: project,
+      name: PROJECT.name,
+      ...(command !== undefined ? { command } : {}),
+    });
+    return { store, manager, id: id.then((r) => r.terminalId as string) };
+  };
+
+  it('reports each command with its exit code, cwd and output', async () => {
+    const { store, manager, id: created } = integrated('echo hi');
+    const id = await created;
+    const done = (n: number) =>
+      vi.waitFor(
+        () => {
+          const list = executions(store, id);
+          expect(list).toHaveLength(n);
+          expect(list.at(-1)).toMatchObject({ endedAt: expect.any(Number) });
+        },
+        { timeout: 10_000 },
+      );
+
+    // The launch command is typed at the first prompt and becomes an execution.
+    await done(1);
+    expect(store.state.terminals[id]).toMatchObject({ shellIntegration: true, cwd: project });
+
+    manager.sendText(id, 'false', true);
+    await done(2);
+    manager.sendText(id, 'cd web', true);
+    await done(3);
+    manager.sendText(id, 'pwd', true);
+    await done(4);
+
+    manager.sendText(id, 'sleep 30', true);
+    await vi.waitFor(() => expect(executions(store, id)).toHaveLength(5), { timeout: 10_000 });
+    const pid = store.state.terminals[id]?.shellPid as number;
+    await vi.waitFor(() => expect(children(pid)).not.toBe(''), { timeout: 10_000 });
+    expect(executions(store, id)[4]?.endedAt).toBeNull();
+    manager.interrupt(id);
+    await done(5);
+
+    const list = executions(store, id);
+    expect(
+      list.map(({ commandLine, exitCode, cwd, confidence }) => ({
+        commandLine,
+        exitCode,
+        cwd,
+        confidence,
+      })),
+    ).toEqual([
+      { commandLine: 'echo hi', exitCode: 0, cwd: project, confidence: 'high' },
+      { commandLine: 'false', exitCode: 1, cwd: project, confidence: 'high' },
+      { commandLine: 'cd web', exitCode: 0, cwd: project, confidence: 'high' },
+      { commandLine: 'pwd', exitCode: 0, cwd: join(project, 'web'), confidence: 'high' },
+      { commandLine: 'sleep 30', exitCode: 130, cwd: join(project, 'web'), confidence: 'high' },
+    ]);
+    expect(list.every((e) => e.inferred === undefined)).toBe(true);
+    expect(store.state.terminals[id]?.cwd).toBe(join(project, 'web'));
+    expect(execOutput(store, list[0]?.id as string)).toMatch(/^hi\r?\n/);
+    expect(execOutput(store, list[3]?.id as string)).toContain(join(project, 'web'));
+
+    // The terminal shows the prompt and the output, but never the markers themselves.
+    const shown = output(store, id);
+    expect(shown).toContain('hi');
+    for (const code of ['133', '633', '7']) expect(shown).not.toContain(`\x1b]${code};`);
+    // The shell echoes the command itself: no extra `$ command` header.
+    expect(shown).not.toContain('\x1b[2m$\x1b[22m');
+  });
+
+  it("loads the user's own startup files", async () => {
+    const rc = name === 'zsh' ? '.zshrc' : '.bashrc';
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(join(home, rc), 'export ACME_GREETING=from-rc\n');
+    try {
+      const { store, manager, id: created } = integrated();
+      const id = await created;
+      await vi.waitFor(() => expect(store.state.terminals[id]?.shellIntegration).toBe(true), {
+        timeout: 10_000,
+      });
+      manager.sendText(id, 'echo "$ACME_GREETING"', true);
+      await vi.waitFor(
+        () => expect(executions(store, id).at(-1)).toMatchObject({ endedAt: expect.any(Number) }),
+        { timeout: 10_000 },
+      );
+      expect(execOutput(store, executions(store, id).at(-1)?.id as string)).toContain('from-rc');
+    } finally {
+      rmSync(join(home, rc), { force: true });
+    }
+  });
+  it('works as a login shell, and leaves nested shells to their own startup files', async () => {
+    const { store, manager, id: created } = integrated(undefined, ['-l']);
+    const id = await created;
+    await vi.waitFor(() => expect(store.state.terminals[id]?.shellIntegration).toBe(true), {
+      timeout: 10_000,
+    });
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion.
+    manager.sendText(id, 'echo "z=${ZDOTDIR:-unset} u=${CBOARD_USER_ZDOTDIR:-unset}"', true);
+    await vi.waitFor(
+      () => expect(executions(store, id).at(-1)).toMatchObject({ endedAt: expect.any(Number) }),
+      { timeout: 10_000 },
+    );
+    const echoed = execOutput(store, executions(store, id).at(-1)?.id as string);
+    expect(echoed).toContain(name === 'zsh' ? `z=${home} u=unset` : 'z=unset u=unset');
+  });
+});
+
+realPty('PtyManager without shell integration', () => {
+  it('infers a running execution from the process table', async () => {
+    const { store, manager } = setup({ markerTimeoutMs: 50 });
+    const id = await created(manager);
+    const pid = store.state.terminals[id]?.shellPid as number;
+    manager.sendText(id, 'sleep 30', true);
+    await vi.waitFor(() => expect(children(pid)).not.toBe(''), { timeout: 5_000 });
+
+    manager.sample(await processTree());
+    const [execution] = executions(store, id);
+    expect(execution).toMatchObject({
+      commandLine: 'sleep 30',
+      confidence: 'low',
+      inferred: true,
+      endedAt: null,
+      exitCode: null,
+    });
+    expect(store.state.terminals[id]?.shellIntegration).toBe(false);
+    // Still running at the next sample: the same execution.
+    manager.sample(await processTree());
+    expect(executions(store, id)).toHaveLength(1);
+
+    manager.interrupt(id);
+    await vi.waitFor(() => expect(children(pid)).toBe(''), { timeout: 5_000 });
+    manager.sample(await processTree());
+    expect(executions(store, id)).toEqual([
+      expect.objectContaining({ id: execution?.id, exitCode: null, inferred: true }),
+    ]);
+    expect(executions(store, id)[0]?.endedAt).not.toBeNull();
+  });
+});
+
 describe('PtyManager without a pty', () => {
   const fake = (): PtyLoad => ({
     ok: true,
@@ -236,6 +437,106 @@ describe('PtyManager without a pty', () => {
     });
     await actions['terminal.close']({ kind: 'terminal.close', terminalId: 'ed-1' });
     expect(editor).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PtyManager shell markers, with a scripted pty', () => {
+  const osc = (body: string) => `\x1b]${body}\x07`;
+
+  function scripted() {
+    const writes: string[] = [];
+    let emit: (data: string) => void = () => {};
+    const load = async (): Promise<PtyLoad> => ({
+      ok: true,
+      spawn: () => ({
+        pid: 4242,
+        onData: (listener) => {
+          emit = listener;
+          return { dispose() {} };
+        },
+        onExit: () => ({ dispose() {} }),
+        write: (data) => writes.push(data),
+        resize: () => {},
+        kill: () => {},
+      }),
+    });
+    return { writes, load, emit: (data: string) => emit(data) };
+  }
+
+  const dir = join(scratch, 'scripted');
+
+  it('types the launch command at the first prompt, and turns markers into executions', async () => {
+    const pty = scripted();
+    const activity = vi.fn();
+    const { store, manager } = setup({
+      load: pty.load,
+      shell: { file: '/bin/zsh', args: ['-l'] },
+      integrationDir: dir,
+      onActivity: activity,
+    });
+    const id = await created(manager, 'pnpm dev');
+    expect(pty.writes).toEqual([]);
+    expect(existsSync(join(dir, 'zsh', '.zshrc'))).toBe(true);
+
+    const prompt = `${osc('633;P;Cwd=/tmp')}${osc('133;A')}$ `;
+    // Split mid-marker on purpose.
+    pty.emit(prompt.slice(0, 5));
+    pty.emit(prompt.slice(5));
+    expect(pty.writes).toEqual(['pnpm dev\r']);
+    pty.emit(`pnpm dev\r\n${osc('633;E;pnpm dev')}${osc('133;C')}\x1b[?1049hVITE ready`);
+    await vi.waitFor(() => expect(executions(store, id)).toHaveLength(1));
+    const [running] = executions(store, id);
+    expect(running).toMatchObject({ commandLine: 'pnpm dev', endedAt: null, cwd: '/tmp' });
+    expect(store.state.terminals[id]?.shellIntegration).toBe(true);
+    await vi.waitFor(() =>
+      expect(execOutput(store, running?.id as string)).toContain('VITE ready'),
+    );
+    expect(store.state.executions[running?.id as string]?.interactive).toBe(true);
+    expect(manager.rerun(running?.id as string)).toEqual({ ok: false, error: 'terminal_busy' });
+
+    pty.emit(`^C${osc('133;D;130')}${prompt}`);
+    expect(store.state.executions[running?.id as string]).toMatchObject({ exitCode: 130 });
+    expect(activity.mock.calls.map(([e]) => [e.kind, e.execId, e.data])).toEqual([
+      ['exec.start', running?.id, {}],
+      ['exec.end', running?.id, { exitCode: 130 }],
+    ]);
+    expect(manager.rerun(running?.id as string)).toEqual({ ok: true });
+    expect(pty.writes.at(-1)).toBe('pnpm dev\r');
+  });
+
+  it("falls back to the process table when a shell's markers never come", async () => {
+    vi.useFakeTimers();
+    try {
+      const pty = scripted();
+      const { store, manager } = setup({
+        load: pty.load,
+        shell: { file: '/bin/bash', args: ['-l'] },
+        integrationDir: dir,
+        markerTimeoutMs: 1_000,
+      });
+      const id = await created(manager, 'pnpm dev');
+      expect(pty.writes).toEqual([]);
+      vi.advanceTimersByTime(1_000);
+      expect(pty.writes).toEqual(['pnpm dev\r']);
+
+      const tree = buildTree(
+        parsePs('  4242 1 0.0 100 bash\n  4300 4242 1.0 2000 node /home/dev/acme-shop/vite.js\n'),
+      );
+      manager.sample(tree);
+      expect(executions(store, id)).toEqual([
+        expect.objectContaining({
+          commandLine: 'node /home/dev/acme-shop/vite.js',
+          inferred: true,
+        }),
+      ]);
+      // A late marker means the shell reports after all: the guess ends.
+      pty.emit(osc('133;A'));
+      expect(executions(store, id)[0]?.endedAt).not.toBeNull();
+      manager.sample(tree);
+      expect(executions(store, id)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
