@@ -73,8 +73,13 @@ for (const profile of PROFILES) {
       await top.getByRole('button', { name: 'Search' }).tap();
       const palette = page.locator('[data-palette][data-sheet]');
       await expect(palette).toBeVisible();
-      const sheet = await palette.boundingBox();
-      expect(Math.round((sheet?.y ?? 0) + (sheet?.height ?? 0))).toBe(height);
+      // Once its spring settles, the sheet sits on the bottom of the screen.
+      await expect
+        .poll(async () => {
+          const sheet = await palette.boundingBox();
+          return Math.round((sheet?.y ?? 0) + (sheet?.height ?? 0));
+        })
+        .toBe(height);
       await page.keyboard.press('Escape');
       await expect(palette).toHaveCount(0);
     });

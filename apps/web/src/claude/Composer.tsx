@@ -272,7 +272,7 @@ function Composer({
               onInterrupt();
             }
           }}
-          className="field-sizing-content max-h-48 min-h-6 w-full resize-none bg-transparent text-body text-text-1 leading-6 outline-none placeholder:text-text-3 focus-visible:shadow-none"
+          className="field-sizing-content max-h-48 min-h-6 w-full resize-none bg-transparent text-body text-text-1 leading-6 outline-none touch:min-h-11 touch:py-2.5 placeholder:text-text-3 focus-visible:shadow-none"
         />
         <div className="flex min-w-0 items-center gap-1.5">
           {menu ?? (
@@ -331,7 +331,7 @@ export function Pill<V extends string>({
     <label
       title={disabled ? `${name}: the session isn't running` : name}
       className={cx(
-        'relative inline-flex h-6 min-w-0 items-center gap-1.5 rounded-chip border border-line bg-bg-1 px-2 text-label text-text-2 transition-[border-color,color] duration-fast',
+        'relative inline-flex h-6 min-w-0 items-center gap-1.5 rounded-chip border border-line bg-bg-1 px-2 text-label text-text-2 transition-[border-color,color] duration-fast touch:h-11 touch:px-3',
         'has-[select:focus-visible]:shadow-focus',
         disabled ? 'opacity-50' : 'hover:border-line-strong hover:text-text-1',
       )}

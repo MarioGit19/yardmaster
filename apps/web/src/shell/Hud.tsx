@@ -90,7 +90,7 @@ export function Hud() {
       <Link
         href={routes.overview}
         aria-label="c-board overview"
-        className="shrink-0 whitespace-nowrap rounded-chip text-body text-text-1"
+        className="flex shrink-0 items-center whitespace-nowrap rounded-chip text-body text-text-1 touch:h-11"
       >
         {/* The smallest phones need the room for the counters; the link keeps its label. */}
         <Wordmark nameClassName="max-[23rem]:sr-only" />
@@ -146,7 +146,7 @@ export function Hud() {
           aria-label="Open project"
           aria-keyshortcuts={IS_MAC ? 'Meta+O' : 'Control+O'}
           onClick={() => pickerOpen.set('open')}
-          className={cx(buttonClass('ghost', 'sm'), 'max-lg:size-7 max-lg:px-0 max-md:size-11')}
+          className={cx(buttonClass('ghost', 'sm'), 'max-lg:size-7 max-lg:px-0 touch:size-11')}
         >
           <FolderOpen aria-hidden className="size-4" strokeWidth={1.5} />
           <span className="max-lg:sr-only">Open project</span>
@@ -159,7 +159,7 @@ export function Hud() {
           aria-label="Open the command palette"
           aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
           onClick={() => paletteOpen.set('open')}
-          className="flex items-center gap-0.5 rounded-control p-1 transition-[background-color,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97] max-md:hidden"
+          className="flex items-center gap-0.5 rounded-control p-1 touch:min-h-11 touch:min-w-11 touch:justify-center transition-[background-color,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97] max-md:hidden"
           data-hud="palette-hint"
         >
           <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd>
@@ -212,7 +212,7 @@ export function Counter({ tone, label, value, format, flare, armed = false }: Co
   return (
     <span
       data-counter={label}
-      className="flex h-7 items-center gap-1.5 px-2 text-body-sm"
+      className="flex h-7 items-center gap-1.5 px-2 text-body-sm touch:h-11 touch:min-w-11"
       title={`${format ? format(value) : value} ${label}`}
     >
       {tone && (

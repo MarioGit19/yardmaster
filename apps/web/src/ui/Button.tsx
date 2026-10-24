@@ -10,12 +10,16 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'text-text-2 hover:bg-bg-2 hover:text-text-1',
 };
 
+// On touch screens every button is a 44 px target (DESIGN.md §11).
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-7 gap-1.5 px-3 text-label',
-  md: 'h-8 gap-2 px-3 text-body-sm',
+  sm: 'h-7 gap-1.5 px-3 text-label touch:h-11 touch:min-w-11',
+  md: 'h-8 gap-2 px-3 text-body-sm touch:h-11 touch:min-w-11',
 };
 
-const SQUARE: Record<ButtonSize, string> = { sm: 'size-7', md: 'size-8' };
+const SQUARE: Record<ButtonSize, string> = {
+  sm: 'size-7 touch:size-11',
+  md: 'size-8 touch:size-11',
+};
 
 /** Shared by Button, IconButton and link-styled buttons. */
 export function buttonClass(

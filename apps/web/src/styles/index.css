@@ -6,6 +6,8 @@
 /* `moving:` applies at motion Full only: travel such as a press scale or a chevron turn, which
    Reduced keeps still (DESIGN.md §3 rule 10). `data-motion` is set before the first paint. */
 @custom-variant moving (&:where([data-motion="full"] *));
+/* `touch:` for phones and touch screens: tap targets grow to 44 px (DESIGN.md §11 fit rules). */
+@custom-variant touch (@media (pointer: coarse), (max-width: 767px));
 
 /* Tokens only: Tailwind's default palette and type scale are cleared so utilities stay on-system. */
 @theme inline {
@@ -870,6 +872,20 @@
   opacity: 0.85;
 }
 
+/* On touch screens a lane is a 44 px row and its buttons fill it (DESIGN.md §11). */
+@media (pointer: coarse), (max-width: 767px) {
+  .lane-row {
+    height: 44px;
+  }
+  .lane-row > :is(button, a),
+  .lane-row [data-inspect] {
+    align-self: stretch;
+  }
+  .lane-row [data-inspect]::after {
+    inset: 0 -6px;
+  }
+}
+
 /* The running dot's pulse ring, driven the same way (`PULSE`). */
 .lane-dot,
 .tool-running {
@@ -1669,6 +1685,14 @@
   line-height: 20px;
   color: var(--text-2);
   user-select: none;
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .palette-item {
+    height: 44px;
+  }
+  .palette-item[data-library-entry] {
+    height: 48px;
+  }
 }
 .palette-item[data-selected="true"] {
   background: var(--bg-2);
@@ -3374,6 +3398,8 @@ main[data-office-zoom] {
   flex: none;
   overflow: hidden;
   white-space: pre;
+  /* Cells are sized in characters; wide glyphs (CJK, emoji) can still run over. */
+  text-overflow: ellipsis;
   vertical-align: top;
 }
 .retro-dim {
@@ -3512,7 +3538,7 @@ main[data-office-zoom] {
   height: var(--app-h, 100dvh);
 }
 /* Inputs at 16 px, so mobile browsers don't zoom the page when one takes focus. */
-@media (max-width: 767px) {
+@media (pointer: coarse), (max-width: 767px) {
   input:not([type="checkbox"], [type="radio"], [type="range"]),
   textarea,
   select {

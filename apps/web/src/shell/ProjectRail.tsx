@@ -58,7 +58,7 @@ export function ProjectRail({ collapsed, onToggle }: ProjectRailProps) {
       data-collapsed={collapsed || undefined}
       className={cx(
         'flex shrink-0 flex-col border-line border-r bg-bg-1',
-        collapsed ? 'w-14' : 'w-60',
+        collapsed ? 'w-14 touch:w-16' : 'w-60',
       )}
     >
       <ul
@@ -189,7 +189,7 @@ function RailLink({
       tabIndex={tabStop ? 0 : -1}
       data-rail-item=""
       className={cx(
-        'relative flex h-9 items-center gap-2 rounded-control px-2 text-body-sm outline-none',
+        'relative flex h-9 items-center gap-2 rounded-control px-2 text-body-sm outline-none touch:h-11',
         'transition-colors duration-fast ease-out',
         collapsed && 'justify-center px-0',
         active
@@ -237,7 +237,7 @@ function RailOpenProject({ collapsed }: { collapsed: boolean }) {
       data-rail-open-project=""
       onClick={() => pickerOpen.set('open')}
       className={cx(
-        'relative flex h-9 w-full items-center gap-2 rounded-control px-2 text-body-sm text-text-2 outline-none',
+        'relative flex h-9 w-full items-center gap-2 rounded-control px-2 text-body-sm text-text-2 outline-none touch:h-11',
         'transition-colors duration-fast ease-out hover:bg-bg-2/60 hover:text-text-1',
         collapsed && 'justify-center px-0',
       )}

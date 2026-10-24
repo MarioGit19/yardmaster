@@ -55,7 +55,7 @@ export function BackgroundLine({
           title={text}
           aria-label={`In the background: ${text}. Show the list`}
           className={cx(
-            'flex min-w-0 max-w-full items-center gap-1.5 rounded-chip text-left text-meta text-text-2 transition-colors duration-fast hover:text-text-1',
+            'flex min-w-0 max-w-full items-center gap-1.5 rounded-chip text-left text-meta text-text-2 transition-colors duration-fast hover:text-text-1 touch:min-h-11',
             className,
           )}
         >

@@ -121,7 +121,7 @@ function RemoteHostsRow({ server: { settings, update } }: { server: ServerSettin
                 aria-label={`Remove ${host}`}
                 title="Remove"
                 onClick={() => remove(host)}
-                className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 max-sm:size-11 [&_svg]:size-4 [&_svg]:stroke-[1.5]"
+                className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 touch:size-11 [&_svg]:size-4 [&_svg]:stroke-[1.5]"
               >
                 <X aria-hidden />
               </button>
@@ -136,7 +136,7 @@ function RemoteHostsRow({ server: { settings, update } }: { server: ServerSettin
         }}
         className="flex min-w-0 flex-col gap-2 sm:flex-row"
       >
-        <label className="flex h-8 min-w-0 flex-1 items-center rounded-control border border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)] max-sm:h-11">
+        <label className="flex h-8 min-w-0 items-center rounded-control border sm:flex-1 touch:h-11 border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
           <input
             aria-label="Tailscale host name"
             placeholder="my-mac.tailnet-name.ts.net"
@@ -153,11 +153,7 @@ function RemoteHostsRow({ server: { settings, update } }: { server: ServerSettin
             className="h-full min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none disabled:opacity-50"
           />
         </label>
-        <Button
-          type="submit"
-          className="max-sm:h-11"
-          disabled={settings === null || full || !draft.trim()}
-        >
+        <Button type="submit" disabled={settings === null || full || !draft.trim()}>
           Add host
         </Button>
       </form>
@@ -245,7 +241,7 @@ function PairRow({
         </div>
         {pairing === null && (
           <Button
-            className="self-start max-sm:h-11 sm:self-auto"
+            className="self-start sm:self-auto"
             variant="primary"
             disabled={remote || hosts.length === 0 || busy || settings === null}
             onClick={() => void show()}
@@ -265,7 +261,7 @@ function PairRow({
               aria-pressed={h === chosen}
               onClick={() => setHost(h)}
               className={cx(
-                'h-7 max-w-full truncate rounded-chip border px-2.5 font-mono text-meta transition-colors duration-fast max-sm:h-11',
+                'h-7 max-w-full truncate rounded-chip border px-2.5 font-mono text-meta transition-colors duration-fast touch:h-11',
                 h === chosen
                   ? 'border-line-strong bg-bg-2 text-text-1'
                   : 'border-line text-text-2 hover:text-text-1',
@@ -313,14 +309,13 @@ function PairRow({
             </p>
             <div className="flex gap-2">
               <Button
-                className="max-sm:h-11"
                 variant={expired ? 'primary' : 'secondary'}
                 disabled={busy}
                 onClick={() => void show()}
               >
                 New code
               </Button>
-              <Button className="max-sm:h-11" variant="ghost" onClick={() => setPairing(null)}>
+              <Button variant="ghost" onClick={() => setPairing(null)}>
                 Done
               </Button>
             </div>
@@ -434,7 +429,6 @@ function DevicesRow({
               <Button
                 size="sm"
                 variant="ghost"
-                className="max-sm:h-11"
                 disabled={revoking === device.id}
                 onClick={() => void revoke(device)}
               >

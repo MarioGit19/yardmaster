@@ -147,7 +147,7 @@ export function NewTerminalPopover({
               setCommand(e.target.value);
               drafts.set(draft, e.target.value);
             }}
-            className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none"
+            className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none touch:h-11"
           />
         </label>
         <fieldset className="flex min-w-0 flex-col gap-1.5">

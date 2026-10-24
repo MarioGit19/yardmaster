@@ -477,7 +477,7 @@ function FocusTabs({
               }}
               className={cx(
                 'relative rounded-control px-3 text-body-sm transition-colors duration-fast',
-                phone ? 'h-11 min-w-0 flex-1' : 'h-10',
+                phone ? 'h-11 min-w-0 flex-1' : 'h-10 touch:h-11',
                 selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
               )}
             >

@@ -406,7 +406,7 @@ function FolderItem({
       value={entry.path}
       onSelect={() => onPick(entry)}
       data-library-entry={entry.name}
-      className="palette-item max-md:h-12"
+      className="palette-item"
     >
       <ProjectAvatar project={avatar} size="sm" />
       <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -543,7 +543,7 @@ function LaunchSheet({
           type="button"
           aria-label="Back to the folders"
           onClick={onBack}
-          className="-ml-1 grid size-8 shrink-0 place-items-center rounded-control text-text-3 transition-[background-color,color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 moving:active:scale-[0.97] max-md:size-11"
+          className="-ml-1 grid size-8 shrink-0 touch:size-11 place-items-center rounded-control text-text-3 transition-[background-color,color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 moving:active:scale-[0.97] max-md:size-11"
         >
           <ArrowLeft className="size-4" strokeWidth={1.5} />
         </button>
@@ -647,7 +647,7 @@ function LaunchSheet({
               autoComplete="off"
               autoCapitalize="off"
               onChange={(e) => update({ command: e.target.value })}
-              className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none max-md:h-11"
+              className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:font-sans placeholder:text-text-3 focus-visible:shadow-none touch:h-11"
             />
           </label>
           {chips.length > 0 && (
@@ -661,7 +661,7 @@ function LaunchSheet({
                   aria-pressed={choice.command.trim() === chip}
                   onClick={() => update({ command: choice.command.trim() === chip ? '' : chip })}
                   className={cx(
-                    'inline-flex h-7 min-w-0 max-w-full items-center rounded-chip border px-2.5 font-mono text-label max-md:h-9',
+                    'inline-flex h-7 min-w-0 max-w-full items-center rounded-chip border px-2.5 font-mono text-label touch:h-11',
                     'transition-[border-color,background-color,color,scale] duration-fast ease-out moving:active:scale-[0.97]',
                     choice.command.trim() === chip
                       ? 'border-line-strong bg-bg-2 text-text-1'
@@ -691,7 +691,7 @@ function LaunchSheet({
           type="submit"
           disabled={busy || blocker !== null}
           aria-busy={busy}
-          className={cx(buttonClass('primary', 'md'), 'max-md:h-11 max-md:px-4')}
+          className={cx(buttonClass('primary', 'md'), 'touch:h-11 touch:px-4')}
         >
           {busy && <LoaderCircle aria-hidden className="hud-spin size-4" strokeWidth={1.5} />}
           Open project

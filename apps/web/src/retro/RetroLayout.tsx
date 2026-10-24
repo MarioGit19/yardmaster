@@ -78,7 +78,9 @@ export default function RetroLayout() {
     if (!element) return;
     const measure = () => {
       const width = element.clientWidth;
-      const stacked = width > 0 && width < STACK_BELOW_PX;
+      // Touch screens get the stacked console at any width: two-line actors are 44 px targets.
+      const stacked =
+        width > 0 && (width < STACK_BELOW_PX || matchMedia('(pointer: coarse)').matches);
       element.toggleAttribute('data-stacked', stacked);
       const ch = (probe.current?.getBoundingClientRect().width ?? 0) / 100;
       const line = Number.parseFloat(getComputedStyle(element).lineHeight);

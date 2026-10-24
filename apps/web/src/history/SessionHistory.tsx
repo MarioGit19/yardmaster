@@ -78,7 +78,7 @@ export function SessionHistory({ projectId, knownIds, refreshKey, branch }: Sess
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="mt-1.5 rounded-control text-meta text-text-2 tabular transition-colors duration-fast hover:text-text-1"
+              className="mt-1.5 rounded-control text-meta text-text-2 tabular transition-colors duration-fast hover:text-text-1 touch:min-h-11"
             >
               {expanded ? 'Show fewer' : `Show ${hidden} more`}
             </button>

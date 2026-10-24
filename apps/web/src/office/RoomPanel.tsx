@@ -122,7 +122,7 @@ export function RoomPanel({ project, box, sheet, onBack }: RoomPanelProps) {
           href={projectHref(project.id)}
           data-focus-return={project.id}
           data-room-open
-          className={cx(buttonClass('primary', 'sm'), 'w-full max-md:min-h-11')}
+          className={cx(buttonClass('primary', 'sm'), 'w-full touch:min-h-11')}
         >
           <SquareArrowOutUpRight aria-hidden className="size-3.5" strokeWidth={1.75} />
           Open workspace

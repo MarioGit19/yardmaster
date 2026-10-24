@@ -458,7 +458,7 @@ function LibraryRootsRow({ server: { settings, update } }: { server: ServerSetti
                   aria-label={`Remove ${root}`}
                   title="Remove"
                   onClick={() => remove(root)}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 [&_svg]:size-4 [&_svg]:stroke-[1.5]"
+                  className="flex size-7 shrink-0 items-center justify-center rounded-control text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1 touch:size-11 [&_svg]:size-4 [&_svg]:stroke-[1.5]"
                 >
                   <X aria-hidden />
                 </button>
@@ -474,7 +474,7 @@ function LibraryRootsRow({ server: { settings, update } }: { server: ServerSetti
         }}
         className="flex min-w-0 flex-col gap-2 sm:flex-row"
       >
-        <label className="flex h-8 min-w-0 flex-1 items-center rounded-control border border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
+        <label className="flex h-8 min-w-0 items-center rounded-control border sm:flex-1 touch:h-11 border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
           <input
             aria-label="Folder to add"
             placeholder={roots?.length ? 'Another folder, such as ~/code' : SUGGESTED_ROOT}
@@ -579,7 +579,7 @@ function EditorCliRow({ server: { settings, update } }: { server: ServerSettings
         }}
         className="flex min-w-0 flex-col gap-2 sm:flex-row"
       >
-        <label className="flex h-8 min-w-0 flex-1 items-center rounded-control border border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
+        <label className="flex h-8 min-w-0 items-center rounded-control border sm:flex-1 touch:h-11 border-line bg-bg-0 px-3 transition-colors duration-fast focus-within:border-line-strong focus-within:shadow-[var(--focus-ring)]">
           <input
             aria-label="Editor command path"
             placeholder="Found automatically"
@@ -815,7 +815,7 @@ export function Segmented<T extends string>({
             onChange(option);
           }}
           className={cx(
-            'relative h-7 rounded-chip px-3 text-label transition-colors duration-fast',
+            'relative h-7 rounded-chip px-3 text-label transition-colors duration-fast touch:h-11 touch:min-w-11',
             option === value ? 'text-text-1' : 'text-text-2 hover:text-text-1',
           )}
         >

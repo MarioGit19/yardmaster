@@ -240,7 +240,8 @@ function Card({
       <span className="flex shrink-0 items-center">{status}</span>
     </>
   );
-  const headClass = 'flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-label';
+  const headClass =
+    'flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-label touch:h-11';
   return (
     <div
       data-tool={row.name}
@@ -479,7 +480,7 @@ function LayoutToggle() {
             diffLayoutPreference.set(option);
           }}
           className={cx(
-            'relative h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-fast',
+            'relative h-5 rounded-chip px-2 text-meta capitalize transition-colors duration-fast touch:h-11 touch:min-w-11',
             layout === option ? 'text-text-1' : 'text-text-3 hover:text-text-1',
           )}
         >
@@ -568,7 +569,7 @@ function ChipCard({
     >
       <div
         className={cx(
-          'tool-chip flex h-7 max-w-full min-w-0 items-center overflow-hidden rounded-chip border border-line bg-bg-1 text-label',
+          'tool-chip flex h-7 max-w-full min-w-0 items-center overflow-hidden rounded-chip border border-line bg-bg-1 text-label touch:h-auto',
           glitch,
         )}
       >
@@ -578,7 +579,7 @@ function ChipCard({
           aria-controls={bodyId}
           disabled={result === null}
           onClick={toggle}
-          className="tool-head flex h-full min-w-0 items-center gap-2 pr-2 pl-2 text-left disabled:cursor-default"
+          className="tool-head flex h-full min-w-0 items-center touch:min-h-11 gap-2 pr-2 pl-2 text-left disabled:cursor-default"
         >
           <Icon aria-hidden className="size-3.5 shrink-0 text-text-3" strokeWidth={1.5} />
           <span className="shrink-0 text-text-2">{row.name}</span>
@@ -594,7 +595,7 @@ function ChipCard({
             target="_blank"
             rel="noreferrer noopener"
             aria-label={`Open ${urlParts(href)?.host ?? 'link'}`}
-            className="flex h-full shrink-0 items-center border-line border-l px-1.5 text-text-3 transition-colors duration-fast hover:bg-bg-2 hover:text-text-1"
+            className="flex h-full shrink-0 items-center border-line border-l px-1.5 text-text-3 touch:min-h-11 touch:min-w-11 touch:justify-center transition-colors duration-fast hover:bg-bg-2 hover:text-text-1"
           >
             <ExternalLink aria-hidden className="size-3" strokeWidth={1.75} />
           </a>
@@ -690,7 +691,7 @@ function UrlChip({ url }: { url: string }) {
       target="_blank"
       rel="noreferrer noopener"
       title={url}
-      className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2 font-mono text-meta transition-colors duration-fast hover:border-line-strong"
+      className="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-chip border border-line bg-bg-2 px-2 font-mono text-meta transition-colors duration-fast hover:border-line-strong touch:h-11"
     >
       <Globe aria-hidden className="size-3 shrink-0 text-text-3" strokeWidth={1.5} />
       <span className="shrink-0 text-text-1">{parts.host}</span>

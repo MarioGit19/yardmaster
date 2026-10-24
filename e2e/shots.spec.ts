@@ -1957,3 +1957,74 @@ for (const theme of THEMES) {
     });
   }
 }
+
+// 12.6c: the worst-case board on phones (long names, branches and commands, the fleet of
+// terminals and sessions), for the fit sweep's review: the overview in Minimal, Grid and Retro,
+// the tabs, and the longest project's workspace.
+const FIT_SIZES = [
+  { name: '360', width: 360, height: 780, themes: ['dark'] },
+  { name: '390', width: 390, height: 844, themes: THEMES },
+  { name: '412', width: 412, height: 915, themes: ['dark'] },
+  { name: 'landscape', width: 844, height: 390, themes: ['dark'] },
+] as const;
+
+for (const size of FIT_SIZES) {
+  for (const theme of size.themes) {
+    test.describe(`phone fit worst ${size.name} ${theme}`, () => {
+      test.use({ ...galaxy, theme, viewport: { width: size.width, height: size.height } });
+      const shot = (page: import('@playwright/test').Page, name: string) =>
+        page.screenshot({
+          path: new URL(`phone-fit-worst-${name}-${size.name}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      const go = async (page: import('@playwright/test').Page, route: string) => {
+        await page.goto(`/?worst=1#${route}`);
+        await expect(
+          page.locator('[data-phone-shell][data-hydrated], a[href^="#/p/"]:visible').first(),
+        ).toBeAttached();
+      };
+
+      test('screens', async ({ page }) => {
+        test.slow();
+        await disableWebgl(page);
+        for (const [layout, ready] of [
+          ['minimal', '[data-pod]'],
+          ['grid', '[data-grid-node]'],
+          ['retro', '[data-retro-frame]'],
+        ] as const) {
+          await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout);
+          await go(page, '/');
+          await page.reload();
+          await expect(page.locator(ready).first()).toBeVisible({ timeout: 20_000 });
+          await page.waitForTimeout(900);
+          await shot(page, `overview-${layout}`);
+        }
+        if (size.width < 768) {
+          for (const tab of ['projects', 'attention', 'pulse'] as const) {
+            await go(page, `/${tab}`);
+            await page.waitForTimeout(700);
+            await shot(page, tab);
+          }
+        }
+        await page.addInitScript(() => localStorage.setItem('cboard.layout', 'minimal'));
+        await go(page, '/');
+        await page.reload();
+        const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
+        await go(page, `/p/${id}`);
+        const focus = page.locator(`[data-focus="${id}"]`);
+        await expect(focus).toBeVisible();
+        const tabs = focus.getByRole('tablist', { name: 'Focus view panels' });
+        if ((await tabs.count()) === 0) {
+          await page.waitForTimeout(700);
+          await shot(page, 'workspace');
+          return;
+        }
+        for (const tab of ['Sessions', 'Claude', 'Terminals'] as const) {
+          await tabs.getByRole('tab', { name: tab, exact: true }).click();
+          await page.waitForTimeout(700);
+          await shot(page, `workspace-${tab.toLowerCase()}`);
+        }
+      });
+    });
+  }
+}

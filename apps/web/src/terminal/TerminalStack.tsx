@@ -499,7 +499,7 @@ function StackTab({
       // detail 0: Enter or Space, not a pointer.
       onClick={(e) => onSelect(e.detail === 0)}
       className={cx(
-        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-fast',
+        'relative flex h-7 max-w-44 shrink-0 items-center gap-1.5 rounded-control px-3 text-label transition-colors duration-fast touch:h-11',
         selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
         closed && 'opacity-70',
       )}
@@ -1244,7 +1244,7 @@ export function CommandLine({
             walk(e.key === 'ArrowUp' ? -1 : 1);
           }
         }}
-        className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none disabled:cursor-not-allowed"
+        className="h-9 min-w-0 flex-1 bg-transparent font-mono text-label text-text-1 outline-none placeholder:text-text-3 focus-visible:shadow-none disabled:cursor-not-allowed touch:h-11"
       />
       <Kbd className="text-text-3">{sending ? '…' : '↵'}</Kbd>
     </form>

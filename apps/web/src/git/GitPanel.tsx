@@ -125,7 +125,7 @@ function ChangedFiles({ git }: { git: GitInfo }) {
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="rounded-control text-text-2 tabular transition-colors duration-fast hover:text-text-1"
+              className="rounded-control text-text-2 tabular transition-colors duration-fast hover:text-text-1 touch:min-h-11"
             >
               {expanded ? 'Show fewer' : `Show ${hidden} more`}
             </button>

@@ -188,7 +188,7 @@ export function FlatCockpit({ project, now, narrow, deep = false, onBack }: Flat
           href={projectHref(project.id)}
           data-focus-return={project.id}
           data-cockpit-open
-          className={cx(buttonClass('primary', 'sm'), 'max-md:min-h-11 max-md:w-full')}
+          className={cx(buttonClass('primary', 'sm'), 'touch:min-h-11 max-md:w-full')}
         >
           <SquareArrowOutUpRight aria-hidden className="size-3.5" strokeWidth={1.75} />
           Open workspace
@@ -530,7 +530,7 @@ function ScreenTitle({ actor, project }: { actor: SceneActor; project: SceneProj
           aria-label={actor.name}
           data-scene-actor={actor.id}
           data-actor-state={actor.state}
-          className="-mx-1.5 flex min-h-8 min-w-0 items-center gap-2 rounded-control px-1.5 text-left outline-none transition-colors duration-fast hover:bg-bg-2 focus-visible:ring-2 focus-visible:ring-line-strong max-md:min-h-11"
+          className="-mx-1.5 flex min-h-8 min-w-0 items-center gap-2 rounded-control px-1.5 text-left outline-none transition-colors duration-fast hover:bg-bg-2 focus-visible:ring-2 focus-visible:ring-line-strong touch:min-h-11"
         >
           <StatusDot tone={actor.tone} label={actorStateLabel(actor)} />
           <span className="truncate font-medium text-body-sm text-text-1">{actor.label}</span>
@@ -576,7 +576,7 @@ function ClaudeScreen({
                     aria-label={kid.name}
                     data-scene-actor={kid.id}
                     data-actor-state={kid.state}
-                    className="flex min-h-7 max-w-full items-center gap-1.5 rounded-chip border border-line border-dashed px-2 text-label text-text-2 transition-colors duration-fast hover:bg-bg-2 max-md:min-h-11"
+                    className="flex min-h-7 max-w-full items-center gap-1.5 rounded-chip border border-line border-dashed px-2 text-label text-text-2 transition-colors duration-fast hover:bg-bg-2 touch:min-h-11"
                   >
                     <StatusDot tone={kid.tone} label={actorStateLabel(kid)} />
                     <span className="truncate">{kid.label}</span>

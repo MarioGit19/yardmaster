@@ -50,7 +50,9 @@ export function PortChip({
         aria-label={`Copy ${portUrl(port)}`}
         data-port={port.port}
         className={cx(
-          'inline-flex h-5 min-w-0 max-w-full items-center rounded-chip border border-line bg-bg-2 px-1.5 font-mono text-meta tabular text-text-2',
+          'relative inline-flex h-5 min-w-0 max-w-full items-center rounded-chip border border-line bg-bg-2 px-1.5 font-mono text-meta tabular text-text-2',
+          // A 44 px hit area on touch screens, without a taller chip.
+          'touch:min-w-11 touch:after:absolute touch:after:inset-x-0 touch:after:-inset-y-3',
           'transition-[border-color,color,scale] duration-fast ease-out hover:border-line-strong hover:text-text-1 moving:active:scale-[0.97]',
           className,
         )}

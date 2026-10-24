@@ -104,7 +104,7 @@ export function ClaudePanel({
               tone={status.tone}
               label={status.label}
               showLabel
-              className="shrink-0 text-meta text-text-2"
+              className="text-meta text-text-2"
             />
             {session.model && (
               <span className="hidden min-w-0 max-w-40 xl:flex">

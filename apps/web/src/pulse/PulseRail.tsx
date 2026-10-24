@@ -196,12 +196,12 @@ export function PulseRail() {
       className="relative shrink-0 border-line border-t bg-bg-1"
     >
       {collapsed && <PulseTicker />}
-      <div className="flex h-9 items-center gap-3 px-3">
+      <div className="flex h-9 items-center gap-3 px-3 touch:h-11">
         <button
           type="button"
           onClick={togglePulse}
           aria-expanded={!collapsed}
-          className="flex h-7 items-center gap-2 rounded-control px-1.5 text-label text-text-2 transition-colors duration-fast hover:text-text-1"
+          className="flex h-7 items-center gap-2 rounded-control px-1.5 text-label text-text-2 transition-colors duration-fast hover:text-text-1 touch:h-11"
         >
           {collapsed ? (
             <ChevronUp className="size-4" strokeWidth={1.5} />
@@ -319,7 +319,7 @@ export function FilterToggle() {
             pulseFilterPreference.set(option);
           }}
           className={cx(
-            'relative h-6 rounded-chip px-2 text-meta transition-colors duration-fast',
+            'relative h-6 rounded-chip px-2 text-meta transition-colors duration-fast touch:h-11 touch:min-w-11',
             filter === option ? 'text-text-1' : 'text-text-3 hover:text-text-1',
           )}
         >

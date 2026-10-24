@@ -73,7 +73,7 @@ export function BackgroundPanel({ session }: { session: ClaudeSession }) {
         aria-controls={listId}
         data-background-toggle
         onClick={() => backgroundOpen.set(session.id, !open)}
-        className="flex w-full min-w-0 items-center gap-2 px-5 py-2 text-left transition-colors duration-fast hover:bg-bg-2/40"
+        className="flex w-full min-w-0 items-center gap-2 px-5 py-2 text-left transition-colors duration-fast hover:bg-bg-2/40 touch:min-h-11"
       >
         <ChevronRight
           aria-hidden

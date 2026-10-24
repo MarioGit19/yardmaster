@@ -342,7 +342,7 @@ export function MessageList({
                   transition: { duration: dur.fast, ease: ease.out },
                 }}
                 transition={spring.snappy}
-                className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-4 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] transition-[background-color,scale] duration-fast ease-out hover:bg-bg-1 moving:active:scale-[0.97]"
+                className="pointer-events-auto flex h-8 touch:h-11 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-4 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] transition-[background-color,scale] duration-fast ease-out hover:bg-bg-1 moving:active:scale-[0.97]"
               >
                 <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
                 Jump to latest
@@ -515,7 +515,7 @@ function Thinking({
         aria-expanded={expanded}
         aria-controls={id}
         onClick={() => onToggle(row.id)}
-        className="group -ml-1 flex h-7 min-w-0 max-w-full items-center gap-1.5 self-start rounded-chip px-1 text-label text-text-3 transition-colors duration-fast hover:text-text-2"
+        className="group -ml-1 flex h-7 touch:h-11 min-w-0 max-w-full items-center gap-1.5 self-start rounded-chip px-1 text-label text-text-3 transition-colors duration-fast hover:text-text-2"
       >
         <ChevronRight
           aria-hidden
