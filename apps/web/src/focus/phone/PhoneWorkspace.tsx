@@ -559,7 +559,7 @@ function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; 
             {view.name}
           </span>
           {item.kind === 'session' && <DraftMarker draft={draftKey.session(item.sessionId)} />}
-          <span className="shrink-0 text-meta text-text-3">{kindLabel(item)}</span>
+          <span className="shrink-0 text-meta text-text-2">{kindLabel(item)}</span>
         </span>
         <StatusDot
           tone={view.tone}

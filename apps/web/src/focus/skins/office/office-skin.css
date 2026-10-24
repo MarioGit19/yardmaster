@@ -241,7 +241,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 6px;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -272,7 +272,7 @@
 }
 .os-monitor[data-led="wait"] .os-chin,
 .os-monitor[data-led="err"] .os-chin {
-  color: var(--text-2);
+  color: var(--text-1);
 }
 @keyframes os-led-wait {
   50% {

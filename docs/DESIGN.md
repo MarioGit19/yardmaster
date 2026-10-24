@@ -28,7 +28,7 @@ Observatory is the **Minimal** layout, the default. The overview can also be sho
 | `--line-strong` | `rgb(255 255 255 / 0.14)` | focus, active |
 | `--text-1` | `#EDEFF5` | primary |
 | `--text-2` | `#A3A9B8` | secondary |
-| `--text-3` | `#6B7183` | tertiary / meta |
+| `--text-3` | `#787E90` | tertiary / meta (≥ 4.5:1 on every Night surface) |
 
 **Status colors** are semantic and identical everywhere, and each has a `-glow` variant at 35% alpha:
 

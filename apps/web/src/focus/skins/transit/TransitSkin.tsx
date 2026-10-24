@@ -16,6 +16,7 @@ import { useBoard } from '../../../data/index.js';
 import { actorId, type SceneActor } from '../../../layouts/scene.js';
 import { SCENE_TICK_MS, useSceneProject } from '../../../layouts/useScene.js';
 import { dur, ease, spring } from '../../../motion.js';
+import { useMediaQuery } from '../../../prefs.js';
 import { routes } from '../../../routes.js';
 import { terminalTarget } from '../../../terminal/target.js';
 import {
@@ -23,6 +24,7 @@ import {
   busiestLine,
   lineStations,
   type ServiceEvent,
+  TOUCH_BIN_PX,
 } from '../../../transit/map.js';
 import { lineKeys, lineReturn, TipCard, TipContext, useTipLayer } from '../../../transit/shared.js';
 import { LineBody, ROW, Roundel, trainCount } from '../../../transit/TransitLine.js';
@@ -80,6 +82,8 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
   const width = useWidth(lineRef);
   const { api, tip } = useTipLayer(bandRef, 'below');
   const [, navigate] = useLocation();
+  // Touch gets the map's touch bins (§10.5: 44 px apart); the CSS grows their hit areas to match.
+  const coarse = useMediaQuery('(pointer: coarse)');
   // Back on the map, the line the workspace came from lights up for a moment.
   useEffect(() => () => lineReturn.mark(project.id), [project.id]);
 
@@ -158,6 +162,7 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
                 events={events}
                 select={(actor) => selectActor(actor, navigate)}
                 selected={session ? actorId.session(session.id) : null}
+                binPx={coarse ? TOUCH_BIN_PX : undefined}
               />
             </div>
           )}

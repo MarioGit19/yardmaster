@@ -34,7 +34,7 @@ const DARK = {
   'line-strong': 'rgb(255 255 255 / 0.14)',
   'text-1': '#edeff5',
   'text-2': '#a3a9b8',
-  'text-3': '#6b7183',
+  'text-3': '#787e90',
   'st-work': '#7c9cff',
   'st-tool': '#5ee7ff',
   'st-wait': '#ffb547',

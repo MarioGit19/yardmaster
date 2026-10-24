@@ -3581,7 +3581,8 @@ main[data-office-zoom] {
 }
 [data-theme="light"] :is(.retro, .focus[data-layout="retro"]) {
   --retro-gray: #5d625e;
-  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 62%, var(--retro-bg));
+  /* Daylight's paper is lighter than the phosphor's black: dim ink needs more ink for §8. */
+  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 78%, var(--retro-bg));
 }
 
 /* The tube: the phosphor's faint bloom in the middle, the curvature darkening the edges. */

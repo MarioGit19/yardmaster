@@ -216,7 +216,7 @@ for (const data of DATA) {
         });
 
         test('every screen fits', async ({ page }) => {
-          test.setTimeout(300_000);
+          test.setTimeout(420_000);
           await walk(page, data.query, viewport.width < 768);
         });
       });
@@ -419,6 +419,34 @@ async function walk(page: Page, query: string, phone: boolean) {
       await expect(page.locator('[data-workspace-menu]')).toBeVisible();
       await check(`workspace menu (${n})`);
       await dismiss('[data-workspace-menu]');
+    }
+  }
+
+  // 12.6k: each layout's workspace skin (DESIGN.md §10.8 "Phones"): the hub, an item page and the
+  // switcher of the first projects (on the worst board, the longest names and the fleet).
+  for (const layout of LAYOUTS.filter((l) => l.id !== 'minimal')) {
+    await page.addInitScript((l) => localStorage.setItem('cboard.layout', l), layout.id);
+    for (const id of ids.slice(0, worst ? 3 : 1)) {
+      const n = `${layout.id} ${ids.indexOf(id) + 1}`;
+      await go(`/p/${id}`);
+      await page.reload();
+      const focus = page.locator(`[data-focus="${id}"][data-layout="${layout.id}"]`);
+      await expect(focus).toBeVisible();
+      const hub = focus.locator('[data-hub]');
+      if ((await hub.count()) === 0) {
+        await check(`skin workspace (${n})`);
+        continue;
+      }
+      await check(`skin hub (${n})`);
+      const href = await hub.locator('[data-hub-item]').first().getAttribute('href');
+      if (!href) continue;
+      await go(href.replace(/^#/, ''));
+      await expect(focus.locator('[data-item-header]')).toBeVisible();
+      await check(`skin item (${n})`);
+      await focus.locator('[data-item-switch]').click();
+      await expect(page.locator('[data-switcher-sheet]')).toBeVisible();
+      await check(`skin switcher (${n})`);
+      await dismiss('[data-switcher-sheet]');
     }
   }
 

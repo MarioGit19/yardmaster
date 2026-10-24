@@ -83,7 +83,8 @@ export function ClaudePanel({
       >
         {!compact && header && (
           <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
-            <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            {/* The name keeps room for a few characters; the status word gives way first. */}
+            <div className="flex min-w-24 flex-1 items-baseline gap-2">
               <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">
                 {sessionDisplayName(session)}
               </h2>
@@ -107,7 +108,7 @@ export function ClaudePanel({
               tone={status.tone}
               label={status.label}
               showLabel
-              className="text-meta text-text-2"
+              className="min-w-0 text-meta text-text-2"
             />
             {session.model && (
               <span className="hidden min-w-0 max-w-40 xl:flex">

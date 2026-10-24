@@ -86,6 +86,7 @@
     radial-gradient(130% 120% at 50% 45%, transparent 60%, rgb(0 0 0 / 0.5) 100%);
 }
 [data-theme="light"] .focus[data-layout="retro"] {
+  --retro-faint-ink: color-mix(in oklch, var(--retro-ink) 74%, var(--retro-bg));
   text-shadow: none;
 }
 [data-theme="light"] .focus[data-layout="retro"]::after {

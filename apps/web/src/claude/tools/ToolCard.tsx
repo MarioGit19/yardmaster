@@ -762,7 +762,7 @@ function TodoCard({
             <span
               className={cx(
                 'min-w-0 break-words',
-                todo.status === 'completed' && 'text-text-3 line-through decoration-text-3/50',
+                todo.status === 'completed' && 'text-text-2 line-through decoration-text-3',
                 todo.status === 'in_progress' && 'font-medium text-text-1',
                 todo.status === 'pending' && 'text-text-2',
               )}

@@ -666,8 +666,11 @@ function SessionLink({
         </span>
       </Link>
       {interrupted && <RowResume session={session} />}
-      {/* Outside the link: it is a control of its own. Indented to the row's text. */}
-      <BackgroundLine session={session} className="mb-1 ml-12" />
+      {/* Outside the link: it is a control of its own. Indented to the row's text (padding, not
+          a margin, so its max-width still ends at the column's edge). */}
+      <div className="pl-12">
+        <BackgroundLine session={session} className="mb-1" />
+      </div>
     </div>
   );
 }

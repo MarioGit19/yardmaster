@@ -528,7 +528,7 @@ function Thinking({
         />
         <span className="shrink-0">Thinking</span>
         {!expanded && (
-          <span className="truncate text-text-3/80 italic">{row.text.split('\n')[0]}</span>
+          <span className="truncate text-text-3 italic">{row.text.split('\n')[0]}</span>
         )}
       </button>
       {expanded && (

@@ -12,7 +12,7 @@
   --line-strong: rgb(255 255 255 / 0.14);
   --text-1: #edeff5;
   --text-2: #a3a9b8;
-  --text-3: #6b7183;
+  --text-3: #787e90;
 
   --st-work: #7c9cff;
   --st-tool: #5ee7ff;
@@ -110,7 +110,8 @@
   --shiki-token-constant: var(--orb-task);
   --shiki-token-parameter: var(--text-2);
   --shiki-token-punctuation: var(--text-2);
-  --shiki-token-comment: var(--text-3);
+  /* A step brighter than --text-3: comments sit on diff line tints too (AA). */
+  --shiki-token-comment: color-mix(in srgb, var(--text-3) 60%, var(--text-2));
   --shiki-token-link: var(--orb-read);
   --shiki-token-inserted: var(--st-ok);
   --shiki-token-deleted: var(--st-err);

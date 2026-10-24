@@ -165,6 +165,7 @@ export function LineBody({
   events,
   select,
   selected,
+  binPx,
 }: {
   project: SceneProject;
   width: number;
@@ -174,6 +175,8 @@ export function LineBody({
   select?: (actor: SceneActor) => void;
   /** The station already picked (the workspace's session). */
   selected?: string | null;
+  /** The service log's bin width: `TOUCH_BIN_PX` on a coarse pointer. */
+  binPx?: number;
 }) {
   const track = width - FIRST - END;
   const slots = slotCount(track, busiest);
@@ -257,6 +260,7 @@ export function LineBody({
         events={events}
         now={now}
         width={width - END * 2}
+        binPx={binPx}
         height={ROW.log}
         style={{ position: 'absolute', left: END, top: ROW.logTop }}
       />
