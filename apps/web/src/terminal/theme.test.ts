@@ -26,6 +26,19 @@ describe('xtermTheme for a workspace skin', () => {
     );
   });
 
+  it('draws Grid in neon on the Grid ground', () => {
+    const theme = xtermTheme((expression) => `resolved(${expression})`, 'grid');
+    expect(theme.background).toBe('resolved(var(--grid-bg))');
+    expect(theme.foreground).toBe('resolved(var(--gs-term-fg))');
+    expect(theme.cursor).toBe('resolved(var(--grid-neon))');
+    expect(theme.cyan).toBe('resolved(var(--grid-neon))');
+    // Status hues keep their meaning.
+    expect(theme.red).toBe('resolved(var(--st-err))');
+    expect(theme.selectionBackground).toBe(
+      'resolved(color-mix(in srgb, var(--grid-neon) 30%, transparent))',
+    );
+  });
+
   it('leaves Minimal as the default', () => {
     const resolve = (expression: string) => expression;
     expect(xtermTheme(resolve, 'minimal')).toEqual(xtermTheme(resolve));

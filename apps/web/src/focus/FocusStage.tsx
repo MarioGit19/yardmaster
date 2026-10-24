@@ -107,8 +107,14 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
     const active = document.activeElement;
     if (active && active !== document.body && !stageRef.current?.contains(active)) return;
     const id = CSS.escape(previous);
-    document
-      .querySelector<HTMLElement>(`[data-pod="${id}"] header a, [data-focus-return="${id}"]`)
+    // The first one on screen: a layout may keep others hidden (the Grid's labels behind its
+    // cockpit).
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        `[data-pod="${id}"] header a, [data-focus-return="${id}"]`,
+      ),
+    ]
+      .find((el) => el.checkVisibility?.({ visibilityProperty: true }) ?? true)
       ?.focus({ preventScroll: true });
   }, [focus]);
 

@@ -10,6 +10,7 @@ describe('workspace skins', () => {
     for (const layout of LAYOUTS) expect(LAYOUT_SKIN[layout]).toBeDefined();
     expect(LAYOUT_SKIN.minimal).toBe('minimal');
     expect(LAYOUT_SKIN.retro).toBe('retro');
+    expect(LAYOUT_SKIN.grid).toBe('grid');
   });
 
   it('has Minimal at once and keeps today’s view: no frame, no entry of its own', async () => {
@@ -27,6 +28,14 @@ describe('workspace skins', () => {
     expect(retro.HeaderBand).toBeTypeOf('function');
     expect(retro.PanelFrame).toBeTypeOf('function');
     expect(retro.EntryTransition).toBeTypeOf('function');
+  });
+
+  it('loads Grid with its holo frame and its phase-in entry', async () => {
+    const grid = await loadSkin('grid');
+    expect(loadedSkin('grid')).toBe(grid);
+    expect(grid.HeaderBand).toBeTypeOf('function');
+    expect(grid.PanelFrame).toBeTypeOf('function');
+    expect(grid.EntryTransition).toBeTypeOf('function');
   });
 });
 

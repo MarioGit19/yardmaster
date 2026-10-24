@@ -196,6 +196,38 @@ test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ pag
   expect(stats.longTasks).toEqual([]);
 });
 
+// 12.6h: the Grid's workspace skin (holo screens lit by activity, the floor) under the same load,
+// opened from the 3D cockpit as a user would.
+test('@perf the Grid workspace keeps 55 fps with a log firehose on screen', async ({ page }) => {
+  test.slow();
+  await fullMotion(page);
+  await page.addInitScript(() => localStorage.setItem('cboard.layout', 'grid'));
+  await page.goto('/#/');
+  await expect(page.locator('[data-grid-3d][data-ready]')).toBeVisible();
+  await page.waitForTimeout(3_000);
+  const node = page.locator('[data-grid-label] [data-grid-node]', { hasText: 'acme-shop' }).first();
+  const id = await node.getAttribute('data-grid-node');
+  await page.locator(`[data-grid-node="${id}"]`).focus();
+  await page.keyboard.press('Enter');
+  await page.locator(`[data-grid-cockpit="${id}"] [data-cockpit-open]`).click();
+  const card = page.locator(`[data-focus="${id}"]`);
+  await expect(card).toHaveAttribute('data-layout', 'grid');
+  const stack = card.locator('[data-terminal-stack]');
+  await stack.getByRole('tab', { name: /logs/ }).click();
+  await expect(stack.locator('[data-xterm]')).toHaveAttribute('data-renderer', /^(webgl|dom)$/);
+  // Lit by the firehose: the glow is up and breathing.
+  await expect(card.locator('[data-grid-panel="Terminals"]')).not.toHaveAttribute(
+    'data-level',
+    '0',
+  );
+  await page.waitForTimeout(1_000);
+
+  const stats = await measure(page, SAMPLE_MS);
+  report('grid focus', stats);
+  expect(stats.fps).toBeGreaterThanOrEqual(MIN_FPS);
+  expect(stats.longTasks).toEqual([]);
+});
+
 test('the expanded Pulse rail measures no text in its steady frames under the stress load', async ({
   page,
 }) => {

@@ -556,6 +556,7 @@ function StackTab({
           layoutId={`terminal-tab-${projectId}`}
           transition={tabGlide(byKeyboard)}
           aria-hidden
+          data-tab-indicator
           className="absolute inset-0 rounded-control border border-line bg-bg-2 shadow-raised"
         />
       )}

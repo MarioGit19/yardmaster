@@ -1,6 +1,7 @@
 import type { ClaudeSession, Project } from '@c-board/protocol';
 import type { ComponentType, ReactNode, RefObject } from 'react';
 import type { CrewView } from '../../pod/SessionCrew.js';
+import type { Tone } from '../../status.js';
 
 /** What the focus view hands its header band: the same facts in every skin. */
 export interface HeaderBandProps {
@@ -21,6 +22,10 @@ export interface HeaderBandProps {
 export interface PanelFrameProps {
   /** The panel's name, as its column or tab is labelled. */
   title: string;
+  /** Activity keys (`activityKey.*`) of what the panel shows, for frames that light with work. */
+  activity: readonly string[];
+  /** The panel's own status when it needs attention (waiting, failed), else undefined. */
+  tone?: Tone;
   children: ReactNode;
 }
 

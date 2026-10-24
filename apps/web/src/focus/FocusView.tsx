@@ -16,6 +16,7 @@ import { useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
 import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
+  activityKey,
   selectApproval,
   selectHydrated,
   selectProject,
@@ -54,12 +55,14 @@ import { PhoneWorkspace } from './phone/PhoneWorkspace.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
 import { SkinContext } from './skins/registry.js';
+import type { PanelFrameProps } from './skins/types.js';
 import { type ActiveSkin, useWorkspaceSkin } from './skins/useWorkspaceSkin.js';
 
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
 
 const LABELS = { left: 'Sessions, history and git', center: 'Claude', right: 'Terminals' } as const;
+type PanelId = 'sessions' | 'claude' | 'terminals';
 /** Sleeping crews only need to notice five quiet minutes. */
 const IDLE_CLOCK_MS = 15_000;
 
@@ -227,8 +230,19 @@ function ProjectFocus({
   // The skin's own entry replaces the cross-fade when the view opens from its overview at Full;
   // decided once, so a skin switched to later doesn't play it.
   const [entering] = useState(() => fade && level === 'full' && EntryTransition !== null);
-  const framed = (title: string, content: ReactNode) =>
-    PanelFrame ? <PanelFrame title={title}>{content}</PanelFrame> : content;
+  const claudeSession = composing ? undefined : session;
+  const claudeTone = claudeSession ? sessionStatusView(claudeSession.status).tone : undefined;
+  const frames: Record<PanelId, Omit<PanelFrameProps, 'children'>> = {
+    sessions: { title: 'Sessions', activity: [activityKey.project(project.id)] },
+    claude: {
+      title: 'Claude',
+      activity: claudeSession ? [activityKey.session(claudeSession.id)] : [],
+      tone: claudeTone === 'wait' || claudeTone === 'err' ? claudeTone : undefined,
+    },
+    terminals: { title: 'Terminals', activity: terminals.map((t) => activityKey.terminal(t.id)) },
+  };
+  const framed = (id: PanelId, content: ReactNode) =>
+    PanelFrame ? <PanelFrame {...frames[id]}>{content}</PanelFrame> : content;
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -326,13 +340,13 @@ function ProjectFocus({
                   {
                     id: 'sessions',
                     label: 'Sessions',
-                    content: framed('Sessions', sessionsColumn),
+                    content: framed('sessions', sessionsColumn),
                   },
-                  { id: 'claude', label: 'Claude', content: framed('Claude', claudeColumn) },
+                  { id: 'claude', label: 'Claude', content: framed('claude', claudeColumn) },
                   {
                     id: 'terminals',
                     label: 'Terminals',
-                    content: framed('Terminals', terminalsColumn),
+                    content: framed('terminals', terminalsColumn),
                   },
                 ]}
               />
@@ -340,9 +354,9 @@ function ProjectFocus({
               <ResizableColumns
                 projectId={project.id}
                 labels={LABELS}
-                left={framed('Sessions', sessionsColumn)}
-                center={framed('Claude', claudeColumn)}
-                right={framed('Terminals', terminalsColumn)}
+                left={framed('sessions', sessionsColumn)}
+                center={framed('claude', claudeColumn)}
+                right={framed('terminals', terminalsColumn)}
                 rightMaximized={maximized}
                 settle={settle}
               />
@@ -436,6 +450,7 @@ function FocusTabs({
                   layoutId="focus-tab-indicator"
                   transition={tabGlide(byKeyboard)}
                   aria-hidden
+                  data-tab-indicator
                   className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-text-1"
                 />
               )}

@@ -10,7 +10,7 @@ function required(name: string): string {
 }
 
 /** The layouts whose workspace skin the focus specs run in (DESIGN.md §10.8); later skins join. */
-export const FOCUS_LAYOUTS = ['minimal', 'retro'] as const;
+export const FOCUS_LAYOUTS = ['minimal', 'grid', 'retro'] as const;
 export type FocusLayout = (typeof FOCUS_LAYOUTS)[number];
 
 /** Tests get a page that is already signed in to the demo board. */
@@ -64,11 +64,18 @@ export async function openRoute(page: Page, route: string): Promise<void> {
   ).toBeAttached();
 }
 
-/** The route of the first demo project, read from the rail. */
+/**
+ * The route of the first demo project, read from the rail (on a phone, from the overview's links,
+ * or the Grid trunk's nodes, which are buttons).
+ */
 export async function firstProjectRoute(page: Page): Promise<string> {
-  const href = await page.locator('a[href^="#/p/"]').first().getAttribute('href');
-  if (!href) throw new Error('no project in the rail');
-  return href.slice(1);
+  const first = page.locator('a[href^="#/p/"], [data-grid-node]').first();
+  await first.waitFor({ state: 'attached' });
+  const href = await first.getAttribute('href');
+  if (href) return href.slice(1);
+  const node = await first.getAttribute('data-grid-node');
+  if (!node) throw new Error('no project in the rail');
+  return `/p/${node}`;
 }
 
 /** Every canvas refuses WebGL from the page's first script on, as a browser without it would. */

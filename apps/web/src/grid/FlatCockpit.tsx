@@ -6,12 +6,14 @@ import {
   type ReactNode,
   Suspense,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import { Link } from 'wouter';
+import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { toolSummary } from '../claude/transcript.js';
@@ -111,11 +113,15 @@ export function FlatCockpit({ project, now, narrow, deep = false, onBack }: Flat
   }, [centered, centerActor]);
 
   // Esc from anywhere but the centered screen itself (which handles its own, after its fields
-  // have had their say) steps back to the arc before the layout's Esc leaves the cockpit.
+  // have had their say) steps back to the arc before the layout's Esc leaves the cockpit. Not
+  // while the workspace covers the cockpit: Esc there goes back to it.
+  const offstage = useContext(OffstageContext);
+  const offstageRef = useRef(offstage);
+  offstageRef.current = offstage;
   useEffect(() => {
     if (!centered) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (event.key !== 'Escape' || event.defaultPrevented || offstageRef.current) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as Element | null;
       if (target?.closest?.('[data-grid-center]')) return;
@@ -190,7 +196,8 @@ export function FlatCockpit({ project, now, narrow, deep = false, onBack }: Flat
         </div>
         <Link
           href={projectHref(project.id)}
-          data-focus-return={project.id}
+          // With a screen centered, Esc from the workspace comes back to that screen's link.
+          data-focus-return={centerActor ? undefined : project.id}
           data-cockpit-open
           className={cx(buttonClass('primary', 'sm'), 'touch:min-h-11 max-md:w-full')}
         >
@@ -293,7 +300,6 @@ function CenterScreen({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const level = useMotionLevel();
-
   // Fly from the arc: measure where it lands, then start it at the arc screen's box.
   useLayoutEffect(() => {
     const el = ref.current;
@@ -354,6 +360,18 @@ function CenterScreen({
           <div className="flex shrink-0 items-center gap-2 font-mono text-meta text-text-3 tabular">
             <TerminalMeta actor={actor} now={now} />
           </div>
+        )}
+        {/* The workspace, on this screen's session or terminal (DESIGN.md §10.8). */}
+        {(actor.links.sessionId || actor.links.terminalId) && (
+          <Link
+            href={actor.links.href}
+            data-focus-return={project.id}
+            data-center-open
+            className={cx(buttonClass('secondary', 'sm'), 'touch:min-h-11')}
+          >
+            <SquareArrowOutUpRight aria-hidden className="size-3.5" strokeWidth={1.75} />
+            Open in workspace
+          </Link>
         )}
         <Tooltip content="Back to the arc" shortcut="Esc">
           <button

@@ -8,17 +8,18 @@ import type { WorkspaceSkin } from './types.js';
  * ships with the app; the others load with their layout. Layouts without their own skin yet wear
  * Minimal's.
  */
-export type SkinId = 'minimal' | 'retro';
+export type SkinId = 'minimal' | 'grid' | 'retro';
 
 export const LAYOUT_SKIN: Record<LayoutId, SkinId> = {
   minimal: 'minimal',
   office: 'minimal',
-  grid: 'minimal',
+  grid: 'grid',
   transit: 'minimal',
   retro: 'retro',
 };
 
 const LOADERS: Record<Exclude<SkinId, 'minimal'>, () => Promise<{ default: WorkspaceSkin }>> = {
+  grid: () => import('./grid/GridSkin.js'),
   retro: () => import('./retro/RetroSkin.js'),
 };
 

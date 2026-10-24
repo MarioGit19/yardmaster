@@ -1,0 +1,405 @@
+/* Grid's workspace skin (DESIGN.md §10.8): the cockpit made fully interactive. It ships with the
+   skin's chunk, and every rule is scoped to the Grid workspace. One neon (`--grid-neon`) for
+   structure; status colors keep their meanings. Nothing here loops faster than once in 1.6 s, and
+   nothing gets brighter than the screen it lights (WCAG 2.3.1). */
+
+.focus[data-layout="grid"] {
+  --gs-edge: color-mix(in srgb, var(--grid-neon) 30%, transparent);
+  --gs-bracket: color-mix(in srgb, var(--grid-neon) 85%, transparent);
+  --gs-glow-color: color-mix(in srgb, var(--grid-neon) 45%, transparent);
+  --gs-term-fg: color-mix(in srgb, var(--grid-neon) 22%, var(--text-1));
+
+  /* The workspace's tokens: near-black ground, glass screens, neon hairlines. */
+  --bg-0: var(--grid-bg);
+  --bg-1: var(--grid-bg);
+  --bg-2: color-mix(in srgb, var(--grid-neon) 9%, var(--grid-bg));
+  --glass: var(--grid-panel);
+  --line: color-mix(in srgb, var(--grid-neon) 16%, transparent);
+  --line-strong: color-mix(in srgb, var(--grid-neon) 36%, transparent);
+  --highlight-inset: inset 0 1px 0 color-mix(in srgb, var(--grid-neon) 8%, transparent);
+  --focus-ring:
+    0 0 0 2px color-mix(in srgb, var(--grid-neon) 70%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--grid-neon) 18%, transparent);
+
+  isolation: isolate;
+  border-color: var(--gs-edge);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--grid-neon) 3%, transparent) 0 1px,
+      transparent 1px 4px
+    ),
+    radial-gradient(90% 70% at 50% 35%, transparent 35%, var(--grid-fog) 100%), var(--grid-bg);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--grid-neon) 6%, transparent),
+    0 24px 80px -24px color-mix(in srgb, var(--grid-neon) 22%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+/* The perspective floor, faint under the lower half and gone into the fog toward the horizon.
+   The screens sit over it, so it shows only in the gutters and at the edges, never under text. */
+.focus[data-layout="grid"]::after {
+  --gs-floor-line: color-mix(in srgb, var(--grid-neon) 9%, transparent);
+  content: "";
+  position: absolute;
+  inset: auto -25% 0;
+  z-index: -1;
+  height: 60%;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--gs-floor-line) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, var(--gs-floor-line) 1px, transparent 1px) 0 0 / 56px 56px;
+  transform: perspective(520px) rotateX(58deg);
+  transform-origin: 50% 100%;
+  mask-image: linear-gradient(to top, #000 10%, transparent 90%);
+}
+[data-theme="light"] .focus[data-layout="grid"] {
+  --gs-edge: color-mix(in srgb, var(--grid-neon) 34%, transparent);
+  --gs-glow-color: color-mix(in srgb, var(--grid-neon) 30%, transparent);
+  --gs-term-fg: color-mix(in srgb, var(--grid-neon) 30%, var(--text-1));
+  --bg-2: color-mix(in srgb, var(--grid-neon) 8%, #fff);
+}
+
+/* Title bars and column titles in Geist Mono caps. */
+.focus[data-layout="grid"] :is(.gs-titlebar, [data-column-heading]) {
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.focus[data-layout="grid"] [data-column-heading] {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* ── Header band: the cockpit's title screen ──────────────────────────────────────────────── */
+
+.gs-band {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--gs-edge);
+  border-radius: 6px;
+  background: var(--grid-panel);
+  box-shadow:
+    var(--highlight-inset),
+    0 12px 40px -18px var(--gs-glow-color);
+}
+.gs-band-name {
+  color: var(--text-1);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 26px;
+}
+.gs-band-state {
+  color: var(--text-2);
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Panel frames: holo screens ───────────────────────────────────────────────────────────── */
+
+.focus[data-layout="grid"] .focus-col {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 6px 8px;
+  /* The frame scrolls inside; the column lets its glow out. */
+  overflow: visible;
+}
+.focus[data-layout="grid"] [role="tabpanel"].focus-col {
+  padding: 12px;
+}
+.focus[data-layout="grid"] [role="tabpanel"].focus-col[hidden] {
+  display: none;
+}
+
+.gs-frame {
+  /* The glow's strength by activity step; a waiting or failed panel glows in its status color. */
+  --gs-strength: 0.18;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  border: 1px solid var(--gs-edge);
+  border-radius: 4px;
+  background: var(--grid-panel);
+  box-shadow: var(--highlight-inset);
+}
+.gs-frame[data-level="1"] {
+  --gs-strength: 0.45;
+}
+.gs-frame[data-level="2"] {
+  --gs-strength: 0.72;
+}
+.gs-frame[data-level="3"] {
+  --gs-strength: 1;
+}
+.gs-frame[data-tone="wait"] {
+  --gs-edge: color-mix(in srgb, var(--st-wait) 60%, transparent);
+  --gs-bracket: var(--st-wait);
+  --gs-glow-color: var(--st-wait-glow);
+  --gs-strength: 1;
+}
+.gs-frame[data-tone="err"] {
+  --gs-edge: color-mix(in srgb, var(--st-err) 60%, transparent);
+  --gs-bracket: var(--st-err);
+  --gs-glow-color: var(--st-err-glow);
+  --gs-strength: 1;
+}
+/* Corner brackets, drawn over the edge. */
+.gs-frame::after {
+  --gs-b: linear-gradient(var(--gs-bracket), var(--gs-bracket));
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  border-radius: 4px;
+  pointer-events: none;
+  background:
+    var(--gs-b) top left / 14px 2px,
+    var(--gs-b) top left / 2px 14px,
+    var(--gs-b) top right / 14px 2px,
+    var(--gs-b) top right / 2px 14px,
+    var(--gs-b) bottom left / 14px 2px,
+    var(--gs-b) bottom left / 2px 14px,
+    var(--gs-b) bottom right / 14px 2px,
+    var(--gs-b) bottom right / 2px 14px;
+  background-repeat: no-repeat;
+}
+/* The glow: a fixed shadow whose opacity follows the step, eased between steps. */
+.gs-glow {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: var(--gs-strength);
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.gs-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--gs-glow-color),
+    0 0 28px -6px var(--gs-glow-color);
+}
+/* Busy screens breathe slowly, faster as they get busier; a waiting one at the attention pace.
+   Still at Reduced and Off, and paused off screen. */
+@keyframes gs-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+.gs-frame:is([data-level="2"], [data-level="3"], [data-tone="wait"]) .gs-glow::before {
+  animation: gs-breathe 2.4s var(--ease-in-out) infinite;
+}
+.gs-frame[data-level="3"] .gs-glow::before {
+  animation-duration: 1.6s;
+}
+:root:is([data-motion="reduced"], [data-motion="off"]) .gs-glow::before {
+  animation: none;
+}
+:root[data-motion="off"] .gs-glow {
+  transition: none;
+}
+
+.gs-titlebar {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  color: color-mix(in srgb, var(--grid-neon) 70%, var(--text-1));
+  font-size: 11px;
+  font-weight: 500;
+}
+.gs-frame[data-tone="wait"] .gs-titlebar {
+  color: var(--st-wait-ink);
+}
+.gs-frame[data-tone="err"] .gs-titlebar {
+  color: var(--st-err-ink);
+}
+/* The activity meter: one lit bar per busy step. */
+.gs-meter {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+.gs-meter > span {
+  width: 3px;
+  background: currentColor;
+  opacity: 0.2;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.gs-meter > span:nth-child(1) {
+  height: 4px;
+}
+.gs-meter > span:nth-child(2) {
+  height: 7px;
+}
+.gs-meter > span:nth-child(3) {
+  height: 10px;
+}
+.gs-meter > span[data-lit] {
+  opacity: 0.9;
+}
+.gs-frame-body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gs-frame-body:has(> .claude-panel) {
+  padding: 0;
+  overflow: hidden;
+}
+.focus[data-layout="grid"] .claude-panel > header {
+  padding-top: 12px;
+}
+.focus[data-layout="grid"] .focus-col-max {
+  background: var(--grid-bg);
+}
+
+/* ── Tabs and the active session glow cyan ────────────────────────────────────────────────── */
+
+.focus[data-layout="grid"] [data-session-pill],
+.focus[data-layout="grid"] [data-tab] > [data-tab-indicator] {
+  border-color: color-mix(in srgb, var(--grid-neon) 55%, transparent);
+  background: color-mix(in srgb, var(--grid-neon) 12%, var(--grid-panel));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--grid-neon) 45%, transparent),
+    0 0 18px -6px var(--gs-glow-color);
+}
+.focus[data-layout="grid"] [role="tab"][aria-selected="true"] {
+  color: color-mix(in srgb, var(--grid-neon) 60%, var(--text-1));
+}
+/* The narrow view's panel tabs: a neon underline. */
+.focus[data-layout="grid"] [id^="focus-tab-"] > [data-tab-indicator] {
+  background: var(--grid-neon);
+  box-shadow: 0 0 10px var(--gs-glow-color);
+}
+
+/* ── Entry: the cockpit's phase-in, continued (`--dur-phase`) ─────────────────────────────── */
+
+.gs-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+.gs-entry-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 64px),
+    color-mix(in srgb, var(--grid-neon) 10%, transparent) calc(50% - 2px),
+    color-mix(in srgb, var(--grid-neon) 45%, transparent) 50%,
+    transparent calc(50% + 1px)
+  );
+  opacity: 0;
+  animation: gs-scan var(--dur-phase) var(--ease-in-out) both;
+}
+@keyframes gs-scan {
+  from {
+    transform: translateY(-50%);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+}
+/* The screens settle into their columns out of a brief chromatic split (a rose and a cyan ghost
+   closing in), as the cockpit's did. */
+.focus[data-layout="grid"]:has(> [data-grid-entry]) :is(.gs-band, .gs-frame) {
+  animation: gs-settle var(--dur-phase) var(--ease-out) backwards;
+}
+@keyframes gs-settle {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+    filter: drop-shadow(4px 0 0 color-mix(in srgb, var(--st-err) 70%, transparent))
+      drop-shadow(-4px 0 0 color-mix(in srgb, var(--grid-neon) 70%, transparent));
+  }
+  55% {
+    opacity: 1;
+    filter: drop-shadow(1.5px 0 0 color-mix(in srgb, var(--st-err) 45%, transparent))
+      drop-shadow(-1.5px 0 0 color-mix(in srgb, var(--grid-neon) 45%, transparent));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent);
+  }
+}
+[data-motion="off"] .gs-entry {
+  display: none;
+}
+
+/* ── Phones: the project hub as a stack of holo screens ───────────────────────────────────── */
+
+.focus[data-layout="grid"] :is([data-workspace-appbar], [data-item-header]) {
+  border-bottom-color: var(--gs-edge);
+  background: color-mix(in srgb, var(--grid-panel) 70%, transparent);
+}
+.focus[data-layout="grid"] [data-hub-item] {
+  --gs-b: linear-gradient(var(--gs-bracket), var(--gs-bracket));
+  border-color: var(--gs-edge);
+  border-radius: 4px;
+  background:
+    var(--gs-b) top left / 12px 2px no-repeat,
+    var(--gs-b) top left / 2px 12px no-repeat,
+    var(--gs-b) top right / 12px 2px no-repeat,
+    var(--gs-b) top right / 2px 12px no-repeat,
+    var(--gs-b) bottom left / 12px 2px no-repeat,
+    var(--gs-b) bottom left / 2px 12px no-repeat,
+    var(--gs-b) bottom right / 12px 2px no-repeat,
+    var(--gs-b) bottom right / 2px 12px no-repeat,
+    var(--grid-panel);
+  box-shadow:
+    var(--highlight-inset),
+    0 10px 32px -18px var(--gs-glow-color);
+}
+.focus[data-layout="grid"] [data-hub-group="needs"] [data-hub-item] {
+  --gs-bracket: var(--st-wait);
+  border-color: color-mix(in srgb, var(--st-wait) 60%, transparent);
+  box-shadow:
+    var(--highlight-inset),
+    0 10px 32px -18px var(--st-wait-glow);
+}
+.focus[data-layout="grid"] [data-hub-item][data-last] {
+  border-color: color-mix(in srgb, var(--grid-neon) 60%, transparent);
+}
+.focus[data-layout="grid"] [data-hub-group] > h2 {
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+.focus[data-layout="grid"] [data-hub-group]:not([data-hub-group="needs"]) > h2 {
+  color: color-mix(in srgb, var(--grid-neon) 70%, var(--text-1));
+}
+.focus[data-layout="grid"] [data-hub-row] {
+  border-color: var(--line);
+}

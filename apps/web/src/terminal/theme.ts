@@ -41,10 +41,39 @@ const RETRO: Palette = {
   white: '--retro-ink',
 };
 
-/** Bright black: the dim text of each skin. */
-const BRIGHT_BLACK: Record<SkinId, string> = { minimal: '--text-2', retro: '--retro-dim-ink' };
+/**
+ * Grid's workspace (DESIGN.md §10.8): neon on the Grid's near-black, a neon cursor, cyan as the
+ * structural neon itself, the other hues at full status strength. Tokens from the skin's scope.
+ */
+const GRID: Palette = {
+  background: '--grid-bg',
+  foreground: '--gs-term-fg',
+  cursor: '--grid-neon',
+  cursorAccent: '--grid-bg',
+  black: '--text-3',
+  red: '--st-err',
+  green: '--st-ok',
+  yellow: '--st-wait',
+  blue: '--st-work',
+  magenta: '--orb-edit',
+  cyan: '--grid-neon',
+  white: '--text-2',
+};
 
-const PALETTES: Record<SkinId, Palette> = { minimal: MINIMAL, retro: RETRO };
+/** Bright black: the dim text of each skin. */
+const BRIGHT_BLACK: Record<SkinId, string> = {
+  minimal: '--text-2',
+  grid: '--text-2',
+  retro: '--retro-dim-ink',
+};
+
+const PALETTES: Record<SkinId, Palette> = { minimal: MINIMAL, grid: GRID, retro: RETRO };
+
+const SELECTION: Record<SkinId, string> = {
+  minimal: '--st-work',
+  grid: '--grid-neon',
+  retro: '--retro-ink',
+};
 
 const BRIGHT = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'] as const;
 
@@ -66,8 +95,9 @@ export function xtermTheme(resolve: ColorResolver, skin: SkinId = 'minimal'): IT
         : `color-mix(in srgb, var(${tokens[name]}) 80%, var(${tokens.foreground}))`;
     (theme as Record<string, string>)[key] = resolve(mix);
   }
-  const selection = skin === 'retro' ? '--retro-ink' : '--st-work';
-  theme.selectionBackground = resolve(`color-mix(in srgb, var(${selection}) 30%, transparent)`);
+  theme.selectionBackground = resolve(
+    `color-mix(in srgb, var(${SELECTION[skin]}) 30%, transparent)`,
+  );
   theme.selectionInactiveBackground = resolve('color-mix(in srgb, var(--text-3) 25%, transparent)');
   theme.scrollbarSliderBackground = resolve('var(--line-strong)');
   theme.scrollbarSliderHoverBackground = resolve(

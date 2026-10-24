@@ -708,6 +708,34 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
       await page.waitForTimeout(600);
     });
+
+    // Grid's workspace skin (DESIGN.md §10.8): from the node's cockpit, Open workspace phases the
+    // screens into the workspace columns (the cockpit's sweep, --dur-phase); Esc returns to it.
+    await page.evaluate(() => localStorage.setItem('cboard.layout', 'grid'));
+    await page.reload();
+    const node = page.locator(`[data-grid-node="${id}"]`);
+    await node.waitFor();
+    await page.waitForTimeout(1200);
+    await node.focus();
+    await page.keyboard.press('Enter');
+    const cockpitOpen = page.locator(`[data-grid-cockpit="${id}"] [data-cockpit-open]`);
+    await cockpitOpen.waitFor();
+    await page.waitForTimeout(900);
+    await r.moment(
+      'grid-open',
+      'transition',
+      'Grid: Open workspace, a scanline sweeps the card as the screens settle into the columns (--dur-phase)',
+      async () => {
+        await cockpitOpen.click();
+        await page.locator(`[data-focus="${id}"]`).waitFor();
+        await page.waitForTimeout(800);
+      },
+    );
+    await r.moment('grid-close', 'transition', 'Esc fades back to the cockpit', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(600);
+    });
     await page.evaluate(() => localStorage.removeItem('cboard.layout'));
   },
 

@@ -8,9 +8,31 @@ import {
   test,
 } from './fixtures.js';
 
-/** Each layout's way into a project from its overview: the item, its id, and the link to click. */
-const OPENERS: Record<FocusLayout, { item: string; id: string; link: (id: string) => string }> = {
+/**
+ * Each layout's way into a project from its overview: the item, its id, a step in (Grid's
+ * cockpit) and the link to click.
+ */
+const OPENERS: Record<
+  FocusLayout,
+  {
+    item: string;
+    id: string;
+    enter?: (page: Page, id: string) => Promise<void>;
+    link: (id: string) => string;
+  }
+> = {
   minimal: { item: '[data-pod]', id: 'data-pod', link: (id) => `[data-pod="${id}"] header a` },
+  grid: {
+    item: '[data-grid-node]',
+    id: 'data-grid-node',
+    // Enter on the node dives into its cockpit; the cockpit's Open workspace opens the view.
+    enter: async (page, id) => {
+      await page.locator(`[data-grid-node="${id}"]`).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator(`[data-grid-cockpit="${id}"]`)).toBeVisible();
+    },
+    link: (id) => `[data-grid-cockpit="${id}"] [data-cockpit-open]`,
+  },
   retro: {
     item: '[data-retro-frame]',
     id: 'data-retro-frame',
@@ -26,6 +48,7 @@ async function openFirstProject(page: Page, layout: FocusLayout) {
   await expect(first).toBeVisible();
   const id = await first.getAttribute(opener.id);
   if (!id) throw new Error('project without an id');
+  await opener.enter?.(page, id);
   await page.locator(opener.link(id)).click();
   const card = page.locator(`[data-focus="${id}"]`);
   await expect(card).toBeVisible();
@@ -286,6 +309,7 @@ for (const layout of FOCUS_LAYOUTS) {
       const id = await first.getAttribute(opener.id);
       if (!id) throw new Error('project without an id');
       const sampling = sampleBoxes(page, `[data-focus="${id}"]`, 400);
+      await opener.enter?.(page, id);
       await page.locator(opener.link(id)).click();
       const widths = (await sampling).map((f) => Math.round(f.w));
       expect(widths.length).toBeGreaterThan(0);
@@ -360,5 +384,96 @@ test.describe('retro at 1440', () => {
     await page.keyboard.press('Alt+Digit5');
     await expect(card).toHaveAttribute('data-layout', 'retro');
     await expect(card.locator('[data-retro-band]')).toBeVisible();
+  });
+});
+
+// Grid's workspace skin (DESIGN.md §10.8): the cockpit's phase-in carries into the workspace, the
+// panels are holo screens lit by their activity, and Esc steps back to the cockpit.
+test.describe('grid at 1440', () => {
+  test.use({ viewport: { width: 1440, height: 900 }, layout: 'grid' });
+
+  /** Enters the first node with a Claude session and returns its cockpit. */
+  async function enterCockpit(page: Page) {
+    await openRoute(page, '/');
+    const node = page
+      .locator('[data-grid-node]', { has: page.locator('[data-scene-actor^="s:"]') })
+      .first();
+    await expect(node).toBeVisible();
+    const id = await node.getAttribute('data-grid-node');
+    if (!id) throw new Error('node without an id');
+    await OPENERS.grid.enter?.(page, id);
+    return { id, cockpit: page.locator(`[data-grid-cockpit="${id}"]`) };
+  }
+
+  test('Open workspace phases the screens into the columns, and Esc returns to the cockpit', async ({
+    page,
+  }) => {
+    const { id, cockpit } = await enterCockpit(page);
+    await cockpit.locator('[data-cockpit-open]').click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    // The card is there at once; a scanline sweeps it while the screens settle, then goes.
+    await expect(card.locator('[data-grid-entry]')).toBeAttached();
+    expect(await card.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+    await expect(card.locator('[data-grid-entry]')).toHaveCount(0);
+    await expect(card).toHaveAttribute('data-layout', 'grid');
+    await expect(card.locator('[data-grid-band]')).toBeVisible();
+    for (const panel of ['Sessions', 'Claude', 'Terminals']) {
+      const frame = card.locator(`[data-grid-panel="${panel}"]`);
+      await expect(frame).toBeVisible();
+      await expect(frame).toHaveAttribute('data-level', /^[0-3]$/);
+    }
+    // Holo screens: a neon edge, Geist Mono caps title bars, the ground behind them.
+    const bar = card.locator('[data-grid-panel="Claude"] .gs-titlebar');
+    expect(await bar.evaluate((el) => getComputedStyle(el).textTransform)).toBe('uppercase');
+    expect(await bar.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Geist Mono');
+    // The active session glows: its highlight takes the neon.
+    await expect(card.locator('[data-session-pill]')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await expect(page.locator('[data-grid]')).toHaveAttribute('data-grid-entered', id);
+    await expect(cockpit.locator('[data-cockpit-open]')).toBeFocused();
+  });
+
+  test('a centered screen opens the workspace on its session, and Esc comes back to it', async ({
+    page,
+  }) => {
+    test.slow();
+    const { id, cockpit } = await enterCockpit(page);
+    await cockpit.locator('[data-grid-screen="claude"] [data-screen-face]').first().click();
+    const center = page.locator('[data-grid-center^="s:"]');
+    await expect(center).toBeVisible();
+    const open = center.locator('[data-center-open]');
+    const href = (await open.getAttribute('href'))?.replace(/^#/, '');
+    await open.click();
+    await expect(page).toHaveURL((url) => url.hash === `#${href}`);
+    const card = page.locator(`[data-focus="${id}"]`);
+    await expect(card).toHaveAttribute('data-layout', 'grid');
+    await expect(card.locator('[data-session][aria-current="page"]')).toBeVisible();
+    // Esc from the view itself (the composer keeps its own Esc).
+    await card.locator('h1').focus();
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await expect(center).toBeVisible();
+    await expect(open).toBeFocused();
+  });
+
+  test('at Reduced the screens hold still: no sweep, no breathing glow', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    await openRoute(page, '/');
+    await openRoute(page, await firstProjectRoute(page));
+    const card = page.locator('[data-focus]');
+    await expect(card).toHaveAttribute('data-layout', 'grid');
+    await expect(card.locator('[data-grid-entry]')).toHaveCount(0);
+    const frames = card.locator('.gs-glow');
+    await expect(frames).toHaveCount(3);
+    const animations = await frames.evaluateAll((els) =>
+      els.map((el) => getComputedStyle(el, '::before').animationName),
+    );
+    expect(animations.every((name) => name === 'none')).toBe(true);
+    // The glow still reads the activity, held at its step: the demo's busy project lights up.
+    await expect
+      .poll(() => card.locator('.gs-frame:not([data-level="0"])').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
   });
 });
