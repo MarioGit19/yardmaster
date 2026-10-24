@@ -534,6 +534,14 @@ function ItemIcon({ view, accent, size = 24 }: { view: ItemView; accent?: string
 const kindLabel = (item: HubItem) =>
   item.kind === 'terminal' ? 'Terminal' : item.terminalId ? 'Claude in a terminal' : 'Claude';
 
+/** What a waiting chat waits for: an approval or an answer. */
+const waitKind = (session: ItemView['session']) =>
+  session?.status.kind === 'waiting_permission'
+    ? 'approval'
+    : session?.status.kind === 'waiting_input'
+      ? 'answer'
+      : undefined;
+
 function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; last: boolean }) {
   const view = useItemView(item);
   const ports = useBoardList(selectPortsByTerminal(item.terminalId ?? ''));
@@ -544,6 +552,7 @@ function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; 
       data-hub-kind={item.kind}
       data-hub-terminal={item.terminalId ?? undefined}
       data-origin={view.session?.origin}
+      data-hub-wait={waitKind(view.session)}
       data-last={last || undefined}
       className={cx(
         'flex min-w-0 items-start gap-3 rounded-panel border bg-bg-1 p-3 shadow-raised transition-[border-color,background-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.99]',

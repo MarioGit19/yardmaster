@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMotionLevel } from '../motion.js';
 import { cx } from './cx.js';
 import { IconButton } from './IconButton.js';
@@ -17,6 +17,24 @@ export function pageAt(scrollLeft: number, stride: number, pages: number): numbe
   return Math.min(pages - 1, Math.max(0, Math.round(scrollLeft / stride)));
 }
 
+/**
+ * The order to show `next` in, given the order shown so far: pages keep their places, pages that
+ * left drop out, and a new page goes in after the page it follows in `next` (first if none does).
+ * A list that re-sorts while it's live (attention order) doesn't shuffle the screens under a thumb.
+ */
+export function stableOrder(shown: readonly string[], next: readonly string[]): string[] {
+  const present = new Set(next);
+  const order = shown.filter((key) => present.has(key));
+  const placed = new Set(order);
+  next.forEach((key, i) => {
+    if (placed.has(key)) return;
+    const after = i > 0 ? order.indexOf(next[i - 1] as string) : -1;
+    order.splice(after + 1, 0, key);
+    placed.add(key);
+  });
+  return order;
+}
+
 /** The distance from one page to the next: a page's width plus the gap. */
 function strideOf(el: HTMLElement): number {
   const [first, second] = el.children as unknown as HTMLElement[];
@@ -31,7 +49,7 @@ function strideOf(el: HTMLElement): number {
  */
 export function SwipePager({
   label,
-  pages,
+  pages: incoming,
   nav = 'bottom',
   className,
   ...data
@@ -45,6 +63,15 @@ export function SwipePager({
   const scroller = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
   const level = useMotionLevel();
+  const shown = useRef<string[]>([]);
+  const pages = useMemo(() => {
+    const byKey = new Map(incoming.map((page) => [page.key, page]));
+    shown.current = stableOrder(
+      shown.current,
+      incoming.map((page) => page.key),
+    );
+    return shown.current.map((key) => byKey.get(key) as SwipePage);
+  }, [incoming]);
   const count = pages.length;
 
   const onScroll = useCallback(() => {

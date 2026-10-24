@@ -2311,11 +2311,36 @@ test.describe('workspace skins', () => {
             await openRoute(page, '/');
             const waiting = page.locator(SKIN_WAITING[layout].item).first();
             await expect(waiting).toBeVisible({ timeout: 40_000 });
-            const id = await waiting.getAttribute(SKIN_WAITING[layout].id);
-            await openRoute(page, `/p/${id}`);
             if (phone) {
-              await page.locator('[data-hub-group="needs"] a[data-hub-item]').first().click();
+              // A chat can wait for an answer instead, which shows neither an approval card nor
+              // (below xl) the caption: try the waiting projects until one waits for an approval.
+              const approval = page.locator('[data-hub] a[data-hub-wait="approval"]').first();
+              await expect
+                .poll(
+                  async () => {
+                    await openRoute(page, '/');
+                    const ids = await page
+                      .locator(SKIN_WAITING[layout].item)
+                      .evaluateAll(
+                        (items, attr) => items.map((item) => item.getAttribute(attr)),
+                        SKIN_WAITING[layout].id,
+                      );
+                    for (const id of ids) {
+                      await openRoute(page, `/p/${id}`);
+                      await expect(
+                        page.locator('[data-hub] a[data-hub-item]').first(),
+                      ).toBeVisible();
+                      if (await approval.isVisible()) return true;
+                    }
+                    return false;
+                  },
+                  { timeout: 60_000 },
+                )
+                .toBe(true);
+              await approval.click();
             } else {
+              const id = await waiting.getAttribute(SKIN_WAITING[layout].id);
+              await openRoute(page, `/p/${id}`);
               await card.locator('a[data-session]:has([data-status="wait"])').first().click();
             }
             await expect(
