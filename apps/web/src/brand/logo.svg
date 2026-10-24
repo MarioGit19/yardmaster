@@ -1,12 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="c-board">
-  <defs>
-    <radialGradient id="cb-glow" cx="12" cy="12" r="7.5" gradientUnits="userSpaceOnUse">
-      <stop offset="0.3" stop-color="#7c9cff" stop-opacity="0.6"/>
-      <stop offset="1" stop-color="#7c9cff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect x="2.75" y="2.75" width="18.5" height="18.5" rx="5.5" stroke="currentColor" stroke-width="1.5"/>
-  <circle cx="12" cy="12" r="7.5" fill="url(#cb-glow)"/>
-  <circle cx="12" cy="12" r="3.25" fill="#7c9cff"/>
-  <circle cx="10.9" cy="10.9" r="1.1" fill="#fff" fill-opacity="0.55"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-label="Yardmaster">
+  <path fill="currentColor" d="M116.03 73.74L72.85 30.56A20 20 0 0 0 44.56 58.85L87.74 102.03A42 42 0 0 1 116.03 73.74Z"/>
+  <path fill="currentColor" d="M168.26 102.03L211.44 58.85A20 20 0 0 0 183.15 30.56L139.97 73.74A42 42 0 0 1 168.26 102.03Z"/>
+  <path fill="currentColor" d="M108 150.93L108 212A20 20 0 0 0 148 212L148 150.93A42 42 0 0 1 108 150.93Z"/>
+  <circle cx="128" cy="114" r="30" fill="#7c9cff"/>
 </svg>

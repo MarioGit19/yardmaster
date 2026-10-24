@@ -2331,3 +2331,67 @@ test.describe('workspace skins', () => {
     }
   }
 });
+
+// 12.7: the Yardmaster brand in place: the HUD lockup, Settings → About, the onboarding header
+// and the app icon on a phone's home screen, in both themes.
+test.describe('brand', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme });
+
+      test('hud and about', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await openRoute(page, '/settings');
+        await page.waitForTimeout(600);
+        const hud = page.locator('header').first();
+        await hud.screenshot({ path: new URL(`brand-hud-${theme}.png`, OUT_DIR).pathname });
+        const about = page.locator('section[aria-label="About"]');
+        await about.scrollIntoViewIfNeeded();
+        await about.screenshot({ path: new URL(`brand-about-${theme}.png`, OUT_DIR).pathname });
+      });
+
+      test('onboarding header', async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await openRoute(page, '/welcome');
+        await page.waitForTimeout(900);
+        await page
+          .locator('[data-onboarding] header')
+          .screenshot({ path: new URL(`brand-onboarding-${theme}.png`, OUT_DIR).pathname });
+      });
+
+      test('phone home screen', async ({ page, baseURL }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await openRoute(page, '/');
+        await page.screenshot({
+          path: new URL(`brand-phone-topbar-${theme}.png`, OUT_DIR).pathname,
+          clip: { x: 0, y: 0, width: 390, height: 120 },
+        });
+        // A synthetic home screen: the board's icon among plain placeholder apps.
+        const dark = theme === 'dark';
+        const tile = (label: string, inner: string) =>
+          `<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:62px;height:62px;border-radius:14px;overflow:hidden">${inner}</div><span style="font:500 12px system-ui;color:#fff;text-shadow:0 1px 2px rgb(0 0 0 / .4)">${label}</span></div>`;
+        const plain = (c: string) => `<div style="width:100%;height:100%;background:${c}"></div>`;
+        const apps = [
+          tile('Notes', plain(dark ? '#3a3a3c' : '#f2c94c')),
+          tile('Mail', plain(dark ? '#2c3e66' : '#4a90e2')),
+          tile('Yardmaster', `<img src="${baseURL}/apple-touch-icon.png" width="62" height="62">`),
+          tile('Music', plain(dark ? '#4a2333' : '#eb5757')),
+          tile('Photos', plain(dark ? '#3a3a3c' : '#ffffff')),
+          tile('Maps', plain(dark ? '#23463a' : '#6fcf97')),
+          tile('Clock', plain(dark ? '#1c1c1e' : '#333333')),
+          tile('Files', plain(dark ? '#2c3e66' : '#56ccf2')),
+        ].join('');
+        const wallpaper = dark
+          ? 'linear-gradient(160deg,#1b1f3a 0%,#0b0c14 60%,#1a1024 100%)'
+          : 'linear-gradient(160deg,#a8c0ff 0%,#e6d8ff 55%,#ffd9c2 100%)';
+        await page.setContent(
+          `<body style="margin:0;height:844px;background:${wallpaper}"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:28px 0;padding:80px 18px">${apps}</div></body>`,
+        );
+        await page.locator('img').evaluate((el: HTMLImageElement) => el.decode());
+        await page.screenshot({
+          path: new URL(`brand-homescreen-${theme}.png`, OUT_DIR).pathname,
+        });
+      });
+    });
+  }
+});

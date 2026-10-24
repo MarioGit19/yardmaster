@@ -5,7 +5,7 @@ import { applyFavicon, faviconState, waitingCount } from './favicon.js';
 const selectFaviconState = (s: BoardStoreState) => faviconState(s.board);
 const selectWaitingCount = (s: BoardStoreState) => waitingCount(s.board);
 
-/** Keeps the tab's favicon and `(n) c-board` title in step with the board. */
+/** Keeps the tab's favicon and `(n) Yardmaster` title in step with the board. */
 export function LiveFavicon() {
   const state = useBoard(selectFaviconState);
   const waiting = useBoard(selectWaitingCount);

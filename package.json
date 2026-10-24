@@ -17,7 +17,7 @@
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck && tsc -p e2e",
     "build": "pnpm -r build",
-    "icons": "pnpm --filter @c-board/web icons",
+    "brand:build": "pnpm --filter @c-board/web brand:build",
     "check": "scripts/privacy-check.sh && pnpm lint && pnpm typecheck && pnpm test",
     "e2e": "pnpm --filter @c-board/web build && playwright test -c e2e --project=e2e",
     "shots": "pnpm --filter @c-board/web build && playwright test -c e2e --project=shots",

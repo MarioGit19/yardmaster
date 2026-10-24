@@ -5,7 +5,7 @@ test('the demo board loads, navigates to a project and opens settings', async ({
   page.on('pageerror', (err) => errors.push(err.message));
 
   await openRoute(page, '/');
-  await expect(page).toHaveTitle(/c-board/);
+  await expect(page).toHaveTitle(/Yardmaster/);
 
   const project = await firstProjectRoute(page);
   await page.locator(`a[href="#${project}"]`).first().click();

@@ -4,40 +4,46 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
 import { applyFavicon, documentTitle, faviconHref, faviconState, waitingCount } from './favicon.js';
 import logoSource from './logo.svg?raw';
-import { LOGO_SOURCE_ACCENT, renderLogo, svgDataUrl } from './render.js';
+import { LOGO_SOURCE_ACCENT, parseLogo, renderLogo, svgDataUrl } from './render.js';
 
 describe('renderLogo', () => {
-  it('recolors the ring and every accent use', () => {
-    const svg = renderLogo(logoSource, { ring: '#111111', accent: '#222222' });
+  it('recolors the Y and the orb', () => {
+    const svg = renderLogo(logoSource, { ink: '#111111', accent: '#222222' });
     expect(svg).not.toContain('currentColor');
     expect(svg).not.toContain(LOGO_SOURCE_ACCENT);
-    expect(svg).toContain('stroke:#111111');
-    expect(svg).toContain('fill:#222222');
-    expect(svg).toContain('stop-color:#222222');
+    expect(svg.match(/fill:#111111/g)).toHaveLength(3);
+    expect(svg.match(/fill:#222222/g)).toHaveLength(1);
   });
 
   it('accepts CSS variables for inline use', () => {
-    const svg = renderLogo(logoSource, { ring: 'currentColor', accent: 'var(--st-work)' });
+    const svg = renderLogo(logoSource, { ink: 'currentColor', accent: 'var(--st-work)' });
     expect(svg).toContain('fill:var(--st-work)');
+    expect(svg).toContain('fill:currentColor');
   });
 
-  it('suffixes gradient ids so several marks can share a page', () => {
-    const svg = renderLogo(logoSource, { ring: 'red', accent: 'blue' }, 'r1');
-    expect(svg).toContain('id="cb-glow-r1"');
-    expect(svg).toContain('url(#cb-glow-r1)');
+  it('stays one flat drawing: no text, rasters, gradients or filters', () => {
+    expect(logoSource).not.toMatch(/<(text|image|filter|mask|linearGradient|radialGradient)\b/);
   });
 
   it('adds a badge dot only when asked', () => {
-    expect(renderLogo(logoSource, { ring: 'red', accent: 'blue' })).not.toContain('cx="19.5"');
-    const svg = renderLogo(logoSource, { ring: 'red', accent: 'blue', badge: 'orange' });
-    expect(svg).toMatch(/<circle cx="19\.5"[^>]*fill:orange[^>]*\/>\s*<\/svg>$/);
+    expect(renderLogo(logoSource, { ink: 'red', accent: 'blue' })).not.toContain('cx="212"');
+    const svg = renderLogo(logoSource, { ink: 'red', accent: 'blue', badge: 'orange' });
+    expect(svg).toMatch(/<circle cx="212"[^>]*fill:orange[^>]*\/>\s*<\/svg>$/);
   });
 
   it('stays parseable SVG', () => {
-    const svg = renderLogo(logoSource, { ring: 'red', accent: 'blue', badge: 'orange' }, 'x');
+    const svg = renderLogo(logoSource, { ink: 'red', accent: 'blue', badge: 'orange' });
     const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
     expect(doc.querySelector('parsererror')).toBeNull();
     expect(doc.documentElement.tagName).toBe('svg');
+  });
+
+  it('splits into the three strokes and the orb', () => {
+    const parts = parseLogo(logoSource);
+    expect(parts.viewBox).toBe('0 0 256 256');
+    expect(parts.strokes).toHaveLength(3);
+    for (const d of parts.strokes) expect(d).toMatch(/^M[\d.]+ [\d.]+L.*Z$/);
+    expect(parts.orb).toEqual({ cx: 128, cy: 114, r: 30 });
   });
 
   it('builds an encoded data URL', () => {
@@ -82,8 +88,8 @@ describe('favicon state', () => {
   });
 
   it('puts the waiting count in the title', () => {
-    expect(documentTitle(0)).toBe('c-board');
-    expect(documentTitle(2)).toBe('(2) c-board');
+    expect(documentTitle(0)).toBe('Yardmaster');
+    expect(documentTitle(2)).toBe('(2) Yardmaster');
   });
 });
 
@@ -96,13 +102,13 @@ describe('applyFavicon', () => {
     expect(link?.rel).toBe('icon');
     expect(link?.type).toBe('image/svg+xml');
     expect(link?.dataset.state).toBe('idle');
-    expect(document.title).toBe('c-board');
+    expect(document.title).toBe('Yardmaster');
     const idleHref = link?.href;
 
     applyFavicon(document, 'wait', 3);
     expect(document.querySelectorAll('link#live-favicon')).toHaveLength(1);
     expect(link?.dataset.state).toBe('wait');
     expect(link?.href).not.toBe(idleHref);
-    expect(document.title).toBe('(3) c-board');
+    expect(document.title).toBe('(3) Yardmaster');
   });
 });

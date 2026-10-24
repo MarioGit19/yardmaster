@@ -1210,6 +1210,47 @@ const SCENARIOS = {
     );
   },
 
+  /** 12.7: the onboarding's brand moment, the first time this browser opens the guide. */
+  async brand(r: Recorder) {
+    const { page } = r;
+    // Measure the guide's header with the moment marked as seen, then forget it so it plays.
+    await page.goto('/#/settings');
+    await page.evaluate(() => localStorage.setItem('cboard.brandIntro', 'seen'));
+    await page.goto('/#/welcome');
+    const header = page.locator('[data-onboarding] header').first();
+    await header.waitFor();
+    await page.waitForTimeout(800);
+    const box = await header.boundingBox();
+    const pad = 24;
+    const clip = box
+      ? visible(
+          {
+            x: box.x - pad,
+            y: box.y - pad,
+            width: box.width + pad * 2,
+            height: box.height + pad * 2,
+          },
+          DESKTOP,
+        )
+      : undefined;
+    // Preferences are read once per page load, so reload for the app to see it unset.
+    await page.evaluate(() => localStorage.removeItem('cboard.brandIntro'));
+    await page.goto('/#/settings');
+    await page.reload();
+    await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
+    await r.moment(
+      'intro',
+      'transition',
+      'the guide opens: the Y converges and the orb lights',
+      async () => {
+        await page.goto('/#/welcome');
+        await page.locator('[data-brand-intro]').first().waitFor();
+        await page.waitForTimeout(1000);
+      },
+      clip,
+    );
+  },
+
   async close(r: Recorder) {
     const { page } = r;
     await openOverview(page);

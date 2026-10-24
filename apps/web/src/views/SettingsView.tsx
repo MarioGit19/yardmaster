@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../ambient/style.js';
+import { Wordmark } from '../brand/Logo.js';
+import { TAGLINE } from '../brand/name.js';
 import { selectWindows, useBoardList } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
@@ -182,8 +184,26 @@ export function SettingsView() {
           <RetentionRow server={server} />
           <TokenRow demo={demo} />
         </SettingsSection>
+
+        <SettingsSection title="About">
+          <AboutRow version={status !== null && status !== 'error' ? status.version : null} />
+        </SettingsSection>
       </div>
     </Page>
+  );
+}
+
+function AboutRow({ version }: { version: string | null }) {
+  return (
+    <div className="flex flex-col gap-3 p-5" data-setting="about">
+      <Wordmark className="text-title" markClassName="size-7" />
+      <p className="text-body-sm text-text-2">
+        {TAGLINE} Runs on this machine with your own Claude Code login.
+      </p>
+      <p className="font-mono text-label text-text-3 tabular-nums">
+        {version ? `Version ${version}` : 'Version unknown'}
+      </p>
+    </div>
   );
 }
 

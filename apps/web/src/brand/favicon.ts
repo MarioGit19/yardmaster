@@ -1,20 +1,13 @@
 import type { BoardState } from '@c-board/protocol';
 import { projectTone, sessionStatusView } from '../status.js';
 import logoSource from './logo.svg?raw';
-import { renderLogo, svgDataUrl } from './render.js';
+import { BRAND_NAME } from './name.js';
+import { FAVICON_COLORS, renderLogo, svgDataUrl } from './render.js';
 
 /** What the tab shows: calm, something waiting on you, or something crashed. */
 export type FaviconState = 'idle' | 'wait' | 'err';
 
-// Night status colors (tokens.css). Favicons can't read CSS variables, and the bright
-// variants read on both light and dark tab strips.
-const COLORS = {
-  idle: { ring: '#a3a9b8', accent: '#7c9cff' },
-  wait: { ring: '#ffb547', accent: '#ffb547', badge: '#ffb547' },
-  err: { ring: '#ff5c7a', accent: '#ff5c7a' },
-} as const;
-
-const TITLE = 'c-board';
+const TITLE = BRAND_NAME;
 
 export function waitingCount(board: BoardState): number {
   let count = 0;
@@ -31,7 +24,7 @@ export function faviconState(board: BoardState): FaviconState {
 }
 
 export function faviconHref(state: FaviconState): string {
-  return svgDataUrl(renderLogo(logoSource, COLORS[state]));
+  return svgDataUrl(renderLogo(logoSource, FAVICON_COLORS[state]));
 }
 
 export function documentTitle(waiting: number): string {

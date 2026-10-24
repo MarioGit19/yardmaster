@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:demo": "vite",
     "build": "tsx scripts/render-icons.ts && tsc -p tsconfig.build.json && vite build",
-    "icons": "tsx scripts/render-icons.ts --force --strict",
+    "brand:build": "tsx scripts/render-icons.ts --force --strict --all",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts",
     "test": "vitest run"

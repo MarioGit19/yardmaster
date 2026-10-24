@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Logomark } from '../brand/Logo.js';
 import { cx } from '../ui/cx.js';
 
 /** Main-area page frame: 16px gutters on phones, 24px from tablet up. `narrow` is for forms. */
@@ -33,10 +34,22 @@ export function PageHeader({ title, meta }: { title: ReactNode; meta?: ReactNode
   );
 }
 
-/** A quiet centered message for empty or missing content. */
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+/**
+ * A quiet centered message for empty or missing content. `mark` heads it with the logomark, for
+ * the board-level empty states.
+ */
+export function EmptyState({
+  title,
+  mark = false,
+  children,
+}: {
+  title: string;
+  mark?: boolean;
+  children?: ReactNode;
+}) {
   return (
     <div className="mx-auto mt-16 flex max-w-sm flex-col items-center gap-2 text-center">
+      {mark && <Logomark className="mb-2 size-10 text-text-3" />}
       <p className="font-medium text-body text-text-1">{title}</p>
       {children && <div className="text-body-sm text-text-2">{children}</div>}
     </div>

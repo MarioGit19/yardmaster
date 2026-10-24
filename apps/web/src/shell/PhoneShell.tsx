@@ -115,8 +115,8 @@ function PhoneTopBar() {
     >
       <Link
         href={routes.overview}
-        aria-label="c-board overview"
-        className="grid size-11 shrink-0 place-items-center rounded-control text-text-2"
+        aria-label="Yardmaster overview"
+        className="grid size-11 shrink-0 place-items-center rounded-control text-text-1"
       >
         <Logomark className="size-6" />
       </Link>

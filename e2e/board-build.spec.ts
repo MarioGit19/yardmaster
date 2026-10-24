@@ -22,7 +22,7 @@ test('the built server serves the built app', async ({ browser }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await page.goto('/#/');
-    await expect(page).toHaveTitle(/c-board/);
+    await expect(page).toHaveTitle(/Yardmaster/);
     await expect(page.locator('a[href^="#/p/"]').first()).toBeVisible();
     const status = await page.request.get('/api/status');
     expect(await status.json()).toMatchObject({ ok: true, demo: true, watched: false });

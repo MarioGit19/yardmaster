@@ -38,6 +38,6 @@ test('the live favicon and title follow the demo board', async ({ page }) => {
   const changes = await page.evaluate(() => window.__favicons);
   expect(new Set(changes.map((f) => f.href)).size).toBeGreaterThan(1);
   for (const change of changes) {
-    expect(change.title).toMatch(change.state === 'wait' ? /^\(\d+\) c-board$/ : /^c-board$/);
+    expect(change.title).toMatch(change.state === 'wait' ? /^\(\d+\) Yardmaster$/ : /^Yardmaster$/);
   }
 });

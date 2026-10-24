@@ -266,7 +266,7 @@ export default function TokenPreview() {
     <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-8">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-label font-medium text-text-3">c-board</p>
+          <p className="font-mono text-label font-medium text-text-3">yardmaster</p>
           <h1 className="text-display font-semibold">Design tokens</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">

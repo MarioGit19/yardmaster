@@ -39,7 +39,7 @@ for (const profile of PROFILES) {
       await expect(page.locator('nav[aria-label="Projects"]')).toHaveCount(0);
       await expect(page.locator('section[aria-label="Pulse"]')).toHaveCount(0);
       const top = page.locator('[data-phone-topbar]');
-      await expect(top.getByRole('link', { name: 'c-board overview' })).toBeVisible();
+      await expect(top.getByRole('link', { name: 'Yardmaster overview' })).toBeVisible();
       await expect(top.locator('[data-counter]')).toHaveCount(3);
       await expect(top.getByRole('button', { name: 'Search' })).toBeVisible();
       // Theme, motion and Open project left the top bar for More and Projects.

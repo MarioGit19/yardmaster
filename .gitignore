@@ -33,9 +33,9 @@ loop/.state/
 .claude/references/
 .claude/settings.local.json
 
-# brand PNGs rendered from apps/web/src/brand/logo.svg (pnpm icons)
-apps/web/public/favicon.png
-apps/web/public/apple-touch-icon.png
+# brand assets rendered from apps/web/src/brand/logo.svg (pnpm brand:build, and the web build)
+apps/web/public/*.png
+apps/web/public/favicon.svg
 apps/extension/media/
 
 .early.coverage

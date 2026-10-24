@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/hero-dark.svg">
+    <img alt="Yardmaster: one calm view over everything running across your projects" src="docs/brand/hero-light.svg" width="640">
+  </picture>
+</p>
+
 # c-board
 
 **Mission control for your local dev work.** See every project you have open in one live, animated dashboard: every Cursor/VS Code terminal, every dev server, and every Claude Code session. You can act on them from there too: approve Claude's permission requests, chat with Claude, restart a crashed backend, or send Ctrl+C.

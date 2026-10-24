@@ -2,7 +2,8 @@ import { Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
-import { Logomark } from '../brand/Logo.js';
+import { BrandIntro } from '../brand/Logo.js';
+import { BRAND_NAME } from '../brand/name.js';
 import { selectConnection, selectWindowCount, useBoard } from '../data/index.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { routes } from '../routes.js';
@@ -137,15 +138,15 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
         }}
       >
         <header className="flex flex-col gap-3">
-          <Logomark className="size-8 text-text-2" />
+          <BrandIntro className="size-10 text-text-1" />
           <div className="flex flex-col gap-1">
             <h1 id="onboarding-title" className="font-medium text-text-1 text-title">
-              {complete ? 'You’re all set' : 'Set up c-board'}
+              {complete ? 'You’re all set' : `Set up ${BRAND_NAME}`}
             </h1>
             <p className="text-body-sm text-text-2">
               {complete
                 ? 'Claude Code sessions and editor terminals now report to the board.'
-                : 'Three steps. Each one ticks itself as soon as c-board sees it working.'}
+                : `Three steps. Each one ticks itself as soon as ${BRAND_NAME} sees it working.`}
             </p>
           </div>
         </header>
@@ -170,7 +171,7 @@ export function OnboardingWizard({ onDone }: { onDone(): void }) {
                 ? 'Receiving events from Claude Code.'
                 : installed
                   ? 'Installed. Start or continue a Claude Code session in any project to send the first event.'
-                  : `Adds c-board’s observer hooks to ${settingsPath}. They run in the background and never block Claude.`
+                  : `Adds ${BRAND_NAME}’s observer hooks to ${settingsPath}. They run in the background and never block Claude.`
             }
           >
             {!installed && (
@@ -241,8 +242,9 @@ function LibrarySuggestion() {
       {roots.length === 0 ? (
         <>
           <p className="text-meta text-text-2">
-            c-board can list the folders in one place, such as {SUGGESTED_ROOT}, so you can start
-            Claude or a terminal in a project that isn’t open anywhere. It only reads folder names.
+            {BRAND_NAME} can list the folders in one place, such as {SUGGESTED_ROOT}, so you can
+            start Claude or a terminal in a project that isn’t open anywhere. It only reads folder
+            names.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button

@@ -5,5 +5,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": [".", "../src/brand/render.ts"]
+  "include": [".", "../src/brand/render.ts", "../src/brand/name.ts"]
 }

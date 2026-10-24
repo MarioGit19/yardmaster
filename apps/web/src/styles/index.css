@@ -225,6 +225,12 @@
   }
 }
 
+/* The lowercase wordmark (DESIGN.md §4.9): Geist 600, tracked in so the ten letters hold as one word. */
+.wordmark {
+  font-family: var(--font-sans);
+  letter-spacing: -0.025em;
+}
+
 .skeleton {
   position: relative;
   overflow: hidden;

@@ -89,11 +89,11 @@ export function Hud() {
     <header className="flex h-12 shrink-0 items-center gap-2 border-line border-b bg-bg-1 px-4 md:gap-3">
       <Link
         href={routes.overview}
-        aria-label="c-board overview"
+        aria-label="Yardmaster overview"
         className="flex shrink-0 items-center whitespace-nowrap rounded-chip text-body text-text-1 touch:h-11"
       >
         {/* The smallest phones need the room for the counters; the link keeps its label. */}
-        <Wordmark nameClassName="max-[23rem]:sr-only" />
+        <Wordmark className="text-title-sm" nameClassName="max-[23rem]:sr-only" />
       </Link>
       <ul
         aria-label="Activity"

@@ -22,6 +22,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
 | `fx`       | `text` (decrypt, glitch, split-flap), `darkveil`, `softaurora`, `faultyterminal` (energy 0.1 → 1), `ripplegrid`, `lighttunnel` (dive and surge), `phone` (swipe and hold), cropped to the `/#/_tokens` fx sections |
 | `phone`    | `entrance`, `scroll`, `tabs` (the tab bar's gliding pill), `focus-open` (tap), `hub-item` (a hub card opens its page, a swipe to the next item, back), `focus-close` (back), `inspector-sheet` (tap a crew, pull the sheet down), `project-swipe` (a Projects row swiped open and shut, then closed) |
+| `brand`    | `intro`: the setup guide's brand moment (the Y converges, the orb lights), cropped to its header |
 | `close`    | `confirm` (pod menu → Close project…), `leave` (confirm: the pod leaves the overview) |
 | `all`      | every scenario above, each on a fresh demo board                             |
 

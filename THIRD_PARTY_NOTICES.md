@@ -58,3 +58,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Geist
+
+Source: [Geist](https://github.com/vercel/geist-font) by Vercel, via `@fontsource-variable/geist`.
+License: **SIL Open Font License 1.1**. The README hero (`docs/brand/hero-*.svg`) embeds the
+Latin subset of Geist so the wordmark renders on GitHub; the font is unmodified and not sold on its
+own, which the license allows.
