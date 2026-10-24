@@ -6,5 +6,8 @@ export const railPreference = createPreference<'expanded' | 'collapsed'>(
   'expanded',
 );
 
-/** Below this width the rail always shows icons only. */
+/** Phones: below this width the app is the phone shell (DESIGN.md §11), without the rail. */
 export const NARROW_QUERY = '(max-width: 767px)';
+
+/** Up to this width the desktop shell's rail shows icons only. */
+export const RAIL_ICONS_QUERY = '(max-width: 1023px)';

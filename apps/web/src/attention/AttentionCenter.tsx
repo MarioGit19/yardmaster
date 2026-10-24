@@ -8,7 +8,7 @@ import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import {
   selectPendingApprovals,
   selectProject,
@@ -19,12 +19,12 @@ import {
 } from '../data/index.js';
 import { dur, ease, type MotionLevel, move, spring, useMotionLevel } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
-import { useMediaQuery, usePreference } from '../prefs.js';
-import { sessionHref } from '../routes.js';
+import { usePreference } from '../prefs.js';
+import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
-import { NARROW_QUERY } from '../shell/prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
 import { actionErrorText } from '../terminal/stack.js';
+import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
 import { StatusDot } from '../ui/StatusDot.js';
@@ -41,16 +41,16 @@ import {
 const close = () => attentionOpen.set('closed');
 
 /**
- * The right sheet (a bottom sheet on narrow screens) listing everything that waits for the user,
- * DESIGN.md §4.5: approval cards (keyboard first: A, ⇧A, D, ↑↓), then sessions to answer elsewhere.
+ * The right sheet listing everything that waits for the user, DESIGN.md §4.5: approval cards
+ * (keyboard first: A, ⇧A, D, ↑↓), then sessions to answer elsewhere. On phones the same list is
+ * the Attention tab (`AttentionPage`).
  */
 export function AttentionCenter() {
   const open = usePreference(attentionOpen) === 'open';
-  const narrow = useMediaQuery(NARROW_QUERY);
   // Reduced cross-fades in place; Off mounts the sheet already at rest.
   const level = useMotionLevel();
   const still = level !== 'full';
-  const offscreen = move(still, narrow ? 'translateY(100%)' : 'translateX(100%)');
+  const offscreen = move(still, 'translateX(100%)');
   return (
     <AnimatePresence>
       {open && (
@@ -77,20 +77,30 @@ export function AttentionCenter() {
             opacity: 0,
             transition: { duration: dur.fast, ease: ease.out },
           }}
-          className={
-            narrow
-              ? 'fixed inset-x-0 bottom-0 z-40 flex max-h-[70dvh] flex-col rounded-t-modal border-line border-t bg-bg-1 shadow-raised'
-              : 'fixed top-12 right-0 bottom-0 z-40 flex w-96 flex-col border-line border-l bg-bg-1 shadow-raised'
-          }
+          className="fixed top-12 right-0 bottom-0 z-40 flex w-96 flex-col border-line border-l bg-bg-1 shadow-raised"
         >
-          <SheetBody />
+          <SheetBody onClose={close} />
         </motion.aside>
       )}
     </AnimatePresence>
   );
 }
 
-function SheetBody() {
+/** The phone's Attention tab: the sheet's list as a full screen; Esc goes to the overview. */
+export function AttentionPage() {
+  const [, navigate] = useLocation();
+  return (
+    <section
+      aria-labelledby="attention-title"
+      data-attention-page=""
+      className="flex min-h-full flex-col bg-bg-1"
+    >
+      <SheetBody onClose={() => navigate(routes.overview)} inline />
+    </section>
+  );
+}
+
+function SheetBody({ onClose, inline = false }: { onClose: () => void; inline?: boolean }) {
   const pending = useBoardList(selectPendingApprovals);
   const others = useBoardList(selectWaitingWithoutApproval);
   const client = useBoardClient();
@@ -128,6 +138,8 @@ function SheetBody() {
 
   // The newest handlers for the window listener, which subscribes once.
   const keys = useRef<(event: KeyboardEvent) => void>(() => {});
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   keys.current = (event) => {
     const key = attentionKey(event);
     if (!key || !selected) return;
@@ -155,7 +167,7 @@ function SheetBody() {
       if (event.defaultPrevented || isTypingTarget(event.target)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
-        close();
+        closeRef.current();
         return;
       }
       keys.current(event);
@@ -170,7 +182,12 @@ function SheetBody() {
   const count = pending.length + others.length;
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-line border-b pr-2 pl-5">
+      <header
+        className={cx(
+          'flex h-12 shrink-0 items-center gap-2 border-line border-b',
+          inline ? 'px-4' : 'pr-2 pl-5',
+        )}
+      >
         <h2
           id="attention-title"
           ref={heading}
@@ -180,14 +197,16 @@ function SheetBody() {
           Needs you
           <NumberTicker value={count} className="ml-2 text-text-2" />
         </h2>
-        <IconButton
-          label="Close"
-          shortcut="Escape"
-          size="sm"
-          tooltipSide="left"
-          onClick={close}
-          icon={<X className="size-4" strokeWidth={1.5} />}
-        />
+        {!inline && (
+          <IconButton
+            label="Close"
+            shortcut="Escape"
+            size="sm"
+            tooltipSide="left"
+            onClick={onClose}
+            icon={<X className="size-4" strokeWidth={1.5} />}
+          />
+        )}
       </header>
       {count === 0 && cards.length === 0 ? (
         // Fades in so it doesn't pop in the frame the last decided card leaves.

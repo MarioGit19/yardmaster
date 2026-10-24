@@ -232,9 +232,10 @@ test('stacked tabs at 390', async ({ page }) => {
   await expect(card.locator('[id^="focus-panel-"]:visible')).toHaveCount(1);
   await expect(card.locator('#focus-panel-terminals')).toContainText('Terminals');
   await expect(card.locator('#focus-panel-terminals [data-terminal-stack]')).toBeVisible();
+  // Phones get the full-bleed workspace (DESIGN.md §11): edge to edge, no card inset.
   const box = await card.boundingBox();
-  expect(box?.x).toBeGreaterThanOrEqual(16);
-  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(390 - 16);
+  expect(Math.round(box?.x ?? -1)).toBe(0);
+  expect(Math.round(box?.width ?? 0)).toBe(390);
 });
 
 test('at Reduced the focus view swaps without movement', async ({ page }) => {

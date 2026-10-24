@@ -4,6 +4,9 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { dur, ease, spring } from '../motion.js';
+import { useMediaQuery } from '../prefs.js';
+import { NARROW_QUERY } from '../shell/prefs.js';
+import { SheetPanel } from '../ui/BottomSheet.js';
 import { Button, type ButtonProps } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { ApiRequestError, api } from './api.js';
@@ -51,6 +54,7 @@ export function InstallHooksButton({
   ...props
 }: Omit<ButtonProps, 'onClick'> & { onInstalled(result: HooksInstallResponse): void }) {
   const [plan, setPlan] = useState<HooksPlanResponse | null>(null);
+  const narrow = useMediaQuery(NARROW_QUERY);
   const [busy, setBusy] = useState<'plan' | 'install' | null>(null);
   const [stale, setStale] = useState(false);
 
@@ -115,44 +119,77 @@ export function InstallHooksButton({
                 />
               </Dialog.Overlay>
               <Dialog.Content asChild forceMount>
-                <motion.div
-                  data-hooks-dialog
-                  className="palette fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] w-[min(640px,calc(100vw-32px))] flex-col gap-4 overflow-hidden rounded-modal border border-line-strong p-5 shadow-raised outline-none"
-                  // Centred, so it scales from its centre (`.palette` scales from its top edge).
-                  style={{ x: '-50%', y: '-50%', transformOrigin: '50% 50%' }}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1, transition: spring.smooth }}
-                  exit={{
-                    opacity: 0,
-                    scale: 0.98,
-                    transition: { duration: dur.fast, ease: ease.out },
-                  }}
-                >
-                  <div className="flex flex-col gap-1">
-                    <Dialog.Title className="font-medium text-text-1 text-title-sm">
-                      Install the c-board hooks?
-                    </Dialog.Title>
-                    <Dialog.Description className="text-body-sm text-text-2">
-                      {stale
-                        ? 'The file changed while this was open. Here is what would change now.'
-                        : 'This is the exact change to Claude’s settings. Other hooks stay as they are, and the current file is backed up first.'}
-                    </Dialog.Description>
-                  </div>
-                  <PlanDiff diff={plan.diff} />
-                  <div className="flex justify-end gap-2">
-                    <Dialog.Close asChild>
-                      <Button variant="ghost">Cancel</Button>
-                    </Dialog.Close>
-                    <Button
-                      variant="primary"
-                      disabled={busy !== null}
-                      onClick={() => void install()}
-                      data-hooks-confirm
-                    >
-                      {busy === 'install' ? 'Installing…' : 'Install'}
-                    </Button>
-                  </div>
-                </motion.div>
+                {narrow ? (
+                  <SheetPanel
+                    data-hooks-dialog
+                    onDismiss={() => setPlan(null)}
+                    className="gap-4 overflow-hidden px-4 pb-[max(16px,env(safe-area-inset-bottom))]"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <Dialog.Title className="font-medium text-text-1 text-title-sm">
+                        Install the c-board hooks?
+                      </Dialog.Title>
+                      <Dialog.Description className="text-body-sm text-text-2">
+                        {stale
+                          ? 'The file changed while this was open. Here is what would change now.'
+                          : 'This is the exact change to Claude’s settings. Other hooks stay as they are, and the current file is backed up first.'}
+                      </Dialog.Description>
+                    </div>
+                    <PlanDiff diff={plan.diff} />
+                    <div className="flex justify-end gap-2">
+                      <Dialog.Close asChild>
+                        <Button variant="ghost">Cancel</Button>
+                      </Dialog.Close>
+                      <Button
+                        variant="primary"
+                        disabled={busy !== null}
+                        onClick={() => void install()}
+                        data-hooks-confirm
+                      >
+                        {busy === 'install' ? 'Installing…' : 'Install'}
+                      </Button>
+                    </div>
+                  </SheetPanel>
+                ) : (
+                  <motion.div
+                    data-hooks-dialog
+                    className="palette fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100vh-32px)] w-[min(640px,calc(100vw-32px))] flex-col gap-4 overflow-hidden rounded-modal border border-line-strong p-5 shadow-raised outline-none"
+                    // Centred, so it scales from its centre (`.palette` scales from its top edge).
+                    style={{ x: '-50%', y: '-50%', transformOrigin: '50% 50%' }}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1, transition: spring.smooth }}
+                    exit={{
+                      opacity: 0,
+                      scale: 0.98,
+                      transition: { duration: dur.fast, ease: ease.out },
+                    }}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <Dialog.Title className="font-medium text-text-1 text-title-sm">
+                        Install the c-board hooks?
+                      </Dialog.Title>
+                      <Dialog.Description className="text-body-sm text-text-2">
+                        {stale
+                          ? 'The file changed while this was open. Here is what would change now.'
+                          : 'This is the exact change to Claude’s settings. Other hooks stay as they are, and the current file is backed up first.'}
+                      </Dialog.Description>
+                    </div>
+                    <PlanDiff diff={plan.diff} />
+                    <div className="flex justify-end gap-2">
+                      <Dialog.Close asChild>
+                        <Button variant="ghost">Cancel</Button>
+                      </Dialog.Close>
+                      <Button
+                        variant="primary"
+                        disabled={busy !== null}
+                        onClick={() => void install()}
+                        data-hooks-confirm
+                      >
+                        {busy === 'install' ? 'Installing…' : 'Install'}
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
               </Dialog.Content>
             </Dialog.Portal>
           )}

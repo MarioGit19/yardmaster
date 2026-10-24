@@ -114,7 +114,7 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
         {focus && (
           <div
             key={focus.projectId}
-            className="focus-layer absolute inset-0 z-10 flex flex-col p-4 md:p-6"
+            className="focus-layer absolute inset-0 z-10 flex flex-col md:p-6"
           >
             <FocusView
               projectId={focus.projectId}

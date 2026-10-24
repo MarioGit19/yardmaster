@@ -32,7 +32,7 @@ import {
   permissionLabel,
 } from '../claude/composerModel.js';
 import { useBoard, useBoardClient, useBoardStore } from '../data/index.js';
-import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
+import { dur, ease, useMotionLevel } from '../motion.js';
 import { editorName } from '../palette/commands.js';
 import { highlightRuns } from '../palette/fuzzy.js';
 import { createPreference, type KeyValueStorage, useMediaQuery, usePreference } from '../prefs.js';
@@ -44,6 +44,7 @@ import { NARROW_QUERY } from '../shell/prefs.js';
 import { BOARD_TERMINALS_OFF, recentCommands, terminalHost } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { formatDateTime, formatWhen } from '../time.js';
+import { SheetPanel } from '../ui/BottomSheet.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { Kbd } from '../ui/Kbd.js';
@@ -98,8 +99,6 @@ const STEP_NAME: Record<LaunchStep['kind'], string> = {
 export function OpenProjectDialog() {
   const open = usePreference(pickerOpen) === 'open';
   const narrow = useMediaQuery(NARROW_QUERY);
-  const level = useMotionLevel();
-  const still = level !== 'full';
   // Set when a launch moves focus to the focus view.
   const keepFocus = useRef(false);
   // The launch sheet handles Esc itself (back to the list) instead of closing.
@@ -117,7 +116,6 @@ export function OpenProjectDialog() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
-  const offscreen = move(still, 'translateY(100%)');
   return (
     <Dialog.Root open={open} onOpenChange={(next) => pickerOpen.set(next ? 'open' : 'closed')}>
       <AnimatePresence>
@@ -146,16 +144,10 @@ export function OpenProjectDialog() {
               }}
             >
               {narrow ? (
-                <motion.div
+                <SheetPanel
                   data-open-project
-                  className="palette fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-modal border-line-strong border-t shadow-raised outline-none"
-                  initial={level === 'off' ? false : { transform: offscreen, opacity: 0 }}
-                  animate={{ transform: 'none', opacity: 1, transition: spring.smooth }}
-                  exit={{
-                    transform: offscreen,
-                    opacity: 0,
-                    transition: { duration: dur.fast, ease: ease.out },
-                  }}
+                  onDismiss={() => pickerOpen.set('closed')}
+                  className="overflow-hidden"
                 >
                   <Dialog.Title className="sr-only">Open project</Dialog.Title>
                   <PickerBody
@@ -164,7 +156,7 @@ export function OpenProjectDialog() {
                     }}
                     onEscape={onEscape}
                   />
-                </motion.div>
+                </SheetPanel>
               ) : (
                 <motion.div
                   data-open-project

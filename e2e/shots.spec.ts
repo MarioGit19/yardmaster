@@ -1660,8 +1660,9 @@ for (const theme of THEMES) {
       test.use({ theme, viewport: { width, height: width < 1024 ? 844 : 900 } });
 
       test('picker and launch sheet', async ({ page }) => {
-        await openRoute(page, '/');
-        await page.locator('[data-hud="open-project"]').click();
+        // Phones open it from the Projects tab (DESIGN.md §11).
+        await openRoute(page, width < 768 ? '/projects' : '/');
+        await page.locator('[data-hud="open-project"], [data-phone-open-project]').click();
         const dialog = page.locator('[data-open-project]');
         await expect(dialog.locator('[data-library-entry="weather-bot"]')).toBeVisible();
         await page.waitForTimeout(400);
@@ -1707,8 +1708,8 @@ test.describe('board terminal', () => {
           });
           const page = await context.newPage();
           await page.addInitScript((t) => localStorage.setItem('cboard.theme', t), theme);
-          await page.goto('/#/');
-          await page.locator('[data-hud="open-project"]').click();
+          await page.goto(viewport.width < 768 ? '/#/projects' : '/#/');
+          await page.locator('[data-hud="open-project"], [data-phone-open-project]').click();
           const dialog = page.locator('[data-open-project]');
           const entry = viewport.width < 768 ? 'tax-notes' : 'recipe-box';
           await dialog.locator(`[data-library-entry="${entry}"]`).click();
@@ -1765,8 +1766,8 @@ for (const theme of THEMES) {
     }
 
     test('picker and launch sheet', async ({ page }) => {
-      await openRoute(page, '/');
-      await page.locator('[data-hud="open-project"]').tap();
+      await openRoute(page, '/projects');
+      await page.locator('[data-phone-open-project]').tap();
       const dialog = page.locator('[data-open-project]');
       await expect(dialog.locator('[data-library-entry="weather-bot"]')).toBeVisible();
       await page.waitForTimeout(500);
@@ -1903,4 +1904,56 @@ for (const theme of THEMES) {
       });
     });
   });
+}
+
+// 12.6b: the phone shell (DESIGN.md §11) at 360, 390 and 412: each tab, the workspace and its
+// overflow sheet, on an Android-like touch profile.
+const { defaultBrowserType: _android, ...galaxy } = devices['Galaxy S24'];
+const SHELL_TABS = [
+  { tab: 'overview', route: '/', ready: '[data-pod]' },
+  { tab: 'projects', route: '/projects', ready: '[data-phone-project]' },
+  { tab: 'attention', route: '/attention', ready: '[data-attention-page]' },
+  { tab: 'pulse', route: '/pulse', ready: '[data-pulse-row]' },
+  { tab: 'more', route: '/more', ready: '[data-more="layout"]' },
+] as const;
+
+for (const theme of THEMES) {
+  for (const width of [360, 390, 412] as const) {
+    test.describe(`phone shell ${theme} ${width}`, () => {
+      test.use({ ...galaxy, theme, viewport: { width, height: width === 412 ? 915 : 844 } });
+      const shot = (page: import('@playwright/test').Page, name: string) =>
+        page.screenshot({
+          path: new URL(`phone-shell-${name}-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+
+      test('tabs', async ({ page }) => {
+        test.slow();
+        await openRoute(page, '/');
+        for (const { tab, route, ready } of SHELL_TABS) {
+          await page.goto(`/#${route}`);
+          await expect(page.locator(ready).first()).toBeVisible({ timeout: 20_000 });
+          await page.waitForTimeout(700);
+          await shot(page, tab);
+        }
+      });
+
+      test('workspace', async ({ page }) => {
+        test.slow();
+        await openRoute(page, '/projects');
+        await page.locator('[data-phone-project]').first().tap();
+        const workspace = page.locator('[data-workspace="phone"]');
+        await expect(workspace).toBeVisible();
+        for (const tab of ['Claude', 'Sessions', 'Terminals'] as const) {
+          await workspace.getByRole('tab', { name: tab, exact: true }).tap();
+          await page.waitForTimeout(700);
+          await shot(page, `workspace-${tab.toLowerCase()}`);
+        }
+        await workspace.locator('[data-workspace-menu-trigger]').tap();
+        await expect(page.locator('[data-workspace-menu]')).toBeVisible();
+        await page.waitForTimeout(600);
+        await shot(page, 'workspace-menu');
+      });
+    });
+  }
 }

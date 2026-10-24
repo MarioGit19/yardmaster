@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, ExternalLink, OctagonX, SquareArrowOutUpRight, X } from 'lucide-react';
-import { AnimatePresence, motion, useDragControls } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
@@ -17,7 +17,7 @@ import {
 import { formatUptime } from '../lanes/lane.js';
 import { PortChip } from '../lanes/PortChip.js';
 import { TerminalPeek } from '../lanes/TerminalPeek.js';
-import { dur, ease, spring } from '../motion.js';
+import { dur, ease } from '../motion.js';
 import { editorName } from '../palette/commands.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import { lastLine } from '../pod/model.js';
@@ -25,6 +25,7 @@ import { useMediaQuery } from '../prefs.js';
 import { projectHref } from '../routes.js';
 import { formatCount, totalTokens } from '../status.js';
 import { actionErrorText } from '../terminal/stack.js';
+import { SheetPanel } from '../ui/BottomSheet.js';
 import { Button, buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { Popover } from '../ui/Popover.js';
@@ -35,9 +36,6 @@ import { useSceneProject } from './useScene.js';
 
 /** Phones and touch screens get a bottom sheet instead of an anchored popover (§10.1). */
 export const SHEET_QUERY = '(max-width: 767px), (pointer: coarse)';
-/** A pull this far (px) or this fast (px/s) closes the sheet. */
-const PULL_CLOSE_PX = 80;
-const PULL_CLOSE_VELOCITY = 500;
 const TAIL_LINES = 6;
 
 export interface ActorInspectorProps {
@@ -170,7 +168,6 @@ function InspectorSheet({
   label: string;
   children: ReactElement;
 }) {
-  const drag = useDragControls();
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
@@ -191,35 +188,14 @@ function InspectorSheet({
               aria-describedby={undefined}
               onOpenAutoFocus={focusPrimary}
             >
-              <motion.div
+              <SheetPanel
                 data-actor-inspector=""
-                data-sheet=""
-                // `y` (not a transform string): Reduced drops it and only fades.
-                initial={{ opacity: 0, y: '100%' }}
-                animate={{ opacity: 1, y: 0, transition: spring.smooth }}
-                exit={{ opacity: 0, y: '100%', transition: { duration: dur.fast, ease: ease.out } }}
-                drag="y"
-                dragListener={false}
-                dragControls={drag}
-                dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={{ top: 0, bottom: 0.7 }}
-                onDragEnd={(_, info) => {
-                  if (info.offset.y > PULL_CLOSE_PX || info.velocity.y > PULL_CLOSE_VELOCITY) {
-                    onOpenChange(false);
-                  }
-                }}
-                className="palette fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-modal border border-line-strong border-b-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-raised outline-none"
+                onDismiss={() => onOpenChange(false)}
+                className="max-h-[85dvh] px-4 pb-[max(16px,env(safe-area-inset-bottom))] [&>[data-sheet-handle]]:-mx-4"
               >
-                {/* The handle: pulling it (or the top of the sheet) down closes it. */}
-                <div
-                  onPointerDown={(e) => drag.start(e)}
-                  className="-mx-4 flex h-6 shrink-0 cursor-grab touch-none select-none items-center justify-center active:cursor-grabbing"
-                >
-                  <span aria-hidden className="h-1 w-10 rounded-full bg-line-strong" />
-                </div>
                 <Dialog.Title className="sr-only">{label}</Dialog.Title>
                 <div className="min-h-0 overflow-y-auto pb-1">{children}</div>
-              </motion.div>
+              </SheetPanel>
             </Dialog.Content>
           </Dialog.Portal>
         )}

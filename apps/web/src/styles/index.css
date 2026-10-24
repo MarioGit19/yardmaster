@@ -3494,3 +3494,32 @@ main[data-office-zoom] {
   pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
+
+/* Phones, DESIGN.md §11. The phone shell publishes the visual viewport as `--app-h`/`--app-top`
+   and the keyboard's overlap of the layout viewport as `--kb-inset` (iOS, where the keyboard
+   doesn't resize the page), so the shell and its sheets stay above the keyboard. */
+@layer components {
+  .sheet-panel {
+    bottom: var(--kb-inset, 0px);
+    max-height: min(90dvh, calc(var(--app-h, 100dvh) - 16px));
+  }
+}
+:root {
+  --tabbar-h: calc(56px + env(safe-area-inset-bottom));
+}
+.phone-shell {
+  top: var(--app-top, 0px);
+  height: var(--app-h, 100dvh);
+}
+/* Inputs at 16 px, so mobile browsers don't zoom the page when one takes focus. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+/* The workspace's composers clear the home indicator. */
+[data-workspace="phone"] [data-composer] {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}

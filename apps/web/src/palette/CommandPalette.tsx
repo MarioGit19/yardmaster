@@ -40,6 +40,7 @@ import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { terminalTarget } from '../terminal/target.js';
 import { NEXT_THEME, themePreference } from '../theme/theme.js';
+import { SheetPanel } from '../ui/BottomSheet.js';
 import { cx } from '../ui/cx.js';
 import { Kbd } from '../ui/Kbd.js';
 import { StatusDot } from '../ui/StatusDot.js';
@@ -84,6 +85,8 @@ const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(naviga
  */
 export function CommandPalette() {
   const open = usePreference(paletteOpen) === 'open';
+  // A bottom sheet on phones (DESIGN.md §11).
+  const narrow = useMediaQuery(NARROW_QUERY);
   // Set when a command moves focus on its own (a new view, the Attention Center).
   const keepFocus = useRef(false);
   // A sub-page handles Esc itself (back to all commands) instead of closing.
@@ -128,33 +131,49 @@ export function CommandPalette() {
                 if (keepFocus.current) event.preventDefault();
               }}
             >
-              <motion.div
-                data-palette
-                className="palette fixed top-[12vh] left-1/2 z-50 flex max-h-[min(560px,76vh)] w-[min(640px,calc(100vw-32px))] flex-col overflow-hidden rounded-modal border border-line-strong shadow-raised outline-none"
-                style={{ x: '-50%' }}
-                // Opened from the keyboard many times a day: quick, so it never holds up typing.
-                initial={{ opacity: 0, scale: 0.96, filter: 'blur(4px)' }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  filter: 'blur(0px)',
-                  transition: { duration: dur.fast, ease: ease.out },
-                  transitionEnd: { filter: 'none' },
-                }}
-                exit={{
-                  opacity: 0,
-                  scale: 0.98,
-                  transition: { duration: dur.fast, ease: ease.out },
-                }}
-              >
-                <Dialog.Title className="sr-only">Command palette</Dialog.Title>
-                <PaletteBody
-                  keepFocus={() => {
-                    keepFocus.current = true;
+              {narrow ? (
+                <SheetPanel
+                  data-palette
+                  onDismiss={() => paletteOpen.set('closed')}
+                  className="overflow-hidden"
+                >
+                  <Dialog.Title className="sr-only">Command palette</Dialog.Title>
+                  <PaletteBody
+                    keepFocus={() => {
+                      keepFocus.current = true;
+                    }}
+                    onEscape={onEscape}
+                  />
+                </SheetPanel>
+              ) : (
+                <motion.div
+                  data-palette
+                  className="palette fixed top-[12vh] left-1/2 z-50 flex max-h-[min(560px,76vh)] w-[min(640px,calc(100vw-32px))] flex-col overflow-hidden rounded-modal border border-line-strong shadow-raised outline-none"
+                  style={{ x: '-50%' }}
+                  // Opened from the keyboard many times a day: quick, so it never holds up typing.
+                  initial={{ opacity: 0, scale: 0.96, filter: 'blur(4px)' }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                    filter: 'blur(0px)',
+                    transition: { duration: dur.fast, ease: ease.out },
+                    transitionEnd: { filter: 'none' },
                   }}
-                  onEscape={onEscape}
-                />
-              </motion.div>
+                  exit={{
+                    opacity: 0,
+                    scale: 0.98,
+                    transition: { duration: dur.fast, ease: ease.out },
+                  }}
+                >
+                  <Dialog.Title className="sr-only">Command palette</Dialog.Title>
+                  <PaletteBody
+                    keepFocus={() => {
+                      keepFocus.current = true;
+                    }}
+                    onEscape={onEscape}
+                  />
+                </motion.div>
+              )}
             </Dialog.Content>
           </Dialog.Portal>
         )}

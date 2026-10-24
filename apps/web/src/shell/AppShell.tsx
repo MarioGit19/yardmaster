@@ -1,10 +1,13 @@
 import { type ReactNode, useCallback, useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
 import { selectConnection, useBoard } from '../data/index.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { cx } from '../ui/cx.js';
 import { Hud } from './Hud.js';
+import { PhoneShell } from './PhoneShell.js';
 import { ProjectRail } from './ProjectRail.js';
-import { NARROW_QUERY, railPreference } from './prefs.js';
+import { historyTrack } from './phoneNav.js';
+import { NARROW_QUERY, RAIL_ICONS_QUERY, railPreference } from './prefs.js';
 import { isTypingTarget } from './railNav.js';
 
 export interface AppShellProps {
@@ -17,8 +20,22 @@ export interface AppShellProps {
   pulse?: ReactNode;
 }
 
+/** The desktop shell; phones get the phone shell (DESIGN.md §11). */
 export function AppShell({ children, sheet, stage, pulse }: AppShellProps) {
-  const narrow = useMediaQuery(NARROW_QUERY);
+  const phone = useMediaQuery(NARROW_QUERY);
+  const [location] = useLocation();
+  useEffect(() => historyTrack.visit(location), [location]);
+  if (phone) return <PhoneShell stage={stage}>{children}</PhoneShell>;
+  return (
+    <DesktopShell sheet={sheet} stage={stage} pulse={pulse}>
+      {children}
+    </DesktopShell>
+  );
+}
+
+/** 768–1023 px keep it with the rail collapsed to icons. */
+function DesktopShell({ children, sheet, stage, pulse }: AppShellProps) {
+  const narrow = useMediaQuery(RAIL_ICONS_QUERY);
   const rail = usePreference(railPreference);
   const collapsed = narrow || rail === 'collapsed';
   const toggleRail = () => railPreference.set(rail === 'collapsed' ? 'expanded' : 'collapsed');

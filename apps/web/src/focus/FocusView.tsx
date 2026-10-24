@@ -42,6 +42,8 @@ import { useMascotState } from '../pod/useMascotState.js';
 import { useMediaQuery } from '../prefs.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
+import { leaveWorkspace } from '../shell/phoneNav.js';
+import { NARROW_QUERY } from '../shell/prefs.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
@@ -59,6 +61,8 @@ import { claudeColumnSession } from './claudeColumn.js';
 import { FocusCaption } from './FocusCaption.js';
 import { ResizableColumns } from './ResizableColumns.js';
 import { sharedId } from './shared.js';
+import { useTabSwipe } from './swipe.js';
+import { WorkspaceMenu } from './WorkspaceMenu.js';
 
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
@@ -196,6 +200,8 @@ function ProjectFocus({
   };
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
+  // Phones: a full-bleed workspace with its own app bar (DESIGN.md §11).
+  const phone = useMediaQuery(NARROW_QUERY);
   // A terminal picked in ⌘K, or a new one asked for there or in the pod's menu.
   const terminalTargeted = useTerminalTarget(project.id) !== null;
   const newTerminalRequested = useNewTerminalRequest(project.id);
@@ -258,62 +264,106 @@ function ProjectFocus({
       transition={spring.smooth}
       {...(fade && cardFade)}
       data-focus={project.id}
-      style={{ borderRadius: 16, '--accent': accent } as never}
-      className="focus-card relative flex h-full min-h-0 flex-col overflow-hidden border border-line bg-bg-1 shadow-raised"
+      data-workspace={phone ? 'phone' : undefined}
+      style={{ borderRadius: phone ? 0 : 16, '--accent': accent } as never}
+      className={cx(
+        'focus-card relative flex h-full min-h-0 flex-col overflow-hidden bg-bg-1',
+        !phone && 'border border-line shadow-raised',
+      )}
     >
-      <motion.header
-        layoutId={shared ? sharedId.header(project.id) : undefined}
-        transition={spring.smooth}
-        className="relative flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-4 py-3 md:px-5"
-      >
-        {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
-        <Tooltip content="Back to the overview" shortcut="Esc">
-          <Link
-            href={routes.overview}
-            aria-label="Back to the overview"
-            className={buttonClass('ghost', 'sm', { square: true })}
+      {phone ? (
+        <motion.header
+          layoutId={shared ? sharedId.header(project.id) : undefined}
+          transition={spring.smooth}
+          data-workspace-appbar=""
+          className="relative flex min-w-0 shrink-0 items-center gap-2 border-line border-b px-1 pt-[env(safe-area-inset-top)]"
+          style={{ minHeight: 'calc(56px + env(safe-area-inset-top))' }}
+        >
+          {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
+          <button
+            type="button"
+            aria-label="Back"
+            aria-keyshortcuts="Escape"
+            data-workspace-back=""
+            onClick={() => leaveWorkspace(navigate)}
+            className="grid size-11 shrink-0 place-items-center rounded-control text-text-2 transition-[background-color,color,scale] duration-fast ease-out hover:bg-bg-2 hover:text-text-1 moving:active:scale-[0.97]"
           >
-            <ArrowLeft className="size-4" strokeWidth={1.5} />
-          </Link>
-        </Tooltip>
-        <ProjectAvatar project={project} size="lg" />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            title={project.name}
-            className="truncate font-medium text-title text-text-1 outline-none focus-visible:shadow-none"
-          >
-            {project.name}
-          </h1>
-          <p className="truncate font-mono text-meta text-text-2" title={project.path}>
-            {project.path}
-          </p>
-        </div>
-        <HeaderCrew
-          key={composing ? 'new' : (session?.id ?? 'project')}
-          session={composing ? null : (session ?? null)}
-          accent={accent}
-          crew={crew}
-          now={now}
-        />
-        {session && session.status.kind !== 'ended' && (
-          <div className="hidden min-w-0 max-w-[32rem] flex-[1.4] md:block">
-            <FocusCaption session={session} />
+            <ArrowLeft aria-hidden className="size-5" strokeWidth={1.5} />
+          </button>
+          <ProjectAvatar project={project} />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              title={project.name}
+              className="truncate font-medium text-body text-text-1 outline-none focus-visible:shadow-none"
+            >
+              {project.name}
+            </h1>
+            {project.git?.branch && (
+              <p className="truncate font-mono text-label text-text-2" title={project.git.branch}>
+                {project.git.branch}
+              </p>
+            )}
           </div>
-        )}
-        {project.git?.branch && (
-          <span className="hidden min-w-0 max-w-60 sm:flex">
-            <Chip mono icon={<GitBranch />} title={project.git.branch}>
-              {project.git.branch}
-            </Chip>
-          </span>
-        )}
-      </motion.header>
+          <WorkspaceMenu project={project} onNewSession={() => setComposing(true)} />
+        </motion.header>
+      ) : (
+        <motion.header
+          layoutId={shared ? sharedId.header(project.id) : undefined}
+          transition={spring.smooth}
+          className="relative flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-4 py-3 md:px-5"
+        >
+          {session && <DoneSweep key={session.id} pulseKey={activityKey.session(session.id)} />}
+          <Tooltip content="Back to the overview" shortcut="Esc">
+            <Link
+              href={routes.overview}
+              aria-label="Back to the overview"
+              className={buttonClass('ghost', 'sm', { square: true })}
+            >
+              <ArrowLeft className="size-4" strokeWidth={1.5} />
+            </Link>
+          </Tooltip>
+          <ProjectAvatar project={project} size="lg" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              title={project.name}
+              className="truncate font-medium text-title text-text-1 outline-none focus-visible:shadow-none"
+            >
+              {project.name}
+            </h1>
+            <p className="truncate font-mono text-meta text-text-2" title={project.path}>
+              {project.path}
+            </p>
+          </div>
+          <HeaderCrew
+            key={composing ? 'new' : (session?.id ?? 'project')}
+            session={composing ? null : (session ?? null)}
+            accent={accent}
+            crew={crew}
+            now={now}
+          />
+          {session && session.status.kind !== 'ended' && (
+            <div className="hidden min-w-0 max-w-[32rem] flex-[1.4] md:block">
+              <FocusCaption session={session} />
+            </div>
+          )}
+          {project.git?.branch && (
+            <span className="hidden min-w-0 max-w-60 sm:flex">
+              <Chip mono icon={<GitBranch />} title={project.git.branch}>
+                {project.git.branch}
+              </Chip>
+            </span>
+          )}
+        </motion.header>
+      )}
 
       <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
         {tabs ? (
           <FocusTabs
+            phone={phone}
             settle={settle}
             show={
               composing
@@ -359,7 +409,10 @@ function FocusTabs({
   show,
   showNonce = 0,
   settle,
+  phone = false,
 }: {
+  /** Full-width tabs, and a horizontal swipe on the panel switches to the next one. */
+  phone?: boolean;
   panels: TabPanel[];
   show: string | null;
   /** Changes when the same panel is asked for again. */
@@ -388,6 +441,12 @@ function FocusTabs({
     setActive(panels[next]?.id ?? active);
     tabRefs.current[next]?.focus();
   };
+  const swipe = useTabSwipe((step) => {
+    const next = panels[index + step];
+    if (!next) return;
+    setByKeyboard(false);
+    setActive(next.id);
+  });
 
   return (
     <>
@@ -395,7 +454,7 @@ function FocusTabs({
         role="tablist"
         aria-label="Focus view panels"
         onKeyDown={onKeyDown}
-        className="flex shrink-0 gap-1 border-line border-b px-3"
+        className={cx('flex shrink-0 gap-1 border-line border-b', phone ? 'px-1' : 'px-3')}
       >
         {panels.map((panel, i) => {
           const selected = panel.id === active;
@@ -417,7 +476,8 @@ function FocusTabs({
                 setActive(panel.id);
               }}
               className={cx(
-                'relative h-10 rounded-control px-3 text-body-sm transition-colors duration-fast',
+                'relative rounded-control px-3 text-body-sm transition-colors duration-fast',
+                phone ? 'h-11 min-w-0 flex-1' : 'h-10',
                 selected ? 'text-text-1' : 'text-text-3 hover:text-text-2',
               )}
             >
@@ -434,19 +494,25 @@ function FocusTabs({
           );
         })}
       </div>
-      {panels.map((panel) => (
-        <motion.div
-          {...settle}
-          key={panel.id}
-          role="tabpanel"
-          id={`focus-panel-${panel.id}`}
-          aria-labelledby={`focus-tab-${panel.id}`}
-          hidden={panel.id !== active}
-          className="focus-col min-h-0 flex-1"
-        >
-          {panel.content}
-        </motion.div>
-      ))}
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        data-tab-swipe={phone ? '' : undefined}
+        {...(phone ? swipe : {})}
+      >
+        {panels.map((panel) => (
+          <motion.div
+            {...settle}
+            key={panel.id}
+            role="tabpanel"
+            id={`focus-panel-${panel.id}`}
+            aria-labelledby={`focus-tab-${panel.id}`}
+            hidden={panel.id !== active}
+            className="focus-col min-h-0 flex-1"
+          >
+            {panel.content}
+          </motion.div>
+        ))}
+      </div>
     </>
   );
 }

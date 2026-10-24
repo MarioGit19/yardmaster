@@ -297,7 +297,7 @@ function PulseTicker() {
   return <div ref={ref} aria-hidden data-pulse-ticker className="pulse-ticker" />;
 }
 
-function FilterToggle() {
+export function FilterToggle() {
   const filter = usePreference(pulseFilterPreference);
   const thumb = useSegmentThumb();
   return (

@@ -36,6 +36,7 @@ import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Popover } from '../ui/Popover.js';
 import { Tooltip } from '../ui/Tooltip.js';
+import { useComposerLift } from './composerLift.js';
 import {
   composerKey,
   isSessionLive,
@@ -212,6 +213,7 @@ function Composer({
   }, []);
   const mode = sendButtonMode({ sending, running, text });
   const column = chatColumn(useCompactChat());
+  const lift = useComposerLift();
 
   const send = async () => {
     const prompt = text.trim();
@@ -233,6 +235,7 @@ function Composer({
 
   return (
     <form
+      ref={lift}
       data-composer
       onSubmit={(e) => {
         e.preventDefault();

@@ -184,7 +184,7 @@ export function SettingsView() {
   );
 }
 
-function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3" aria-label={title}>
       <h2 className="px-1 font-medium text-body-sm text-text-2">{title}</h2>
@@ -757,7 +757,7 @@ function NotificationsRow() {
   );
 }
 
-function SettingRow({
+export function SettingRow({
   title,
   description,
   data,
@@ -783,7 +783,7 @@ function SettingRow({
   );
 }
 
-function Segmented<T extends string>({
+export function Segmented<T extends string>({
   label,
   options,
   labels,

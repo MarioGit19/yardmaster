@@ -199,7 +199,7 @@ interface CounterProps {
   armed?: boolean;
 }
 
-function Counter({ tone, label, value, format, flare, armed = false }: CounterProps) {
+export function Counter({ tone, label, value, format, flare, armed = false }: CounterProps) {
   const active = value > 0;
   const level = useMotionLevel();
   const [flares, setFlares] = useState(0);
@@ -250,7 +250,7 @@ function Counter({ tone, label, value, format, flare, armed = false }: CounterPr
   );
 }
 
-function Connection() {
+export function Connection() {
   const connection = useBoard(selectConnection);
   const view = connectionView(connection);
   const reconnecting = connection.status === 'reconnecting';

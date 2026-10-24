@@ -949,11 +949,22 @@ const SCENARIOS = {
       await openOverview(page);
       await page.waitForTimeout(2000);
     });
+    // The phone shell scrolls its main area, not the window.
     await r.moment('scroll', 'transition', 'a flick down the overview and back', async () => {
-      await page.evaluate(() => window.scrollBy({ top: 600, behavior: 'smooth' }));
+      await page.evaluate(() =>
+        document.getElementById('main')?.scrollBy({ top: 600, behavior: 'smooth' }),
+      );
       await page.waitForTimeout(900);
-      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      await page.evaluate(() =>
+        document.getElementById('main')?.scrollTo({ top: 0, behavior: 'smooth' }),
+      );
       await page.waitForTimeout(900);
+    });
+    await r.moment('tabs', 'transition', 'the tab bar: its pill glides tab to tab', async () => {
+      for (const tab of ['projects', 'pulse', 'overview']) {
+        await page.locator(`[data-tab-bar] [data-tab="${tab}"]`).tap();
+        await page.waitForTimeout(700);
+      }
     });
     const id = await page.locator('[data-pod]').first().getAttribute('data-pod');
     if (!id) throw new Error('no pod on the overview');
@@ -961,6 +972,32 @@ const SCENARIOS = {
       await page.locator(`[data-pod="${id}"] header a`).tap();
       await page.locator(`[data-focus="${id}"]`).waitFor();
       await page.waitForTimeout(1200);
+    });
+    await r.moment('workspace-swipe', 'transition', 'swipe the workspace tabs', async () => {
+      const area = await page.locator('[data-tab-swipe]').boundingBox();
+      if (!area) return;
+      const y = area.y + 48;
+      const cdp = await page.context().newCDPSession(page);
+      for (const [x0, x1] of [
+        [area.width * 0.8, area.width * 0.2],
+        [area.width * 0.2, area.width * 0.8],
+      ] as const) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [{ x: x0, y }],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: (x0 + x1) / 2, y }],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: x1, y }],
+        });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(700);
+      }
+      await cdp.detach();
     });
     await r.moment('focus-close', 'transition', 'back: the focus view closes', async () => {
       await page.goBack();

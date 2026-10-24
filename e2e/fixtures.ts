@@ -44,10 +44,15 @@ export function signedInState(origin: string, cookie: string) {
   };
 }
 
-/** Opens a hash route and waits until the demo snapshot has rendered the project rail. */
+/**
+ * Opens a hash route and waits until the demo snapshot has rendered the project rail (on a phone,
+ * which has no rail: until the phone shell has the snapshot).
+ */
 export async function openRoute(page: Page, route: string): Promise<void> {
   await page.goto(`/#${route}`);
-  await expect(page.locator('a[href^="#/p/"]').first()).toBeVisible();
+  await expect(
+    page.locator('a[href^="#/p/"]:visible, [data-phone-shell][data-hydrated]').first(),
+  ).toBeAttached();
 }
 
 /** The route of the first demo project, read from the rail. */

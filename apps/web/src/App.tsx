@@ -5,7 +5,7 @@ import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
 import { useBackdropTaken } from './ambient/backdrop.js';
 import { AttentionAlerts } from './attention/AttentionAlerts.js';
-import { AttentionCenter } from './attention/AttentionCenter.js';
+import { AttentionCenter, AttentionPage } from './attention/AttentionCenter.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { useLayoutShortcuts } from './layouts/LayoutStage.js';
@@ -23,6 +23,7 @@ import { Toasts } from './ui/Toasts.js';
 import { TooltipProvider } from './ui/Tooltip.js';
 import { Overview } from './views/Overview.js';
 import { EmptyState, Page } from './views/Page.js';
+import { MorePage, ProjectsPage, PulsePage } from './views/PhoneTabs.js';
 import { SettingsView } from './views/SettingsView.js';
 
 const TokenPreview = lazy(() => import('./dev/TokenPreview.js'));
@@ -101,6 +102,18 @@ function OtherScreens() {
       </Route>
       <Route path={routes.welcome}>
         <WelcomeView />
+      </Route>
+      <Route path={routes.projects}>
+        <ProjectsPage />
+      </Route>
+      <Route path={routes.attention}>
+        <AttentionPage />
+      </Route>
+      <Route path={routes.pulse}>
+        <PulsePage />
+      </Route>
+      <Route path={routes.more}>
+        <MorePage />
       </Route>
       <Route>
         <Page>
