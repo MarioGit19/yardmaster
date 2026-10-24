@@ -2,6 +2,7 @@ import { toolInputDetail } from '@c-board/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useBoardClient, useBoardStore } from '../data/index.js';
+import { pushIdStore } from '../push/push.js';
 import {
   approvalHeadline,
   attentionOpen,
@@ -76,6 +77,8 @@ export function AttentionAlerts() {
 
 function notify(tag: string, title: string, body: string | undefined): void {
   if (notificationsPreference.get() !== 'on') return;
+  // With Web Push on, the board's own notification comes from the service worker instead.
+  if (pushIdStore.get() !== null) return;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;
   try {

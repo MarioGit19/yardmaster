@@ -334,6 +334,15 @@ export const TerminalResize = envelope(
   }),
 );
 
+/**
+ * Whether this tab is visible and focused, and the push subscription of its browser: the server
+ * doesn't push to a device that is looking at the board (12.6e3). No reply.
+ */
+export const Presence = envelope(
+  'presence',
+  z.object({ focused: z.boolean(), pushId: z.string().min(1).max(64).nullable() }),
+);
+
 export const UiToServer = z.discriminatedUnion('type', [
   Subscribe,
   Unsubscribe,
@@ -342,6 +351,7 @@ export const UiToServer = z.discriminatedUnion('type', [
   ApprovalDecide,
   TerminalInput,
   TerminalResize,
+  Presence,
 ]);
 export type UiToServer = z.infer<typeof UiToServer>;
 

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -25,5 +26,16 @@ export default defineConfig({
   build: {
     target: 'es2023',
     sourcemap: true,
+    rolldownOptions: {
+      // The push service worker (12.6e3) is served from the root, under a fixed name, so its
+      // scope is the whole board.
+      input: {
+        index: fileURLToPath(new URL('index.html', import.meta.url)),
+        sw: fileURLToPath(new URL('src/push/sw.ts', import.meta.url)),
+      },
+      output: {
+        entryFileNames: (chunk) => (chunk.name === 'sw' ? 'sw.js' : 'assets/[name]-[hash].js'),
+      },
+    },
   },
 });

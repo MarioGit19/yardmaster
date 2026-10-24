@@ -11,6 +11,7 @@ import {
   PairingResponse,
   PortShare,
   PortSharesResponse,
+  PushInfoResponse,
   ServerStatus,
 } from '@c-board/protocol';
 
@@ -80,4 +81,8 @@ export const api = {
     request(PortSharesResponse, 'GET', '/api/ports/shares', undefined, signal),
   sharePort: (port: number) => request(PortShare, 'POST', `/api/ports/${port}/share`, {}),
   unsharePort: (port: number) => request(OkResponse, 'DELETE', `/api/ports/${port}/share`),
+  push: (signal?: AbortSignal) => request(PushInfoResponse, 'GET', '/api/push', undefined, signal),
+  removePushDevice: (id: string) =>
+    request(OkResponse, 'DELETE', `/api/push/subscriptions/${encodeURIComponent(id)}`),
+  testPush: (id: string) => request(OkResponse, 'POST', '/api/push/test', { id }),
 };

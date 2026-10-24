@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import {
   type ActivityEvent,
+  type ApprovalDecision,
   type HealthResponse,
   HISTORY_WINDOW_MS,
   type LibraryResponse,
@@ -24,6 +25,7 @@ import type { ServerConfig } from './config.js';
 import { createDemoQuery } from './demo/demo-query.js';
 import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library.js';
 import { demoPty } from './demo/pty.js';
+import { runPushDrill } from './demo/push-drill.js';
 import { DemoSimulator } from './demo/simulator.js';
 import { demoTailscale } from './demo/tailscale.js';
 import { WorstBoard } from './demo/worst.js';
@@ -37,6 +39,7 @@ import {
 import { EditorRouter } from './editor-router.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
+import { Notifier, type NotifierOptions } from './notifier.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import {
   createTailscaleCli,
@@ -54,6 +57,17 @@ import {
 } from './project-actions.js';
 import { loadNodePty } from './pty.js';
 import { PtyManager, type PtyManagerOptions } from './pty-manager.js';
+import {
+  DemoOutbox,
+  loadVapidKeys,
+  memoryVapidKeys,
+  type PushSender,
+  PushSubscriptions,
+  registerPushRoutes,
+  SUBSCRIPTIONS_KEY,
+  type VapidKeys,
+  webPushSender,
+} from './push.js';
 import { DEVICES_KEY, RemoteDevices, registerRemoteRoutes, remoteHosts } from './remote.js';
 import { registerSecurity } from './security.js';
 import { SessionLinker } from './session-linker.js';
@@ -68,6 +82,7 @@ import {
   librarySettings,
   memoryHookSettings,
   migrateTerminalReply,
+  notifySettings,
   PINNED_KEY,
   RETENTION_KEY,
   registerSettingsRoutes,
@@ -133,6 +148,11 @@ export interface BuildOptions {
   tailscale?: TailscaleCli;
   /** The Vite "Blocked request" check after sharing a port, for tests. */
   portShareProbe?: PortSharesOptions['probe'];
+  /** Push notification tuning: tests inject the sender (they never reach a push service). */
+  push?: { send?: PushSender } & Pick<
+    NotifierOptions,
+    'longRunMs' | 'coalesceMs' | 'approvalGraceMs' | 'now'
+  >;
   /** Runs under a file watcher (`pnpm dev`), so any edit restarts it. Reported for `doctor`. */
   watched?: boolean;
 }
@@ -159,6 +179,8 @@ declare module 'fastify' {
     backgroundTracker: BackgroundTracker;
     gitScanner: GitScanner | null;
     ptyManager: PtyManager;
+    notifier: Notifier;
+    pushSubscriptions: PushSubscriptions;
   }
 }
 
@@ -212,6 +234,7 @@ export async function buildServer(
   app.addHook('onClose', async () => {
     // Serve entries the board made end with it; the user's own stay.
     await portShares.stop();
+    notifier.stop();
     // Board terminals end with the server.
     ptyManager.stopAll();
     demo?.stop();
@@ -430,16 +453,17 @@ export async function buildServer(
     };
   }
 
+  // Board sessions, then away-mode hooks; demo approvals come from the simulator.
+  const decideApproval = (decision: ApprovalDecision) => {
+    let result = runner.decideApproval(decision);
+    if (!result.ok) result = awayApprovals.decide(decision);
+    return demo && !result.ok ? demo.decideApproval(decision) : result;
+  };
   const gateway: UiGateway = new UiGateway({
     store,
     ...(transcripts ? { transcripts } : demo ? { transcripts: demo.transcripts } : {}),
     dispatch: createActionDispatcher(actions),
-    // Board sessions, then away-mode hooks; demo approvals come from the simulator.
-    decideApproval: (decision) => {
-      let result = runner.decideApproval(decision);
-      if (!result.ok) result = awayApprovals.decide(decision);
-      return demo && !result.ok ? demo.decideApproval(decision) : result;
-    },
+    decideApproval,
     sendToSession: runner.send.bind(runner),
     boardTerminals: {
       input: (terminalId, data) => ptyManager.input(terminalId, data),
@@ -552,6 +576,56 @@ export async function buildServer(
   });
 
   registerRemoteRoutes(app, { devices: remoteDevices, hosts: allowedRemoteHosts });
+
+  // Push notifications (12.6e3). The demo hands them to an outbox instead of a push service.
+  const pushSubscriptions = new PushSubscriptions({
+    load: () => settings[SUBSCRIPTIONS_KEY],
+    save: (subscriptions) => {
+      settings[SUBSCRIPTIONS_KEY] = subscriptions;
+      persistence.setSetting(SUBSCRIPTIONS_KEY, subscriptions);
+    },
+  });
+  app.decorate('pushSubscriptions', pushSubscriptions);
+  remoteDevices.onRevoke((id) => pushSubscriptions.removeDevice(id));
+  let vapid: Promise<VapidKeys> | null = null;
+  const vapidKeys = (): Promise<VapidKeys> => {
+    vapid ??= (
+      options.demo ? Promise.resolve(memoryVapidKeys()) : loadVapidKeys(config.home)
+    ).catch((err: unknown) => {
+      vapid = null;
+      throw err;
+    });
+    return vapid;
+  };
+  const outbox = options.demo ? new DemoOutbox() : null;
+  const { send: pushSend, ...pushTuning } = options.push ?? {};
+  const notifier = new Notifier({
+    store,
+    subscriptions: pushSubscriptions,
+    send: pushSend ?? outbox?.sender ?? webPushSender(vapidKeys),
+    settings: () => {
+      const notify = notifySettings(settings);
+      return {
+        events: new Set(notify.notifyEvents),
+        hideDetails: notify.notifyHideDetails,
+        muted: new Set(notify.notifyMutedProjects),
+        away: awaySettings(settings).awayMode,
+      };
+    },
+    focused: () => gateway.focusedPushIds(),
+    onMessage: (message) => gateway.broadcast(message),
+    logger: logger.child({ component: 'push' }),
+    ...pushTuning,
+  });
+  app.decorate('notifier', notifier);
+  registerPushRoutes(app, {
+    subscriptions: pushSubscriptions,
+    keys: vapidKeys,
+    test: (subscription) => notifier.test(subscription.id),
+    decideApproval,
+    demo: outbox ? { outbox, drill: () => runPushDrill(store) } : null,
+    logger: logger.child({ component: 'push' }),
+  });
 
   const portShares = new PortShares({
     store,

@@ -378,6 +378,20 @@ describe('/ws/ui messages', () => {
   });
 });
 
+describe('/ws/ui presence', () => {
+  it('tracks which push subscriptions have a focused tab, until the socket closes', async () => {
+    const { port, origin } = await boot();
+    const gateway = (app as FastifyInstance).uiGateway;
+    const phone = await connect(port, origin);
+    const mac = await connect(port, origin);
+    phone.send('presence', { focused: true, pushId: 'push-phone' });
+    mac.send('presence', { focused: false, pushId: 'push-mac' });
+    await expect.poll(() => [...gateway.focusedPushIds()]).toEqual(['push-phone']);
+    phone.socket.close();
+    await expect.poll(() => gateway.focusedPushIds().size).toBe(0);
+  });
+});
+
 describe('/ws/ui session.send', () => {
   it('routes to the session runner', async () => {
     const { port, origin } = await boot();

@@ -349,6 +349,31 @@ describe('BoardClient reconnect', () => {
   });
 });
 
+describe('BoardClient presence', () => {
+  const presences = (socket: FakeSocket) =>
+    socket.sent.flatMap((m) => (m.type === 'presence' ? [m.payload] : []));
+
+  it('reports focus and the push id once synced, on change, and again after a reconnect', () => {
+    const { client, connect, last } = setup();
+    client.start();
+    client.setPresence(true, 'push-1');
+    expect(last().sent).toEqual([]);
+    const first = connect();
+    expect(presences(first)).toEqual([{ focused: true, pushId: 'push-1' }]);
+
+    client.setPresence(true, 'push-1');
+    client.setPresence(false, 'push-1');
+    expect(presences(first)).toEqual([
+      { focused: true, pushId: 'push-1' },
+      { focused: false, pushId: 'push-1' },
+    ]);
+
+    first.drop();
+    vi.advanceTimersByTime(500);
+    expect(presences(connect())).toEqual([{ focused: false, pushId: 'push-1' }]);
+  });
+});
+
 describe('BoardClient streams', () => {
   const S = 'exec:e1';
 

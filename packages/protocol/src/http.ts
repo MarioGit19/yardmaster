@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SessionHistoryEntry } from './claude-sessions.js';
 import { EditorApp, ProjectId, Timestamp } from './domain.js';
+import { NotifyEvent, NotifyMutedProjects } from './push.js';
 
 // JSON bodies of the server's HTTP routes, shared by the CLI, the web app and tests.
 
@@ -132,6 +133,12 @@ export const BoardSettings = z.object({
   editorCli: EditorCliPath.nullable(),
   /** `remote.allowedHosts`: Tailscale names the board answers on over HTTPS (F27), none by default. */
   remoteAllowedHosts: z.array(RemoteHost).max(REMOTE_MAX_HOSTS),
+  /** `notify.events`: what a push notification is sent for (12.6e3). */
+  notifyEvents: z.array(NotifyEvent).max(NotifyEvent.options.length),
+  /** `notify.hideDetails`: a push says only "acme-shop needs you", nothing about the work. */
+  notifyHideDetails: z.boolean(),
+  /** `notify.mutedProjects`: projects that never push. */
+  notifyMutedProjects: NotifyMutedProjects,
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 

@@ -139,6 +139,8 @@ const uiToServer: UiToServer[] = [
   env('approval.decide', { approvalId: approval.id, decision: 'deny', reason: 'use pnpm' }),
   env('terminal.input', { terminalId: 'board-1', data: 'ls\r' }),
   env('terminal.resize', { terminalId: 'board-1', cols: 120, rows: 30 }),
+  env('presence', { focused: true, pushId: 'push-1' }),
+  env('presence', { focused: false, pushId: null }),
 ] as UiToServer[];
 
 function unionTypes(schema: z.ZodDiscriminatedUnion): string[] {

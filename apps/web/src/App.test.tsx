@@ -231,9 +231,10 @@ describe('routes', () => {
   it('renders settings and unknown routes', () => {
     render('/settings');
     expect(heading()).toBe('Settings');
-    // Layout (5), theme (3), motion (4), ambient (4), Retro phosphor (2), notifications (2),
-    // redact (2), away mode (2), retention (4), terminal reply (2) and the idle window (5).
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(35);
+    // Layout (5), theme (3), motion (4), ambient (4), Retro phosphor (2), five notification
+    // events (2 each), hide details (2), redact (2), away mode (2), retention (4), terminal reply
+    // (2) and the idle window (5). This test browser has no notifications at all.
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(45);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');

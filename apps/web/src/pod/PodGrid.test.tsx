@@ -42,6 +42,9 @@ beforeEach(() => {
     remoteAllowedHosts: [],
     libraryIdleHideMin: 30,
     pinnedProjects: [],
+    notifyEvents: ['needs_you'],
+    notifyHideDetails: false,
+    notifyMutedProjects: [],
   };
   vi.stubGlobal('fetch', async () => Response.json(serverSettings));
   container = document.createElement('div');

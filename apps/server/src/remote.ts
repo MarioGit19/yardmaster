@@ -174,6 +174,12 @@ export class RemoteDevices {
     return true;
   }
 
+  /** Calls `listener` with the id of each device that is revoked. */
+  onRevoke(listener: (id: string) => void): () => void {
+    this.revokeListeners.add(listener);
+    return () => this.revokeListeners.delete(listener);
+  }
+
   /** Closes a device's sockets when it is revoked. */
   track(id: string, socket: TrackedSocket): void {
     const listener = (revoked: string) => {

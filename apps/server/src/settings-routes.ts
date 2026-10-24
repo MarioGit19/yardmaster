@@ -17,6 +17,7 @@ import {
   BoardSettingsPatch,
   DEFAULT_AWAY_TIMEOUT_SEC,
   DEFAULT_IDLE_HIDE_MIN,
+  DEFAULT_NOTIFY_EVENTS,
   DEFAULT_RETENTION_DAYS,
   EditorCliPath,
   HooksInstallRequest,
@@ -26,7 +27,9 @@ import {
   IdleHideMin,
   LIBRARY_MAX_ROOTS,
   LibraryRootPath,
+  MAX_MUTED_PROJECTS,
   MAX_PINNED_PROJECTS,
+  NotifyEvent,
   ProjectId,
   RetentionDays,
 } from '@c-board/protocol';
@@ -48,6 +51,9 @@ export const LIBRARY_ROOTS_KEY = 'library.roots';
 export const IDLE_HIDE_KEY = 'library.idleHideMin';
 export const PINNED_KEY = 'library.pinned';
 export const EDITOR_CLI_KEY = 'editor.cli';
+export const NOTIFY_EVENTS_KEY = 'notify.events';
+export const NOTIFY_HIDE_DETAILS_KEY = 'notify.hideDetails';
+export const NOTIFY_MUTED_KEY = 'notify.mutedProjects';
 
 /** Claude's settings.json as the hooks routes see it. Demo mode swaps in an in-memory one. */
 export interface HookSettingsFile {
@@ -167,6 +173,25 @@ export function editorCliSetting(settings: Record<string, unknown>): string | nu
   return parsed.success ? parsed.data : null;
 }
 
+/** The stored push notification settings (12.6e3): the default events, details shown, none muted. */
+export function notifySettings(settings: Record<string, unknown>): {
+  notifyEvents: NotifyEvent[];
+  notifyHideDetails: boolean;
+  notifyMutedProjects: string[];
+} {
+  const events = settings[NOTIFY_EVENTS_KEY];
+  return {
+    notifyEvents: Array.isArray(events)
+      ? (storedList(events, NotifyEvent) as NotifyEvent[])
+      : [...DEFAULT_NOTIFY_EVENTS],
+    notifyHideDetails: settings[NOTIFY_HIDE_DETAILS_KEY] === true,
+    notifyMutedProjects: storedList(settings[NOTIFY_MUTED_KEY], ProjectId).slice(
+      0,
+      MAX_MUTED_PROJECTS,
+    ),
+  };
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -200,6 +225,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     ...librarySettings(settings),
     editorCli: editorCliSetting(settings),
     remoteAllowedHosts: remoteHosts(settings),
+    ...notifySettings(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -234,6 +260,15 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     if (patch.data.remoteAllowedHosts !== undefined) {
       save(REMOTE_HOSTS_KEY, [...new Set(patch.data.remoteAllowedHosts)]);
       app.log.info({ hosts: patch.data.remoteAllowedHosts.length }, 'remote hosts changed');
+    }
+    if (patch.data.notifyEvents !== undefined) {
+      save(NOTIFY_EVENTS_KEY, [...new Set(patch.data.notifyEvents)]);
+    }
+    if (patch.data.notifyHideDetails !== undefined) {
+      save(NOTIFY_HIDE_DETAILS_KEY, patch.data.notifyHideDetails);
+    }
+    if (patch.data.notifyMutedProjects !== undefined) {
+      save(NOTIFY_MUTED_KEY, [...new Set(patch.data.notifyMutedProjects)]);
     }
     return current();
   });

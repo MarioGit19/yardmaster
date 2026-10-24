@@ -18,6 +18,7 @@ import { OnboardingWizard } from './onboarding/OnboardingWizard.js';
 import { CommandPalette } from './palette/CommandPalette.js';
 import { PortShareDialog } from './ports/PortShareDialog.js';
 import { PulseRail } from './pulse/PulseRail.js';
+import { PushPresence } from './push/push.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
@@ -158,6 +159,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
         </Router>
         <Toasts />
         <AttentionAlerts />
+        <PushPresence />
         <LiveFavicon />
       </TooltipProvider>
     </MotionRoot>

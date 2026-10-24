@@ -12,6 +12,9 @@ const BASE: BoardSettings = {
   remoteAllowedHosts: [],
   libraryIdleHideMin: 30,
   pinnedProjects: [],
+  notifyEvents: ['needs_you'],
+  notifyHideDetails: false,
+  notifyMutedProjects: [],
 };
 
 describe('createBoardSettingsStore', () => {

@@ -13,7 +13,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../ambient/style.js';
-import { notificationsPreference } from '../attention/attention.js';
 import { selectWindows, useBoardList } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
@@ -28,6 +27,7 @@ import {
   useBoardSettings,
 } from '../settings/boardSettings.js';
 import { InstallHooksButton } from '../settings/HooksInstall.js';
+import { NotificationSettings } from '../settings/NotificationSettings.js';
 import { PhoneSettings } from '../settings/PhoneSettings.js';
 import { redactPreference } from '../settings/prefs.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
@@ -131,8 +131,11 @@ export function SettingsView() {
           </SettingRow>
         </SettingsSection>
 
-        <SettingsSection title="Alerts and privacy">
-          <NotificationsRow />
+        <SettingsSection title="Notifications">
+          <NotificationSettings server={server} />
+        </SettingsSection>
+
+        <SettingsSection title="Privacy and approvals">
           <SettingRow
             title="Redact secrets"
             description="Mask API keys, tokens and private keys in terminals, tool cards and messages. Click a masked value to reveal it."
@@ -708,51 +711,6 @@ function TokenRow({ demo }: { demo: boolean }) {
           Rotate token
         </Button>
       )}
-    </SettingRow>
-  );
-}
-
-const NOTIFICATION_OPTIONS = ['off', 'on'] as const;
-const NOTIFICATION_LABEL = { off: 'Off', on: 'On' } as const;
-
-/** Browser notifications for new approvals; turning them on asks the browser for permission. */
-function NotificationsRow() {
-  const supported = typeof Notification !== 'undefined';
-  const setting = usePreference(notificationsPreference);
-  const [permission, setPermission] = useState(() =>
-    supported ? Notification.permission : 'denied',
-  );
-  const enabled = setting === 'on' && permission === 'granted';
-
-  const change = async (next: 'on' | 'off') => {
-    if (next === 'off' || !supported) {
-      notificationsPreference.set('off');
-      return;
-    }
-    const result =
-      Notification.permission === 'default'
-        ? await Notification.requestPermission()
-        : Notification.permission;
-    setPermission(result);
-    notificationsPreference.set(result === 'granted' ? 'on' : 'off');
-  };
-
-  const description = !supported
-    ? 'This browser does not support notifications.'
-    : permission === 'denied'
-      ? 'Blocked by the browser. Allow notifications for this site in its settings to turn them on.'
-      : 'Notify me about new approvals while c-board is in the background.';
-
-  return (
-    <SettingRow title="Notifications" description={description}>
-      <Segmented
-        label="Notifications"
-        options={NOTIFICATION_OPTIONS}
-        labels={NOTIFICATION_LABEL}
-        value={enabled ? 'on' : 'off'}
-        onChange={(next) => void change(next)}
-        disabled={!supported || permission === 'denied'}
-      />
     </SettingRow>
   );
 }

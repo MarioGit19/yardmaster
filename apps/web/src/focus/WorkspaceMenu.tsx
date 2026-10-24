@@ -1,6 +1,8 @@
 import type { Project } from '@c-board/protocol';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  Bell,
+  BellOff,
   Copy,
   EllipsisVertical,
   ExternalLink,
@@ -18,6 +20,7 @@ import { useBoard, useBoardClient } from '../data/index.js';
 import { requestClose } from '../library/closing.js';
 import { usePin } from '../library/useActive.js';
 import { dur, ease } from '../motion.js';
+import { useMute } from '../push/mute.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { SheetPanel } from '../ui/BottomSheet.js';
@@ -41,6 +44,7 @@ export function WorkspaceMenu({
       'Cursor',
   );
   const pin = usePin(project.id);
+  const mute = useMute(project.id);
   const run = (action: () => void | Promise<void>) => () => {
     setOpen(false);
     void action();
@@ -108,6 +112,9 @@ export function WorkspaceMenu({
                   </Item>
                   <Item icon={pin.pinned ? <PinOff /> : <Pin />} onSelect={run(pin.toggle)}>
                     {pin.pinned ? 'Unpin from the overview' : 'Pin to the overview'}
+                  </Item>
+                  <Item icon={mute.muted ? <Bell /> : <BellOff />} onSelect={run(mute.toggle)}>
+                    {mute.muted ? 'Unmute notifications' : 'Mute notifications'}
                   </Item>
                   <Item
                     icon={<Copy />}

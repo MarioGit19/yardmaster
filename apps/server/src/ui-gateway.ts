@@ -65,6 +65,8 @@ interface Client {
   streams: Map<StreamId, boolean>;
   /** Pending ops that were already part of this client's snapshot. */
   skipOps: number;
+  /** The tab is visible and focused, and its browser's push subscription (12.6e3). */
+  presence: { focused: boolean; pushId: string | null };
 }
 
 /**
@@ -123,7 +125,12 @@ export class UiGateway {
     // Changes made earlier in this tick are already in `state`; collect them now so they
     // reach existing clients but aren't replayed on top of the new client's snapshot.
     this.store.flush();
-    const client: Client = { socket, streams: new Map(), skipOps: this.pending.length };
+    const client: Client = {
+      socket,
+      streams: new Map(),
+      skipOps: this.pending.length,
+      presence: { focused: false, pushId: null },
+    };
     this.clients.add(client);
 
     socket.on('message', (data, isBinary) => {
@@ -145,6 +152,15 @@ export class UiGateway {
     }
     // Events still queued may repeat in the next live batch; the client drops duplicate ids.
     this.send(client, this.message('activity', { events: recent, replace: true }));
+  }
+
+  /** Push subscriptions whose browser has a board tab visible and focused: they get no push. */
+  focusedPushIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const { presence } of this.clients) {
+      if (presence.focused && presence.pushId !== null) ids.add(presence.pushId);
+    }
+    return ids;
   }
 
   /** Queues a new activity event; clients get them in batches at the patch rate. */
@@ -211,6 +227,9 @@ export class UiGateway {
         this.boardTerminals?.resize(terminalId, cols, rows);
         return;
       }
+      case 'presence':
+        client.presence = message.payload;
+        return;
       case 'session.send': {
         const { sessionId, text } = message.payload;
         const result = await settle(() => this.sendToSession(sessionId, text));

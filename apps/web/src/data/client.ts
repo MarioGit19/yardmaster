@@ -122,6 +122,7 @@ export class BoardClient {
   private attempt = 0;
   private running = false;
   private synced = false;
+  private presence: { focused: boolean; pushId: string | null } = { focused: false, pushId: null };
   private nextRequestId = 1;
   private readonly streams = new Map<StreamId, StreamEntry>();
   private readonly pending = new Map<string, Pending>();
@@ -220,6 +221,16 @@ export class BoardClient {
       );
       from = to;
     }
+  }
+
+  /**
+   * Whether this tab is visible and focused, and its browser's push subscription: the server skips
+   * the push for a device looking at the board (12.6e3). Sent again on every reconnect.
+   */
+  setPresence(focused: boolean, pushId: string | null): void {
+    if (focused === this.presence.focused && pushId === this.presence.pushId) return;
+    this.presence = { focused, pushId };
+    if (this.synced) this.send(makeMessage<UiToServer>('presence', this.presence));
   }
 
   /** The size of the xterm showing a board terminal. */
@@ -367,6 +378,10 @@ export class BoardClient {
     const state = this.store.getState();
     state.replaceBoard(message.payload.state);
     state.setConnection({ status: 'live', attempt: 0, retryAt: null, syncedAt: Date.now() });
+    // A new socket starts as unfocused without a push id on the server.
+    if (firstSync && (this.presence.focused || this.presence.pushId !== null)) {
+      this.send(makeMessage<UiToServer>('presence', this.presence));
+    }
     // The server forgets subscriptions with the socket; resume each where we left off.
     if (!firstSync) return;
     for (const [streamId, entry] of this.streams) this.sendSubscribe(streamId, entry);

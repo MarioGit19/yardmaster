@@ -2,6 +2,8 @@ import type { Project } from '@c-board/protocol';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import {
   ArrowUpRight,
+  Bell,
+  BellOff,
   ExternalLink,
   FolderX,
   Pin,
@@ -15,6 +17,7 @@ import { useLocation } from 'wouter';
 import { useBoard, useBoardClient } from '../data/index.js';
 import { requestClose } from '../library/closing.js';
 import { usePin } from '../library/useActive.js';
+import { useMute } from '../push/mute.js';
 import { projectHref } from '../routes.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
@@ -40,6 +43,7 @@ export function PodMenu({
   );
   const href = projectHref(project.id);
   const pin = usePin(project.id);
+  const mute = useMute(project.id);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
@@ -77,6 +81,9 @@ export function PodMenu({
           </MenuItem>
           <MenuItem icon={pin.pinned ? <PinOff /> : <Pin />} onSelect={pin.toggle}>
             {pin.pinned ? 'Unpin from the overview' : 'Pin to the overview'}
+          </MenuItem>
+          <MenuItem icon={mute.muted ? <Bell /> : <BellOff />} onSelect={mute.toggle}>
+            {mute.muted ? 'Unmute notifications' : 'Mute notifications'}
           </MenuItem>
           <ContextMenu.Separator className="mx-2 my-1 h-px bg-line" />
           <MenuItem icon={<FolderX />} onSelect={() => requestClose(project.id)}>

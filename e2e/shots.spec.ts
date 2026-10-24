@@ -2109,3 +2109,55 @@ for (const theme of THEMES) {
     });
   }
 }
+
+// Settings → Notifications (12.6e3), with two subscribed devices. The headless shell reports
+// notifications as blocked, so the page sees them as not asked yet.
+for (const theme of THEMES) {
+  for (const width of [1440, 390]) {
+    test.describe(`settings notifications ${theme} ${width}`, () => {
+      test.use({
+        theme,
+        viewport: { width, height: 900 },
+      });
+      test('notifications', async ({ page }) => {
+        const now = Date.now();
+        await page.addInitScript(() =>
+          Object.defineProperty(Notification, 'permission', { get: () => 'default' }),
+        );
+        await page.route('**/api/push', async (route) => {
+          if (route.request().method() !== 'GET') return route.fallback();
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            json: {
+              ...(await response.json()),
+              devices: [
+                {
+                  id: 'push-0a1b2c3d',
+                  name: 'iPhone · Safari',
+                  createdAt: now - 2 * 86_400_000,
+                  lastSentAt: now - 600_000,
+                },
+                {
+                  id: 'push-4e5f6a7b',
+                  name: 'Mac · Chrome',
+                  createdAt: now - 9 * 86_400_000,
+                  lastSentAt: null,
+                },
+              ],
+            },
+          });
+        });
+        await openRoute(page, '/settings');
+        const section = page.getByRole('region', { name: 'Notifications', exact: true });
+        await expect(section.locator('[data-push-device]')).toHaveCount(2);
+        await section.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
+        await section.screenshot({
+          path: new URL(`settings-notifications-${width}-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+      });
+    });
+  }
+}

@@ -35,6 +35,9 @@ const LIBRARY_DEFAULTS = {
   pinnedProjects: [],
   editorCli: null,
   remoteAllowedHosts: [],
+  notifyEvents: ['needs_you', 'claude_finished', 'command_finished', 'crashed'],
+  notifyHideDetails: false,
+  notifyMutedProjects: [],
 };
 const HOOK = '/opt/c-board/bin/c-board-hook';
 
