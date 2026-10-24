@@ -736,6 +736,35 @@ const SCENARIOS = {
       await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
       await page.waitForTimeout(600);
     });
+
+    // Office's workspace skin (DESIGN.md §10.8): from the room view, Open workspace shrinks the
+    // room's front into the header band while the monitors rise in (smooth); Esc returns to it.
+    await page.evaluate(() => localStorage.setItem('cboard.layout', 'office'));
+    await page.reload();
+    const room = page.locator(`[data-room="${id}"]`);
+    await room.waitFor();
+    await page.waitForTimeout(1200);
+    await room.focus();
+    await page.keyboard.press('Enter');
+    const roomOpen = page.locator(`[data-office-room-panel="${id}"] [data-room-open]`);
+    await roomOpen.waitFor();
+    await page.waitForTimeout(900);
+    await r.moment(
+      'office-open',
+      'transition',
+      "Office: Open workspace, the room's front shrinks into the header band as the monitors rise in (smooth)",
+      async () => {
+        await roomOpen.click();
+        await page.locator(`[data-focus="${id}"]`).waitFor();
+        await page.waitForTimeout(900);
+      },
+    );
+    await r.moment('office-close', 'transition', 'Esc fades back to the room view', async () => {
+      await page.locator(`[data-focus="${id}"] h1`).focus();
+      await page.keyboard.press('Escape');
+      await page.locator(`[data-focus="${id}"]`).waitFor({ state: 'detached' });
+      await page.waitForTimeout(600);
+    });
     await page.evaluate(() => localStorage.removeItem('cboard.layout'));
   },
 

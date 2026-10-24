@@ -307,6 +307,7 @@ function ProjectFocus({
             terminalId={terminalId}
             page={page}
             headingRef={headingRef}
+            HubCrew={skin.skin.HubCrew}
           />
         ) : (
           <HeaderBand

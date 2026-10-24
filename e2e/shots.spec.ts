@@ -2253,6 +2253,7 @@ for (const theme of THEMES) {
 // project at rest with its running terminal, a Claude session streaming, and a waiting approval.
 const SKIN_WAITING: Record<FocusLayout, { item: string; id: string }> = {
   minimal: { item: '[data-pod][data-tone="wait"]', id: 'data-pod' },
+  office: { item: '[data-room][data-tone="wait"]', id: 'data-room' },
   grid: { item: '[data-grid-node][data-tone="wait"]', id: 'data-grid-node' },
   retro: { item: '[data-retro-frame][data-tone="wait"]', id: 'data-retro-frame' },
 };

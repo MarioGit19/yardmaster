@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist mono",
+        "createdAt": "2026-10-24T16:41:26.788Z",
+        "reason": "DESIGN.md §2 Type: Geist and Geist Mono are the project's fixed type families; CLAUDE.md says to keep ours over skill advice"
+      }
+    ]
+  }
+}

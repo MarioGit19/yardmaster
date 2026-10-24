@@ -9,8 +9,8 @@ import {
 } from './fixtures.js';
 
 /**
- * Each layout's way into a project from its overview: the item, its id, a step in (Grid's
- * cockpit) and the link to click.
+ * Each layout's way into a project from its overview: the item, its id, a step in (Office's room
+ * view, Grid's cockpit) and the link to click.
  */
 const OPENERS: Record<
   FocusLayout,
@@ -22,6 +22,17 @@ const OPENERS: Record<
   }
 > = {
   minimal: { item: '[data-pod]', id: 'data-pod', link: (id) => `[data-pod="${id}"] header a` },
+  office: {
+    item: '[data-room]',
+    id: 'data-room',
+    // Enter on the room zooms into its room view; the view's Open workspace opens the workspace.
+    enter: async (page, id) => {
+      await page.locator(`[data-room="${id}"]`).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator(`[data-office-room-panel="${id}"]`)).toBeVisible();
+    },
+    link: (id) => `[data-office-room-panel="${id}"] [data-room-open]`,
+  },
   grid: {
     item: '[data-grid-node]',
     id: 'data-grid-node',
@@ -475,5 +486,123 @@ test.describe('grid at 1440', () => {
     await expect
       .poll(() => card.locator('.gs-frame:not([data-level="0"])').count(), { timeout: 15_000 })
       .toBeGreaterThan(0);
+  });
+});
+
+// Office's workspace skin (DESIGN.md §10.8): the room view's room shrinks into the header band as
+// the monitors rise in, the band's characters select what they are, and Esc returns to the room.
+test.describe('office at 1440', () => {
+  test.use({ viewport: { width: 1440, height: 900 }, layout: 'office' });
+
+  /** Zooms into the first room with a terminal and returns its id. */
+  async function enterRoom(page: Page) {
+    await openRoute(page, '/');
+    const room = page
+      .locator('[data-room]', { has: page.locator('[data-scene-actor^="t:"]') })
+      .first();
+    await expect(room).toBeVisible();
+    const id = await room.getAttribute('data-room');
+    if (!id) throw new Error('room without an id');
+    await OPENERS.office.enter?.(page, id);
+    return id;
+  }
+
+  test('Open workspace carries the room into the band, and Esc returns to the room view', async ({
+    page,
+  }) => {
+    const id = await enterRoom(page);
+    const open = page.locator(OPENERS.office.link(id));
+    // The entry is short; note it from the page as it plays (a loaded runner may poll after it).
+    const seen = page.evaluate(
+      () =>
+        new Promise<{ entry: boolean; ghost: boolean; opacity: string }>((resolve) => {
+          const observer = new MutationObserver(() => {
+            const entry = document.querySelector('[data-office-entry]');
+            if (!entry) return;
+            observer.disconnect();
+            const card = entry.closest<HTMLElement>('[data-focus]');
+            resolve({
+              entry: true,
+              ghost: entry.querySelector('[data-office-ghost]') !== null,
+              opacity: card ? getComputedStyle(card).opacity : '',
+            });
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+          setTimeout(() => resolve({ entry: false, ghost: false, opacity: '' }), 5_000);
+        }),
+    );
+    await open.click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    // The card is there at once; the room's still copy moves into the band, then goes.
+    expect(await seen).toEqual({ entry: true, ghost: true, opacity: '1' });
+    await expect(card.locator('[data-office-entry]')).toHaveCount(0);
+    await expect(card).toHaveAttribute('data-layout', 'office');
+    const band = card.locator('[data-office-band]');
+    await expect(band).toBeVisible();
+    await expect(band.locator('[data-kit-nameplate] h1')).toBeVisible();
+    await expect(band.locator('[data-band-actor]').first()).toBeVisible();
+    expect(await band.locator('[data-band-actor]').count()).toBeLessThanOrEqual(8);
+    // Monitors: each panel on a bezel with a power LED; at rest, nothing left transformed.
+    for (const panel of ['Sessions', 'Claude', 'Terminals']) {
+      const monitor = card.locator(`[data-office-panel="${panel}"]`);
+      await expect(monitor).toBeVisible();
+      await expect(monitor).toHaveAttribute('data-led', /^(on|work|wait|err)$/);
+      expect(await monitor.evaluate((el) => getComputedStyle(el).transform)).toBe('none');
+    }
+
+    await card.locator('h1').focus();
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await expect(page.locator('[data-office]')).toHaveAttribute('data-office-entered', id);
+    await expect(open).toBeFocused();
+  });
+
+  test('a band character selects its terminal, or its session', async ({ page }) => {
+    const id = await enterRoom(page);
+    await page.locator(OPENERS.office.link(id)).click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    await expect(card.locator('[data-office-entry]')).toHaveCount(0);
+    const band = card.locator('[data-office-band]');
+
+    await expect(band.locator('[data-band-actor^="t:"]').first()).toBeVisible();
+    const tabs = card.locator('[role="tab"][data-tab]');
+    await expect(tabs.first()).toBeVisible();
+    // Read and click in one step: the band reseats as states change (attention first).
+    const clickBand = (kind: 's' | 't') =>
+      band.evaluate((el, prefix) => {
+        const selected = document
+          .querySelector('[role="tab"][data-tab][aria-selected="true"]')
+          ?.getAttribute('data-tab');
+        const actors = [...el.querySelectorAll<HTMLElement>(`[data-band-actor^="${prefix}:"]`)];
+        const pick =
+          actors.find((a) => a.dataset.bandActor?.slice(2) !== selected) ?? actors.at(-1);
+        pick?.click();
+        return pick?.dataset.bandActor?.slice(2) ?? null;
+      }, kind);
+
+    const terminalId = await clickBand('t');
+    await expect(card.locator(`[role="tab"][data-tab="${terminalId}"]`)).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const sessionId = await clickBand('s');
+    if (sessionId) {
+      await expect(page).toHaveURL((url) => url.hash.endsWith(`/s/${sessionId}`));
+      await expect(card.locator(`a[data-session="${sessionId}"]`)).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+    }
+  });
+
+  test('at Reduced the workspace cross-fades in: no room move', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cboard.motion', 'reduced'));
+    const id = await enterRoom(page);
+    await page.locator(OPENERS.office.link(id)).click();
+    const card = page.locator(`[data-focus="${id}"]`);
+    await expect(card).toHaveAttribute('data-layout', 'office');
+    await expect(card.locator('[data-office-entry]')).toHaveCount(0);
+    await expect(card.locator('[data-office-band]')).toBeVisible();
   });
 });

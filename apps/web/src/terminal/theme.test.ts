@@ -43,4 +43,9 @@ describe('xtermTheme for a workspace skin', () => {
     const resolve = (expression: string) => expression;
     expect(xtermTheme(resolve, 'minimal')).toEqual(xtermTheme(resolve));
   });
+
+  it('gives Office’s monitors the standard terminal', () => {
+    const resolve = (expression: string) => expression;
+    expect(xtermTheme(resolve, 'office')).toEqual(xtermTheme(resolve, 'minimal'));
+  });
 });

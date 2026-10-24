@@ -11,6 +11,7 @@ describe('workspace skins', () => {
     expect(LAYOUT_SKIN.minimal).toBe('minimal');
     expect(LAYOUT_SKIN.retro).toBe('retro');
     expect(LAYOUT_SKIN.grid).toBe('grid');
+    expect(LAYOUT_SKIN.office).toBe('office');
   });
 
   it('has Minimal at once and keeps today’s view: no frame, no entry of its own', async () => {
@@ -36,6 +37,15 @@ describe('workspace skins', () => {
     expect(grid.HeaderBand).toBeTypeOf('function');
     expect(grid.PanelFrame).toBeTypeOf('function');
     expect(grid.EntryTransition).toBeTypeOf('function');
+  });
+
+  it('loads Office with its monitors, its room entry and the phone hub crew', async () => {
+    const office = await loadSkin('office');
+    expect(loadedSkin('office')).toBe(office);
+    expect(office.HeaderBand).toBeTypeOf('function');
+    expect(office.PanelFrame).toBeTypeOf('function');
+    expect(office.EntryTransition).toBeTypeOf('function');
+    expect(office.HubCrew).toBeTypeOf('function');
   });
 });
 

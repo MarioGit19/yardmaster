@@ -18,7 +18,15 @@ import {
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ComponentType,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Link, useLocation } from 'wouter';
 import { ClaudePanel } from '../../claude/ClaudePanel.js';
 import { useComposerLift } from '../../claude/composerLift.js';
@@ -68,6 +76,7 @@ import { cx } from '../../ui/cx.js';
 import { StatusDot } from '../../ui/StatusDot.js';
 import { EmptyState } from '../../views/Page.js';
 import { NewSessionPanel } from '../NewSessionPanel.js';
+import type { HubCrewProps } from '../skins/types.js';
 import { useTabSwipe } from '../swipe.js';
 import { WorkspaceMenu } from '../WorkspaceMenu.js';
 import {
@@ -101,6 +110,8 @@ export interface PhoneWorkspaceProps {
   terminalId?: string;
   page?: string;
   headingRef: RefObject<HTMLHeadingElement | null>;
+  /** The skin's crew beside the project's name in the hub (Office, DESIGN.md §10.8). */
+  HubCrew?: ComponentType<HubCrewProps>;
 }
 
 /** Steps through the history without the router losing the entry's index stamp. */
@@ -119,6 +130,7 @@ export function PhoneWorkspace({
   terminalId,
   page,
   headingRef,
+  HubCrew,
 }: PhoneWorkspaceProps) {
   const [, navigate] = useLocation();
   const hydrated = useBoard(selectHydrated);
@@ -176,6 +188,7 @@ export function PhoneWorkspace({
         hidden={open}
         last={last}
         headingRef={headingRef}
+        HubCrew={HubCrew}
         onAdd={() => setAdding(true)}
         onNewSession={() => navigate(projectPageHref(project.id, 'new'))}
       />
@@ -246,6 +259,7 @@ function Hub({
   hidden,
   last,
   headingRef,
+  HubCrew,
   onAdd,
   onNewSession,
 }: {
@@ -255,6 +269,7 @@ function Hub({
   hidden: boolean;
   last: string | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
+  HubCrew?: ComponentType<HubCrewProps>;
   onAdd: () => void;
   onNewSession: () => void;
 }) {
@@ -297,6 +312,7 @@ function Hub({
             </p>
           )}
         </div>
+        {HubCrew && <HubCrew projectId={project.id} />}
         <WorkspaceMenu project={project} onNewSession={onNewSession} />
       </header>
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-4">

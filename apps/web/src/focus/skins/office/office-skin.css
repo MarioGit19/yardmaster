@@ -1,0 +1,338 @@
+/* Office's workspace skin (DESIGN.md §10.8): the project's room carried into the workspace. It
+   ships with the skin's chunk, and every rule is scoped to the Office workspace. §10.3's palette:
+   walls in --bg-1/--bg-2, furniture in the kit's tones with 1 px lines, the accent only on the
+   door and the main session's visor, the warm light as Night's one indulgence. */
+
+.focus[data-layout="office"] {
+  /* The monitors' bezel: the kit's furniture step above the walls (there is no --bg-3 token). */
+  --os-bezel: var(--office-top);
+  --os-desk: 22px;
+  --room-accent: var(--accent);
+
+  /* The wall, with the desk the monitors stand on along the bottom. */
+  background: linear-gradient(
+    to bottom,
+    var(--bg-1) calc(100% - var(--os-desk)),
+    var(--office-furniture) calc(100% - var(--os-desk))
+  );
+}
+
+/* ── Header band: the room's front ────────────────────────────────────────────────────────── */
+
+.os-band {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 96px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 12px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line-strong);
+  /* Wall and floor, the floor's edge a step in front of the wall. */
+  background: linear-gradient(
+    to bottom,
+    var(--bg-1) calc(100% - 12px),
+    var(--bg-2) calc(100% - 12px)
+  );
+}
+.os-band::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 12px;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+.os-band-back {
+  flex: none;
+}
+.os-band-door {
+  position: relative;
+  flex: none;
+  align-self: flex-end;
+  width: 28px;
+  height: 54px;
+  margin-bottom: 12px;
+}
+.os-band-door-svg {
+  display: block;
+  width: 28px;
+  height: 54px;
+  overflow: visible;
+}
+.os-band-door-light {
+  position: absolute;
+  top: -14px;
+  left: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}
+.os-band-plate {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 22rem;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  box-shadow: var(--highlight-inset);
+}
+.os-band-board {
+  flex: none;
+  align-self: center;
+}
+
+/* The crew's corner of the room: the ceiling light over everyone, feet on the floor. */
+.os-band-crew {
+  position: relative;
+  display: flex;
+  /* Shares the room with the live caption; `useSeats` fits the row to what it gets. */
+  flex: 1 1 0;
+  min-width: 0;
+  align-self: stretch;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+.os-band-lamp {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(100%, 440px);
+  height: 100%;
+  translate: -50% 0;
+  pointer-events: none;
+}
+.os-band-shade {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 30px;
+  height: 9px;
+  translate: -50% 0;
+  border: 1px solid var(--line-strong);
+  border-top: 0;
+  border-radius: 0 0 15px 15px;
+  background: var(--office-top);
+}
+.os-band-row {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 2px;
+  overflow: hidden;
+}
+.os-band-actor {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  border-radius: 8px;
+  outline: none;
+}
+.os-band-actor:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+/* The selected one stands in a pool of the door's color. */
+.os-band-actor::before {
+  content: "";
+  position: absolute;
+  inset: auto 6px 0;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--room-accent) 50%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.os-band-actor[aria-current]::before {
+  opacity: 1;
+}
+.os-band-more {
+  display: grid;
+  height: 24px;
+  min-width: 32px;
+  flex: none;
+  margin-bottom: 10px;
+  place-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg-1);
+  color: var(--text-1);
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+}
+
+/* ── Panel frames: monitors on desks ──────────────────────────────────────────────────────── */
+
+.focus[data-layout="office"] .focus-col {
+  display: flex;
+  flex-direction: column;
+  /* The monitor stands on the desk along the card's bottom. */
+  padding: 14px 8px calc(var(--os-desk) + 6px);
+  /* The monitor scrolls inside; the column lets the lamp's glow out. */
+  overflow: visible;
+}
+.focus[data-layout="office"] [role="tabpanel"].focus-col {
+  padding: 14px 14px calc(var(--os-desk) + 6px);
+}
+.focus[data-layout="office"] [role="tabpanel"].focus-col[hidden] {
+  display: none;
+}
+.focus[data-layout="office"] .focus-col-max {
+  background: var(--bg-1);
+}
+
+.os-monitor {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 5px 5px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--os-bezel);
+  box-shadow: var(--highlight-inset);
+}
+/* The stand's foot on the desk. */
+.os-monitor::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  width: 56px;
+  height: 6px;
+  translate: -50% 0;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  background: var(--os-bezel);
+}
+.os-screen {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-1);
+}
+.os-screen:has(> .claude-panel) {
+  padding: 0;
+  overflow: hidden;
+}
+.os-chin {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+/* The power LED in the panel's status color: on, busy, waiting (slowly pulsing) or failed. */
+.os-led {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--st-ok) 70%, var(--os-bezel));
+  transition:
+    background-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+.os-monitor[data-led="work"] .os-led {
+  background: var(--st-work);
+  box-shadow: 0 0 6px var(--st-work-glow);
+}
+.os-monitor[data-led="wait"] .os-led {
+  background: var(--st-wait);
+  box-shadow: 0 0 6px var(--st-wait-glow);
+  animation: os-led-wait var(--dur-pulse) var(--ease-in-out) infinite;
+}
+.os-monitor[data-led="err"] .os-led {
+  background: var(--st-err);
+  box-shadow: 0 0 6px var(--st-err-glow);
+}
+.os-monitor[data-led="wait"] .os-chin,
+.os-monitor[data-led="err"] .os-chin {
+  color: var(--text-2);
+}
+@keyframes os-led-wait {
+  50% {
+    opacity: 0.45;
+  }
+}
+:root:is([data-motion="reduced"], [data-motion="off"]) .os-monitor .os-led {
+  animation: none;
+}
+
+/* The desk lamp's warm pool of light under the Claude monitor, in Night only. */
+.os-desk-lamp {
+  position: absolute;
+  inset: auto -8% calc(-1 * var(--os-desk) - 6px);
+  z-index: -1;
+  height: 120px;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 60% at 50% 100%,
+    color-mix(in srgb, var(--office-lamp) 18%, transparent),
+    transparent 75%
+  );
+}
+[data-theme="light"] .os-desk-lamp {
+  display: none;
+}
+
+/* ── Entry: the room's front shrinks into the band ────────────────────────────────────────── */
+
+.os-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+[data-motion="off"] .os-entry {
+  display: none;
+}
+
+/* ── Phones: the hub as the room, its cards as the characters' desks ──────────────────────── */
+
+.focus[data-layout="office"][data-workspace="phone"] {
+  background: var(--bg-1);
+}
+.focus[data-layout="office"] :is([data-workspace-appbar], [data-item-header]) {
+  /* The nameplate on the room's wall; the avatar's ring carries the project's color. */
+  background: var(--bg-1);
+}
+.focus[data-layout="office"] [data-hub-item] {
+  border-radius: 8px;
+  background: var(--bg-1);
+  /* The desk's top edge under each card. */
+  box-shadow:
+    var(--highlight-inset),
+    inset 0 -3px 0 var(--office-top);
+}
+.os-hub-crew {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 2px;
+}

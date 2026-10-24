@@ -10,7 +10,7 @@ function required(name: string): string {
 }
 
 /** The layouts whose workspace skin the focus specs run in (DESIGN.md §10.8); later skins join. */
-export const FOCUS_LAYOUTS = ['minimal', 'grid', 'retro'] as const;
+export const FOCUS_LAYOUTS = ['minimal', 'office', 'grid', 'retro'] as const;
 export type FocusLayout = (typeof FOCUS_LAYOUTS)[number];
 
 /** Tests get a page that is already signed in to the demo board. */
@@ -66,14 +66,15 @@ export async function openRoute(page: Page, route: string): Promise<void> {
 
 /**
  * The route of the first demo project, read from the rail (on a phone, from the overview's links,
- * or the Grid trunk's nodes, which are buttons).
+ * or the Grid trunk's nodes and the Office's rooms, which aren't links).
  */
 export async function firstProjectRoute(page: Page): Promise<string> {
-  const first = page.locator('a[href^="#/p/"], [data-grid-node]').first();
+  const first = page.locator('a[href^="#/p/"], [data-grid-node], [data-room]').first();
   await first.waitFor({ state: 'attached' });
   const href = await first.getAttribute('href');
   if (href) return href.slice(1);
-  const node = await first.getAttribute('data-grid-node');
+  const node =
+    (await first.getAttribute('data-grid-node')) ?? (await first.getAttribute('data-room'));
   if (!node) throw new Error('no project in the rail');
   return `/p/${node}`;
 }

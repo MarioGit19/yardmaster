@@ -29,6 +29,10 @@ export interface PanelFrameProps {
   children: ReactNode;
 }
 
+export interface HubCrewProps {
+  projectId: string;
+}
+
 export interface EntryTransitionProps {
   projectId: string;
 }
@@ -48,4 +52,6 @@ export interface WorkspaceSkin {
    * cross-fade. Null: the standard entry (the pod morph, or the cross-fade).
    */
   EntryTransition: ComponentType<EntryTransitionProps> | null;
+  /** Beside the project's name in the phone hub's app bar (Office's crew), when the skin has one. */
+  HubCrew?: ComponentType<HubCrewProps>;
 }

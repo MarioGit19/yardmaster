@@ -63,14 +63,22 @@ const GRID: Palette = {
 /** Bright black: the dim text of each skin. */
 const BRIGHT_BLACK: Record<SkinId, string> = {
   minimal: '--text-2',
+  office: '--text-2',
   grid: '--text-2',
   retro: '--retro-dim-ink',
 };
 
-const PALETTES: Record<SkinId, Palette> = { minimal: MINIMAL, grid: GRID, retro: RETRO };
+// Office's monitors show the standard terminal: the room is in the frame, not in the text.
+const PALETTES: Record<SkinId, Palette> = {
+  minimal: MINIMAL,
+  office: MINIMAL,
+  grid: GRID,
+  retro: RETRO,
+};
 
 const SELECTION: Record<SkinId, string> = {
   minimal: '--st-work',
+  office: '--st-work',
   grid: '--grid-neon',
   retro: '--retro-ink',
 };

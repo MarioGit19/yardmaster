@@ -137,7 +137,7 @@ export function OfficeCharacter({
                 className="office-face absolute inset-0"
                 data-facing={facing < 0 ? 'left' : undefined}
               >
-                <Mascot
+                <ActorMascot
                   actor={actor}
                   size={placement.size}
                   color={color}
@@ -160,7 +160,8 @@ export function OfficeCharacter({
   );
 }
 
-function Mascot({
+/** An actor's character: the crew mascot for Claude, the ops crew for terminals (§10.3). */
+export function ActorMascot({
   actor,
   size,
   color,
