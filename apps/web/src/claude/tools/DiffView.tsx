@@ -1,6 +1,7 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { createPreference, usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
+import { useScrollFocus } from '../../ui/useScrollFocus.js';
 import { type Lang, type TokenLine, useHighlight } from '../highlight.js';
 import { type DiffLine, type Hunk, type Segment, segments, splitRows } from './diff.js';
 import { useStickyFlag } from './viewState.js';
@@ -17,6 +18,16 @@ export const diffLayoutPreference = createPreference<DiffLayout>(
 const CLAMP_ROWS = 18;
 /** Never render more rows than this, even expanded. */
 const MAX_ROWS = 800;
+
+/** A sideways scroll box that takes a Tab stop when its lines run past it. */
+function ScrollX({ label, children }: { label: string; children: ReactNode }) {
+  const ref = useScrollFocus<HTMLDivElement>(label);
+  return (
+    <div ref={ref} className="min-w-0 overflow-x-auto">
+      {children}
+    </div>
+  );
+}
 
 const FONT_ITALIC = 1;
 const FONT_BOLD = 2;
@@ -104,7 +115,7 @@ const HunkView = memo(function HunkView({ hunk, lang, limit, numbers, gutter, la
 
   const rows = splitRows(lines);
   const side = (pick: 'left' | 'right') => (
-    <div className="min-w-0 overflow-x-auto">
+    <ScrollX label={pick === 'left' ? 'Diff, before' : 'Diff, after'}>
       <div className="w-max min-w-full">
         {rows.map((row, i) => {
           const line = row[pick];
@@ -140,7 +151,7 @@ const HunkView = memo(function HunkView({ hunk, lang, limit, numbers, gutter, la
           );
         })}
       </div>
-    </div>
+    </ScrollX>
   );
   return (
     <div className="grid grid-cols-2 divide-x divide-line">
@@ -198,13 +209,18 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
               {gapLabel?.(i) ?? '⋯'}
             </div>
           )}
-          <div
-            className={
-              layout === 'unified' || hunk.added === 0 || hunk.removed === 0
-                ? 'overflow-x-auto'
-                : undefined
-            }
-          >
+          {layout === 'unified' || hunk.added === 0 || hunk.removed === 0 ? (
+            <ScrollX label={shown.length > 1 ? `Diff, part ${i + 1}` : 'Diff'}>
+              <HunkView
+                hunk={hunk}
+                lang={lang}
+                limit={limit}
+                numbers={numbers}
+                gutter={gutter}
+                layout={layout}
+              />
+            </ScrollX>
+          ) : (
             <HunkView
               hunk={hunk}
               lang={lang}
@@ -213,7 +229,7 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
               gutter={gutter}
               layout={layout}
             />
-          </div>
+          )}
         </div>
       ))}
       {total === 0 && <p className="px-3 py-1.5 font-sans text-meta text-text-2">No changes</p>}

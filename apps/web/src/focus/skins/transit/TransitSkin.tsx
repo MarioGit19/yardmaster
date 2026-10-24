@@ -92,6 +92,8 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
   const branch = project.git?.branch ?? null;
   const live = session !== null && session.status.kind !== 'ended';
   const counts = scene ? trainCount(scene.actors) : null;
+  const empty =
+    scene !== null && !scene.actors.some((a) => a.kind === 'claude' || a.kind === 'terminal');
   return (
     <header
       ref={bandRef}
@@ -137,7 +139,7 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
                 {tone === 'wait' ? 'Needs you' : 'Failed'}
               </span>
             ) : (
-              counts && <span className="shrink-0 text-text-3 tabular">{counts}</span>
+              counts && !empty && <span className="shrink-0 text-text-3 tabular">{counts}</span>
             )}
           </p>
         </div>
@@ -165,6 +167,16 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
                 binPx={coarse ? TOUCH_BIN_PX : undefined}
               />
             </div>
+          )}
+          {/* A line with nothing on it says so, instead of a bare track. */}
+          {empty && (
+            <p
+              data-band-empty
+              className="ts-band-empty text-meta text-text-3"
+              style={{ top: ROW.line - SIGN_ROW - 24 }}
+            >
+              No trains
+            </p>
           )}
         </div>
       </TipContext.Provider>

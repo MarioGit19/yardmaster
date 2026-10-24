@@ -24,6 +24,7 @@ import { cx } from '../../ui/cx.js';
 import { DrawnCheck } from '../../ui/DrawnCheck.js';
 import { ExitBadge } from '../../ui/ExitBadge.js';
 import { SegmentThumb, useSegmentThumb } from '../../ui/SegmentThumb.js';
+import { useScrollFocus } from '../../ui/useScrollFocus.js';
 import { langFor, type TokenLine, useHighlight } from '../highlight.js';
 import { Markdown } from '../Markdown.js';
 import { type ToolRow, toolSummary } from '../transcript.js';
@@ -278,8 +279,10 @@ function Card({
 /** Result text as monospace, cut to a sane size. */
 function ResultText({ text, tone }: { text: string; tone?: 'error' }) {
   const clipped = text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}\n…` : text;
+  const ref = useScrollFocus<HTMLPreElement>(tone === 'error' ? 'Error output' : 'Output');
   return (
     <pre
+      ref={ref}
       className={cx(
         'max-h-72 overflow-auto px-3 py-2 font-mono text-label leading-5 whitespace-pre-wrap break-words',
         tone === 'error' ? 'bg-st-err/[0.06] text-st-err-ink' : 'text-text-2',
@@ -306,8 +309,9 @@ function CodeLines({
   const code = lines.join('\n');
   const tokens = useHighlight(code, langFor(lang));
   const width = String((firstNo ?? 1) + lines.length).length + 2;
+  const ref = useScrollFocus<HTMLDivElement>('Code');
   return (
-    <div className="max-h-80 overflow-auto py-1.5 font-mono text-label leading-5">
+    <div ref={ref} className="max-h-80 overflow-auto py-1.5 font-mono text-label leading-5">
       <div className="w-max min-w-full">
         {lines.map((line, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
@@ -351,6 +355,7 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
   const exit = bashExitCode(row.result);
   const [first = '', ...restLines] = call.command.split('\n');
   const output = row.result ? bashOutput(row.result.text) : null;
+  const commandRef = useScrollFocus<HTMLPreElement>('Command');
   return (
     <Card
       row={row}
@@ -384,7 +389,10 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
       defaultOpen={exit !== null && exit !== 0}
     >
       {restLines.length > 0 && (
-        <pre className="max-h-40 overflow-auto border-line border-b px-3 py-2 font-mono text-label leading-5 whitespace-pre-wrap text-text-1">
+        <pre
+          ref={commandRef}
+          className="max-h-40 overflow-auto border-line border-b px-3 py-2 font-mono text-label leading-5 whitespace-pre-wrap text-text-1"
+        >
           <span className="text-text-3">$ </span>
           {call.command}
         </pre>

@@ -58,7 +58,9 @@ function fitProblems(): string[] {
   const skipped = (el: Element) =>
     Boolean(el.closest('.xterm, svg *, canvas, [aria-hidden="true"], [inert]')) ||
     // A visually hidden element (the sr-only pattern).
-    el.closest('.sr-only') !== null;
+    el.closest('.sr-only') !== null ||
+    // A toast tucked behind the front one (Sonner scales it down): a tap expands the stack first.
+    el.closest('[data-sonner-toast][data-front="false"][data-expanded="false"]') !== null;
   const visible = (el: Element) =>
     el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) &&
     el.getClientRects().length > 0;

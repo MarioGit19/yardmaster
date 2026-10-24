@@ -85,6 +85,7 @@ import {
   HUB_GROUPS,
   type HubItem,
   type HubPage,
+  hubFailures,
   hubItems,
   hubItemsKey,
   isHubPage,
@@ -364,15 +365,17 @@ function Hub({
   );
 }
 
-/** "2 working · 1 needs you · :3000 serving". */
+/** "2 working · 1 needs you · 1 failed · :3000 serving". */
 function Summary({ project, items }: { project: Project; items: readonly HubItem[] }) {
   const ports = useBoardList(selectPortsByProject(project.id));
+  const failed = useBoard((s) => hubFailures(s.board, items));
   const needs = items.filter((i) => i.group === 'needs').length;
   const running = items.filter((i) => i.group === 'running').length;
   const listening = [...new Set(ports.map((p) => p.port))].sort((a, b) => a - b);
   const parts = [
     running > 0 && `${running} working`,
     needs > 0 && `${needs} needs you`,
+    failed > 0 && `${failed} failed`,
     listening.length === 1 && `:${listening[0]} serving`,
     listening.length > 1 && `${listening.length} ports serving`,
   ].filter(Boolean);

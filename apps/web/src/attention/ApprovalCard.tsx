@@ -24,6 +24,7 @@ import { Button } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { DrawnCheck } from '../ui/DrawnCheck.js';
 import { Kbd } from '../ui/Kbd.js';
+import { useScrollFocus } from '../ui/useScrollFocus.js';
 import {
   type AttentionDecision,
   COLLAPSE_AT_MS,
@@ -311,6 +312,8 @@ function MaskedPayload({ approval, projectPath }: { approval: Approval; projectP
 /** The exact payload: a highlighted command, a mini diff for edits, or the main argument. */
 function Payload({ approval, projectPath }: { approval: Approval; projectPath?: string }) {
   const call = useMemo(() => parseToolCall(approval.tool, approval.input), [approval]);
+  const diffRef = useScrollFocus<HTMLDivElement>('Proposed change');
+  const jsonRef = useScrollFocus<HTMLPreElement>('Tool input');
   if (call.kind === 'bash') return <Command command={call.command} />;
   if (call.kind === 'edit' || call.kind === 'write') {
     const hunks =
@@ -322,7 +325,7 @@ function Payload({ approval, projectPath }: { approval: Approval; projectPath?: 
         <p className="truncate border-line border-b px-3 py-1 font-mono text-meta text-text-2">
           {relativeToProject(call.filePath, projectPath)}
         </p>
-        <div className="max-h-48 overflow-auto">
+        <div ref={diffRef} className="max-h-48 overflow-auto">
           <DiffView
             id={`approval:${approval.id}`}
             hunks={hunks}
@@ -346,7 +349,10 @@ function Payload({ approval, projectPath }: { approval: Approval; projectPath?: 
   }
   const json = prettyJson(approval.input);
   return (
-    <pre className="max-h-40 overflow-auto rounded-control bg-bg-0/60 px-2.5 py-1.5 font-mono text-label text-text-1">
+    <pre
+      ref={jsonRef}
+      className="max-h-40 overflow-auto rounded-control bg-bg-0/60 px-2.5 py-1.5 font-mono text-label text-text-1"
+    >
       {json.length > MAX_JSON_CHARS ? `${json.slice(0, MAX_JSON_CHARS)}…` : json}
     </pre>
   );
@@ -354,8 +360,10 @@ function Payload({ approval, projectPath }: { approval: Approval; projectPath?: 
 
 function Command({ command }: { command: string }) {
   const lines = useHighlight(command, 'shellscript');
+  const ref = useScrollFocus<HTMLPreElement>('Command');
   return (
     <pre
+      ref={ref}
       data-command
       className="max-h-40 overflow-auto rounded-control bg-bg-0/60 px-2.5 py-1.5 font-mono text-label leading-5 whitespace-pre-wrap break-all text-text-1"
     >

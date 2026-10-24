@@ -1,6 +1,6 @@
 import type { BoardState, ClaudeSession, SessionStatus } from '@c-board/protocol';
 import { terminalSession } from '../../data/selectors.js';
-import { laneExecution } from '../../lanes/lane.js';
+import { laneExecution, laneView } from '../../lanes/lane.js';
 import { podSessions } from '../../pod/model.js';
 import { sessionHref, terminalHref } from '../../routes.js';
 import { stackOrder } from '../../terminal/stack.js';
@@ -84,6 +84,23 @@ export function hubItems(
     });
   }
   return HUB_GROUPS.flatMap((group) => items.filter((item) => item.group === group));
+}
+
+/** How many items failed: a session in error, or a terminal whose last command exited non-zero. */
+export function hubFailures(
+  board: Pick<BoardState, 'sessions' | 'terminals' | 'executions'>,
+  items: readonly HubItem[],
+): number {
+  let failed = 0;
+  for (const item of items) {
+    if (item.kind === 'session') {
+      if (board.sessions[item.sessionId]?.status.kind === 'error') failed++;
+      continue;
+    }
+    const terminal = board.terminals[item.terminalId];
+    if (terminal && laneView(terminal, laneExecution(board, terminal), '').tone === 'err') failed++;
+  }
+  return failed;
 }
 
 /** `hubItems` as one string, so a store selector compares it by value. */

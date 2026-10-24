@@ -2,6 +2,7 @@ import { type BoardState, emptyBoardState } from '@c-board/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession, makeTerminal } from '../../test/board.js';
 import {
+  hubFailures,
   hubItems,
   hubItemsKey,
   itemHref,
@@ -44,6 +45,19 @@ function board(): BoardState {
   };
   return b;
 }
+
+describe('hubFailures', () => {
+  it('counts sessions in error and terminals whose last command failed', () => {
+    const b = board();
+    expect(hubFailures(b, hubItems(b, 'p-acme'))).toBe(0);
+    b.sessions['s-work'] = makeSession('s-work', 'p-acme', { kind: 'error', message: 'boom' });
+    const dev = b.executions['e-dev'];
+    if (dev) b.executions['e-dev'] = { ...dev, endedAt: T0 + 5, exitCode: 1 };
+    // A terminal closed with exit 0 is not a failure.
+    b.terminals['t-idle'] = { ...makeTerminal('t-idle', 'p-acme'), state: 'closed', exitCode: 0 };
+    expect(hubFailures(b, hubItems(b, 'p-acme'))).toBe(2);
+  });
+});
 
 describe('hubItems', () => {
   it('groups everything Needs you, Running, Idle, with a Claude terminal as one card', () => {

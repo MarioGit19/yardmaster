@@ -77,6 +77,13 @@
   right: 0;
   left: 0;
 }
+.ts-band-empty {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
 /* The caption takes what it needs (a short "Idle", or an approval with its buttons), so the line
    keeps the rest. */
 .ts-band-caption {
@@ -247,17 +254,18 @@
 .focus[data-layout="transit"] [data-session-list] [data-session-name] {
   font-weight: 600;
 }
-/* The status in the board's words, in its tone; it keeps its room before the token count. */
+/* The status in the board's words, in its tone; it keeps its room, and the token count drops to
+   a line of its own (still at the right) when both don't fit. */
+.focus[data-layout="transit"] [data-session-list] :has(> [data-status]) {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
 .focus[data-layout="transit"] [data-session-list] [data-status] {
   flex: none;
   max-width: 100%;
 }
 .focus[data-layout="transit"] [data-session-list] [data-status] + span {
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-left: auto;
 }
 .focus[data-layout="transit"] [data-session-list] [data-status] > span:last-child {
   font-weight: 600;

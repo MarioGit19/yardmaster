@@ -224,6 +224,17 @@
 .focus[data-layout="retro"] .btn:not(.btn-icon) svg {
   display: none;
 }
+/* A shortcut inside a button is a dim key after a space, not a box glued to the word. */
+.focus[data-layout="retro"] .btn:not(.btn-icon) kbd {
+  min-width: 0;
+  height: auto;
+  margin-left: 1ch;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--retro-dim-ink);
+  font-size: inherit;
+}
 .focus[data-layout="retro"] :is(.btn, .rs-key, [data-send]):hover {
   background: color-mix(in srgb, var(--retro-ink) 12%, transparent);
 }
@@ -320,6 +331,17 @@
 .focus[data-layout="retro"] [data-status="idle"]::before {
   content: "[IDLE]" / "";
   color: var(--retro-dim-ink);
+}
+
+/* A session row's tag already says its status: the word stays for screen readers only, so the
+   row keeps room for its name and token count. */
+.focus[data-layout="retro"] a[data-session] [data-status] > [data-mark] + span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ── Number shortcuts: `[1]` on each session row, then on each terminal tab ────────────────── */

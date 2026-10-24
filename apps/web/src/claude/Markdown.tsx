@@ -11,6 +11,7 @@ import {
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cx } from '../ui/cx.js';
+import { useScrollFocus } from '../ui/useScrollFocus.js';
 import { langFor, type TokenLine, useHighlight } from './highlight.js';
 
 const FONT_ITALIC = 1;
@@ -46,6 +47,7 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
   const lang = langFor(info);
   const lines = useHighlight(code, lang);
   const [copied, setCopied] = useState(false);
+  const scrollRef = useScrollFocus<HTMLPreElement>(info ? `${info} code` : 'Code');
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(false), 1_400);
@@ -84,6 +86,7 @@ export function CodeBlock({ code, lang: info }: { code: string; lang: string | n
         </button>
       </div>
       <pre
+        ref={scrollRef}
         data-highlighted={lines ? '' : undefined}
         className="overflow-x-auto px-3 py-2 font-mono text-label leading-5 text-text-1"
       >
