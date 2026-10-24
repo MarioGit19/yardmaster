@@ -256,6 +256,7 @@ Every project has a small original character, the **crew member**, that acts out
 ## 9. Visual QA checklist (used by the loop's screenshot review tasks)
 
 - [ ] No element touches the viewport edge without padding. 16px minimum gutter at 390px width.
+- [ ] Phones (§11): no sideways page scroll and nothing spilling out of its container at 360, 390 and 412 px and in landscape; the composer stays visible with the keyboard open.
 - [ ] Type uses only the scale above, and numbers are tabular.
 - [ ] No default browser focus rings, no unstyled scrollbars (thin custom ones).
 - [ ] Status colors match the token table exactly. Accents never signal status.
@@ -405,3 +406,22 @@ The focus view (§4.6) keeps one implementation: the same columns, session list,
 - **Retro:** text mode. Geist Mono only, `--retro-fg` phosphor (amber option kept), box-drawing frames around every panel (`┌─ CLAUDE ─┐` titles), buttons as `[ SEND ]`, pills as `<opus>`, status as tags (`[RUN]` `[WAIT]` `[ERR]`) plus dimmed status colors. Chat renders as a console transcript (`> you:` / `claude:` lines; tool cards as indented `├─ Bash(pnpm test) [RUN]` blocks that expand in place), the streaming caret is the blinking block cursor, the terminal theme is phosphor on black. Scanline and vignette as in §10.6; Daylight is the line-printer variant. Keyboard-first: the number shortcuts from the overview keep working in the session list and tabs.
 - **Phones (390 px):** every skin works on the tabbed phone focus view: the header band collapses to one line (Office: nameplate and up to 3 characters; Transit: the line strip without labels; Grid and Retro: the title only), frames thin out, tap targets stay ≥ 44 px.
 - **Performance:** skins add no per-frame work beyond what the layout already draws; the Office header characters and Grid glow follow the off-screen pause and motion-level rules, and the focus view still meets §7 under `--demo-stress`.
+
+## 11. Phones
+
+The board must be fully usable one-handed on a phone (360–430 px wide, portrait, and landscape at 844 × 390), not a desktop squeezed down. Below 768 px the app switches to the **phone shell**; 768–1023 px keeps the desktop shell with the project rail collapsed to icons.
+
+**Phone shell.**
+- **Top bar** (48 px, plus `env(safe-area-inset-top)`): the logomark (no wordmark), the three status counts (working, waiting, errors; waiting opens the Attention Center), and a search button for ⌘K on the right. Theme, editor status and *Open project* leave the top bar.
+- **Bottom tab bar** (56 px plus `env(safe-area-inset-bottom)`, glass, thumb reach): **Overview**, **Projects** (the project rail as a list, with *Open project* at the top), **Attention** (with its count badge; the Attention Center full-screen), **Pulse** (the timeline as a vertical list, newest first), and **More** (layout, theme, motion, editor status, settings). The active tab's indicator glides (`layoutId`, `tabGlide`). The tab bar replaces the left rail and the Pulse rail, which don't render on phones.
+- **Workspace (focus view)** is full-bleed: no card inset, no outer margin. Its own app bar (back, project avatar and name, an overflow menu) sits on top, the Sessions / Claude / Terminals tabs are sticky under it and swipeable, and the bottom tab bar hides while a workspace is open (back brings it back). The composer is pinned to the bottom and rides above the on-screen keyboard (`interactive-widget=resizes-content` in the viewport meta, `visualViewport` as a fallback), so the field and Send are always visible while typing.
+- **Sheets and dialogs** are bottom sheets, at most 90 dvh, with a drag handle and their own scroll; nothing opens as a centered desktop dialog on a phone.
+- Toasts sit above the tab bar (or above the composer in a workspace) and never cover the tab bar or Send.
+
+**Fit rules (hard).**
+- The page never scrolls sideways. Use `100dvh`, never `100vh`; `viewport-fit=cover` with the safe-area insets applied to the bars.
+- 16 px gutters. Every flex or grid child that holds text has `min-width: 0`.
+- Wide content (diffs, code, tool output, tables, xterm, git graphs) scrolls **inside its own box** horizontally, with a soft edge fade showing there's more; it never widens its parent.
+- Long names, branches, commands and paths truncate with an ellipsis (middle truncation for paths), and the full value is one tap away (inspector or sheet).
+- Tap targets ≥ 44 × 44 px with 8 px between neighbors, text ≥ 12 px, inputs ≥ 16 px (so mobile browsers don't zoom on focus).
+- Every layout's phone version follows §10.1's phone rules inside the phone shell.

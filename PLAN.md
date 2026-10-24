@@ -838,30 +838,60 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Done when:** server tests spawn a real pty with `zsh -f`/`bash --norc` plus the injection and see `echo hi` (exit 0), `false` (exit 1), `sleep 30` + Ctrl+C (130) and a `cd` as executions with the right cwd; a fallback test with `/bin/sh` sees an inferred running execution; e2e on `--demo` shows the board terminal as Running in the focus view and in every layout (the Grid node lit, the Office character working); no marker bytes appear in the xterm output.
   - **Verify:** `pnpm check && pnpm --filter @c-board/server test && pnpm e2e`
 
-- [ ] **12.6b Workspace skins: the framework, and Retro**
+- [ ] **12.6b Phone shell: navigation and a full-bleed workspace**
+  - Maintainer feedback from a real phone (Android, about 412 px wide): many things spill out of their containers, and the board is hard to use one-handed. Shots at 390 confirm it: the left project rail stays on phones and takes about 15 % of the width, the focus view sits inset inside a card so diffs and code are cut off, the HUD is crammed, and the Grid cockpit's cards run off the right edge. DESIGN.md §11 now specifies the phone shell; read it first.
+  - Build it below 768 px: the 48 px top bar (logomark, the three counts, search), the bottom tab bar (Overview, Projects, Attention, Pulse, More) with safe-area insets and a gliding indicator, the full-bleed workspace with its own app bar, sticky swipeable Sessions/Claude/Terminals tabs, the tab bar hidden inside a workspace, and the composer riding above the keyboard (`interactive-widget=resizes-content`, `viewport-fit=cover`, a `visualViewport` fallback). Projects and Pulse become full-screen lists, More holds layout/theme/motion/editor status/settings, and every dialog becomes a bottom sheet. 768–1023 px keeps the desktop shell with the rail collapsed to icons. Deep links, back gesture and browser back keep working.
+  - **Done when:** e2e with an Android profile (Galaxy S-class, 412 × 915) and an iPhone profile (390 × 844) moves through every tab, opens a project, switches workspace tabs by swiping, types a reply with the viewport shrunk as by a keyboard and still sees the field and Send, and goes back; shots of each tab and the workspace at 360/390/412 in both themes; the desktop shots at 1440 are unchanged.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
+
+- [ ] **12.6c Phone fit sweep, with a guard**
+  - New `e2e/phone-fit.spec.ts`: visit every route, tab, sheet and dialog (overview in all five layouts plus their enter views, workspace tabs, chat with a long diff and a wide tool output, terminals, the picker and launch sheet, Settings and its Phone page, the Attention Center, the inspector, ⌘K) at 360, 390 and 412 px and in landscape (844 × 390), in both themes, with `--demo` data and with worst-case data (very long project names, branches, commands and paths, 12 terminals, 30 sessions). Fail when the page scrolls sideways (`scrollWidth > innerWidth`), when a visible element's box extends past the viewport and isn't inside a horizontal scroller, when text overflows its box without an ellipsis or a scroller, or when a tap target is under 44 px. Fix everything it finds per DESIGN.md §11's fit rules (`min-width: 0`, scrollers with edge fades for wide content, middle truncation for paths, 16 px inputs).
+  - **Done when:** the spec passes on every combination, and shots of the worst-case screens look right.
+  - **Verify:** `pnpm check && pnpm e2e --grep phone-fit && pnpm shots`
+
+- [ ] **12.6d Layouts on phones**
+  - Redo each layout's phone version inside the phone shell, from the 390/412 shots: Minimal pods full width at 16 px gutters; Office rooms full width with whiteboards and nameplates readable and nothing clipped; the Grid 2D trunk list and the cockpit as a swipeable stack of full-width screens (today a cockpit card runs off the right edge); Transit with at most 4 lines on screen and horizontal swipe between groups, so line names don't wrap into fragments; Retro frames full width at ≥ 40 characters. Each enter view (room, cockpit, Retro frame) fits too, and the inspector is a bottom sheet everywhere. Phone performance caps from §10.1 still hold.
+  - **Done when:** the phone-fit spec passes for every layout and enter view, and shots of each at 360/390/412 in both themes look right (review them against §10.1 and §11).
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
+
+- [ ] **12.6e Close and forget projects**
+  - Maintainer feedback: there's no way to remove a project from the board. Add **Close project** to the pod/room/node/line context menu, the Actor inspector's project header, the workspace's overflow menu, the Projects list (swipe left on phones) and ⌘K ("Close <project>").
+  - Closing hides the project from the overview, the rail and the phone Projects list until something new happens in it (a new terminal, Claude session or editor window, or opening it again from the picker). Before closing, a confirm sheet lists what is still running there and what will happen: board terminals are stopped (Ctrl+C, then kill after 3 s), board Claude sessions are interrupted (they can be resumed from History), terminal-origin Claude sessions and Cursor terminals are left running and just hidden, and when a Cursor window is open on that folder a checkbox offers to close that window too (a new editor action in the extension, `window.close` for that workspace, only after the user ticks it). Unpin the project on close.
+  - **Forget project** (in the same menu, and in the picker's recents) also removes it from recents and the project list; it comes back only if it is opened again or something runs there.
+  - Server: a `project.close` action (validated with zod, through the auth guard) that records `closedAt` on the project, stops what the board owns, and makes `activeProjectIds` (`library/active.ts`) skip a closed project until it has activity newer than `closedAt`; `project.forget` drops it from the library store. Tests for both, including a closed project coming back when a new terminal opens.
+  - **Done when:** server and web tests pass; e2e on `--demo` closes a project with a running board terminal (the confirm lists it, the terminal stops, the project leaves the overview with its exit animation and returns when a new terminal starts there), forgets one, and does both on the phone profile.
+  - **Verify:** `pnpm check && pnpm e2e`
+
+- [ ] **[HUMAN] 12.6f Update the extension, and try the board on your phone**
+  - 12.6e changed the extension. From the repo root run:
+    `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`
+  - Then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Close a project from the board and check that ticking "Close the Cursor window too" closes it.
+  - Open the board on your phone (`https://<your-mac>.<tailnet>.ts.net`) and go through the overview in every layout, Projects, Attention, Pulse, a workspace and a reply. Write anything that still spills over or is hard to tap as new tasks below this one, tick it, and restart the loop.
+
+- [ ] **12.6g Workspace skins: the framework, and Retro**
   - Maintainer feedback: in every layout but Minimal, opening a project lands in the standard focus view, so the theme stops at the overview. DESIGN.md §10.8 now specifies a **workspace skin** per layout (read it first; §10.1's contract changed with it).
   - Framework: the focus view root gets `data-layout` from `layoutPreference`; a `focus/skins/` registry maps each layout to its token override (CSS scoped to `[data-layout="…"] .focus`), its xterm theme (`terminal/theme.ts` takes the layout) and its slots (`HeaderBand`, `PanelFrame`, `EntryTransition`), lazy-loaded with the layout's chunk. Minimal's slots are today's components, so Minimal is unchanged pixel for pixel (compare shots). A layout switch while in the focus view swaps the skin with the §10.1 cross-fade. Components that need a skin hook get a token or a `data-layout` CSS hook, never a fork.
   - Retro skin per §10.8: box-drawing panel frames with titles, `[ SEND ]`-style buttons and `<pill>` pills, console-transcript chat (user and assistant lines, tool cards as tree lines that expand in place, TodoWrite as `[x]` lines), block-cursor streaming caret, phosphor xterm theme, tags plus dimmed status colors, scanline and vignette, the Daylight line-printer variant, number shortcuts in the session list and tabs. Entry: the Retro frame's text "opens" into the workspace (a quick line-by-line reveal, `dur.base`; cross-fade at Reduced); Esc returns to the same frame.
   - **Done when:** every existing focus e2e passes with `cboard.layout` set to `minimal` and to `retro` (parametrize the focus specs over a layout list that later tasks extend); Minimal's focus shots match the previous ones; Retro focus shots at 390/1440, dark and light, with streaming, a running terminal and a waiting approval; `pnpm motion:record focus` sheets for the Retro entry.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
 
-- [ ] **12.6c Workspace skin: Grid**
+- [ ] **12.6h Workspace skin: Grid**
   - Per DESIGN.md §10.8: `--grid-bg` ground with the faint floor and edge scanlines, holo-screen panel frames (neon edge, corner brackets, activity-driven glow), mono caps title bars, cyan active tabs and session, neon xterm theme. Entry continues the cockpit: from a centered cockpit screen or *Open workspace*, the screens settle into the workspace columns with the phase-in sweep (about 400 ms); Esc goes back to the cockpit. Glow strength reads the activity level (no per-frame React renders). Reduced: no sweep or glow pulsing; Off: static. No flashes over 3 Hz.
   - **Done when:** the focus specs pass with `grid` added to the layout list; Grid focus shots at 390/1440, dark and light; `pnpm motion:record focus` shows the cockpit → workspace entry reading as one move; the focus view meets §7 under `--demo-stress` in Grid.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
 
-- [ ] **12.6d Workspace skin: Office**
+- [ ] **12.6i Workspace skin: Office**
   - Per DESIGN.md §10.8: the header band is the room's front (nameplate, door light, ceiling light, whiteboard todo lines, up to 8 characters at small size acting their live states, reusing the Office crew components and their pause rules); panels framed as monitors with a status power LED; the Night desk-lamp glow under the Claude monitor; §10.3's palette. Clicking a character in the band selects its session or terminal (the same as the session list or tab). Entry continues from the room view (the room's front shrinks into the header band while the panels rise in, `smooth`); Esc returns to the room view. Reduced: cross-fade.
   - **Done when:** the focus specs pass with `office` added; Office focus shots at 390/1440, dark and light; a band character click selects its terminal in e2e; `pnpm motion:record focus` sheets for room → workspace and back.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
 
-- [ ] **12.6e Workspace skin: Transit**
+- [ ] **12.6j Workspace skin: Transit**
   - Per DESIGN.md §10.8: the line strip header (the project's line over the last 60 min with stations and trains, reusing the Transit map's line renderer; clicking a station jumps to the event like the Pulse rail), station-sign column headings, route-roundel terminal tabs, the departures-board session list, flat surfaces and the §10.5 grounds. Entry: the clicked line slides up into the header strip as the columns appear; Esc returns to the map with that line highlighted. Reduced: cross-fade.
   - **Done when:** the focus specs pass with `transit` added; Transit focus shots at 390/1440, dark and light; a station click in the strip jumps to its event in e2e; `pnpm motion:record focus` sheets for the entry.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
 
-- [ ] **12.6f Workspace skins review pass**
-  - For all five skins: `review-animations` (read its SKILL.md) on the entries and skin motion, an `impeccable` critique of each skinned workspace, `break-ui` with worst-case data in each (very long names and commands, 12 terminals, 30 sessions, a huge diff, no terminals), a phone pass (iPhone profile, 390 px, ≥ 44 px targets, tabs and swipes), axe checks of each skin (contrast in both themes), and the §10.7 skins QA item. Fix up to 10 issues; add `12.6g` for the rest.
+- [ ] **12.6k Workspace skins review pass**
+  - For all five skins: `review-animations` (read its SKILL.md) on the entries and skin motion, an `impeccable` critique of each skinned workspace, `break-ui` with worst-case data in each (very long names and commands, 12 terminals, 30 sessions, a huge diff, no terminals), a phone pass (iPhone profile, 390 px, ≥ 44 px targets, tabs and swipes), axe checks of each skin (contrast in both themes), and the §10.7 skins QA item. Fix up to 10 issues; add `12.6l` for the rest.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
 
 ## Phase 13 — Quality, docs, release
