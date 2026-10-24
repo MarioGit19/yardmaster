@@ -838,6 +838,32 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Done when:** server tests spawn a real pty with `zsh -f`/`bash --norc` plus the injection and see `echo hi` (exit 0), `false` (exit 1), `sleep 30` + Ctrl+C (130) and a `cd` as executions with the right cwd; a fallback test with `/bin/sh` sees an inferred running execution; e2e on `--demo` shows the board terminal as Running in the focus view and in every layout (the Grid node lit, the Office character working); no marker bytes appear in the xterm output.
   - **Verify:** `pnpm check && pnpm --filter @c-board/server test && pnpm e2e`
 
+- [ ] **12.6b Workspace skins: the framework, and Retro**
+  - Maintainer feedback: in every layout but Minimal, opening a project lands in the standard focus view, so the theme stops at the overview. DESIGN.md §10.8 now specifies a **workspace skin** per layout (read it first; §10.1's contract changed with it).
+  - Framework: the focus view root gets `data-layout` from `layoutPreference`; a `focus/skins/` registry maps each layout to its token override (CSS scoped to `[data-layout="…"] .focus`), its xterm theme (`terminal/theme.ts` takes the layout) and its slots (`HeaderBand`, `PanelFrame`, `EntryTransition`), lazy-loaded with the layout's chunk. Minimal's slots are today's components, so Minimal is unchanged pixel for pixel (compare shots). A layout switch while in the focus view swaps the skin with the §10.1 cross-fade. Components that need a skin hook get a token or a `data-layout` CSS hook, never a fork.
+  - Retro skin per §10.8: box-drawing panel frames with titles, `[ SEND ]`-style buttons and `<pill>` pills, console-transcript chat (user and assistant lines, tool cards as tree lines that expand in place, TodoWrite as `[x]` lines), block-cursor streaming caret, phosphor xterm theme, tags plus dimmed status colors, scanline and vignette, the Daylight line-printer variant, number shortcuts in the session list and tabs. Entry: the Retro frame's text "opens" into the workspace (a quick line-by-line reveal, `dur.base`; cross-fade at Reduced); Esc returns to the same frame.
+  - **Done when:** every existing focus e2e passes with `cboard.layout` set to `minimal` and to `retro` (parametrize the focus specs over a layout list that later tasks extend); Minimal's focus shots match the previous ones; Retro focus shots at 390/1440, dark and light, with streaming, a running terminal and a waiting approval; `pnpm motion:record focus` sheets for the Retro entry.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
+
+- [ ] **12.6c Workspace skin: Grid**
+  - Per DESIGN.md §10.8: `--grid-bg` ground with the faint floor and edge scanlines, holo-screen panel frames (neon edge, corner brackets, activity-driven glow), mono caps title bars, cyan active tabs and session, neon xterm theme. Entry continues the cockpit: from a centered cockpit screen or *Open workspace*, the screens settle into the workspace columns with the phase-in sweep (about 400 ms); Esc goes back to the cockpit. Glow strength reads the activity level (no per-frame React renders). Reduced: no sweep or glow pulsing; Off: static. No flashes over 3 Hz.
+  - **Done when:** the focus specs pass with `grid` added to the layout list; Grid focus shots at 390/1440, dark and light; `pnpm motion:record focus` shows the cockpit → workspace entry reading as one move; the focus view meets §7 under `--demo-stress` in Grid.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
+
+- [ ] **12.6d Workspace skin: Office**
+  - Per DESIGN.md §10.8: the header band is the room's front (nameplate, door light, ceiling light, whiteboard todo lines, up to 8 characters at small size acting their live states, reusing the Office crew components and their pause rules); panels framed as monitors with a status power LED; the Night desk-lamp glow under the Claude monitor; §10.3's palette. Clicking a character in the band selects its session or terminal (the same as the session list or tab). Entry continues from the room view (the room's front shrinks into the header band while the panels rise in, `smooth`); Esc returns to the room view. Reduced: cross-fade.
+  - **Done when:** the focus specs pass with `office` added; Office focus shots at 390/1440, dark and light; a band character click selects its terminal in e2e; `pnpm motion:record focus` sheets for room → workspace and back.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
+
+- [ ] **12.6e Workspace skin: Transit**
+  - Per DESIGN.md §10.8: the line strip header (the project's line over the last 60 min with stations and trains, reusing the Transit map's line renderer; clicking a station jumps to the event like the Pulse rail), station-sign column headings, route-roundel terminal tabs, the departures-board session list, flat surfaces and the §10.5 grounds. Entry: the clicked line slides up into the header strip as the columns appear; Esc returns to the map with that line highlighted. Reduced: cross-fade.
+  - **Done when:** the focus specs pass with `transit` added; Transit focus shots at 390/1440, dark and light; a station click in the strip jumps to its event in e2e; `pnpm motion:record focus` sheets for the entry.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots && pnpm motion:record focus`
+
+- [ ] **12.6f Workspace skins review pass**
+  - For all five skins: `review-animations` (read its SKILL.md) on the entries and skin motion, an `impeccable` critique of each skinned workspace, `break-ui` with worst-case data in each (very long names and commands, 12 terminals, 30 sessions, a huge diff, no terminals), a phone pass (iPhone profile, 390 px, ≥ 44 px targets, tabs and swipes), axe checks of each skin (contrast in both themes), and the §10.7 skins QA item. Fix up to 10 issues; add `12.6g` for the rest.
+  - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
+
 ## Phase 13 — Quality, docs, release
 
 - [x] **13.1 Performance pass** (committed as 10.1)
