@@ -36,6 +36,7 @@ Installed for this project: the plugins in `.claude/settings.json`, and the skil
 | Performance work (10.4, 11.10, 13.1) or a janky animation | `animation-performance` + `react-best-practices` |
 | Polish, a11y and audit tasks (13.2, 13.4) | `web-design-guidelines` + `impeccable` audit/polish |
 | Edge-case hardening of data-heavy components | `break-ui` |
+| Logo, brand mark, app icons, favicons (12.7) | `logo-design` (process, scripts, tests), plus `logo-designer`'s SVG reviewer checklist |
 | Looking for places that should animate but don't | `find-animation-opportunities` (proposes only; you implement what fits DESIGN.md) |
 
 `review-animations` is user-invocable only (`disable-model-invocation`). To use it, Read `.claude/skills/review-animations/SKILL.md` and follow it.

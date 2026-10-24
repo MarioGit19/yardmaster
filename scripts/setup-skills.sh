@@ -22,6 +22,8 @@ sources=(
   "emilkowalski/skills|skills|emil-design-eng animate review-animations animation-performance find-animation-opportunities improve-animations apple-design break-ui"
   "vercel-labs/agent-skills|skills|react-best-practices web-design-guidelines"
   "motiondivision/ai-kit|plugins/motion/skills|motion"
+  "kaankiziltug/logo-design-skill|skills|logo-design"
+  "luongnv89/skills|skills|logo-designer"
 )
 
 for entry in "${sources[@]}"; do
