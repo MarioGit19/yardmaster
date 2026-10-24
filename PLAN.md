@@ -829,6 +829,15 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
 - [ ] **[HUMAN] 12.6 Try workspaces and phone access**
   - Add your projects folder in Settings, open a project that isn't open anywhere (Cursor, Claude, and a terminal), then set up Tailscale and pair your phone. Write any feedback as tasks below, then tick this.
 
+- [ ] **12.6a Board terminals: know what they're running**
+  - Maintainer feedback (Grid): a board terminal (12.4) started with `pnpm sync` shows as idle while the script runs. Cause: board terminals have no shell integration, so they never get executions (`executionIds: []`, `shellIntegration: false`), and `opsStateFor` (`layouts/scene.ts`) and every status, lane caption, Pulse entry and project activity derived from executions fall back to idle/sleeping. Commands typed into a board terminal later are invisible too.
+  - **Shell integration in the pty:** `PtyManager` injects command markers (OSC 133 A/B/C/D with the exit code, plus OSC 633 E for the command line and OSC 7/633 P for the cwd) without touching the user's dotfiles: zsh via a temporary `ZDOTDIR` whose `.zshenv`/`.zshrc` source the user's real ones and then add `precmd`/`preexec` hooks; bash via `--rcfile` with a wrapper that sources `~/.bashrc` (and the login profile) and installs `PROMPT_COMMAND` plus a DEBUG trap. Keep the wrapper files in the c-board data dir, created per server start, never in the repo. Parse the markers from the pty stream (tolerating chunks split mid-sequence) and turn them into the same `Execution` records editor terminals get (command line, cwd, start, end, exit code), set `shellIntegration: true` once a marker arrives, and strip the markers before the ring buffer and the UI if xterm would show them. The initial `command` from the launch sheet becomes an execution like any typed one.
+  - **Fallback** for shells without injection (fish, nu, sh, or if the markers never arrive within a few seconds): the process sampler gives the terminal a synthetic running execution while the shell has a foreground child (its argv as the command line, ended when the child exits, exit code unknown). Mark it as inferred so the UI doesn't claim an exit code it doesn't have.
+  - Check that ports opened by a board terminal's descendants attach to that terminal (the `pnpm dev` → "serving" path), as they do for editor terminals.
+  - Demo: a demo board terminal runs a command so the e2e covers it.
+  - **Done when:** server tests spawn a real pty with `zsh -f`/`bash --norc` plus the injection and see `echo hi` (exit 0), `false` (exit 1), `sleep 30` + Ctrl+C (130) and a `cd` as executions with the right cwd; a fallback test with `/bin/sh` sees an inferred running execution; e2e on `--demo` shows the board terminal as Running in the focus view and in every layout (the Grid node lit, the Office character working); no marker bytes appear in the xterm output.
+  - **Verify:** `pnpm check && pnpm --filter @c-board/server test && pnpm e2e`
+
 ## Phase 13 — Quality, docs, release
 
 - [x] **13.1 Performance pass** (committed as 10.1)
