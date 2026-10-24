@@ -895,12 +895,6 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Done when:** e2e on the Android (412) and iPhone (390) profiles proves each §11 reachability path in at most two taps from the overview (a session's chat, a terminal's output, a waiting approval, a new terminal), switches between items with the switcher and by swiping, sees one card for a Claude terminal, and finds no icon-only button on a phone screen (every button has visible text or sits in a labelled menu; allow-list the back arrow and the overflow ⋮); phone-fit passes; shots of the hub, each item page, the switcher and the + New sheet at 360/390/412 in both themes.
   - **Verify:** `pnpm check && pnpm e2e && pnpm shots`
 
-- [ ] **[HUMAN] 12.6f Update the extension, and try the board on your phone**
-  - 12.6e changed the extension. From the repo root run:
-    `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`
-  - Then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Close a project from the board and check that ticking "Close the Cursor window too" closes it.
-  - Open the board on your phone (`https://<your-mac>.<tailnet>.ts.net`) and go through the overview in every layout, Projects, Attention, Pulse, a workspace's project hub, a chat and a terminal, switching between them, and a reply. Share a dev server with **Open on phone** and open it. Turn on notifications in Settings → Notifications, add the board to the home screen, and check that a finished command and a Claude approval reach the phone. Write anything that still spills over or is hard to tap as new tasks below this one, tick it, and restart the loop.
-
 - [ ] **12.6g Workspace skins: the framework, and Retro**
   - Maintainer feedback: in every layout but Minimal, opening a project lands in the standard focus view, so the theme stops at the overview. DESIGN.md §10.8 now specifies a **workspace skin** per layout (read it first; §10.1's contract changed with it).
   - Framework: the focus view root gets `data-layout` from `layoutPreference`; a `focus/skins/` registry maps each layout to its token override (CSS scoped to `[data-layout="…"] .focus`), its xterm theme (`terminal/theme.ts` takes the layout) and its slots (`HeaderBand`, `PanelFrame`, `EntryTransition`), lazy-loaded with the layout's chunk. Minimal's slots are today's components, so Minimal is unchanged pixel for pixel (compare shots). A layout switch while in the focus view swaps the skin with the §10.1 cross-fade. Components that need a skin hook get a token or a `data-layout` CSS hook, never a fork.
@@ -958,6 +952,13 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
 - [ ] **13.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry, so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Add a CHANGELOG.
   - **Verify:** `pnpm build && node apps/server/dist/cli.js doctor`
+
+- [ ] **[HUMAN] 12.6f Update the extension, and try the board on your phone (moved here by the maintainer: check everything once, at the end)**
+  - 12.6e changed the extension. From the repo root run:
+    `pnpm --filter c-board-extension package && cursor --install-extension apps/extension/dist/c-board.vsix --force`
+  - Then reload every Cursor window (Cmd+Shift+P, "Developer: Reload Window"). Close a project from the board and check that ticking "Close the Cursor window too" closes it.
+  - Open the board on your phone (`https://<your-mac>.<tailnet>.ts.net`) and go through the overview in every layout, Projects, Attention, Pulse, a workspace's project hub, a chat and a terminal, switching between them, and a reply. Share a dev server with **Open on phone** and open it. Turn on notifications in Settings → Notifications, add the board to the home screen, and check that a finished command and a Claude approval reach the phone. Write anything that still spills over or is hard to tap as new tasks below this one, tick it, and restart the loop.
+  - Also try the workspace skins (12.6g–k) in every layout, on desktop and on the phone.
 
 - [ ] **[HUMAN] 13.7 Real-world acceptance**
   - Use c-board for a day with your real projects. File issues or add tasks below for anything off. Decide on a license and the open questions in PRD §13.
