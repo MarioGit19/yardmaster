@@ -1,4 +1,4 @@
-import { expect, openRoute, test } from './fixtures.js';
+import { expect, openRoute, test, WEBGL } from './fixtures.js';
 
 // The fx effects (apps/web/src/fx) on /_tokens and the ambient style setting.
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -10,7 +10,9 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('yardmaster.motion', 'full'));
 });
 
-test('a WebGL background replaces the ambient field while it is on screen', async ({ page }) => {
+test('a WebGL background replaces the ambient field while it is on screen', { tag: WEBGL }, async ({
+  page,
+}) => {
   await page.goto('/#/_tokens');
   const field = page.locator('[data-ambient]');
   await expect(field).toHaveAttribute('data-ambient', 'webgl');
@@ -26,7 +28,7 @@ test('a WebGL background replaces the ambient field while it is on screen', asyn
   await expect(field).toHaveAttribute('data-ambient', 'webgl');
 });
 
-test('Settings switches the ambient style and remembers it', async ({ page }) => {
+test('Settings switches the ambient style and remembers it', { tag: WEBGL }, async ({ page }) => {
   await openRoute(page, '/settings');
   const field = page.locator('[data-ambient]');
   await expect(field).toHaveAttribute('data-ambient-style', 'nebula');

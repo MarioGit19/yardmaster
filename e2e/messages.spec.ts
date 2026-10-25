@@ -62,6 +62,24 @@ test('the transcript opens at the latest message and offers a jump back', async 
   expect(gap).toBeLessThan(48);
 });
 
+test('a reader at the latest message follows new rows, also in front of the live caption', async ({
+  page,
+}) => {
+  const list = await openLongTranscript(page);
+  await expect(list).toHaveAttribute('data-at-end', '');
+  // The demo session keeps working: rows land before its caption, which keeps the last key.
+  for (let round = 0; round < 3; round++) {
+    const count = Number(await list.getAttribute('data-count'));
+    await expect
+      .poll(async () => Number(await list.getAttribute('data-count')), { timeout: 20_000 })
+      .toBeGreaterThan(count);
+    await expect(list).toHaveAttribute('data-at-end', '');
+    await expect
+      .poll(() => list.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight))
+      .toBeLessThan(48);
+  }
+});
+
 test('renders user bubbles, markdown with highlighted code, and collapsible thinking', async ({
   page,
 }) => {

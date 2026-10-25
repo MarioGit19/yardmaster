@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, FOCUS_LAYOUTS, firstProjectRoute, openRoute, test } from './fixtures.js';
+import { expect, FOCUS_LAYOUTS, firstProjectRoute, openRoute, test, WEBGL } from './fixtures.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 // One shared demo zsh: commands from parallel tests (and the other skin's run) would race each
@@ -145,7 +145,9 @@ for (const layout of FOCUS_LAYOUTS) {
       });
     });
 
-    test('the terminal uses the WebGL renderer where the browser has it', async ({ page }) => {
+    test('the terminal uses the WebGL renderer where the browser has it', { tag: WEBGL }, async ({
+      page,
+    }) => {
       const stack = await openStack(page);
       await stack.locator('[role="tab"][data-terminal-name="zsh"]').click();
       await expect(stack.locator('[data-xterm]')).toHaveAttribute('data-renderer', /^(webgl|dom)$/);

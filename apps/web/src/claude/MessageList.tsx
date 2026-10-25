@@ -195,20 +195,22 @@ export function MessageList({
   }, [virtualizer]);
   useEffect(() => stopSettling, [stopSettling]);
 
+  // Where the reader left the list, as of their last scroll: content growing below doesn't move it.
+  const stuck = useRef(true);
+
   // The list's own height changes too (the composer grows with a long message, then shrinks when
   // it is sent): a list that sat at the bottom stays there, so it keeps following.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let bottom = true;
     let height = el.clientHeight;
     const onScroll = () => {
-      bottom = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX;
+      stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX;
     };
     const observer = new ResizeObserver(() => {
       if (el.clientHeight === height) return;
       height = el.clientHeight;
-      if (bottom) toEnd();
+      if (stuck.current) toEnd();
     });
     el.addEventListener('scroll', onScroll, { passive: true });
     observer.observe(el);
@@ -223,6 +225,15 @@ export function MessageList({
   useLayoutEffect(() => {
     toEnd();
   }, []);
+
+  // `followOnAppend` only follows when the last key changes, and a live tail or caption keeps
+  // the last key while rows arrive in front of it: those appends are followed here.
+  const lastRow = rows[rows.length - 1]?.id;
+  const trailing = items.length > body.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a new last row only
+  useLayoutEffect(() => {
+    if (trailing && stuck.current) toEnd();
+  }, [lastRow]);
 
   useEffect(() => {
     if (atEnd) awayFrom.current = rows.length;

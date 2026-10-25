@@ -20,7 +20,7 @@
     "build": "pnpm -r build",
     "brand:build": "pnpm --filter @yardmaster/web brand:build",
     "check": "scripts/privacy-check.sh && pnpm lint && pnpm typecheck && pnpm test",
-    "e2e": "pnpm --filter @yardmaster/web build && playwright test -c e2e --project=e2e",
+    "e2e": "pnpm --filter @yardmaster/web build && playwright test -c e2e --project=e2e --project=e2e-webgl",
     "shots": "pnpm --filter @yardmaster/web build && playwright test -c e2e --project=shots",
     "motion:record": "pnpm --filter @yardmaster/web build && tsx e2e/motion/record.ts"
   },

@@ -6,7 +6,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { startBoard, startDemoBoard } from './board.js';
-import { disableWebgl, expect, openRoute, signedInState, test } from './fixtures.js';
+import { disableWebgl, expect, openRoute, signedInState, test, WEBGL } from './fixtures.js';
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -774,7 +774,7 @@ const camera = (page: Page) =>
     .locator('[data-grid-3d]')
     .evaluate((el) => (el as unknown as { gridCamera(): GridCamera }).gridCamera());
 
-test.describe('the Grid 3D network', () => {
+test.describe(`the Grid 3D network ${WEBGL}`, () => {
   test('draws the network in one WebGL context, with the same cues as Minimal', async ({
     browser,
   }) => {

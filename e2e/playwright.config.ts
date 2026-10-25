@@ -17,11 +17,14 @@ export default defineConfig({
   projects: [
     // Frame-rate and long-task checks run alone, one after the other, before the parallel suite.
     { name: 'perf', testMatch: /crew\.spec\.ts$/ },
-    // The transcript tests scroll hundreds of rows and highlight code in a worker: alone, in order.
+    // The transcript tests scroll hundreds of rows and highlight code in a worker: alone, in order,
+    // on the GPU, as the stress check below: the headless shell rasters in software, and under
+    // load its compositor stalls the main thread for 50+ ms commits that no script caused.
     {
       name: 'perf-messages',
       testMatch: /messages\.spec\.ts$/,
       fullyParallel: false,
+      use: { channel: 'chromium' },
       dependencies: ['perf'],
     },
     // The PRD §9 load (`--demo-stress`). Full Chromium (new headless) renders with the GPU; the
@@ -37,6 +40,17 @@ export default defineConfig({
     {
       name: 'e2e',
       testIgnore: /(shots|crew|stress|messages)\.spec\.ts$/,
+      grepInvert: /@webgl/,
+      dependencies: ['perf-stress'],
+    },
+    // Tests tagged `WEBGL` (fixtures.ts) need a WebGL context, so they get the GPU, two at a time:
+    // the headless shell's software WebGL fails context creation under the parallel suite's load.
+    {
+      name: 'e2e-webgl',
+      testIgnore: /(shots|crew|stress|messages)\.spec\.ts$/,
+      grep: /@webgl/,
+      use: { channel: 'chromium' },
+      workers: 2,
       dependencies: ['perf-stress'],
     },
     { name: 'shots', testMatch: /shots\.spec\.ts$/ },

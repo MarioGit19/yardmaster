@@ -9,6 +9,12 @@ function required(name: string): string {
   return value;
 }
 
+/**
+ * Tags a test that needs a real WebGL context. These run in the `e2e-webgl` project, on a browser
+ * with the GPU: under parallel load the headless shell's software WebGL fails to create contexts.
+ */
+export const WEBGL = '@webgl';
+
 /** The layouts whose workspace skin the focus specs run in (DESIGN.md §10.8); later skins join. */
 export const FOCUS_LAYOUTS = ['minimal', 'office', 'grid', 'transit', 'retro'] as const;
 export type FocusLayout = (typeof FOCUS_LAYOUTS)[number];
