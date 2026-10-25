@@ -1,10 +1,15 @@
 {
   "name": "yardmaster",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=22"
+  },
+  "bin": {
+    "yardmaster": "apps/server/dist/cli.js",
+    "c-board": "apps/server/dist/c-board.js"
   },
   "scripts": {
     "prepare": "simple-git-hooks",
@@ -12,7 +17,7 @@
     "dev:demo": "pnpm --parallel --filter @yardmaster/server --filter @yardmaster/web dev:demo",
     "yardmaster": "pnpm --silent --filter @yardmaster/server cli",
     "c-board": "pnpm --silent --filter @yardmaster/server cli:c-board",
-    "board": "pnpm --filter \"@yardmaster/server...\" --filter @yardmaster/web build && node --conditions=yardmaster-build apps/server/dist/cli.js start --no-open",
+    "board": "pnpm --filter \"@yardmaster/server...\" --filter @yardmaster/web build && node apps/server/dist/cli.js start --no-open",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

@@ -91,6 +91,8 @@ pnpm i
 pnpm build
 ```
 
+To get a global `yardmaster` command, run `npm i -g .` in the clone after `pnpm build`. It links to the clone, so keep the clone and rerun `pnpm build` after you pull. Then `yardmaster start` works anywhere, and so does every `pnpm yardmaster …` command below without the `pnpm`.
+
 **1. Start the board.**
 
 ```bash

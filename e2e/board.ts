@@ -77,9 +77,7 @@ export async function startBoard({
     : demo
       ? ['--demo']
       : [];
-  const [command, entry] = built
-    ? [process.execPath, ['--conditions=yardmaster-build', 'dist/cli.js']]
-    : [TSX, ['src/cli.ts']];
+  const [command, entry] = built ? [process.execPath, ['dist/cli.js']] : [TSX, ['src/cli.ts']];
   const args = [...entry, 'start', ...mode, '--no-open'];
   const child = spawn(command, args, {
     cwd: SERVER_DIR,

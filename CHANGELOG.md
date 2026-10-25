@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Release packaging
+
+- `pnpm build` bundles the server with esbuild into one file, `apps/server/dist/cli.js`, and builds the web app it serves. The workspace packages are inlined, so `node apps/server/dist/cli.js` runs without extra flags. node-pty and the Claude Agent SDK stay outside the bundle.
+- `npm i -g .` in a built clone installs the `yardmaster` command (and the deprecated `c-board` alias), linked to the clone.
+- CI packages the editor extension and uploads `yardmaster.vsix` as a build artifact.
+- The version is now 0.1.0.
+
 ### Renamed: c-board is now Yardmaster
 
 The CLI, packages, extension, settings and docs use the new name. Upgrading keeps everything:

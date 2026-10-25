@@ -7,7 +7,7 @@ import { expect, signedInState, test } from './fixtures.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 // `pnpm board` (10.9e): the server runs from its build, without a watcher. `pnpm e2e` has built
-// the web app; the server and its workspace packages are built here.
+// the web app; the server is bundled here.
 test('the built server serves the built app', async ({ browser }) => {
   test.slow();
   await promisify(execFile)('pnpm', ['--filter', '@yardmaster/server...', 'build'], { cwd: ROOT });

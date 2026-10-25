@@ -1,6 +1,6 @@
 {
   "name": "@yardmaster/server",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -12,7 +12,7 @@
     "dev:demo": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --demo --no-open",
     "start": "node dist/cli.js start",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
     "test": "vitest run",
     "cli": "tsx src/cli.ts",
     "cli:c-board": "tsx src/c-board.ts"
@@ -33,6 +33,7 @@
     "@types/node": "^22",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15"
   },
   "optionalDependencies": {

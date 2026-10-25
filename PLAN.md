@@ -1041,9 +1041,10 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - **Verify:** `scripts/privacy-check.sh && pnpm check`
   - Note: README images are WebP copies of demo-mode shots in `docs/screenshots/`; `scripts/readme-shots.sh` refreshes them from `artifacts/shots/` (needs `cwebp`). The clone URL is a placeholder, and the repo has no license file yet.
 
-- [ ] **13.6 Release packaging**
+- [x] **13.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry (`yardmaster`, plus the deprecated `c-board` alias from 12.7a), so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Extend `CHANGELOG.md` (started in 12.7a).
   - **Verify:** `pnpm build && node apps/server/dist/cli.js doctor`
+  - Note: `apps/server/scripts/build.mjs` bundles `src/cli.ts` with esbuild into one ESM file (workspace packages inlined from source; node-pty, the Agent SDK and ws's native helpers stay external) and writes `dist/c-board.js` as a tiny alias that imports it. Modules that find files next to themselves (`version.ts`, `static.ts`, `pty.ts`, the hook installer) get their own `import.meta.url` back through a plugin, made relative to `dist/`, so the web dist and `packages/hook/bin` resolve as before. The bins live on the root package (version 0.1.0): `npm i -g .` links to the clone and installs no dependencies, so the clone's pnpm `node_modules` serve node-pty and the SDK; a packed tarball install isn't supported yet. The `yardmaster-build` condition is no longer needed by `pnpm board` or e2e. CI now runs doctor on the build and always packages and uploads the `.vsix` (before, it only uploaded one if it existed, which it never did).
 
 - [ ] **[HUMAN] 12.6f Rename the repo, update the extension, and try everything (moved here by the maintainer: check everything once, at the end)**
   - 12.6e and 12.7a changed the extension: install it as described in the Yardmaster step at the bottom of this task (it replaces the old c-board command).

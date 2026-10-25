@@ -34,9 +34,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm build
+      - run: node apps/server/dist/cli.js doctor
+
+      - name: Package the extension
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm --filter yardmaster-extension package
 
       - name: Upload extension package
-        if: matrix.os == 'ubuntu-latest' && hashFiles('apps/extension/dist/*.vsix') != ''
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: yardmaster-extension
