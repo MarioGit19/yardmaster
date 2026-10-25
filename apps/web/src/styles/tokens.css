@@ -84,7 +84,7 @@
   --ops-idle: #8a90a3;
 
   /* Layout worlds (DESIGN.md §10), used by the fx effects: Grid's one structural neon, and Retro's
-     phosphor (green, or amber as the option) on its screen. */
+     phosphor on its screen. */
   --grid-neon: #4cc8ff;
   /* Grid's world (§10.4): near-black ground, the fog at the horizon, and its glass panels. */
   --grid-bg: #03060b;
@@ -101,9 +101,36 @@
   --transit-rule: rgb(255 255 255 / 0.1);
   --transit-board: #050816;
   --transit-on-route: #0b1228;
+  /* Retro's phosphors (§10.6): each a family of text, dim and bright, green (`--retro-fg`) by
+     default. Dims keep ≥ 6.5:1 on the tube, so the faint ink made from them keeps AA. */
   --retro-fg: #4dff8f;
+  --retro-fg-dim: #30a85c;
+  --retro-fg-bright: #82ffb1;
   --retro-amber: #ffb000;
+  --retro-amber-dim: #c58700;
+  --retro-amber-bright: #ffc84d;
+  --retro-red: #ff7b6b;
+  --retro-red-dim: #e86f61;
+  --retro-red-bright: #ffa397;
+  --retro-purple: #cfa6ff;
+  --retro-purple-dim: #a685ce;
+  --retro-purple-bright: #ddc1ff;
+  --retro-cyan: #4ce6ff;
+  --retro-cyan-dim: #32a1b3;
+  --retro-cyan-bright: #82eeff;
+  --retro-white: #e6ebef;
+  --retro-white-dim: #919496;
+  --retro-white-bright: #f6f8fa;
   --retro-bg: #030805;
+  /* Status colors at reduced saturation (§10.6), read against the phosphor. Resolved here, at the
+     root, because Retro's workspace skin maps `--st-*` back onto these tones. */
+  --retro-gray: #9ba39d;
+  --retro-tone-work: color-mix(in oklch, var(--st-work-ink) 75%, var(--retro-gray));
+  --retro-tone-tool: color-mix(in oklch, var(--st-tool-ink) 75%, var(--retro-gray));
+  --retro-tone-wait: color-mix(in oklch, var(--st-wait-ink) 80%, var(--retro-gray));
+  --retro-tone-ok: color-mix(in oklch, var(--st-ok-ink) 75%, var(--retro-gray));
+  --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
+  --retro-tone-edit: color-mix(in oklch, var(--orb-edit) 75%, var(--retro-gray));
 
   /* Code highlighting (shiki css-variables theme), built from the tokens above. */
   --shiki-foreground: var(--text-1);
@@ -231,7 +258,26 @@
   --transit-rule: rgb(0 0 0 / 0.12);
   --transit-board: #161c2e;
   --transit-on-route: #0b1228;
+  /* Each phosphor as ink on paper; "bright" is the heavier ink. */
   --retro-fg: #1f3a24;
-  --retro-amber: #6b4300;
+  --retro-fg-dim: #36513a;
+  --retro-fg-bright: #162919;
+  --retro-amber: #573600;
+  --retro-amber-dim: #664413;
+  --retro-amber-bright: #3d2600;
+  --retro-red: #7c1a12;
+  --retro-red-dim: #8a281f;
+  --retro-red-bright: #57120d;
+  --retro-purple: #4b2a86;
+  --retro-purple-dim: #573895;
+  --retro-purple-bright: #341d5e;
+  --retro-cyan: #0c4654;
+  --retro-cyan-dim: #1b5160;
+  --retro-cyan-bright: #08313b;
+  --retro-white: #262626;
+  --retro-white-dim: #4b4b4b;
+  --retro-white-bright: #111111;
   --retro-bg: #f3efe3;
+  /* Dark enough that every Retro tone keeps AA on a highlighted (hovered or open) row. */
+  --retro-gray: #2b2f2c;
 }

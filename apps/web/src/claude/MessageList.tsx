@@ -23,6 +23,7 @@ import { Markdown } from './Markdown.js';
 import { ToolCard } from './tools/ToolCard.js';
 import { ToolViewState } from './tools/viewState.js';
 import { inheritedRows, type ToolRow, type TranscriptRow } from './transcript.js';
+import { turnHead } from './turns.js';
 
 /** Within this many px of the bottom the list counts as "at the latest" and follows new rows. */
 export const STICK_THRESHOLD_PX = 48;
@@ -288,6 +289,7 @@ export function MessageList({
               const enter = item.id !== TAIL_ID && item.id !== FORK_ID && entering(item.id);
               // The parent's messages, before the divider, read as context.
               const parentRow = v.index < inherited;
+              const head = turnHead(items, v.index);
               return (
                 <div
                   key={v.key}
@@ -299,6 +301,9 @@ export function MessageList({
                   style={{ transform: `translateY(${v.start}px)` }}
                 >
                   <div
+                    // A skin hook (DESIGN.md §10.8): Retro prints it as a header line.
+                    data-turn={head?.speaker}
+                    data-turn-label={head?.label}
                     className={cx(
                       column.measure,
                       turnStart

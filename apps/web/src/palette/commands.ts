@@ -8,9 +8,11 @@ import {
 } from '@yardmaster/protocol';
 import { isWaiting } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
+import type { Phosphor } from '../fx/FaultyTerminal.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';
 import { LAYOUT_NAME, LAYOUTS, type LayoutId } from '../layouts/registry.js';
 import type { MotionSetting } from '../motion.js';
+import { PHOSPHOR_LABEL, PHOSPHORS } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
 import { ESC } from '../terminal/claudeTerminal.js';
@@ -30,6 +32,7 @@ export type PaletteRun =
   | { kind: 'motion'; next: MotionSetting }
   | { kind: 'theme'; next: ThemeSetting }
   | { kind: 'layout'; next: LayoutId }
+  | { kind: 'phosphor'; next: Phosphor }
   | { kind: 'attention' }
   | { kind: 'openProject' }
   | { kind: 'closeProject'; projectId: string; forget: boolean }
@@ -48,6 +51,7 @@ export type PaletteIcon =
   | 'motion'
   | 'theme'
   | 'layout'
+  | 'phosphor'
   | 'settings'
   | 'attention'
   | 'rail'
@@ -85,6 +89,8 @@ export interface PaletteContext {
   theme: ThemeSetting;
   nextTheme: ThemeSetting;
   layout: LayoutId;
+  /** Retro's phosphor color (DESIGN.md §10.6). */
+  phosphor: Phosphor;
   /** The rail can be toggled (it is pinned to icons on narrow screens). */
   railToggle: boolean;
   /** Shortcut hints use ⌘ rather than Ctrl. */
@@ -437,6 +443,19 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       run: { kind: 'layout', next: layout },
     });
   });
+  // Retro's colors open the list only in Retro; elsewhere a search finds them.
+  for (const phosphor of PHOSPHORS) {
+    const current = phosphor === context.phosphor;
+    commands.push({
+      id: `phosphor:${phosphor}`,
+      group: 'Actions',
+      label: `Retro color: ${PHOSPHOR_LABEL[phosphor]}`,
+      ...(current ? { hint: 'Current' } : {}),
+      icon: 'phosphor',
+      searchOnly: current || context.layout !== 'retro',
+      run: { kind: 'phosphor', next: phosphor },
+    });
+  }
   commands.push({
     id: 'pulse',
     group: 'Actions',

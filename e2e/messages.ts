@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, openRoute } from './fixtures.js';
 
 /** The demo gives its first project's first session a 500+ message history. */
@@ -21,4 +21,24 @@ export async function openLongTranscript(page: Page) {
     .poll(async () => Number(await list.getAttribute('data-count')), { timeout: 15_000 })
     .toBeGreaterThanOrEqual(500);
   return list;
+}
+
+/** Scrolls the transcript up until a turn header (`data-turn`, Retro's `── YOU ──`) is in view. */
+export async function scrollToTurnHead(list: Locator) {
+  await expect
+    .poll(
+      async () => {
+        const seen = await list.evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          return [...el.querySelectorAll('[data-turn]')].some((head) => {
+            const r = head.getBoundingClientRect();
+            return r.top >= box.top && r.top < box.top + box.height * 0.6;
+          });
+        });
+        if (!seen) await list.evaluate((el) => el.scrollBy(0, -240));
+        return seen;
+      },
+      { timeout: 15_000, intervals: [100] },
+    )
+    .toBe(true);
 }

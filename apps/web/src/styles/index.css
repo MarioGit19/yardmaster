@@ -1928,30 +1928,33 @@
 
 /* Static fallbacks: what each background is at Off or without WebGL2. */
 .fx-terminal-fallback {
+  --fx-phosphor: var(--retro-fg);
   background:
     repeating-linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--retro-fg) 5%, transparent) 0 1px,
+      color-mix(in srgb, var(--fx-phosphor) 5%, transparent) 0 1px,
       transparent 1px 3px
     ),
     radial-gradient(
       120% 90% at 50% 40%,
-      color-mix(in srgb, var(--retro-fg) 8%, var(--retro-bg)),
+      color-mix(in srgb, var(--fx-phosphor) 8%, var(--retro-bg)),
       var(--retro-bg) 75%
     );
 }
 .fx-terminal-fallback[data-phosphor="amber"] {
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--retro-amber) 5%, transparent) 0 1px,
-      transparent 1px 3px
-    ),
-    radial-gradient(
-      120% 90% at 50% 40%,
-      color-mix(in srgb, var(--retro-amber) 8%, var(--retro-bg)),
-      var(--retro-bg) 75%
-    );
+  --fx-phosphor: var(--retro-amber);
+}
+.fx-terminal-fallback[data-phosphor="red"] {
+  --fx-phosphor: var(--retro-red);
+}
+.fx-terminal-fallback[data-phosphor="purple"] {
+  --fx-phosphor: var(--retro-purple);
+}
+.fx-terminal-fallback[data-phosphor="cyan"] {
+  --fx-phosphor: var(--retro-cyan);
+}
+.fx-terminal-fallback[data-phosphor="white"] {
+  --fx-phosphor: var(--retro-white);
 }
 .fx-grid-fallback {
   --fx-grid-line: color-mix(in srgb, var(--grid-neon) 16%, transparent);
@@ -3611,25 +3614,36 @@ main[data-office-zoom] {
 .retro-ground,
 .focus[data-layout="retro"] {
   --retro-ink: var(--retro-fg);
+  --retro-dim-ink: var(--retro-fg-dim);
+  --retro-bright-ink: var(--retro-fg-bright);
 }
 :is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="amber"] {
   --retro-ink: var(--retro-amber);
+  --retro-dim-ink: var(--retro-amber-dim);
+  --retro-bright-ink: var(--retro-amber-bright);
+}
+:is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="red"] {
+  --retro-ink: var(--retro-red);
+  --retro-dim-ink: var(--retro-red-dim);
+  --retro-bright-ink: var(--retro-red-bright);
+}
+:is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="purple"] {
+  --retro-ink: var(--retro-purple);
+  --retro-dim-ink: var(--retro-purple-dim);
+  --retro-bright-ink: var(--retro-purple-bright);
+}
+:is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="cyan"] {
+  --retro-ink: var(--retro-cyan);
+  --retro-dim-ink: var(--retro-cyan-dim);
+  --retro-bright-ink: var(--retro-cyan-bright);
+}
+:is(.retro, .retro-ground, .focus[data-layout="retro"])[data-phosphor="white"] {
+  --retro-ink: var(--retro-white);
+  --retro-dim-ink: var(--retro-white-dim);
+  --retro-bright-ink: var(--retro-white-bright);
 }
 :is(.retro, .focus[data-layout="retro"]) {
-  /* Status colors at reduced saturation (§10.6), read against the phosphor. */
-  --retro-gray: #9ba39d;
-  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 58%, var(--retro-bg));
-  --retro-tone-work: color-mix(in oklch, var(--st-work-ink) 75%, var(--retro-gray));
-  --retro-tone-tool: color-mix(in oklch, var(--st-tool-ink) 75%, var(--retro-gray));
-  --retro-tone-wait: color-mix(in oklch, var(--st-wait-ink) 80%, var(--retro-gray));
-  --retro-tone-ok: color-mix(in oklch, var(--st-ok-ink) 75%, var(--retro-gray));
-  --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
-}
-[data-theme="light"] :is(.retro, .focus[data-layout="retro"]) {
-  /* Dark enough that every tone keeps AA on a highlighted (hovered or open) row. */
-  --retro-gray: #3d423e;
-  /* Daylight's paper is lighter than the phosphor's black: dim ink needs more ink for §8. */
-  --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 78%, var(--retro-bg));
+  --retro-glow-ink: color-mix(in srgb, var(--retro-ink) 45%, transparent);
 }
 
 /* The tube: the phosphor's faint bloom in the middle, the curvature darkening the edges. */
@@ -3657,7 +3671,7 @@ main[data-office-zoom] {
   font-variant-numeric: tabular-nums;
   font-variant-ligatures: none;
   color: var(--retro-ink);
-  text-shadow: var(--retro-glow) color-mix(in srgb, var(--retro-ink) 45%, transparent);
+  text-shadow: var(--retro-glow) var(--retro-glow-ink);
 }
 .retro[data-stacked] {
   --retro-line: 22px;
@@ -3809,9 +3823,19 @@ main[data-office-zoom] {
 .retro-tag[data-tone="idle"] {
   color: var(--retro-dim-ink);
 }
+/* What needs you prints in inverse video, so it holds on every phosphor (an `[ERR]` on red too). */
 .retro-tag[data-tone="wait"],
 .retro-tag[data-tone="err"] {
+  background: var(--retro-tag-ink);
+  color: var(--retro-bg);
   font-weight: 600;
+  text-shadow: none;
+}
+.retro-tag[data-tone="wait"] {
+  --retro-tag-ink: var(--retro-tone-wait);
+}
+.retro-tag[data-tone="err"] {
+  --retro-tag-ink: var(--retro-tone-err);
 }
 
 /* The caption's field: the text, then the cursor right after it. */

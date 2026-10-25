@@ -18,6 +18,7 @@ const context = (over: Partial<PaletteContext> = {}): PaletteContext => ({
   theme: 'dark',
   nextTheme: 'light',
   layout: 'minimal',
+  phosphor: 'green',
   railToggle: true,
   ...over,
 });
@@ -229,6 +230,21 @@ describe('buildCommands', () => {
     expect(byId(commands, 'layout:office')).toMatchObject({ hint: 'Current', searchOnly: true });
     const found = searchCommands(commands, 'layout retro').flatMap((s) => s.results);
     expect(found[0]?.command.id).toBe('layout:retro');
+  });
+
+  it('offers every Retro color, listed up front only in Retro', () => {
+    const retro = buildCommands(board(), context({ layout: 'retro', phosphor: 'amber' }));
+    expect(byId(retro, 'phosphor:red')).toMatchObject({
+      label: 'Retro color: Red',
+      searchOnly: false,
+      run: { kind: 'phosphor', next: 'red' },
+    });
+    expect(byId(retro, 'phosphor:amber')).toMatchObject({ hint: 'Current', searchOnly: true });
+    expect(retro.filter((c) => c.id.startsWith('phosphor:'))).toHaveLength(6);
+    const elsewhere = buildCommands(board(), context());
+    expect(byId(elsewhere, 'phosphor:purple')?.searchOnly).toBe(true);
+    const found = searchCommands(elsewhere, 'retro color purple').flatMap((s) => s.results);
+    expect(found[0]?.command.id).toBe('phosphor:purple');
   });
 
   it('opens the project picker, with the platform shortcut', () => {

@@ -4,8 +4,8 @@
    tones (`--retro-ink`, `--retro-tone-*`) come from index.css, shared with the overview. */
 
 .focus[data-layout="retro"] {
-  --retro-tone-edit: color-mix(in oklch, var(--orb-edit) 75%, var(--retro-gray));
-  --retro-faint-ink: color-mix(in oklch, var(--retro-ink) 50%, var(--retro-bg));
+  /* Mixed in sRGB from the phosphor's dim, so it keeps its hue and AA on every phosphor. */
+  --retro-faint-ink: color-mix(in srgb, var(--retro-dim-ink) 89%, var(--retro-bg));
 
   /* The workspace's tokens, in phosphor. */
   --bg-0: var(--retro-bg);
@@ -54,7 +54,7 @@
   color: var(--retro-ink);
   font-variant-ligatures: none;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 6px color-mix(in srgb, var(--retro-ink) 35%, transparent);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--retro-glow-ink) 78%, transparent);
 }
 /* Geist Mono only. */
 .focus[data-layout="retro"],
@@ -86,7 +86,7 @@
     radial-gradient(130% 120% at 50% 45%, transparent 60%, rgb(0 0 0 / 0.5) 100%);
 }
 [data-theme="light"] .focus[data-layout="retro"] {
-  --retro-faint-ink: color-mix(in oklch, var(--retro-ink) 74%, var(--retro-bg));
+  --retro-faint-ink: color-mix(in srgb, var(--retro-dim-ink) 88%, var(--retro-bg));
   text-shadow: none;
 }
 [data-theme="light"] .focus[data-layout="retro"]::after {
@@ -134,10 +134,21 @@
   color: var(--retro-tone-work);
 }
 .rs-tag[data-tone="wait"] {
-  color: var(--retro-tone-wait);
+  --retro-tag-ink: var(--retro-tone-wait);
 }
 .rs-tag[data-tone="err"] {
-  color: var(--retro-tone-err);
+  --retro-tag-ink: var(--retro-tone-err);
+}
+/* What needs you prints in inverse video (as on the overview), so it holds on every phosphor. */
+.rs-tag:is([data-tone="wait"], [data-tone="err"]),
+.focus[data-layout="retro"] :is([data-status="wait"], [data-status="err"])::before,
+.focus[data-layout="retro"]
+  .tool-card[data-state="error"]
+  > :first-child
+  > [data-tool-status]::before {
+  background: var(--retro-tag-ink);
+  color: var(--retro-bg);
+  text-shadow: none;
 }
 .rs-tag[data-tone="ok"] {
   color: var(--retro-tone-ok);
@@ -317,12 +328,12 @@
   color: var(--retro-tone-work);
 }
 .focus[data-layout="retro"] [data-status="wait"]::before {
+  --retro-tag-ink: var(--retro-tone-wait);
   content: "[WAIT]" / "";
-  color: var(--retro-tone-wait);
 }
 .focus[data-layout="retro"] [data-status="err"]::before {
+  --retro-tag-ink: var(--retro-tone-err);
   content: "[ERR]" / "";
-  color: var(--retro-tone-err);
 }
 .focus[data-layout="retro"] [data-status="ok"]::before {
   content: "[OK]" / "";
@@ -368,26 +379,72 @@
 
 /* ── Chat as a console transcript ────────────────────────────────────────────────────────── */
 
+/* Each turn opens after a blank line on a header rule, `── YOU · 14:02 ─────`, the full width of
+   the column (the rule is clipped to it). Your messages print in the bright phosphor after a `>`
+   prompt, Claude's in the normal one, its tool calls dimmer and indented under it. */
+.focus[data-layout="retro"] [data-turn] {
+  padding-top: 20px;
+}
+.focus[data-layout="retro"] [data-index="0"] > [data-turn] {
+  padding-top: 4px;
+}
+.focus[data-layout="retro"] [data-turn]::before {
+  content:
+    "── " attr(data-turn-label)
+    " ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+    / "";
+  display: block;
+  margin-bottom: 8px;
+  overflow: hidden;
+  color: var(--retro-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+  white-space: pre;
+}
+.focus[data-layout="retro"] [data-turn="you"]::before {
+  color: var(--retro-bright-ink);
+}
 .focus[data-layout="retro"] div:has(> [data-user-bubble]) {
   justify-content: flex-start;
 }
 .focus[data-layout="retro"] [data-user-bubble] {
   max-width: none;
-  padding: 0;
+  padding: 0 0 0 2ch;
   border: 0;
   background: transparent;
   box-shadow: none;
+  color: var(--retro-bright-ink);
+  font-weight: 500;
 }
 .focus[data-layout="retro"] [data-user-bubble] > p::before {
-  content: "> you: " / "";
+  content: ">" / "";
+  display: inline-block;
+  width: 2ch;
+  margin-left: -2ch;
   color: var(--retro-dim-ink);
-  font-weight: 600;
 }
-.focus[data-layout="retro"] :is([data-row="assistant"], [data-row="tail"]) .md::before {
-  content: "claude:" / "";
-  display: block;
-  color: var(--retro-dim-ink);
-  font-weight: 600;
+/* The indent is on the row's content, so a turn that opens on a tool call keeps its header flush. */
+/* Only the call's line dims: what it opens into (a diff, the output) keeps the full phosphor. */
+.focus[data-layout="retro"] [data-row="thinking"] > div,
+.focus[data-layout="retro"] [data-row="tool"] :is(.tool-card > :first-child, .tool-head) {
+  --text-1: var(--retro-dim-ink);
+  --text-2: var(--retro-dim-ink);
+}
+.focus[data-layout="retro"] :is([data-row="tool"], [data-row="thinking"]) > div > * {
+  margin-left: 2ch;
+}
+/* Code is framed in a box, its language set into the top rule. */
+.focus[data-layout="retro"] .md-code {
+  border-color: var(--line-strong);
+  background: transparent;
+}
+.focus[data-layout="retro"] .md-code > :first-child {
+  border-bottom-style: dashed;
+}
+.focus[data-layout="retro"] .md-code > :first-child > span:first-child::before {
+  content: "── " / "";
 }
 /* The streaming caret is the console's blinking block cursor (held lit at Reduced). */
 .focus[data-layout="retro"] .md[data-streaming] > :last-child::after {
@@ -451,8 +508,8 @@
   .tool-card[data-state="error"]
   > :first-child
   > [data-tool-status]::before {
+  --retro-tag-ink: var(--retro-tone-err);
   content: "[ERR]";
-  color: var(--retro-tone-err);
 }
 .focus[data-layout="retro"]
   .tool-card[data-state="done"]:not([data-tool="TodoWrite"])
@@ -469,6 +526,15 @@
 }
 .focus[data-layout="retro"] [data-tool]:not(.tool-card) .tool-head > svg:first-child {
   display: none;
+}
+
+/* A diff's changed words are underlined, as a terminal would, rather than set on a block of tint
+   that the dimmed syntax tones can't read on. */
+.focus[data-layout="retro"] .diff-mark {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 /* TodoWrite as checklist lines. */

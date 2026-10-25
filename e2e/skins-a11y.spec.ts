@@ -1,5 +1,14 @@
 import AxeBuilder from '@axe-core/playwright';
-import { disableWebgl, expect, FOCUS_LAYOUTS, settleAnimations, test } from './fixtures.js';
+import { startBoard } from './board.js';
+import {
+  disableWebgl,
+  expect,
+  FOCUS_LAYOUTS,
+  settleAnimations,
+  signedInState,
+  test,
+} from './fixtures.js';
+import { openLongTranscript, scrollToTurnHead } from './messages.js';
 
 // 12.6k: axe on each layout's workspace skin (DESIGN.md §10.8 "Same meaning": contrast meets
 // WCAG AA in both themes), on the demo's first project and on the worst board's longest one.
@@ -63,4 +72,59 @@ for (const layout of FOCUS_LAYOUTS) {
       });
     }
   }
+}
+
+// 12.6m: every Retro phosphor keeps AA on a long conversation (turn headers, both voices, tool
+// lines and tags, code boxes), in Night and on Daylight's paper, on a phone and on the desktop.
+// Each phosphor gets a fresh demo board: other specs start sessions in the long project.
+for (const phosphor of ['green', 'amber', 'red', 'purple', 'cyan', 'white'] as const) {
+  test(`retro phosphor a11y ${phosphor} @a11y`, async ({ browser }) => {
+    test.slow();
+    const board = await startBoard({ demo: true });
+    const found: string[] = [];
+    try {
+      for (const theme of ['dark', 'light'] as const) {
+        const context = await browser.newContext({
+          colorScheme: theme,
+          baseURL: board.url,
+          storageState: signedInState(board.url, board.cookie),
+        });
+        const page = await context.newPage();
+        await disableWebgl(page);
+        await page.addInitScript(
+          ({ p, t }) => {
+            localStorage.setItem('yardmaster.layout', 'retro');
+            localStorage.setItem('yardmaster.theme', t);
+            localStorage.setItem('yardmaster.motion', 'off');
+            localStorage.setItem('yardmaster.phosphor', p);
+          },
+          { p: phosphor, t: theme },
+        );
+        for (const width of [1440, 390]) {
+          await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
+          const list = await openLongTranscript(page);
+          await expect(page.locator(`[data-focus][data-phosphor="${phosphor}"]`)).toBeVisible();
+          await scrollToTurnHead(list);
+          await page.waitForTimeout(500);
+          await settleAnimations(page);
+          const { violations } = await new AxeBuilder({ page })
+            .include('[data-focus]')
+            .exclude('.xterm')
+            .withRules(['color-contrast'])
+            .analyze();
+          for (const v of violations) {
+            for (const node of v.nodes) {
+              found.push(
+                `${theme} ${width} ${v.id}: ${node.target.join(' ')} ${node.failureSummary ?? ''}`,
+              );
+            }
+          }
+        }
+        await context.close();
+      }
+    } finally {
+      await board.stop();
+    }
+    expect(found, found.join('\n')).toEqual([]);
+  });
 }

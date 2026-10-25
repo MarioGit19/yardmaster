@@ -152,7 +152,11 @@ void main() {
 /** Character cell size in CSS pixels. */
 const CELL_PX = 14;
 
-export type Phosphor = 'green' | 'amber';
+export type Phosphor = 'green' | 'amber' | 'red' | 'purple' | 'cyan' | 'white';
+
+/** The token each phosphor draws in (`--retro-fg` is the default green). */
+export const phosphorToken = (phosphor: Phosphor) =>
+  phosphor === 'green' ? 'retro-fg' : `retro-${phosphor}`;
 
 interface Input {
   energy: number;
@@ -176,7 +180,7 @@ function terminalEffect(gl: WebGL2RenderingContext, input: { current: Input }): 
       if (colors?.key !== key) {
         colors = {
           key,
-          tint: tokenColor(goal.phosphor === 'amber' ? 'retro-amber' : 'retro-fg'),
+          tint: tokenColor(phosphorToken(goal.phosphor)),
           base: tokenColor('retro-bg'),
         };
       }

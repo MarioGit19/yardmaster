@@ -21,6 +21,7 @@ import {
   Sparkles,
   SquareTerminal,
   SunMoon,
+  SwatchBook,
   Trash2,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -36,6 +37,7 @@ import { pickerOpen } from '../library/OpenProject.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
+import { phosphorPreference } from '../retro/phosphor.js';
 import { inProject, projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY, railPreference } from '../shell/prefs.js';
@@ -68,6 +70,7 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   motion: Sparkles,
   theme: SunMoon,
   layout: LayoutDashboard,
+  phosphor: SwatchBook,
   settings: Settings,
   attention: BellDot,
   rail: PanelLeft,
@@ -201,6 +204,7 @@ function PaletteBody({
   const motion = usePreference(motionPreference);
   const theme = usePreference(themePreference);
   const layout = usePreference(layoutPreference);
+  const phosphor = usePreference(phosphorPreference);
   const narrow = useMediaQuery(NARROW_QUERY);
   const [page, setPage] = useState<Page>({ kind: 'root' });
   const [query, setQuery] = useState('');
@@ -216,10 +220,11 @@ function PaletteBody({
         theme,
         nextTheme: NEXT_THEME[theme],
         layout,
+        phosphor,
         railToggle: !narrow,
         mac: IS_MAC,
       }),
-    [board, focus?.projectId, motion, theme, layout, narrow],
+    [board, focus?.projectId, motion, theme, layout, phosphor, narrow],
   );
   const sections = useMemo(
     () => (page.kind === 'root' ? searchCommands(commands, query) : []),
@@ -281,6 +286,10 @@ function PaletteBody({
         return;
       case 'layout':
         layoutPreference.set(action.next);
+        close();
+        return;
+      case 'phosphor':
+        phosphorPreference.set(action.next);
         close();
         return;
       case 'openProject':

@@ -11,7 +11,7 @@ import {
   type Theme,
   test,
 } from './fixtures.js';
-import { openLongTranscript } from './messages.js';
+import { openLongTranscript, scrollToTurnHead } from './messages.js';
 
 const VIEWPORTS = [
   { width: 1440, height: 900 },
@@ -1630,6 +1630,39 @@ test.describe('retro amber', () => {
         animations: 'disabled',
       });
     });
+  }
+});
+
+// 12.6m: a long Retro conversation in every phosphor, at 390 and 1440 in both themes: turn
+// headers, your lines brighter than Claude's, tool calls dim and indented, code in a box.
+const PHOSPHORS = ['green', 'amber', 'red', 'purple', 'cyan', 'white'] as const;
+test.describe('retro conversation', () => {
+  for (const phosphor of PHOSPHORS) {
+    for (const theme of THEMES) {
+      for (const width of [1440, 390]) {
+        test.describe(`${phosphor} ${theme} ${width}`, () => {
+          test.use({
+            theme,
+            layout: 'retro',
+            viewport: { width, height: width < 768 ? 844 : 900 },
+          });
+          test('chat', async ({ page }) => {
+            await page.addInitScript(
+              (p) => localStorage.setItem('yardmaster.phosphor', p),
+              phosphor,
+            );
+            const list = await openLongTranscript(page);
+            await expect(page.locator(`[data-focus][data-phosphor="${phosphor}"]`)).toBeVisible();
+            await scrollToTurnHead(list);
+            await page.waitForTimeout(600);
+            await page.screenshot({
+              path: new URL(`retro-chat-${phosphor}-${width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          });
+        });
+      }
+    }
   }
 });
 
