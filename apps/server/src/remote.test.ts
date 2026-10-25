@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { buildServer, startServer } from './app.js';
 import type { ServerConfig } from './config.js';
+import { EDITOR_WS_PATH } from './editor-gateway.js';
 import { DEVICE_COOKIE, deviceName, RemoteDevices, remoteHosts } from './remote.js';
 import { TOKEN_HEADER } from './security.js';
 import { generateToken } from './token.js';
@@ -144,6 +145,29 @@ describe('remote hosts', () => {
     expect(auth.statusCode).toBe(403);
     expect(auth.json()).toEqual({ error: 'pair_required' });
     expect(auth.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('never open the editor socket, even with the token', async () => {
+    app = await startServer(
+      { ...config, port: 0 },
+      { token, dbPath: ':memory:', processes: false, git: false },
+    );
+    await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      headers: { host: `127.0.0.1:${port(app)}`, [TOKEN_HEADER]: token },
+      payload: { remoteAllowedHosts: [PHONE_HOST] },
+    });
+    const socket = new WebSocket(`ws://127.0.0.1:${port(app)}${EDITOR_WS_PATH}`, {
+      headers: { ...remote, [TOKEN_HEADER]: token },
+    });
+    sockets.push(socket);
+    socket.on('error', () => {});
+    const status = await new Promise<number | undefined>((resolve) => {
+      socket.once('unexpected-response', (_req, res) => resolve(res.statusCode));
+      socket.once('open', () => resolve(undefined));
+    });
+    expect(status).toBe(403);
   });
 
   it('only accept *.ts.net names in the settings', async () => {

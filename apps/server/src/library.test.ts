@@ -235,5 +235,7 @@ describe('ProjectLibrary.resolve', () => {
     expect(isInside('/home/dev', '/home/dev')).toBe(false);
     expect(isInside('/home/dev', '/home/devious')).toBe(false);
     expect(isInside('/home/dev', '/home')).toBe(false);
+    expect(isInside('/home/dev', '/home/dev/../other')).toBe(false);
+    expect(isInside('/home/dev', '/home/dev/..notes')).toBe(true);
   });
 });

@@ -148,6 +148,18 @@ describe('API auth guard', () => {
     expect(res.statusCode).toBe(200);
   });
 
+  it('forbids framing on every response, refused ones too', async () => {
+    const instance = await server();
+    for (const res of [
+      await get(instance, '/api/health'),
+      await get(instance, '/api/settings'),
+      await get(instance, '/api/health', { host: 'evil.example:4317' }),
+    ]) {
+      expect(res.headers['x-frame-options']).toBe('DENY');
+      expect(res.headers['content-security-policy']).toBe("frame-ancestors 'none'");
+    }
+  });
+
   it('returns 401 without a token', async () => {
     const res = await get(await withProbe(), '/api/probe');
     expect(res.statusCode).toBe(401);

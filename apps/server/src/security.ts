@@ -178,6 +178,10 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   });
 
   app.addHook('onRequest', async (request, reply) => {
+    // The board types into terminals: no page may frame it (clickjacking).
+    reply
+      .header('x-frame-options', 'DENY')
+      .header('content-security-policy', "frame-ancestors 'none'");
     const host = request.headers.host?.toLowerCase();
     const remoteHost = host === undefined ? null : remoteHostOf(host);
     if (!host || (remoteHost === null && !allowedHosts().has(host))) {

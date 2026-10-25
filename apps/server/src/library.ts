@@ -1,7 +1,7 @@
 import type { Dirent, Stats } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, relative } from 'node:path';
+import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import type {
   LibraryEntry,
   LibraryResponse,
@@ -55,7 +55,7 @@ export function expandRoot(root: string, home = homedir()): string {
 /** `child` is strictly inside `parent` (both resolved, absolute). */
 export function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
 const hidden = (name: string) => name.startsWith('.');

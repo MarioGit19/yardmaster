@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { claudeSettingsPath } from '@yardmaster/hook';
 import {
   applyTaskNotifications,
@@ -14,6 +14,7 @@ import {
 } from '@yardmaster/protocol';
 import { watch } from 'chokidar';
 import type { FastifyBaseLogger } from 'fastify';
+import { isInside } from '../library.js';
 import { type ReadResult, RingBuffer } from '../ring-buffer.js';
 import type { BoardStore } from '../store.js';
 import { JsonlTail } from './jsonl-tail.js';
@@ -254,7 +255,7 @@ export class TranscriptService {
   }
 
   private async history(id: string, cwd: string): Promise<unknown[] | null> {
-    if (this.loadHistory === null) return null;
+    if (this.loadHistory === null || !isSafeSessionId(id)) return null;
     try {
       const entries = await this.loadHistory(id, cwd);
       return Array.isArray(entries) ? entries : null;
@@ -399,16 +400,36 @@ export class TranscriptService {
     }
   }
 
+  /**
+   * Hook payloads name the transcript; only a `.jsonl` under `<config>/projects` is read, so a
+   * payload can't point the tail at another file (PRD §8 item 4).
+   */
   private pathFor(session: ClaudeSession): string | null {
-    if (session.transcriptPath) return session.transcriptPath;
-    if (!session.cwd) return null;
-    return join(this.configDir, 'projects', encodeProjectDir(session.cwd), `${session.id}.jsonl`);
+    const path = session.transcriptPath
+      ? resolve(session.transcriptPath)
+      : session.cwd && isSafeSessionId(session.id)
+        ? join(this.configDir, 'projects', encodeProjectDir(session.cwd), `${session.id}.jsonl`)
+        : null;
+    if (path === null) return null;
+    if (path.endsWith('.jsonl') && isInside(join(resolve(this.configDir), 'projects'), path)) {
+      return path;
+    }
+    this.log.warn(
+      { sessionId: session.id },
+      'ignored a transcript path outside the Claude projects folder',
+    );
+    return null;
   }
 }
 
 /** Nothing writes the transcript of an ended session, or of one interrupted by a restart. */
 function isStopped(session: ClaudeSession): boolean {
   return session.status.kind === 'ended' || session.status.kind === 'interrupted';
+}
+
+/** A session id that is safe as a file name: Claude's are UUIDs, hook payloads are free text. */
+function isSafeSessionId(id: string): boolean {
+  return id === basename(id) && id !== '.' && id !== '..' && !id.includes('\\');
 }
 
 /** Claude Code's folder name for a cwd under `~/.claude/projects`. */

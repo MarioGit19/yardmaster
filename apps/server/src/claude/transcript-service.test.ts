@@ -28,7 +28,10 @@ const services: TranscriptService[] = [];
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'yardmaster-transcripts-'));
-  path = join(dir, `${FIXTURE_SESSION_ID}.jsonl`);
+  // Hook-reported paths are only read under `<config>/projects`.
+  const reported = join(dir, 'claude', 'projects', 'reported');
+  await mkdir(reported, { recursive: true });
+  path = join(reported, `${FIXTURE_SESSION_ID}.jsonl`);
   fixture = await readFile(FIXTURE, 'utf8');
 });
 
@@ -258,6 +261,23 @@ describe('TranscriptService', () => {
     expect([...watcher.watched.keys()]).toEqual([path]);
   });
 
+  it('ignores a reported transcript path outside the Claude projects folder', async () => {
+    const outside = join(dir, 'outside.jsonl');
+    await writeFile(outside, fixture);
+    const watcher = manualWatcher();
+    const { store, service } = setup({ watchFile: watcher.watchFile });
+    store.upsertSession({ id: FIXTURE_SESSION_ID, cwd: FIXTURE_CWD, transcriptPath: outside });
+    store.upsertSession({
+      id: '../../outside',
+      cwd: FIXTURE_CWD,
+      transcriptPath: join(dir, 'claude', 'projects', '..', '..', 'outside.jsonl'),
+    });
+    await settled(service);
+    expect(service.messages(FIXTURE_SESSION_ID)).toEqual([]);
+    expect(service.messages('../../outside')).toEqual([]);
+    expect([...watcher.watched.keys()]).toEqual([]);
+  });
+
   it('does a final read and stops watching when the session ends or is removed', async () => {
     await writeFile(path, fixture);
     const watcher = manualWatcher();
@@ -387,7 +407,12 @@ describe('TranscriptService', () => {
   it('follows a real file with the default chokidar watcher', async () => {
     await writeFile(path, `${fixture.split('\n').slice(0, 3).join('\n')}\n`);
     const store = new BoardStore();
-    const service = new TranscriptService({ store, logger, loadHistory: null });
+    const service = new TranscriptService({
+      store,
+      logger,
+      loadHistory: null,
+      claudeConfigDir: join(dir, 'claude'),
+    });
     services.push(service);
     store.upsertSession({ id: FIXTURE_SESSION_ID, cwd: FIXTURE_CWD, transcriptPath: path });
     await settled(service);

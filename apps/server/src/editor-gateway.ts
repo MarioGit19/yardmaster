@@ -413,7 +413,7 @@ export class EditorGateway {
   }
 }
 
-/** `/ws/editor`: the install token must arrive in the `X-Yardmaster-Token` header (PRD §8). */
+/** `/ws/editor`: local only, with the install token in the `X-Yardmaster-Token` header (PRD §8). */
 export function registerEditorGateway(
   app: FastifyInstance,
   gateway: EditorGateway,
@@ -425,6 +425,8 @@ export function registerEditorGateway(
     {
       websocket: true,
       preValidation: async (request, reply) => {
+        // Editors run on this machine; the token never counts over Tailscale (PRD §8 item 12).
+        if (request.isRemote()) return reply.code(403).send({ error: 'local_only' });
         const header = tokenHeader(request.headers);
         if (header === undefined || !tokensEqual(header, currentToken())) {
           return reply.code(401).send({ error: 'unauthorized' });

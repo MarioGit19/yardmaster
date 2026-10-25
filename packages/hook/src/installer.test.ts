@@ -108,6 +108,20 @@ describe('hook installer', () => {
     expect(hooks.SessionStart).toEqual([ours]);
   });
 
+  it('keeps every backup private and never overwrites one made the same second', async () => {
+    await install();
+    const original = `${JSON.stringify(THIRD_PARTY, null, 2)}\n`;
+    await writeFile(path, original);
+    await chmod(path, 0o600);
+    const first = await install();
+    const second = await uninstall();
+    expect(second).toBe(`${path}.yardmaster-backup-20260304T050607Z-2`);
+    expect(await readFile(first as string, 'utf8')).toBe(original);
+    for (const backup of [first, second]) {
+      expect((await stat(backup as string)).mode & 0o777).toBe(0o600);
+    }
+  });
+
   it('is idempotent: a second install plans no change and writes nothing', async () => {
     await install();
     await writeFile(path, `${JSON.stringify(THIRD_PARTY)}\n`);

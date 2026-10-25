@@ -1,3 +1,4 @@
+import { constants } from 'node:fs';
 import { chmod, copyFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -239,6 +240,24 @@ function stamp(now: Date): string {
 }
 
 /**
+ * Copies `path` next to itself with the same mode (settings.json can hold secrets in `env`).
+ * Never overwrites an earlier backup: two installs in one second keep the original file.
+ */
+async function backupFile(path: string, stamp: string, mode: number): Promise<string> {
+  for (let n = 1; ; n++) {
+    const backup = `${path}.yardmaster-backup-${stamp}${n === 1 ? '' : `-${n}`}`;
+    try {
+      await copyFile(path, backup, constants.COPYFILE_EXCL);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST' && n < 100) continue;
+      throw err;
+    }
+    await chmod(backup, mode);
+    return backup;
+  }
+}
+
+/**
  * Writes a plan's result, backing up the current file first. The write goes through a temp
  * file and a rename, and refuses if the file changed since it was planned.
  * Returns the backup path, if one was made.
@@ -260,8 +279,7 @@ export async function applyPlan(
   if (current === undefined) await mkdir(dirname(path), { recursive: true });
   else {
     mode = (await stat(path)).mode & 0o777;
-    backup = `${path}.yardmaster-backup-${stamp(now)}`;
-    await copyFile(path, backup);
+    backup = await backupFile(path, stamp(now), mode);
   }
   const tmp = `${path}.yardmaster-tmp-${process.pid}`;
   await writeFile(tmp, planned.after, { mode });
