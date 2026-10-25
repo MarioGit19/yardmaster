@@ -252,6 +252,9 @@ Every project has a small original character, the **crew member**, that acts out
 
 - Every status uses color **plus** shape or text (dot + label, icon on the orb) for color-blind users.
 - Focus ring: 2px `--line-strong` plus a 4px accent glow.
+  - It is a `box-shadow` from a base rule, so any element that sets its own shadow (`shadow-raised`, a status glow) must restore it with `focus-visible:shadow-[var(--focus-ring)]` (or combine it in CSS). `e2e/keyboard.spec.ts` fails on a Tab stop that shows no focus.
+- Text never fades below AA: quiet items dim their marks (hexes, rings, satellites), not their text; text colors in code and terminal output use the `-ink` tones (`--st-*-ink`, `--orb-*-ink`), which darken in Daylight.
+- No keyboard traps: a read-only terminal lets Tab move on; a board terminal keeps Tab for the shell and Shift+Tab leaves it. Esc closes the innermost layer first (a tooltip, then a sheet, then the workspace); text fields keep Esc. Toasts never send focus back on their own.
 - `aria-live="polite"` region announces new approvals and crashes.
 - Every action is reachable from the keyboard and appears in ⌘K with its shortcut.
 - **Cursor:** everything clickable shows the pointer. A base rule in `styles/index.css` gives it to `button`, `a[href]`, `summary`, `select`, `label[for]` and the interactive roles (`button`, `tab`, `menuitem`, `option`, `switch`, …), and `not-allowed` to disabled controls. Build pressables as a real `button`/link or give them a role (with keyboard handling); use `cursor-pointer` only where no role fits (a card holding its own buttons, a canvas hit area). Special cursors stay: `col-resize` on dividers, `grab`/`grabbing` on draggables, the text cursor in terminals. The `cursor` e2e check enforces it; mark a deliberate arrow with `data-cursor="default"`.

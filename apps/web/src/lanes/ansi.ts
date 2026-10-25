@@ -2,15 +2,15 @@
 // stream as styled segments. Understands SGR colors, CR/LF and backspace; every other escape
 // sequence is dropped. Escapes split across chunks are carried over.
 
-/** Status and text tokens for the 8 basic colors; bright variants share them. */
+/** Status and text tokens for the 8 basic colors (the AA ink tones); bright variants share them. */
 const COLORS = [
   'var(--text-3)', // black
-  'var(--st-err)', // red
-  'var(--st-ok)', // green
-  'var(--st-wait)', // yellow
-  'var(--st-work)', // blue
-  'var(--orb-edit)', // magenta
-  'var(--st-tool)', // cyan
+  'var(--st-err-ink)', // red
+  'var(--st-ok-ink)', // green
+  'var(--st-wait-ink)', // yellow
+  'var(--st-work-ink)', // blue
+  'var(--orb-edit-ink)', // magenta
+  'var(--st-tool-ink)', // cyan
   'var(--text-1)', // white
 ] as const;
 
@@ -199,13 +199,17 @@ export class TerminalTail {
 /** Inline CSS for a segment; inverse swaps the colors. */
 export function segmentCss(style: Style): React.CSSProperties | undefined {
   if (sameStyle(style, PLAIN)) return undefined;
-  const fg = style.inverse ? (style.bg ?? 'var(--bg-1)') : style.fg;
+  let fg = style.inverse ? (style.bg ?? 'var(--bg-1)') : style.fg;
   const bg = style.inverse ? (style.fg ?? 'var(--text-1)') : style.bg;
+  // Default or black text on a colored background (a test runner's PASS badge) takes the page
+  // color: dark on the dark theme's bright tones, white on the light theme's deep inks.
+  if (bg && (fg === null || fg === COLORS[0])) fg = 'var(--bg-1)';
+  // Dim is the quiet text color rather than a fade, which would drop it below AA.
+  if (style.dim && fg === null) fg = 'var(--text-3)';
   return {
     color: fg ?? undefined,
     backgroundColor: bg ?? undefined,
     fontWeight: style.bold ? 600 : undefined,
-    opacity: style.dim ? 0.6 : undefined,
     fontStyle: style.italic ? 'italic' : undefined,
     textDecoration: style.underline ? 'underline' : undefined,
   };

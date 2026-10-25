@@ -26,9 +26,9 @@ describe('TerminalTail', () => {
     tail.feed(`${ESC}[32m✓${ESC}[39m Ready ${ESC}[1;31mfail${ESC}[0m\n`);
     const [line = []] = tail.snapshot();
     expect(line.map((s) => [s.text, s.style.fg, s.style.bold])).toEqual([
-      ['✓', 'var(--st-ok)', false],
+      ['✓', 'var(--st-ok-ink)', false],
       [' Ready ', null, false],
-      ['fail', 'var(--st-err)', true],
+      ['fail', 'var(--st-err-ink)', true],
     ]);
   });
 
@@ -40,7 +40,7 @@ describe('TerminalTail', () => {
     const [line = []] = tail.snapshot();
     expect(line.map((s) => [s.text, s.style.fg])).toEqual([
       ['a', null],
-      ['b', 'var(--st-tool)'],
+      ['b', 'var(--st-tool-ink)'],
       ['c', null],
     ]);
   });
@@ -71,7 +71,7 @@ describe('applySgr', () => {
   it('supports 256-color and truecolor', () => {
     const plain = applySgr(applySgr({} as never, '0'), '');
     expect(applySgr(plain, '38;5;196').fg).toBe('rgb(255 0 0)');
-    expect(applySgr(plain, '38;5;2').fg).toBe('var(--st-ok)');
+    expect(applySgr(plain, '38;5;2').fg).toBe('var(--st-ok-ink)');
     expect(applySgr(plain, '48;2;10;20;30').bg).toBe('rgb(10 20 30)');
     expect(applySgr(plain, '38;5;240').fg).toBe('rgb(88 88 88)');
   });
@@ -79,9 +79,24 @@ describe('applySgr', () => {
   it('turns inverse into swapped colors', () => {
     const style = applySgr(applySgr({} as never, '0'), '41;37;1');
     expect(segmentCss({ ...style, inverse: true })).toMatchObject({
-      color: 'var(--st-err)',
+      color: 'var(--st-err-ink)',
       backgroundColor: 'var(--text-1)',
     });
     expect(segmentCss(applySgr(style, '0'))).toBeUndefined();
+  });
+
+  it('keeps text readable on a colored background and when dim', () => {
+    const plain = applySgr({} as never, '0');
+    // Black (or default) text on a status background takes the page color: dark on the bright
+    // dark-theme tones, white on the deep light-theme inks.
+    expect(segmentCss(applySgr(plain, '30;42'))).toMatchObject({
+      color: 'var(--bg-1)',
+      backgroundColor: 'var(--st-ok-ink)',
+    });
+    expect(segmentCss(applySgr(plain, '41'))).toMatchObject({ color: 'var(--bg-1)' });
+    expect(segmentCss(applySgr(plain, '37;41'))).toMatchObject({ color: 'var(--text-1)' });
+    // Dim is the quiet text color, not a fade that drops it below AA.
+    expect(segmentCss(applySgr(plain, '2'))).toEqual({ color: 'var(--text-3)' });
+    expect(segmentCss(applySgr(plain, '2;32'))).toEqual({ color: 'var(--st-ok-ink)' });
   });
 });

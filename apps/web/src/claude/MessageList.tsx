@@ -342,7 +342,7 @@ export function MessageList({
                   transition: { duration: dur.fast, ease: ease.out },
                 }}
                 transition={spring.snappy}
-                className="pointer-events-auto flex h-8 touch:h-11 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-4 pl-3 text-label text-text-1 shadow-raised backdrop-blur-[16px] transition-[background-color,scale] duration-fast ease-out hover:bg-bg-1 moving:active:scale-[0.97]"
+                className="pointer-events-auto flex h-8 touch:h-11 items-center gap-1.5 rounded-full border border-line-strong bg-bg-2 pr-4 pl-3 text-label text-text-1 shadow-raised focus-visible:shadow-[var(--focus-ring)] backdrop-blur-[16px] transition-[background-color,scale] duration-fast ease-out hover:bg-bg-1 moving:active:scale-[0.97]"
               >
                 <ArrowDown aria-hidden className="size-3.5" strokeWidth={1.75} />
                 Jump to latest

@@ -9,6 +9,7 @@ import { RESIZE_END, resizingAncestor } from '../anim/resizing.js';
 import { useBoardClient } from '../data/index.js';
 import { useSkinId } from '../focus/skins/registry.js';
 import { StreamRedactor } from '../redact/redact.js';
+import { releasesFocus } from './focusKeys.js';
 import { ctrlLatch } from './keyBar.js';
 import { domColorResolver, xtermTheme } from './theme.js';
 
@@ -130,6 +131,11 @@ export default function XtermView({
     const start = () => {
       if (disposed) return;
       term.open(host);
+      term.attachCustomKeyEventHandler((event) => !releasesFocus(event, input));
+      term.textarea?.setAttribute(
+        'aria-description',
+        input ? 'Tab completes in the shell. Shift+Tab leaves the terminal.' : 'Read only.',
+      );
       if (prefer === 'dom') setRenderer('dom');
       else
         try {

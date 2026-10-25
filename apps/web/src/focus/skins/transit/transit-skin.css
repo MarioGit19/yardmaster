@@ -95,6 +95,11 @@
   background: color-mix(in srgb, var(--route) 18%, transparent);
   box-shadow: inset 0 -2px 0 var(--route);
 }
+.ts-band .transit-station[aria-current]:focus-visible {
+  box-shadow:
+    inset 0 -2px 0 var(--route),
+    var(--focus-ring);
+}
 /* Touch (a landscape phone, a tablet): stations and log bins reach 44 px tall (§11). */
 @media (pointer: coarse) {
   .ts-band :is(.transit-station, .transit-bin)::after {

@@ -114,7 +114,8 @@ export function Hud() {
               onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
               className={cx(
                 'rounded-control transition-[background-color,box-shadow,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97]',
-                counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
+                counts.waiting > 0 &&
+                  'shadow-[inset_0_0_0_1px_var(--st-wait-glow)] focus-visible:shadow-[var(--focus-ring)]',
               )}
             >
               <Counter

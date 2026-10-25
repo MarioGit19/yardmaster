@@ -15,7 +15,7 @@ const PROJECTS = [
 for (const layout of FOCUS_LAYOUTS) {
   for (const theme of ['dark', 'light'] as const) {
     for (const width of [1440, 390]) {
-      test.describe(`skin a11y ${layout} ${theme} ${width}`, () => {
+      test.describe(`skin a11y ${layout} ${theme} ${width} @a11y`, () => {
         test.use({ theme, layout });
 
         test('axe finds nothing in the workspace', async ({ page }) => {

@@ -6,7 +6,8 @@ export type ButtonSize = 'sm' | 'md';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-text-1 text-bg-0 hover:bg-text-2',
-  secondary: 'border border-line bg-bg-2 text-text-1 shadow-raised hover:border-line-strong',
+  secondary:
+    'border border-line bg-bg-2 text-text-1 shadow-raised hover:border-line-strong focus-visible:shadow-[var(--focus-ring)]',
   ghost: 'text-text-2 hover:bg-bg-2 hover:text-text-1',
 };
 

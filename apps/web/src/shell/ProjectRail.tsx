@@ -196,7 +196,8 @@ function RailLink({
         'transition-colors duration-fast ease-out',
         collapsed && 'justify-center px-0',
         active
-          ? 'bg-bg-2 text-text-1 shadow-raised'
+          ? // The raised shadow would cover the base focus ring.
+            'bg-bg-2 text-text-1 shadow-raised focus-visible:shadow-[var(--focus-ring)]'
           : 'text-text-2 hover:bg-bg-2/60 hover:text-text-1',
       )}
     >

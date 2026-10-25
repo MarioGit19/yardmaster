@@ -62,6 +62,11 @@
   --orb-read: oklch(0.7 0.15 250);
   --orb-web: oklch(0.78 0.12 178);
   --orb-task: oklch(0.74 0.16 350);
+  /* The same hues as text (code highlighting, terminal magenta): AA on every surface. */
+  --orb-edit-ink: var(--orb-edit);
+  --orb-read-ink: var(--orb-read);
+  --orb-web-ink: var(--orb-web);
+  --orb-task-ink: var(--orb-task);
 
   /* Crew mascot visor glass, DESIGN.md §4.11; dark in both themes so the eyes glow. */
   --crew-visor: #05070c;
@@ -103,19 +108,19 @@
   /* Code highlighting (shiki css-variables theme), built from the tokens above. */
   --shiki-foreground: var(--text-1);
   --shiki-background: transparent;
-  --shiki-token-keyword: var(--orb-edit);
-  --shiki-token-string: var(--orb-web);
-  --shiki-token-string-expression: var(--orb-web);
-  --shiki-token-function: var(--orb-read);
-  --shiki-token-constant: var(--orb-task);
+  --shiki-token-keyword: var(--orb-edit-ink);
+  --shiki-token-string: var(--orb-web-ink);
+  --shiki-token-string-expression: var(--orb-web-ink);
+  --shiki-token-function: var(--orb-read-ink);
+  --shiki-token-constant: var(--orb-task-ink);
   --shiki-token-parameter: var(--text-2);
   --shiki-token-punctuation: var(--text-2);
   /* A step brighter than --text-3: comments sit on diff line tints too (AA). */
   --shiki-token-comment: color-mix(in srgb, var(--text-3) 60%, var(--text-2));
-  --shiki-token-link: var(--orb-read);
-  --shiki-token-inserted: var(--st-ok);
-  --shiki-token-deleted: var(--st-err);
-  --shiki-token-changed: var(--st-wait);
+  --shiki-token-link: var(--orb-read-ink);
+  --shiki-token-inserted: var(--st-ok-ink);
+  --shiki-token-deleted: var(--st-err-ink);
+  --shiki-token-changed: var(--st-wait-ink);
 
   --focus-ring:
     0 0 0 2px var(--line-strong), 0 0 0 6px color-mix(in srgb, var(--st-work) 25%, transparent);
@@ -196,6 +201,10 @@
   --orb-read: oklch(0.58 0.15 250);
   --orb-web: oklch(0.66 0.12 178);
   --orb-task: oklch(0.62 0.16 350);
+  --orb-edit-ink: oklch(0.5 0.16 300);
+  --orb-read-ink: oklch(0.48 0.15 250);
+  --orb-web-ink: oklch(0.48 0.09 178);
+  --orb-task-ink: oklch(0.5 0.16 350);
 
   --crew-visor: #1b1f29;
 

@@ -83,6 +83,8 @@ export function PhoneShell({ children, stage }: { children: ReactNode; stage?: R
           <main
             id="main"
             tabIndex={-1}
+            // Under a workspace the page is covered and its content inert: no Tab stop, no scroll.
+            inert={workspace || undefined}
             className={cx(
               'relative min-w-0 flex-1 overflow-y-auto overscroll-contain outline-none transition-opacity duration-base',
               // The tab bar floats over the bottom of the page; the last row scrolls clear of it.
@@ -137,7 +139,8 @@ function PhoneTopBar() {
             aria-label={`${counts.waiting} waiting, open the Attention Center`}
             className={cx(
               'flex h-11 items-center rounded-control transition-[background-color,box-shadow,scale] duration-fast ease-out moving:active:scale-[0.97]',
-              counts.waiting > 0 && 'shadow-[inset_0_0_0_1px_var(--st-wait-glow)]',
+              counts.waiting > 0 &&
+                'shadow-[inset_0_0_0_1px_var(--st-wait-glow)] focus-visible:shadow-[var(--focus-ring)]',
             )}
           >
             <Counter

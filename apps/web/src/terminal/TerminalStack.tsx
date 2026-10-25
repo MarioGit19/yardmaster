@@ -825,7 +825,7 @@ function ClaudePaneHeader({
             className={cx(
               'h-6 rounded-chip px-2.5 text-label transition-colors duration-fast',
               option === view
-                ? 'bg-bg-2 text-text-1 shadow-raised'
+                ? `bg-bg-2 text-text-1 shadow-raised focus-visible:shadow-[var(--focus-ring)]`
                 : 'text-text-2 hover:text-text-1',
             )}
           >

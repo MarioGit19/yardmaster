@@ -555,7 +555,7 @@ function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; 
       data-hub-wait={waitKind(view.session)}
       data-last={last || undefined}
       className={cx(
-        'flex min-w-0 items-start gap-3 rounded-panel border bg-bg-1 p-3 shadow-raised transition-[border-color,background-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.99]',
+        'flex min-w-0 items-start gap-3 rounded-panel border bg-bg-1 p-3 shadow-raised focus-visible:shadow-[var(--focus-ring)] transition-[border-color,background-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.99]',
         item.group === 'needs' ? 'border-st-wait/60' : last ? 'border-line-strong' : 'border-line',
       )}
     >
@@ -730,7 +730,7 @@ function ItemPage({
               className={cx(
                 'h-11 flex-1 rounded-chip text-body-sm transition-colors duration-fast',
                 option === shown
-                  ? 'bg-bg-2 text-text-1 shadow-raised'
+                  ? `bg-bg-2 text-text-1 shadow-raised focus-visible:shadow-[var(--focus-ring)]`
                   : 'text-text-2 hover:text-text-1',
               )}
             >
@@ -1119,7 +1119,7 @@ function NewSheet({
             onOpenChange(false);
             navigate(projectPageHref(project.id, 'new'));
           }}
-          className="flex min-h-16 min-w-0 items-center gap-3 rounded-panel border border-line bg-bg-2 px-4 text-left shadow-raised transition-[border-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.99]"
+          className="flex min-h-16 min-w-0 items-center gap-3 rounded-panel border border-line bg-bg-2 px-4 text-left shadow-raised focus-visible:shadow-[var(--focus-ring)] transition-[border-color,scale] duration-fast ease-out hover:border-line-strong moving:active:scale-[0.99]"
         >
           <Sparkles aria-hidden className="size-5 shrink-0 text-text-2" strokeWidth={1.5} />
           <span className="flex min-w-0 flex-col">

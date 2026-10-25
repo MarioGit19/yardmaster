@@ -75,6 +75,8 @@ export const pickerOpen = createPreference<'open' | 'closed'>(
   memory,
 );
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
 /** ⌘O on macOS, Ctrl+O elsewhere. */
 export function isPickerShortcut(
   event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>,
@@ -289,6 +291,10 @@ function LibraryList({
   const roots = library.state === 'ready' ? library.data.roots : [];
   const blocked = roots.filter((r) => r.error !== null);
   const multipleRoots = roots.length > 1;
+  const current = rows.find((r) => r.entry.path === value)?.entry;
+  const forgettable = useBoard(
+    (s) => current?.projectId != null && !!s.board.projects[current.projectId],
+  );
 
   return (
     <Command
@@ -297,6 +303,14 @@ function LibraryList({
       loop
       value={value}
       onValueChange={setSelected}
+      onKeyDown={(e) => {
+        // The row's Forget button stays out of the Tab order (a button inside an option);
+        // ⌘⌫ forgets the selected row from the keyboard.
+        if (e.key !== 'Backspace' || !(e.metaKey || e.ctrlKey)) return;
+        if (!forgettable || current?.projectId == null) return;
+        e.preventDefault();
+        requestClose(current.projectId, true);
+      }}
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="flex shrink-0 items-center gap-2 border-line border-b px-4">
@@ -385,6 +399,12 @@ function LibraryList({
           </Kbd>
           to choose
         </span>
+        {forgettable && (
+          <span className="flex items-center gap-1.5">
+            <Kbd>{IS_MAC ? '⌘⌫' : 'Ctrl ⌫'}</Kbd>
+            to forget
+          </span>
+        )}
         <span className="flex items-center gap-1.5">
           <Kbd>Esc</Kbd>
           to close
@@ -413,6 +433,7 @@ function FolderItem({
       value={entry.path}
       onSelect={() => onPick(entry)}
       data-library-entry={entry.name}
+      aria-keyshortcuts={onBoard ? 'Meta+Backspace Control+Backspace' : undefined}
       className="palette-item group/item"
     >
       <ProjectAvatar project={avatar} size="sm" />
@@ -459,23 +480,26 @@ function FolderItem({
   );
 }
 
-/** Forget a recent project (12.6e) without picking its row: the confirm opens over the picker. */
+/**
+ * Forget a recent project (12.6e) without picking its row: the confirm opens over the picker.
+ * A pointer target only: a control inside an option isn't reachable (axe `nested-interactive`),
+ * so the keyboard forgets the selected row with ⌘⌫ (and ⌘K lists "Forget …").
+ */
 function ForgetButton({ projectId, name }: { projectId: string; name: string }) {
   return (
-    <Tooltip content={`Forget ${name}`}>
-      <button
-        type="button"
-        aria-label={`Forget ${name}`}
+    <Tooltip content={`Forget ${name}`} shortcut={IS_MAC ? '⌘⌫' : 'Ctrl ⌫'}>
+      <span
+        aria-hidden
         data-library-forget={name}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           requestClose(projectId, true);
         }}
-        className="-mr-1 grid size-7 shrink-0 place-items-center rounded-control text-text-3 opacity-0 transition-[opacity,background-color,color] duration-fast hover:bg-bg-2 hover:text-text-1 focus-visible:opacity-100 group-data-[selected=true]/item:opacity-100 touch:size-11 touch:opacity-100"
+        className="-mr-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-control text-text-3 opacity-0 transition-[opacity,background-color,color] duration-fast hover:bg-bg-2 hover:text-text-1 group-data-[selected=true]/item:opacity-100 touch:size-11 touch:opacity-100"
       >
-        <X aria-hidden className="size-3.5" strokeWidth={1.75} />
-      </button>
+        <X className="size-3.5" strokeWidth={1.75} />
+      </span>
     </Tooltip>
   );
 }
@@ -562,6 +586,7 @@ function LaunchSheet({
 
   return (
     <form
+      ref={focusFirstOption}
       data-launch-sheet={entry.name}
       onSubmit={(e) => {
         e.preventDefault();
@@ -730,6 +755,11 @@ function LaunchSheet({
       </footer>
     </form>
   );
+}
+
+/** The list it came from leaves with the focused search field: focus moves into the sheet. */
+function focusFirstOption(form: HTMLFormElement | null) {
+  form?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus({ preventScroll: true });
 }
 
 function LaunchOption({

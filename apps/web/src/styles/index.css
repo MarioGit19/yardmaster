@@ -260,8 +260,10 @@
 [data-motion="reduced"] .context-menu {
   animation-name: fade-in;
 }
-/* Moving between triggers while tooltips are warm opens the next one instantly: no entrance. */
-.tooltip[data-state="instant-open"] {
+/* Moving between triggers while tooltips are warm opens the next one instantly: no entrance.
+   Closing has no exit either: from an instant open, the closing state's restarted entrance kept
+   Radix waiting for an animationend, with the closed tooltip still mounted and eating Esc. */
+.tooltip:is([data-state="instant-open"], [data-state="closed"]) {
   animation: none;
 }
 
@@ -2465,6 +2467,17 @@ main[data-office-zoom] {
     0 0 0 1px color-mix(in srgb, var(--st-err) 30%, transparent),
     0 8px 40px -8px var(--st-err-glow);
 }
+/* The waiting and failed glows would cover the focus ring. */
+.grid-node[data-tone="wait"]:focus-visible {
+  box-shadow:
+    var(--focus-ring),
+    0 8px 40px -8px var(--st-wait-glow);
+}
+.grid-node[data-tone="err"]:focus-visible {
+  box-shadow:
+    var(--focus-ring),
+    0 8px 40px -8px var(--st-err-glow);
+}
 .grid-hex-edge {
   fill: var(--grid-bg);
   stroke: var(--edge);
@@ -2537,12 +2550,12 @@ main[data-office-zoom] {
   stroke: var(--grid-bg);
   stroke-width: 1;
 }
-/* Dims the contents, not the card: a pipeline ends under the card's hexagon and would show
-   through a faded panel. */
-.grid-node[data-variant] > * {
+/* Dims the marks, not the card: a pipeline ends under the card's hexagon and would show
+   through a faded panel. Text keeps its AA contrast, as on a quiet pod. */
+.grid-node[data-variant] :is(.grid-hex, .grid-satellites) {
   transition: opacity var(--dur-dim) var(--ease-out);
 }
-.grid-node[data-dim]:not(:hover, :focus-within) > * {
+.grid-node[data-dim]:not(:hover, :focus-within) :is(.grid-hex, .grid-satellites) {
   opacity: 0.7;
 }
 .grid-satellite[data-tone="work"] .grid-satellite-mark > * {
@@ -3131,6 +3144,13 @@ main[data-office-zoom] {
   color: var(--st-wait-ink);
   background: color-mix(in srgb, var(--st-wait) 14%, transparent);
 }
+/* On the light ground a see-through tint leaves the ink short of AA; tint the stop's white. */
+[data-theme="light"] .transit-flag {
+  background: color-mix(in srgb, var(--st-err) 14%, var(--transit-stop));
+}
+[data-theme="light"] .transit-flag[data-tone="wait"] {
+  background: color-mix(in srgb, var(--st-wait) 14%, var(--transit-stop));
+}
 
 /* The track: thick, flat, in the project's accent, a terminus bar at each end. */
 .transit-track {
@@ -3586,7 +3606,8 @@ main[data-office-zoom] {
   --retro-tone-err: color-mix(in oklch, var(--st-err-ink) 80%, var(--retro-gray));
 }
 [data-theme="light"] :is(.retro, .focus[data-layout="retro"]) {
-  --retro-gray: #5d625e;
+  /* Dark enough that every tone keeps AA on a highlighted (hovered or open) row. */
+  --retro-gray: #3d423e;
   /* Daylight's paper is lighter than the phosphor's black: dim ink needs more ink for §8. */
   --retro-dim-ink: color-mix(in oklch, var(--retro-ink) 78%, var(--retro-bg));
 }
@@ -3657,6 +3678,10 @@ main[data-office-zoom] {
 }
 .retro-frame[data-dim] {
   opacity: 0.72;
+}
+/* Daylight's dim ink has no contrast to spare (§8): a quiet frame steps back by its dim tag. */
+[data-theme="light"] .retro-frame[data-dim] {
+  opacity: 1;
 }
 /* Lines are blocks of preformatted text (a flex line would drop its space-only runs). */
 .retro-line,
