@@ -1036,9 +1036,10 @@ Goal: start work from the board (or a phone) on a project that isn't open anywhe
   - Note: not a to-do state: a fork. `composer.spec`'s fork test forks a session of the demo's first project on the shared board, and a fork shows the parent's messages at 55% opacity (`MessageList`), which took `--text-2` to 2.65:1 and diff text to 2.3:1. skins-a11y saw it only when it ran after that test (reproduced every time with the fork test run first). Inherited rows now step each text token down one level (`--text-1` → `--text-2`, `--text-2` → `--text-3`, all AA) instead of fading. The fork test now runs axe contrast on the inherited rows (fails without the fix), and skins-a11y's settle wait is a shared `settleAnimations` in `fixtures.ts`.
   - Note: `pnpm e2e` ran in parts: perf chain + `e2e-webgl` (36 passed), then the `e2e` specs in batches of 96, 103 and 101, all passed.
 
-- [ ] **13.5 README and docs**
+- [x] **13.5 README and docs**
   - Write a public README: hero screenshot or GIF (captured from demo mode only), one shot per layout, features, how it works (diagram), requirements, install (clone, `pnpm i`, `pnpm build`, `yardmaster hooks install`, install the vsix), adding a projects folder, phone access, privacy statement ("runs locally, uses your own Claude Code login, no telemetry"), uninstall (`yardmaster hooks uninstall`, remove the extension, `rm -rf ~/.yardmaster`), troubleshooting (`yardmaster doctor`), and contributing. Add `docs/ARCHITECTURE.md` from PRD §5–7.
   - **Verify:** `scripts/privacy-check.sh && pnpm check`
+  - Note: README images are WebP copies of demo-mode shots in `docs/screenshots/`; `scripts/readme-shots.sh` refreshes them from `artifacts/shots/` (needs `cwebp`). The clone URL is a placeholder, and the repo has no license file yet.
 
 - [ ] **13.6 Release packaging**
   - Add a `pnpm build` that bundles the server (esbuild) with the web dist and a `bin` entry (`yardmaster`, plus the deprecated `c-board` alias from 12.7a), so that `npm i -g` from the repo works. CI uploads the `.vsix` artifact. Extend `CHANGELOG.md` (started in 12.7a).
