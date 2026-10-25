@@ -1,9 +1,12 @@
-import type { KeyboardEvent, RefObject } from 'react';
+import { type FocusEvent, type KeyboardEvent, type RefObject, useState } from 'react';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import type { SceneProject } from '../layouts/scene.js';
+import { useHeldOrder } from '../order.js';
 import { cx } from '../ui/cx.js';
 import { type BoardRow, boardRows } from './map.js';
 import { Roundel } from './TransitLine.js';
+
+const rowKey = (row: BoardRow) => row.actor.id;
 
 const clock = (now: number) =>
   new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -12,7 +15,8 @@ const clock = (now: number) =>
  * The concourse's departures board (DESIGN.md §10.5): every session and terminal as a departure,
  * the ones that need you on top ("Due · needs you" in amber, "Cancelled" in rose), then work
  * ("Departing"), then the rest. A row opens the Actor inspector; pointing at one lights its
- * station on the map. The board is one Tab stop, the arrows move between its rows.
+ * station on the map. The board is one Tab stop, the arrows move between its rows. While the
+ * pointer or the focus is on it, rows hold their places: a row doesn't slide away under a click.
  */
 export function DeparturesBoard({
   projects,
@@ -28,7 +32,10 @@ export function DeparturesBoard({
   mapRef: RefObject<HTMLElement | null>;
   className?: string;
 }) {
-  const { rows, hidden, due, departing } = boardRows(projects, max);
+  const { rows: live, hidden, due, departing } = boardRows(projects, max);
+  const [pointed, setPointed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const rows = useHeldOrder(live, rowKey, pointed || focused);
   const light = (id: string, on: boolean) => {
     const station = mapRef.current?.querySelector(`[data-transit-station="${CSS.escape(id)}"]`);
     station?.toggleAttribute('data-lit', on);
@@ -71,7 +78,17 @@ export function DeparturesBoard({
           No trains running. Sessions and terminals board here as they start.
         </p>
       ) : (
-        <ul aria-label="Departures" className="transit-board-rows" onKeyDown={onKeyDown}>
+        <ul
+          aria-label="Departures"
+          className="transit-board-rows"
+          onKeyDown={onKeyDown}
+          onPointerEnter={() => setPointed(true)}
+          onPointerLeave={() => setPointed(false)}
+          onFocus={() => setFocused(true)}
+          onBlur={(event: FocusEvent<HTMLElement>) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+          }}
+        >
           {rows.map((row, i) => (
             <Row key={row.actor.id} row={row} first={i === 0} light={light} />
           ))}

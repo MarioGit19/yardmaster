@@ -1,12 +1,20 @@
+import { availableParallelism } from 'node:os';
 import { defineConfig, devices } from '@playwright/test';
 
 const ci = Boolean(process.env.CI);
+
+// One worker per ~3 cores, across all projects: a Full-motion page keeps about 1.5 cores busy
+// (renderer plus software compositor) beside the demo server. At half the cores (Playwright's
+// default) the pages saturate the machine and setup waits time out; a batch also ran slower
+// (8.8 min with 5 workers on 10 cores, 5.4 min with 3). `--workers` still overrides it.
+const workers = Math.max(2, Math.floor(availableParallelism() / 3));
 
 export default defineConfig({
   testDir: '.',
   outputDir: '../test-results',
   globalSetup: './global-setup.ts',
   fullyParallel: true,
+  workers,
   forbidOnly: ci,
   retries: ci ? 1 : 0,
   reporter: ci ? 'github' : 'list',

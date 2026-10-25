@@ -234,7 +234,15 @@ async function walk(page: Page, query: string, phone: boolean) {
   const problems: string[] = [];
   const check = async (screen: string) => {
     await settle(page);
-    for (const line of await page.evaluate(fitProblems)) {
+    let found = await page.evaluate(fitProblems);
+    // A misfit is still there a moment later. A box caught mid-entry or mid-exit (the "Jump to
+    // latest" pill scaling in while the demo streams) is not one.
+    if (found.length > 0) {
+      await settle(page, 400);
+      const again = new Set(await page.evaluate(fitProblems));
+      found = found.filter((line) => again.has(line));
+    }
+    for (const line of found) {
       problems.push(`${screen}: ${line}`);
       if (process.env.FIT_DEBUG) console.log(`${screen}: ${line}`);
     }

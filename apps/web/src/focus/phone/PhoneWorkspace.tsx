@@ -54,6 +54,7 @@ import { PortChip, portProcess } from '../../lanes/PortChip.js';
 import { dur, ease, move, spring, useMotionLevel } from '../../motion.js';
 import { ClaudeOrb } from '../../orb/ClaudeOrb.js';
 import { orbStateFor } from '../../orb/model.js';
+import { useHeldOrder } from '../../order.js';
 import { LiveCaption } from '../../pod/LiveCaption.js';
 import { type Caption, sessionCaption } from '../../pod/model.js';
 import { createPreference, usePreference } from '../../prefs.js';
@@ -120,6 +121,8 @@ export interface PhoneWorkspaceProps {
 const replaceKeepingStamp = (navigate: ReturnType<typeof useLocation>[1], href: string) =>
   navigate(href, { replace: true, state: window.history.state });
 
+const itemKey = (item: HubItem) => item.key;
+
 /**
  * The phone workspace (DESIGN.md §11): the project hub (one list of everything in the project,
  * grouped by what needs the user) with an item page over it for a chat or a terminal, and pages
@@ -180,6 +183,9 @@ export function PhoneWorkspace({
     else replaceKeepingStamp(navigate, hub);
   };
   const goTo = (next: HubItem) => replaceKeepingStamp(navigate, itemHref(project.id, next));
+  // The order a swipe walks: the hub's when an item page opened, held until back on the hub. A
+  // terminal whose command ends moves to Idle there, not under the finger.
+  const swipeOrder = useHeldOrder(items, itemKey, onItem);
 
   const still = useMotionLevel() !== 'full';
   return (
@@ -215,7 +221,14 @@ export function PhoneWorkspace({
             {subPage ? (
               <SubPage project={project} page={subPage} items={items} onBack={back} />
             ) : item ? (
-              <ItemPage project={project} item={item} items={items} onBack={back} onGo={goTo} />
+              <ItemPage
+                project={project}
+                item={item}
+                items={items}
+                order={swipeOrder}
+                onBack={back}
+                onGo={goTo}
+              />
             ) : (
               <MissingItem
                 project={project}
@@ -660,12 +673,15 @@ function ItemPage({
   project,
   item,
   items,
+  order,
   onBack,
   onGo,
 }: {
   project: Project;
   item: HubItem;
   items: readonly HubItem[];
+  /** The order a swipe walks (`useHeldOrder`). */
+  order: readonly HubItem[];
   onBack: () => void;
   onGo: (item: HubItem) => void;
 }) {
@@ -677,7 +693,7 @@ function ItemPage({
   // Which way the content slides in after a swipe: from the side the finger came from.
   const [direction, setDirection] = useState<1 | -1 | 0>(0);
   const swipe = useTabSwipe((step) => {
-    const next = neighbour(items, item.key, step);
+    const next = neighbour(order, item.key, step);
     if (!next) return;
     setDirection(step);
     onGo(next);
@@ -686,7 +702,11 @@ function ItemPage({
   const accent = 'var(--accent)';
   // The whole page takes the swipe; the terminal's output and text fields keep their own drags.
   return (
-    <div data-item-swipe="" className="flex min-h-0 flex-1 flex-col" {...swipe}>
+    <div
+      data-item-swipe={order.map((i) => i.key).join(' ')}
+      className="flex min-h-0 flex-1 flex-col"
+      {...swipe}
+    >
       <header data-item-header={item.key} className={appBarClass} style={appBarStyle}>
         <BackButton onClick={onBack} label={`Back to ${project.name}`} />
         <button

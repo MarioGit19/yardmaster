@@ -213,9 +213,22 @@ export function SwipeRow({ children, right, left, disabled = false, className }:
       ref={rootRef}
       data-fx="swipe-row"
       data-committed={committed ?? undefined}
-      className={cx('relative isolate overflow-hidden rounded-panel', className)}
+      className={cx('relative isolate touch-pan-y overflow-hidden rounded-panel', className)}
       animate={{ opacity: committed && level === 'reduced' ? 0 : 1 }}
       transition={{ duration: dur.base, ease: ease.out }}
+      // On the row, not the sliding content: a press on the strip a returning row has uncovered
+      // still grabs it.
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+      onClickCapture={(event) => {
+        // The click that ends a swipe must not also press a button inside the row.
+        if (!suppressClick.current) return;
+        suppressClick.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       {right && (
         <motion.div
@@ -247,21 +260,7 @@ export function SwipeRow({ children, right, left, disabled = false, className }:
           </motion.span>
         </motion.div>
       )}
-      <motion.div
-        style={{ x }}
-        className={cx('relative touch-pan-y', dragging && 'select-none')}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerEnd}
-        onPointerCancel={onPointerEnd}
-        onClickCapture={(event) => {
-          // The click that ends a swipe must not also press a button inside the row.
-          if (!suppressClick.current) return;
-          suppressClick.current = false;
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-      >
+      <motion.div style={{ x }} className={cx('relative', dragging && 'select-none')}>
         {children}
       </motion.div>
       <span className="sr-only" aria-live="polite">

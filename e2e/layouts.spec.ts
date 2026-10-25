@@ -1154,9 +1154,13 @@ test.describe('the Transit concourse', () => {
       await page.keyboard.press('Escape');
       await expect(inspector).toHaveCount(0);
 
-      // Pointing at a board row lights its station on the map; a click inspects it.
-      const row = page.locator('[data-board-row]').first();
-      const rowActor = await row.getAttribute('data-board-row');
+      // Pointing at a board row lights its station on the map; a click inspects it. Rows re-sort
+      // until the pointer is on the board (then they hold), so the row is pinned by its actor.
+      const rowActor = await page
+        .locator('[data-board-row]')
+        .first()
+        .getAttribute('data-board-row');
+      const row = page.locator(`[data-board-row="${rowActor}"]`);
       await row.hover();
       await expect(page.locator(`[data-transit-station="${rowActor}"]`)).toHaveAttribute(
         'data-lit',

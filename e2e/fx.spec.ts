@@ -58,6 +58,7 @@ test('swiping an approval past the threshold allows it', async ({ page }) => {
   await page.mouse.up();
   await expect(phone.getByText('Allowed')).toHaveCount(0);
 
+  // Grabbed again at once, while it springs back (the press lands on the strip it uncovered).
   await page.mouse.move(box.x + 10, y);
   await page.mouse.down();
   await page.mouse.move(box.x + 260, y, { steps: 12 });

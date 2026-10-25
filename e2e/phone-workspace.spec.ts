@@ -230,34 +230,31 @@ for (const profile of PROFILES) {
       await expect(switcher).toHaveCount(0);
       await expect(item.locator('[data-item-header]')).toHaveAttribute('data-item-header', other);
 
-      // A swipe moves to the neighbouring item in the hub's order (read live: on the shared demo
-      // board a card can change groups while the test runs).
+      // A swipe moves to the neighbouring item in the order the hub had when the page opened. It
+      // holds while you swipe (on the shared demo board a card can change groups meanwhile), so
+      // swiping back lands where you started.
       const header = item.locator('[data-item-header]');
-      const live = () =>
-        hub
-          .locator('[data-hub-item]')
-          .evaluateAll((all) => all.map((c) => c.getAttribute('data-hub-item') ?? ''));
-      const adjacent = async (a: string, b: string) => {
-        const keys = await live();
-        return Math.abs(keys.indexOf(a) - keys.indexOf(b)) === 1;
-      };
+      const pager = item.locator('[data-item-swipe]');
+      const order = async () => ((await pager.getAttribute('data-item-swipe')) ?? '').split(' ');
       // On the header: a terminal's output keeps sideways drags for itself.
       const area = await header.boundingBox();
       if (!area) throw new Error('no swipe area');
       const y = area.y + area.height / 2;
-      const keys = await live();
-      const forward = keys.indexOf(other) < keys.length - 1;
+      const keys = await order();
+      const at = keys.indexOf(other);
+      expect(at).toBeGreaterThanOrEqual(0);
+      const forward = at < keys.length - 1;
       const [x0, x1] = forward ? [width * 0.85, width * 0.15] : [width * 0.15, width * 0.85];
       await swipe(page, y, x0, x1);
-      await expect(header).not.toHaveAttribute('data-item-header', other);
-      const moved = (await header.getAttribute('data-item-header')) ?? '';
-      expect(await adjacent(moved, other)).toBe(true);
+      await expect(header).toHaveAttribute('data-item-header', keys[at + (forward ? 1 : -1)] ?? '');
+      // Nothing moved under the finger (cards other tests close drop out; newcomers go last).
+      const now = await order();
+      expect(now.filter((key) => keys.includes(key))).toEqual(
+        keys.filter((key) => now.includes(key)),
+      );
       // And back the other way.
       await swipe(page, y, x1, x0);
-      await expect(header).not.toHaveAttribute('data-item-header', moved);
-      expect(await adjacent((await header.getAttribute('data-item-header')) ?? '', moved)).toBe(
-        true,
-      );
+      await expect(header).toHaveAttribute('data-item-header', other);
 
       // Moving between items replaces the entry: one back is the hub.
       await page.goBack();

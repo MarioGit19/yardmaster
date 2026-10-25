@@ -2,6 +2,7 @@ import { toolFamily } from '@yardmaster/protocol';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { loop } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
+import { keepOrder as keepInOrder } from '../order.js';
 import type { Caption } from '../pod/model.js';
 
 // The Grid's 2D map (DESIGN.md §10.4 "2D map"): the core in the middle, a node per project on a
@@ -246,10 +247,7 @@ export function keepOrder(
   actors: readonly SceneActor[],
   previous: readonly string[],
 ): SceneActor[] {
-  const index = new Map(previous.map((id, i) => [id, i]));
-  const known = actors.filter((a) => index.has(a.id));
-  known.sort((a, b) => (index.get(a.id) ?? 0) - (index.get(b.id) ?? 0));
-  return [...known, ...actors.filter((a) => !index.has(a.id))];
+  return keepInOrder(actors, previous, (actor) => actor.id);
 }
 
 /** Each step out from the middle of the arc sits this much lower, px. */
