@@ -170,15 +170,30 @@ export function sessionCaption(session: ClaudeSession, approval?: Approval | nul
   }
 }
 
-/** The last non-empty line of the assistant's text, whitespace collapsed. */
+/**
+ * The last line of the assistant's text that reads as prose, whitespace collapsed: code inside
+ * fences (closed or still streaming) and bracket-only lines are skipped, and list, quote and
+ * heading markers and inline backticks are dropped.
+ */
 export function lastLine(text: string | null): string | null {
   if (!text) return null;
-  const lines = text.split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = (lines[i] ?? '').replace(/\s+/g, ' ').trim();
-    if (line && !/^[`#>*\-_|]+$/.test(line)) return line;
+  let found: string | null = null;
+  let inFence = false;
+  for (const raw of text.split('\n')) {
+    const trimmed = raw.trim();
+    if (/^(`{3,}|~{3,})/.test(trimmed)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const line = trimmed
+      .replace(/^(?:[#>]+|[-*+]|\d+[.)])\s+/, '')
+      .replace(/`/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (line && !/^[\s`#>*\-_|=~{}[\]();,.:]+$/.test(line)) found = line;
   }
-  return null;
+  return found;
 }
 
 /** The session is producing output right now (thinking or running a tool). */

@@ -247,7 +247,6 @@ export default function OfficeLayout() {
 
   // A click outside the open room and its panel (on the dimmed building) steps out too.
   const onStageClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (!roomId) return;
     const target = event.target as Element;
     if (!event.currentTarget.contains(target)) return;
     if (target.closest('[data-room-entered], [data-office-room-panel]')) return;
@@ -263,8 +262,12 @@ export default function OfficeLayout() {
         data-office
         data-office-entered={roomId ?? undefined}
         data-office-moving={moving || undefined}
-        onClick={onStageClick}
-        className="relative w-full"
+        onClick={roomId ? onStageClick : undefined}
+        className={
+          roomId
+            ? 'relative w-full cursor-pointer [&_[data-office-room-panel]]:cursor-auto [&_[data-room-entered]]:cursor-auto'
+            : 'relative w-full'
+        }
       >
         {width > 0 && (
           <motion.div

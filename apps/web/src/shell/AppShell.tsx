@@ -65,14 +65,6 @@ function DesktopShell({ children, sheet, stage, pulse }: AppShellProps) {
       </button>
       <Hud />
       <div className="relative flex min-h-0 flex-1">
-        {reconnecting && (
-          <div
-            role="status"
-            className="glass pointer-events-none absolute inset-x-0 top-0 z-30 flex h-8 items-center justify-center border-line border-b text-label text-st-err-ink"
-          >
-            Reconnecting…
-          </div>
-        )}
         <div
           className={cx(
             'flex shrink-0 transition-opacity duration-base',
@@ -82,6 +74,14 @@ function DesktopShell({ children, sheet, stage, pulse }: AppShellProps) {
           <ProjectRail collapsed={collapsed} onToggle={narrow ? undefined : toggleRail} />
         </div>
         <div data-reconnecting={reconnecting || undefined} className="relative flex min-w-0 flex-1">
+          {reconnecting && (
+            <div
+              role="status"
+              className="glass pointer-events-none absolute top-3 left-1/2 z-30 flex h-7 -translate-x-1/2 items-center rounded-full border border-line px-3 text-label text-st-err-ink"
+            >
+              Reconnecting…
+            </div>
+          )}
           <main
             id="main"
             tabIndex={-1}

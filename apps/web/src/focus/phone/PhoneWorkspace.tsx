@@ -410,7 +410,7 @@ function ItemGroups({
             <h2
               id={`hub-group-${group}`}
               className={cx(
-                'mb-2 font-medium text-label uppercase tracking-wide',
+                'mb-2 font-medium text-label',
                 group === 'needs' ? 'text-st-wait-ink' : 'text-text-2',
               )}
             >
@@ -839,9 +839,7 @@ function Switcher({
           if (members.length === 0) return null;
           return (
             <section key={group} aria-label={HUB_GROUP_LABEL[group]} className="mb-3">
-              <h3 className="mb-1 font-medium text-label text-text-2 uppercase tracking-wide">
-                {HUB_GROUP_LABEL[group]}
-              </h3>
+              <h3 className="mb-1 font-medium text-label text-text-2">{HUB_GROUP_LABEL[group]}</h3>
               <ul className="flex flex-col">
                 {members.map((item) => (
                   <li key={item.key}>

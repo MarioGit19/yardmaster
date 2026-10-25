@@ -108,3 +108,54 @@ test('the approvals sheet shows the pointer on everything clickable', async ({ b
     await board.stop();
   }
 });
+
+for (const [key, name] of [
+  ['Digit2', 'office'],
+  ['Digit3', 'grid'],
+  ['Digit4', 'transit'],
+  ['Digit5', 'retro'],
+] as const) {
+  test(`the ${name} layout shows the pointer on everything clickable`, async ({ page }) => {
+    await openRoute(page, '/');
+    await page.keyboard.press(`Alt+${key}`);
+    const layout = page.locator(`main [data-layout="${name}"]:not([aria-hidden], [data-focus])`);
+    // Grid's WebGL scene can take a while to mount when the suite runs in parallel.
+    await expect(layout).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(600);
+    expect(await arrowClickables(page)).toEqual([]);
+  });
+}
+
+test('the picker and the launch sheet show the pointer on everything clickable', async ({
+  page,
+}) => {
+  await openRoute(page, '/');
+  await page.locator('[data-hud="open-project"]').click();
+  const dialog = page.locator('[data-open-project]');
+  await expect(dialog.locator('[data-library-entry="weather-bot"]')).toBeVisible();
+  expect(await arrowClickables(page)).toEqual([]);
+
+  // Selecting a folder opens the sheet; nothing is launched.
+  await dialog.locator('[data-library-entry="weather-bot"]').click();
+  const sheet = dialog.locator('[data-launch-sheet="weather-bot"]');
+  await sheet.locator('[data-launch-option="claude"] label').click();
+  await sheet.locator('[data-launch-option="terminal"] label').click();
+  await expect(sheet.getByRole('textbox', { name: 'What should Claude do?' })).toBeVisible();
+  expect(await arrowClickables(page)).toEqual([]);
+});
+
+test('an entered Office room and its panel show the pointer on everything clickable', async ({
+  page,
+}) => {
+  await openRoute(page, '/');
+  await page.keyboard.press('Alt+Digit2');
+  const room = page.locator('[data-room]').first();
+  await expect(room).toBeVisible();
+  // The ceiling, clear of every character and sign.
+  const box = await room.boundingBox();
+  if (!box) throw new Error('the room has no box');
+  await room.click({ position: { x: box.width / 2, y: 4 } });
+  await expect(page.locator('[data-office-room-panel]')).toBeVisible();
+  await page.waitForTimeout(600);
+  expect(await arrowClickables(page)).toEqual([]);
+});

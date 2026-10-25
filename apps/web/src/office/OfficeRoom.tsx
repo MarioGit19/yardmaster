@@ -132,7 +132,7 @@ export const OfficeRoom = memo(function OfficeRoom({
   // Anywhere in the room but a character or a control opens the room view. Clicks inside an
   // inspector bubble here through its portal; those stay out.
   const onClick = (event: MouseEvent<HTMLElement>) => {
-    if (entered || !onEnter) return;
+    if (!onEnter) return;
     const target = event.target as Element;
     if (!event.currentTarget.contains(target)) return;
     if (target.closest('button, a, [data-scene-actor]')) return;
@@ -153,7 +153,7 @@ export const OfficeRoom = memo(function OfficeRoom({
         data-tone={project.tone}
         data-dim={project.dim || undefined}
         onKeyDown={onKeyDown}
-        onClick={onClick}
+        onClick={entered ? undefined : onClick}
         className={cx(
           'office-room relative outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-inset',
           !entered && onEnter && 'cursor-pointer',

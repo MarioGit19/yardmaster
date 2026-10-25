@@ -57,7 +57,7 @@
     0 0 0 4px var(--st-err);
 }
 .ts-band-sign .transit-roundel {
-  font-size: 15px;
+  font-size: 16px;
 }
 /* The line: the map's own renderer, its sign row left out (the band's sign stands beside it). */
 .ts-band-line {

@@ -134,6 +134,14 @@ describe('lastLine', () => {
     expect(lastLine(null)).toBeNull();
     expect(lastLine('---\n')).toBeNull();
   });
+
+  it('skips code blocks, bracket-only lines and markdown markers', () => {
+    expect(lastLine('The fix:\n```ts\nif (a) {\n  run();\n}\n```\n')).toBe('The fix:');
+    // Still streaming: the fence isn't closed yet.
+    expect(lastLine('Here it is:\n```ts\nconst x = 1;')).toBe('Here it is:');
+    expect(lastLine('Changed:\n- `src/checkout/tax.ts`')).toBe('src/checkout/tax.ts');
+    expect(lastLine('## Summary\n> Totals round per line.\n});')).toBe('Totals round per line.');
+  });
 });
 
 describe('isStreaming', () => {
