@@ -42,7 +42,7 @@ import { cx } from '../ui/cx.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { SwipePager } from '../ui/SwipePager.js';
 import { Tooltip } from '../ui/Tooltip.js';
-import { ARC_DROP, planCockpit } from './map.js';
+import { ARC_DROP, keepOrder, planCockpit } from './map.js';
 
 /** Messages the Claude screen keeps: the newest few, like a monitor's last lines. */
 const MESSAGE_ROWS = 5;
@@ -79,7 +79,11 @@ export interface FlatCockpitProps {
  * screens are a stack of full-width pages you swipe through.
  */
 export function FlatCockpit({ project, now, narrow, deep = false, onBack }: FlatCockpitProps) {
-  const plan = planCockpit(project.actors);
+  // The arc keeps the order the screens had when the cockpit opened (see `keepOrder`).
+  const order = useRef<string[]>([]);
+  const actors = keepOrder(project.actors, order.current);
+  order.current = actors.map((a) => a.id);
+  const plan = planCockpit(actors);
   // One screen beside the middle one: the two sit side by side, centered as a pair, instead of
   // leaving the arc's left side empty.
   const pair = plan.left.length === 0 && plan.right.length > 0;

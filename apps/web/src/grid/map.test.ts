@@ -7,6 +7,7 @@ import {
   CORE_R,
   cardsOverlap,
   hexCenter,
+  keepOrder,
   NODE_H,
   NODE_W,
   nodeCaption,
@@ -171,5 +172,27 @@ describe('planCockpit', () => {
   it('centers a terminal when there is no session', () => {
     expect(planCockpit([actor('t:1'), actor('t:2')]).center?.id).toBe('t:1');
     expect(planCockpit([]).center).toBeNull();
+  });
+  it('keeps a screen in its column when the scene re-sorts the actors', () => {
+    const claude = actor('s:1', { kind: 'claude' });
+    const [t1, t2, t3] = [actor('t:1'), actor('t:2'), actor('t:3')];
+    const before = keepOrder([claude, t1, t2, t3], []);
+    // t:3 finished its command and now ranks first.
+    const after = planCockpit(
+      keepOrder(
+        [t3, claude, t1, t2],
+        before.map((a) => a.id),
+      ),
+    );
+    expect(after.right.map((a) => a.id)).toEqual(['t:1', 't:3']);
+    expect(after.left.map((a) => a.id)).toEqual(['t:2']);
+  });
+});
+
+describe('keepOrder', () => {
+  it('keeps known actors in their first order, newcomers after, leavers dropped', () => {
+    const ids = keepOrder([actor('c'), actor('a'), actor('d')], ['a', 'b', 'c']).map((a) => a.id);
+    expect(ids).toEqual(['a', 'c', 'd']);
+    expect(keepOrder([actor('b'), actor('a')], []).map((a) => a.id)).toEqual(['b', 'a']);
   });
 });

@@ -236,5 +236,21 @@ export function planCockpit(actors: readonly SceneActor[]): CockpitPlan {
   return { center, left, right, children };
 }
 
+/**
+ * The actors in the order they were first seen (`previous`, by id), newcomers after them in the
+ * order they come. The scene re-sorts actors by state, so the open cockpit plans its arc from
+ * this: a screen keeps its place while it's open instead of jumping columns (and dropping focus)
+ * when a command finishes.
+ */
+export function keepOrder(
+  actors: readonly SceneActor[],
+  previous: readonly string[],
+): SceneActor[] {
+  const index = new Map(previous.map((id, i) => [id, i]));
+  const known = actors.filter((a) => index.has(a.id));
+  known.sort((a, b) => (index.get(a.id) ?? 0) - (index.get(b.id) ?? 0));
+  return [...known, ...actors.filter((a) => !index.has(a.id))];
+}
+
 /** Each step out from the middle of the arc sits this much lower, px. */
 export const ARC_DROP = 28;
