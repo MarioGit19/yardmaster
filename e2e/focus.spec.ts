@@ -237,10 +237,15 @@ for (const layout of FOCUS_LAYOUTS) {
         await expect
           .poll(async () => Math.round((await screen.boundingBox())?.width ?? 0))
           .toBeGreaterThan(before);
+        const after = Math.round((await screen.boundingBox())?.width ?? 0);
 
-        const frames = await page.evaluate(
-          () => (window as unknown as { __frames: { w: number; resizing: boolean }[] }).__frames,
-        );
+        // The fit runs in a frame after the sampler's read: let the sampler see the new width.
+        const sampled = () =>
+          page.evaluate(
+            () => (window as unknown as { __frames: { w: number; resizing: boolean }[] }).__frames,
+          );
+        await expect.poll(async () => (await sampled()).at(-1)?.w).toBe(after);
+        const frames = await sampled();
         const during = frames.filter((f) => f.resizing);
         expect(during.length).toBeGreaterThan(5);
         expect(new Set(during.map((f) => f.w))).toEqual(new Set([before]));

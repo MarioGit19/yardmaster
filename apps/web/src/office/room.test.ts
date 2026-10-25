@@ -129,6 +129,29 @@ describe('planRoom', () => {
     expect(p.placements.map((x) => x.actorId)).not.toContain('t:11');
   });
 
+  it('keeps a held actor drawn in a crowded room, hiding the next least urgent instead', () => {
+    const sessions = Array.from({ length: 12 }, (_, i) =>
+      claude(`s:${i}`, { since: NOW - i, state: 'typing' }),
+    );
+    const drawn = (width: number, hold: string[]) =>
+      planRoom(sessions, { width, now: NOW, hold: new Set(hold) }).placements.map((x) => x.actorId);
+    // The room trims to its width: a held desk past the cut stays, the last one drawn goes.
+    const free = drawn(WIDTH, []);
+    expect(free.length).toBeLessThan(5);
+    const cut = `s:${free.length}`;
+    const held = drawn(WIDTH, [cut]);
+    expect(held).toContain(cut);
+    expect(held).toHaveLength(free.length);
+    expect(held).not.toContain(free.at(-1));
+    // Held past the eight: it's swapped in for the least urgent.
+    const wide = (hold: string[]) => drawn(4000, hold);
+    expect(wide([])).toHaveLength(MAX_CHARACTERS);
+    expect(wide([])).not.toContain('s:10');
+    expect(wide(['s:10'])).toContain('s:10');
+    expect(wide(['s:10'])).not.toContain('s:7');
+    expect(wide(['s:10'])).toHaveLength(MAX_CHARACTERS);
+  });
+
   it('keeps every station inside the room and characters apart', () => {
     const p = plan([
       claude('s:a', { state: 'typing' }),

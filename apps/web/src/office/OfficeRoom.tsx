@@ -1,13 +1,16 @@
 import { toolFamily } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   memo,
+  type PointerEvent,
   type ReactNode,
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { dur, ease, spring } from '../motion.js';
@@ -84,9 +87,17 @@ export const OfficeRoom = memo(function OfficeRoom({
   fit = 1,
 }: OfficeRoomProps) {
   const work = useRef<ReadonlyMap<string, WorkStation>>(new Map());
+  // The character under the pointer and the focused one hold still while you read their name
+  // tag: they wait to walk, and a crowded room hides someone else.
+  const [pointed, setPointed] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const hold = useMemo(
+    () => new Set([pointed, focused].filter((id): id is string => id !== null)),
+    [pointed, focused],
+  );
   const plan = useMemo(
-    () => planRoom(project.actors, { width, now, previous: work.current }),
-    [project.actors, width, now],
+    () => planRoom(project.actors, { width, now, previous: work.current, hold }),
+    [project.actors, width, now, hold],
   );
   useEffect(() => {
     work.current = plan.work;
@@ -129,6 +140,24 @@ export const OfficeRoom = memo(function OfficeRoom({
     buttons[(next + buttons.length) % buttons.length]?.focus({ preventScroll: true });
   };
 
+  // Events from the inspector bubble here through its portal: those leave the hold as it is.
+  const actorAt = (target: EventTarget) =>
+    (target as Element).closest('[data-scene-actor]')?.getAttribute('data-scene-actor') ?? null;
+  const onPointerOver = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'mouse' || !event.currentTarget.contains(event.target as Node))
+      return;
+    setPointed(actorAt(event.target));
+  };
+  const onFocus = (event: FocusEvent<HTMLElement>) => {
+    if (event.currentTarget.contains(event.target)) setFocused(actorAt(event.target));
+  };
+  const onBlur = (event: FocusEvent<HTMLElement>) => {
+    const next = event.relatedTarget;
+    if (next && (event.currentTarget.contains(next) || next.closest('[data-actor-inspector]')))
+      return;
+    setFocused(null);
+  };
+
   // Anywhere in the room but a character or a control opens the room view. Clicks inside an
   // inspector bubble here through its portal; those stay out.
   const onClick = (event: MouseEvent<HTMLElement>) => {
@@ -153,6 +182,10 @@ export const OfficeRoom = memo(function OfficeRoom({
         data-tone={project.tone}
         data-dim={project.dim || undefined}
         onKeyDown={onKeyDown}
+        onPointerOver={onPointerOver}
+        onPointerLeave={() => setPointed(null)}
+        onFocus={onFocus}
+        onBlur={onBlur}
         onClick={entered ? undefined : onClick}
         className={cx(
           'office-room relative outline-none focus-visible:ring-2 focus-visible:ring-line-strong focus-visible:ring-inset',
@@ -212,6 +245,7 @@ export const OfficeRoom = memo(function OfficeRoom({
                   projectName={project.name}
                   color={actor.id === main ? accent : undefined}
                   fit={fit}
+                  held={hold.has(actor.id)}
                 />
               );
             })}

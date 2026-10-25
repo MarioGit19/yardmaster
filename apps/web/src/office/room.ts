@@ -107,6 +107,8 @@ export interface PlanOptions {
   now: number;
   /** Where terminals worked on the previous plan. */
   previous?: ReadonlyMap<string, WorkStation>;
+  /** Actors under the pointer or focus: they stay drawn while the room is crowded. */
+  hold?: ReadonlySet<string>;
 }
 
 type Home =
@@ -200,26 +202,45 @@ function layoutStations(
   return { stations, width: x - GAP - START_X };
 }
 
+/** The first `max` actors, with any held ones swapped in for the least urgent. */
+function pickShown(
+  actors: readonly SceneActor[],
+  max: number,
+  hold: ReadonlySet<string>,
+): SceneActor[] {
+  const shown = actors.slice(0, max);
+  for (const held of actors.slice(max)) {
+    if (!hold.has(held.id)) continue;
+    const drop = shown.findLastIndex((a) => !hold.has(a.id));
+    if (drop < 0) break;
+    shown.splice(drop, 1);
+    shown.push(held);
+  }
+  return shown;
+}
+
 /**
  * Lays out one room: a station per Claude session (desk), a shared side desk for subagents and
  * background tasks, a rack per long-running terminal, a bench per one-shot command, couches for
  * idle shells, and a bookshelf when there's room. Then everyone's spot: at their station, or on a
  * trip to the bookshelf (reading for a while) or the whiteboard (planning). Actors that don't fit
- * (past 8, or past the room's width, least urgent first) are counted in `hidden`.
+ * (past 8, or past the room's width, least urgent first, never a held one) are counted in
+ * `hidden`.
  */
 export function planRoom(
   actors: readonly SceneActor[],
-  { width, now, previous = new Map() }: PlanOptions,
+  { width, now, previous = new Map(), hold = new Set() }: PlanOptions,
 ): RoomPlan {
   const room = width - START_X - END_PAD;
-  let shown = actors.slice(0, MAX_CHARACTERS);
+  let shown = pickShown(actors, MAX_CHARACTERS, hold);
   const homes = new Map<string, Home>();
   for (const actor of actors) homes.set(actor.id, homeOf(actor, now, previous));
 
   let layout = layoutStations(shown, homes, true);
   if (layout.width > room) layout = layoutStations(shown, homes, false);
   while (layout.width > room && shown.length > 1) {
-    shown = shown.slice(0, -1);
+    const drop = shown.findLastIndex((a) => !hold.has(a.id));
+    shown = shown.filter((_, i) => i !== (drop < 0 ? shown.length - 1 : drop));
     layout = layoutStations(shown, homes, false);
   }
   const { stations } = layout;

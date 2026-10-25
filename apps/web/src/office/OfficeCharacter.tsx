@@ -23,12 +23,15 @@ export interface OfficeCharacterProps {
   color?: string;
   /** The room's drawing scale: the tap target grows to stay 44 px on screen. */
   fit?: number;
+  /** Under the pointer or focused: it waits to walk until you're off it, tag and all. */
+  held?: boolean;
 }
 
 /**
  * One character in an Office room: its mascot at its spot, a button that opens the Actor
  * inspector, and a name tag with the live caption on hover or focus. A new spot is a walk along
- * the floor (600–900 ms, legs swinging) at Full, a cross-fade at Reduced, a jump at Off.
+ * the floor (600–900 ms, legs swinging) at Full, a cross-fade at Reduced, a jump at Off. A held
+ * character stops where it is and walks on when it's let go.
  */
 export function OfficeCharacter({
   actor,
@@ -36,6 +39,7 @@ export function OfficeCharacter({
   projectName,
   color,
   fit = 1,
+  held = false,
 }: OfficeCharacterProps) {
   const level = useMotionLevel();
   const left = placement.x - placement.size / 2;
@@ -50,7 +54,7 @@ export function OfficeCharacter({
   useEffect(() => {
     const dx = left - x.get();
     const dy = top - y.get();
-    if (dx === 0 && dy === 0) return;
+    if ((dx === 0 && dy === 0) || held) return;
     if (levelRef.current === 'off') {
       x.set(left);
       y.set(top);
@@ -83,7 +87,7 @@ export function OfficeCharacter({
       walkY.stop();
       setWalking(false);
     };
-  }, [left, top, x, y, opacity]);
+  }, [left, top, held, x, y, opacity]);
 
   const hit = Math.max(Math.ceil(TAP_PX / Math.min(1, fit)), placement.size);
   const mini = actor.parentId !== null;

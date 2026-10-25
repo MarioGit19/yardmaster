@@ -262,21 +262,21 @@ test.describe('the Office building', () => {
     const { page, stop } = await openBoard(browser);
     try {
       await page.keyboard.press('Alt+Digit2');
-      const any = page.locator('[data-room] [data-scene-actor]').first();
+      // A Claude session: a crowded room hides its idle shells first, so one may leave.
+      const any = page.locator('[data-room] [data-scene-actor^="s:"]').first();
       await expect(any).toBeVisible();
       // Pinned by id: rooms reorder under a `.first()`.
       const actorId = await any.getAttribute('data-scene-actor');
       const character = page.locator(`[data-scene-actor="${actorId}"]`);
       const tag = character.locator('[data-office-tag]');
       await expect(tag).toHaveCSS('opacity', '0');
-      // Rooms reorder and characters walk under a still pointer: point again until it shows.
-      await expect
-        .poll(async () => {
-          await character.hover();
-          await page.waitForTimeout(200);
-          return tag.evaluate((el) => getComputedStyle(el).opacity);
-        })
-        .toBe('1');
+      // It can set off for another station between Playwright's aim and the move: point again
+      // until it shows. Once pointed at, it holds still (no walk, never hidden) for the tag.
+      // Each try is bounded: under the parallel suite's load one pointer move can take seconds.
+      await expect(async () => {
+        await character.hover({ timeout: 10_000 });
+        await expect(tag).toHaveCSS('opacity', '1', { timeout: 2_000 });
+      }).toPass({ timeout: 25_000 });
       await character.click();
       const inspector = page.locator('[data-actor-inspector]');
       await expect(inspector.locator('[data-actor]')).toBeVisible();
@@ -985,11 +985,15 @@ test.describe(`the Grid 3D network ${WEBGL}`, () => {
       await input.press('Enter');
       await expect(input).toHaveValue('');
       await expect(center.locator('.xterm-rows')).toContainText(hello);
-      // It sits in the middle of the cockpit.
-      const box = await center.boundingBox();
-      const deck = await cockpit.boundingBox();
-      if (!box || !deck) throw new Error('no boxes');
-      expect(Math.abs(box.x + box.width / 2 - (deck.x + deck.width / 2))).toBeLessThan(4);
+      // It settles in the middle of the cockpit (on the GPU the echo can beat its spring).
+      await expect
+        .poll(async () => {
+          const box = await center.boundingBox();
+          const deck = await cockpit.boundingBox();
+          if (!box || !deck) throw new Error('no boxes');
+          return Math.abs(box.x + box.width / 2 - (deck.x + deck.width / 2));
+        })
+        .toBeLessThan(4);
 
       // Esc once: the screen goes back to the arc, and focus with it.
       await page.keyboard.press('Escape');

@@ -3350,6 +3350,17 @@ main[data-office-zoom] {
   border-radius: 6px;
   outline: none;
 }
+@media (pointer: coarse), (max-width: 767px) {
+  .transit-mini {
+    position: relative;
+  }
+  /* 28 × 24 drawn, 44 × 44 to tap. */
+  .transit-mini::after {
+    content: "";
+    position: absolute;
+    inset: -10px -8px;
+  }
+}
 .transit-mini:focus-visible,
 .transit-mini[data-state="open"] {
   box-shadow: var(--focus-ring);
