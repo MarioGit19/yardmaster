@@ -295,11 +295,7 @@ export function MessageList({
                   data-index={v.index}
                   data-row={item.kind}
                   data-inherited={parentRow ? '' : undefined}
-                  className={cx(
-                    'absolute top-0 left-0 w-full',
-                    column.gutter,
-                    parentRow && 'opacity-55',
-                  )}
+                  className={cx('absolute top-0 left-0 w-full', column.gutter)}
                   style={{ transform: `translateY(${v.start}px)` }}
                 >
                   <div

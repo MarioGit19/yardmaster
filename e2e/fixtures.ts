@@ -96,3 +96,21 @@ export async function disableWebgl(page: Page): Promise<void> {
     } as typeof getContext;
   });
 }
+
+/** Waits (up to 5 s) until no finite animation runs, so contrast is read from settled colors. */
+export async function settleAnimations(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () =>
+        document
+          .getAnimations()
+          .every(
+            (a) =>
+              a.playState !== 'running' ||
+              a.effect?.getComputedTiming().iterations === Number.POSITIVE_INFINITY,
+          ),
+      undefined,
+      { timeout: 5000 },
+    )
+    .catch(() => {});
+}

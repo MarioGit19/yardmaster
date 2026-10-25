@@ -1,5 +1,13 @@
+import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { expect, FOCUS_LAYOUTS, firstProjectRoute, openRoute, test } from './fixtures.js';
+import {
+  expect,
+  FOCUS_LAYOUTS,
+  firstProjectRoute,
+  openRoute,
+  settleAnimations,
+  test,
+} from './fixtures.js';
 
 async function openFirstProject(page: Page) {
   await openRoute(page, '/');
@@ -110,6 +118,16 @@ for (const layout of FOCUS_LAYOUTS) {
         );
         await expect(fork.locator('[data-fork-divider]')).toHaveCount(1);
         await expect(fork.locator('[data-inherited]').first()).toBeAttached();
+        // The parent's messages read dimmer, but still meet AA (13.4f: they were at 55% opacity).
+        await settleAnimations(page);
+        const { violations } = await new AxeBuilder({ page })
+          .include('[data-inherited]')
+          .withRules(['color-contrast'])
+          .analyze();
+        const found = violations.flatMap((v) =>
+          v.nodes.map((n) => `${n.target.join(' ')} ${n.failureSummary ?? ''}`),
+        );
+        expect(found, found.join('\n')).toEqual([]);
       });
 
       test('with replies turned off in Settings, a terminal session offers the fork bar', async ({

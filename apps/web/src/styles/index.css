@@ -1388,6 +1388,15 @@
 .message-scroll:focus-visible {
   box-shadow: inset 0 0 0 2px var(--line-strong);
 }
+/* A fork's inherited rows read as context: each text step one dimmer (every step meets AA), not
+   an opacity, which took --text-2 and code below AA. Two levels, so --text-1 takes the old
+   --text-2 before --text-2 becomes --text-3. */
+[data-inherited] {
+  --text-1: var(--text-2);
+}
+[data-inherited] > * {
+  --text-2: var(--text-3);
+}
 
 /* New messages: a plain fade and a 4px rise (§3 rule 1); a cross-fade at Reduced. */
 @keyframes msg-enter {
