@@ -3,7 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
+    # Docs-only pushes don't need a run.
+    paths-ignore: ["**.md", "docs/**", "loop/**"]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,7 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # macOS minutes count 10x on private repos, so it runs there only when started by hand.
+        # Once the repo is public (free minutes), every run covers both.
+        os: ${{ fromJSON((github.event.repository.private && github.event_name != 'workflow_dispatch') && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
     steps:
       - uses: actions/checkout@v5
 
