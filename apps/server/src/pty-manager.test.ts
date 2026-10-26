@@ -141,9 +141,11 @@ realPty('PtyManager with a real pty', SLOW, () => {
     const id = await created(manager);
     // The child shell says when it runs (the echoed line reads `st''arted`, its output
     // `started`), so the interrupt can't reach the parent shell before it forked.
-    manager.sendText(id, "sh -c 'echo st''arted; sleep 30'; echo after-$?", true);
+    manager.sendText(id, "sh -c 'echo st''arted; sleep 30'", true);
     await vi.waitFor(() => expect(output(store, id)).toContain('started'), { timeout: 5_000 });
     expect(manager.interrupt(id)).toEqual({ ok: true });
+    // Asked on its own line: dash (Linux's sh) drops the rest of a line after an interrupt.
+    manager.sendText(id, 'echo after-$?', true);
     await vi.waitFor(() => expect(output(store, id)).toContain('after-130'), { timeout: 5_000 });
   });
 
@@ -170,12 +172,18 @@ realPty('PtyManager with a real pty', SLOW, () => {
     const { store, manager } = setup();
     const quits = await created(manager);
     const stays = await created(manager);
-    // One shell exits on Ctrl+C; the other ignores it and has to be killed.
-    manager.sendText(quits, "trap 'exit 3' INT; echo re''ady-1", true);
+    // One exits on Ctrl+C; the other ignores it and has to be killed. The first is a
+    // non-interactive sh in the shell's place: an interactive dash defers its INT trap until
+    // the next line is entered.
+    manager.sendText(
+      quits,
+      `exec sh -c 'trap "exit 3" INT; echo re""ady-1; while :; do sleep 1; done'`,
+      true,
+    );
     manager.sendText(stays, "trap '' INT; echo re''ady-2", true);
     await vi.waitFor(() => expect(output(store, quits)).toContain('ready-1'), { timeout: 5_000 });
     await vi.waitFor(() => expect(output(store, stays)).toContain('ready-2'), { timeout: 5_000 });
-    manager.stopProject(PROJECT.id, 300);
+    manager.stopProject(PROJECT.id, 1_500);
     await vi.waitFor(() => expect(store.state.terminals[quits]?.exitCode).toBe(3), {
       timeout: 5_000,
     });

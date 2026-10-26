@@ -196,8 +196,11 @@ describe('PortShares', () => {
 
     store.setPorts([]);
     store.flush();
-    await vi.waitFor(async () => expect((await readStub()).serve['3000']).toBeUndefined());
-    expect(saved()).toEqual([]);
+    // The entry goes from tailscale first, then from the board's own list and its saved copy.
+    await vi.waitFor(async () => {
+      expect((await readStub()).serve['3000']).toBeUndefined();
+      expect(saved()).toEqual([]);
+    });
     expect(instance.ownPorts).toEqual([]);
     const { serve } = await readStub();
     expect(Object.keys(serve).sort()).toEqual(['443', '8080']);
