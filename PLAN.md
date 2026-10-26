@@ -1142,3 +1142,14 @@ A security review before the repo goes public (three independent reviews of the 
 
 - [ ] **[HUMAN] 13.7 Real-world acceptance**
   - Use Yardmaster for a day with your real projects. File issues or add tasks below for anything off. Decide on a license and the open questions in PRD §13.
+
+## Backlog (maintainer's to-dos, not loop tasks)
+
+These have no checkbox on purpose, so the loop never picks them up. To schedule one, turn it into a `- [ ]` task above.
+
+- **Optional Anthropic API key for board sessions.** **Your Claude Code login stays the default.** Add Settings → Claude → "Board sessions use: Your Claude login / API key", set from the Mac only (never from a phone).
+  - **Passing the key:** pass it per session through the Agent SDK's `env` option (`ANTHROPIC_API_KEY`). Show the billing source from the SDK's `apiKeySource` on each session.
+  - **Login mode:** strip any inherited `ANTHROPIC_API_KEY` so it really uses the login.
+  - **Storage:** store the key in the macOS Keychain or a 0600 file in `~/.yardmaster`. Never put it in argv, logs, WS snapshots, the phone or push payloads.
+  - **Errors and docs:** surface key and credit errors in chat. Update README/PRD §8.4: Yardmaster never *requires* a key.
+  - **Before the public release:** the Agent SDK overview says third-party products may not offer claude.ai login or rate limits unless approved. Decide how the README describes login mode, and point subscription users to "Claude in a terminal" if needed.
