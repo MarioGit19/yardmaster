@@ -13,6 +13,8 @@ import { BoardStore } from './store.js';
 
 const loaded = await loadNodePty();
 const realPty = describe.skipIf(!loaded.ok);
+// Real shells are slow to start on CI runners; each wait below has its own 5 s deadline.
+const SLOW = { timeout: 30_000 };
 
 const PROJECT: Project = {
   id: 'p-acme',
@@ -93,7 +95,7 @@ async function created(manager: PtyManager, command?: string): Promise<string> {
   return result.terminalId;
 }
 
-realPty('PtyManager with a real pty', () => {
+realPty('PtyManager with a real pty', SLOW, () => {
   it('runs a shell in the project folder and streams its output', async () => {
     const { store, manager } = setup();
     const id = await created(manager);
@@ -348,7 +350,7 @@ realPty.each(SHELLS)('PtyManager with $name and the shell integration', ({ name,
   });
 });
 
-realPty('PtyManager without shell integration', () => {
+realPty('PtyManager without shell integration', SLOW, () => {
   it('infers a running execution from the process table', async () => {
     const { store, manager } = setup({ markerTimeoutMs: 50 });
     const id = await created(manager);
