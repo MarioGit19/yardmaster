@@ -169,7 +169,7 @@ export interface PortSharesOptions {
   /** The board's bookkeeping: the serve entries it created. */
   load(): unknown;
   save(shares: unknown): void;
-  /** Phone access (12.5) is set up: an allowed host exists. */
+  /** Phone access is set up: an allowed host exists. */
   phoneAccess(): boolean;
   /** The board's own port: never shared, and its serve entry is never touched. */
   boardPort: number;
@@ -183,7 +183,7 @@ export interface PortSharesOptions {
 }
 
 /**
- * Dev servers on the phone (12.6e2): `tailscale serve --https=<port>` for a listening port,
+ * Dev servers on the phone: `tailscale serve --https=<port>` for a listening port,
  * tailnet only. The board removes only the entries it created (kept in its data dir), when the
  * port stops listening, on Stop sharing and when the server stops.
  */

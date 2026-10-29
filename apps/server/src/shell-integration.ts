@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 /**
- * Shell integration for board terminals (12.6a): zsh and bash load the user's own startup files
+ * Shell integration for board terminals: zsh and bash load the user's own startup files
  * as usual, then report each command with OSC 133/633 markers (`shell-markers.ts`). Nothing in
  * the user's dotfiles changes: zsh starts with `ZDOTDIR` pointing at wrapper files that source the
  * real ones, bash with an `--rcfile` that does the same.

@@ -42,7 +42,7 @@ const ICONS: Record<TrustFindingKind, ReactNode> = {
 };
 
 /**
- * The trust card (14.4): before the first board session in a folder whose Claude settings can run
+ * The trust card: before the first board session in a folder whose Claude settings can run
  * code or widen permissions, it lists exactly what was found. Nothing starts until the user trusts
  * the folder; Cancel leaves it unstarted. A small glass modal on wide screens, a bottom sheet on
  * phones. It also answers the board client's trust gate, so every way to start a session asks.

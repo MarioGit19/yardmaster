@@ -10,7 +10,7 @@ import {
 } from './fixtures.js';
 import { openLongTranscript, scrollToTurnHead } from './messages.js';
 
-// 12.6k: axe on each layout's workspace skin (DESIGN.md §10.8 "Same meaning": contrast meets
+// Axe on each layout's workspace skin (DESIGN.md §10.8 "Same meaning": contrast meets
 // WCAG AA in both themes), on the demo's first project and on the worst board's longest one.
 // The terminal's own output colors are the program's, so xterm is left out. Scroll boxes take
 // a Tab stop when they overflow (`useScrollFocus`). Motion is Off: contrast is read from settled
@@ -74,7 +74,7 @@ for (const layout of FOCUS_LAYOUTS) {
   }
 }
 
-// 12.6m: every Retro phosphor keeps AA on a long conversation (turn headers, both voices, tool
+// Every Retro phosphor keeps AA on a long conversation (turn headers, both voices, tool
 // lines and tags, code boxes), in Night and on Daylight's paper, on a phone and on the desktop.
 // Each phosphor gets a fresh demo board: other specs start sessions in the long project.
 for (const phosphor of ['green', 'amber', 'red', 'purple', 'cyan', 'white'] as const) {

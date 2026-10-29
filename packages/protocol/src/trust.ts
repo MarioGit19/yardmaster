@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Folder trust for board Claude sessions (PLAN 14.4, PRD §8). Headless SDK runs load a folder's
+// Folder trust for board Claude sessions (PRD §8). Headless SDK runs load a folder's
 // project settings and `.mcp.json` without the CLI's "trust this folder?" dialog, so the board
 // asks first whenever those files can run code or widen permissions.
 

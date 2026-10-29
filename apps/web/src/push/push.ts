@@ -5,7 +5,7 @@ import type { BoardClient } from '../data/client.js';
 import { useBoardClient } from '../data/index.js';
 import { api } from '../settings/api.js';
 
-// Web Push on this browser (12.6e3): the service worker, the subscription and its id on the server.
+// Web Push on this browser: the service worker, the subscription and its id on the server.
 
 export const SW_URL = '/sw.js';
 /** `sw-logic`'s message to open a route. Not imported: that would pull it into a shared chunk. */

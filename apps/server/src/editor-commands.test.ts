@@ -393,7 +393,7 @@ describe('editor commands', () => {
     expect((await client.next()).payload).toEqual({ id: 'o-2', ok: true, editor: 'Cursor' });
     expect(spawned).toEqual([['/usr/local/bin/cursor', ['/home/dev/recipe-box']]]);
 
-    // No window has it open yet: a board terminal (12.4) runs it, and takes raw keystrokes.
+    // No window has it open yet: a board terminal runs it, and takes raw keystrokes.
     client.send('action', { kind: 'terminal.create', projectId, command: 'pnpm dev' }, 'o-3');
     expect((await client.next()).payload).toEqual({ id: 'o-3', ok: true });
     const board = Object.values(app.store.state.terminals).find((t) => t.origin === 'board');

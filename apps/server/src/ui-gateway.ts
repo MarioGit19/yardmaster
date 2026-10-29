@@ -67,7 +67,7 @@ interface Client {
   streams: Map<StreamId, boolean>;
   /** Pending ops that were already part of this client's snapshot. */
   skipOps: number;
-  /** The tab is visible and focused, and its browser's push subscription (12.6e3). */
+  /** The tab is visible and focused, and its browser's push subscription. */
   presence: { focused: boolean; pushId: string | null };
 }
 
@@ -382,7 +382,7 @@ async function settle(run: () => ActionResult | Promise<ActionResult>): Promise<
 export function registerUiGateway(
   app: FastifyInstance,
   gateway: UiGateway,
-  /** Demo mode's worst-case board, for sockets opened with `?worst=1` (PLAN 7.14). */
+  /** Demo mode's worst-case board, for sockets opened with `?worst=1`. */
   worst?: UiGateway,
   /** Sees every accepted socket, e.g. to close a session's sockets when it is revoked. */
   onSocket?: (request: FastifyRequest, socket: WebSocket) => void,

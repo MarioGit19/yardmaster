@@ -167,7 +167,7 @@ function storedList(value: unknown, item: { safeParse(v: unknown): { success: bo
   return [...new Set(items)];
 }
 
-/** The stored library settings (12.1): no roots, a 30-minute idle window and no pins by default. */
+/** The stored library settings: no roots, a 30-minute idle window and no pins by default. */
 export function librarySettings(settings: Record<string, unknown>): {
   libraryRoots: string[];
   libraryIdleHideMin: IdleHideMin;
@@ -190,7 +190,7 @@ export function editorCliSetting(settings: Record<string, unknown>): string | nu
   return parsed.success ? parsed.data : null;
 }
 
-/** The stored push notification settings (12.6e3): the default events, details shown, none muted. */
+/** The stored push notification settings: the default events, details shown, none muted. */
 export function notifySettings(settings: Record<string, unknown>): {
   notifyEvents: NotifyEvent[];
   notifyHideDetails: boolean;
@@ -239,7 +239,7 @@ function settingsError(reply: FastifyReply, err: unknown) {
 }
 
 /**
- * Settings (F11, 8.5): server-owned preferences, the hooks status and installer, and token
+ * Settings (F11): server-owned preferences, the hooks status and installer, and token
  * rotation. All under `/api`, so the auth guard covers them.
  */
 export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRoutesOptions): void {

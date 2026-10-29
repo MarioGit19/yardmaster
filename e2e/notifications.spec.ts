@@ -2,7 +2,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
 import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
-// 12.6e3: push notifications. The demo's push service is simulated (an outbox the server hands
+// Push notifications. The demo's push service is simulated (an outbox the server hands
 // payloads to), and the browser's PushManager is mocked, since headless Chromium has no push
 // service. The service worker is real: the test delivers the outbox to it over CDP. Its own board,
 // so the drill's events and toasts never reach the other specs.

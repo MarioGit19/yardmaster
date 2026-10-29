@@ -286,7 +286,7 @@ export const UiAction = z.discriminatedUnion('kind', [
   action('session.replyInTerminal', { sessionId: SessionId, text: Text.min(1) }),
   action('project.add', { path: Path }),
   /**
-   * Closes a project (12.6e): stops what the board runs there and hides it until something new
+   * Closes a project: stops what the board runs there and hides it until something new
    * happens in it. `closeWindow` also closes the editor windows open on it.
    */
   action('project.close', { projectId: ProjectId, closeWindow: z.boolean().optional() }),
@@ -341,7 +341,7 @@ export const TerminalResize = envelope(
 
 /**
  * Whether this tab is visible and focused, and the push subscription of its browser: the server
- * doesn't push to a device that is looking at the board (12.6e3). No reply.
+ * doesn't push to a device that is looking at the board. No reply.
  */
 export const Presence = envelope(
   'presence',

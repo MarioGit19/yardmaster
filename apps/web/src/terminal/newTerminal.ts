@@ -16,7 +16,7 @@ const isClaude = (command: string) => command === CLAUDE_COMMAND || command.star
 /**
  * The project's distinct recent command lines, newest first: what someone is likely to start
  * again in a new terminal. Interactive apps, `claude` (it has its own chip), blanks and lines with
- * control characters (14.4) are left out.
+ * control characters are left out.
  */
 export function recentCommands(
   board: Pick<BoardState, 'terminals' | 'executions'>,

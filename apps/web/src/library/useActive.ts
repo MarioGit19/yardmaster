@@ -51,7 +51,7 @@ export function useActiveProjects(): ReadonlySet<string> {
 
 const NONE: ReadonlySet<string> = new Set();
 
-/** Closed projects with nothing newer since (12.6e): the rail and the phone list leave them out. */
+/** Closed projects with nothing newer since: the rail and the phone list leave them out. */
 export function useClosedProjects(): ReadonlySet<string> {
   const opened = useSyncExternalStore(openedProjects.subscribe, openedProjects.get);
   const key = useBoard((s) => closedKey(s.board, opened));

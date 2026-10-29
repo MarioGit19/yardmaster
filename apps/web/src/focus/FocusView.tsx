@@ -93,7 +93,7 @@ export function FocusView({
   const known = project !== undefined;
   const store = useBoardStore();
   // Opened from the board: it's on the overview when the user comes back (F26), however long
-  // they stayed. Unless they left by closing it (12.6e).
+  // they stayed. Unless they left by closing it.
   useEffect(() => {
     if (!known) return;
     markOpened(projectId);

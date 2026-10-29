@@ -666,7 +666,7 @@ export async function buildServer(
   registerRemoteRoutes(app, { sessions, hosts: allowedRemoteHosts });
   registerSessionRoutes(app, sessions);
 
-  // Push notifications (12.6e3). The demo hands them to an outbox instead of a push service.
+  // Push notifications. The demo hands them to an outbox instead of a push service.
   const pushSubscriptions = new PushSubscriptions({
     load: () => settings[SUBSCRIPTIONS_KEY],
     save: (subscriptions) => {

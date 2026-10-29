@@ -157,7 +157,7 @@ describe('DemoSimulator', () => {
       expect.arrayContaining(['user', 'assistant', 'thinking', 'tool_use', 'tool_result']),
     );
     expect(messages.some((m) => m?.kind === 'assistant' && m.text.includes('```'))).toBe(true);
-    // Every tool card variant has something to show (7.9).
+    // Every tool card variant has something to show.
     const tools = new Set(messages.flatMap((m) => (m?.kind === 'tool_use' ? [m.name] : [])));
     expect([...tools]).toEqual(
       expect.arrayContaining([

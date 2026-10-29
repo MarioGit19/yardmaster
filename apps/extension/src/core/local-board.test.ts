@@ -99,7 +99,7 @@ describe('locateBoard', () => {
 
 describe('an impostor that holds the port or plants a socket', () => {
   it('gets no token, no connection and no terminal data from the editor link', async () => {
-    // The 14.1 attack: something else bound the board's TCP port before the board started.
+    // A port-squatting attack: something else bound the board's TCP port before the board started.
     const squatter = new WebSocketServer({ host: '127.0.0.1', port: 0 });
     await new Promise<void>((resolve) => squatter.once('listening', () => resolve()));
     let squatted = 0;

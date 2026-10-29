@@ -2,7 +2,7 @@ import { devices, type Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
 import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
-// 12.6e2: dev servers on the phone. The demo simulates Tailscale (`demo-mac.tailnet-demo.ts.net`),
+// Dev servers on the phone. The demo simulates Tailscale (`demo-mac.tailnet-demo.ts.net`),
 // on its own board so the shared ports never show up in other specs' screenshots.
 
 const HOST = 'demo-mac.tailnet-demo.ts.net';

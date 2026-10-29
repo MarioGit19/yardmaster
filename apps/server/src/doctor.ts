@@ -588,7 +588,7 @@ function checkApiKey(deps: DoctorDeps): DoctorCheck {
       ...base,
       level: 'warn',
       message: 'ANTHROPIC_API_KEY is set',
-      hint: 'Sessions started from the board bill that key instead of your Claude login. Unset it to use your subscription.',
+      hint: "Sessions started from the board bill that key instead of going through your signed-in Claude Code. Unset it to use Claude Code's own sign-in.",
     };
   }
   return { ...base, level: 'ok', message: 'uses your Claude Code login' };

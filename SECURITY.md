@@ -14,7 +14,7 @@ Yardmaster is pre-1.0. Only the latest release, and `main`, get security fixes. 
 
 ## Threat model
 
-Yardmaster runs locally, as you, with your own Claude Code login. It has no cloud service and makes no network calls of its own.
+Yardmaster runs locally, as you. Board Claude sessions run through your own locally installed and signed-in Claude Code, and Yardmaster never reads, stores or asks for credentials. It has no cloud service and makes no network calls of its own.
 
 ### What it protects against
 

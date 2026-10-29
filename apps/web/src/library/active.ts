@@ -16,7 +16,7 @@ export interface ActiveRule {
 type Board = Pick<BoardState, 'projects' | 'windows' | 'terminals' | 'sessions'>;
 
 /**
- * Closed projects (12.6e) with nothing newer than their close: off the overview, the rail and
+ * Closed projects with nothing newer than their close: off the overview, the rail and
  * the phone list. A new editor window, terminal or Claude session there, or the user opening it
  * from the board, brings one back (the server clears `closedAt` soon after; this covers the gap).
  */

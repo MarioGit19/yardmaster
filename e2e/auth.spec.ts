@@ -313,7 +313,7 @@ test('a phone pairs, opens the hub, and answers a request from a notification', 
       mac.page.locator(`[data-setting="sessions"] [data-session="${phoneId}"]`),
     ).toContainText('Phone');
 
-    // A phone can't reach what only the Mac may change (14.3), but it keeps its own settings.
+    // A phone can't reach what only the Mac may change, but it keeps its own settings.
     const fromPhone = (method: string, path: string, body: unknown) =>
       phone.evaluate(
         async ({ method, path, body, secret }) =>

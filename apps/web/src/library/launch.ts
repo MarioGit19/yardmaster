@@ -70,7 +70,7 @@ export function pickerRows(
 }
 
 /**
- * The library as the board stands now: a folder whose project was forgotten (12.6e) while the
+ * The library as the board stands now: a folder whose project was forgotten while the
  * picker was open is no longer recent, and moves down among the others by name, as the server
  * orders them.
  */

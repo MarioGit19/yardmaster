@@ -261,7 +261,7 @@ export function ProjectPod({ project }: { project: Project }) {
   );
 }
 
-/** Launched from the board (12.3): waiting for the editor window's extension to connect. */
+/** Launched from the board: waiting for the editor window's extension to connect. */
 function OpeningLine({ editor, phase }: { editor: EditorApp; phase: OpeningPhase }) {
   return (
     <span

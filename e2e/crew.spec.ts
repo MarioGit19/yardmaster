@@ -47,7 +47,7 @@ for (const ambient of ['nebula', 'veil', 'aurora'] as const) {
   });
 }
 
-// 10.4 measured 342–378 ms/s here; 10.8e moved the last SVG loops onto HTML layers.
+// SVG loops measured 342–378 ms/s here; HTML layers brought it down.
 test('@perf 30 crew mascots main-thread time', async ({ page }) => {
   await page.goto('/#/_tokens');
   const section = page.locator('section', {

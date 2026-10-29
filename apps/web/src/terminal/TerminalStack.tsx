@@ -424,7 +424,7 @@ function parseLinks(links: string): Map<string, string> {
   return map;
 }
 
-/** The terminal's newest execution, its live Claude session (10.9) and what it's called. */
+/** The terminal's newest execution, its live Claude session and what it's called. */
 export function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const session = useBoard(selectTerminalSession(terminal.id));

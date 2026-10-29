@@ -1,6 +1,6 @@
 import { type BoardState, isBoardTerminal, sessionDisplayName } from '@yardmaster/protocol';
 
-/** Close (or forget) a project (12.6e): who asked, from where. The confirm reads it. */
+/** Close (or forget) a project: who asked, from where. The confirm reads it. */
 export interface CloseRequest {
   projectId: string;
   forget: boolean;

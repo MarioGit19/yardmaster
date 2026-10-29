@@ -101,7 +101,7 @@ const REVEAL_PX = 88;
 /** A flick this fast (px/s) opens or shuts the row whatever the distance. */
 const FLICK_VELOCITY = 400;
 
-/** A project in the list: tap to open it, swipe left for Close (12.6e). */
+/** A project in the list: tap to open it, swipe left for Close. */
 function ProjectRow({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));

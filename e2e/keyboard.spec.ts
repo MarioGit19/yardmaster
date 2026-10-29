@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { disableWebgl, expect, FOCUS_LAYOUTS, type FocusLayout, test } from './fixtures.js';
 
-// 13.2: the main flows with the keyboard alone (PRD §9: full keyboard navigation, visible
+// The main flows with the keyboard alone (PRD §9: full keyboard navigation, visible
 // focus), and the OS's reduced-motion preference honored in every layout (DESIGN.md §3 rule 10:
 // Reduced moves nothing but cross-fades).
 

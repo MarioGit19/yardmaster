@@ -1,4 +1,4 @@
-// The `--demo-stress` board (PLAN 10.1, PRD §9): the demo projects scaled up to the performance
+// The `--demo-stress` board (PRD §9): the demo projects scaled up to the performance
 // target. Every name and log line here is made up.
 
 import {

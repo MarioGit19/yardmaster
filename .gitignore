@@ -18,7 +18,7 @@ playwright-report/
 *.pem
 *.key
 
-# build loop runtime (logs contain full transcripts)
+# local agent run logs and state (logs contain full transcripts)
 loop/logs/
 loop/.state/
 
@@ -28,7 +28,7 @@ loop/.state/
 .DS_Store
 .idea/
 
-# third-party skills (installed by scripts/setup-skills.sh) and personal Claude settings
+# local Claude Code skills, references and personal settings
 .claude/skills/
 .claude/references/
 .claude/settings.local.json

@@ -4,7 +4,7 @@ import { boardSettings } from '../settings/boardSettings.js';
 
 const NONE: readonly string[] = [];
 
-/** A project's push notifications (`notify.mutedProjects`, 12.6e3), for its menus. */
+/** A project's push notifications (`notify.mutedProjects`), for its menus. */
 export function useMute(projectId: string): { muted: boolean; toggle: () => void } {
   const settings = useSyncExternalStore(boardSettings.subscribe, boardSettings.get);
   const loaded = settings !== null;

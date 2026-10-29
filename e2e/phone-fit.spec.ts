@@ -1,7 +1,7 @@
 import { devices, type Page } from '@playwright/test';
 import { disableWebgl, expect, test } from './fixtures.js';
 
-// 12.6c: the phone fit guard (DESIGN.md §11, "Fit rules"). Every screen at 360, 390 and 412 px and
+// The phone fit guard (DESIGN.md §11, "Fit rules"). Every screen at 360, 390 and 412 px and
 // in landscape, in both themes, on the demo board and on the `?worst=1` board. A screen fails when
 // the page scrolls sideways, a visible box runs past the viewport outside a horizontal scroller,
 // text overflows its box without an ellipsis or a scroller, a tap target is under 44 px, or an
@@ -432,7 +432,7 @@ async function walk(page: Page, query: string, phone: boolean) {
     }
   }
 
-  // 12.6k: each layout's workspace skin (DESIGN.md §10.8 "Phones"): the hub, an item page and the
+  // Each layout's workspace skin (DESIGN.md §10.8 "Phones"): the hub, an item page and the
   // switcher of the first projects (on the worst board, the longest names and the fleet).
   for (const layout of LAYOUTS.filter((l) => l.id !== 'minimal')) {
     await page.addInitScript((l) => localStorage.setItem('yardmaster.layout', l), layout.id);

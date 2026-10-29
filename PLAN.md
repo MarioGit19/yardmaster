@@ -1137,7 +1137,7 @@ A security review before the repo goes public (three independent reviews of the 
   - **Verify:** `pnpm check`
   - Note: A token-only subscribe is now 403 `browser_session_required` (the web client always sends its session; nothing else subscribed). A phone re-sending another device's endpoint gets 403 `local_only` and the owner stays; this machine's own browser may still take an endpoint over. Stored subscriptions keep the nullable `deviceId` only so old rows parse; the start sweep drops them. PRD §8 updated.
 
-- [ ] **14.7 Prepare the docs and code for the public repo**
+- [x] **14.7 Prepare the docs and code for the public repo**
   - The maintainer will remove `PLAN.md`, `loop/`, `CLAUDE.md`, `.claude/`, `.mcp.json`, `.impeccable/` and `scripts/setup-skills.sh` from the repo after the final check. **Don't delete or edit them here:** the loop still needs them. Everything else must read as a normal open-source project with no reference to those files, the build loop, task numbers, AI skills or "the maintainer".
   - **Code:** about 80 comments and test names cite plan task ids (for example `(12.6e)`, `12.6e3`, `10.9c`). Replace each with the feature it names, or a PRD feature id (`F27`), or drop it. Don't change behaviour.
   - **Docs:**
@@ -1150,6 +1150,8 @@ A security review before the repo goes public (three independent reviews of the 
   - **CONTRIBUTING.md:** setup, the commands (`pnpm dev`, `dev:demo`, `check`, `e2e`, `shots`, `motion:record`), and the engineering conventions and privacy rules from CLAUDE.md, written for human contributors. Leave out the skills table, the loop, the maintainer's own commit rules and `[HUMAN]` tasks.
   - **Done when:** `git grep -nE 'PLAN\.md|loop/|\bthe loop\b|CLAUDE\.md|setup-skills|\.claude/(skills|references)|\[HUMAN\]|maintainer|\b1[0-4]\.[0-9]+[a-z]?\b'` outside the files listed above returns nothing that refers to the plan, the loop or the tooling. Number formats like versions, durations and the PRD's own section numbers may remain, so check each hit.
   - **Verify:** `pnpm check && pnpm e2e`
+  - Note: `.gitignore` still ignores `loop/logs/`, `loop/.state/`, `.claude/skills/` and `.claude/references/` (comments made neutral): the loop writes full transcripts there, so the ignores stay until those folders are gone. CI no longer skips `loop/**`. PRD §13 is now "Decisions" (distribution, MIT). The doctor's API-key hint no longer says "subscription". UI copy that says "your Claude Code login" was left as is.
+  - Note: the e2e suite passed, but split into chunks: on this busy machine (load avg ~11) a few timing tests (crew fps, the grid workspace, phone-fit diffs) flaked in the full run and passed when rerun alone.
 
 - [ ] **[HUMAN] 14.8 Check the hardened build**
   - The extension and the hook changed in 14.1:

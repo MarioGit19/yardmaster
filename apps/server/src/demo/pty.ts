@@ -6,7 +6,7 @@ const DIM = '\x1b[2m';
 const ACCENT = '\x1b[36m';
 const RESET = '\x1b[0m';
 
-/** Shell integration markers, as the real shells' injected hooks print them (12.6a). */
+/** Shell integration markers, as the real shells' injected hooks print them. */
 const mark = (body: string) => `\x1b]${body}\x07`;
 const escapeValue = (value: string) => value.replaceAll('\\', '\\\\').replaceAll(';', '\\x3b');
 

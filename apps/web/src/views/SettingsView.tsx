@@ -577,7 +577,7 @@ function IdleHideRow({ server: { settings, update } }: { server: ServerSettings 
   );
 }
 
-/** `editor.cli` (12.3): the Cursor or VS Code CLI that "Open in Cursor" runs. */
+/** `editor.cli`: the Cursor or VS Code CLI that "Open in Cursor" runs. */
 function EditorCliRow({ server: { settings, update } }: { server: ServerSettings }) {
   const saved = settings?.editorCli ?? null;
   const [draft, setDraft] = useState<string | null>(null);

@@ -128,13 +128,13 @@ Yardmaster only ever listens on `127.0.0.1`. To use it from your phone, put both
 
 ## Privacy
 
-**Yardmaster runs locally, uses your own Claude Code login, and has no telemetry.**
+**Yardmaster runs locally, runs Claude through your own signed-in Claude Code, and has no telemetry.**
 
 - The server binds `127.0.0.1` only, checks the `Host` and `Origin` of every request, and requires a per-install token (`~/.yardmaster/token`, mode 0600) or a browser session. Each browser signs in with a one-time link and keeps its own session in the board's own storage, never in a cookie, so dev servers on other ports of the same host never see it. Settings lists every signed-in browser and phone and can sign any of them out.
 - The editor extension and the Claude hooks talk to it only through a socket in `~/.yardmaster` that only you can reach, so another program holding the port can't collect the token or answer in Yardmaster's place. A project's editor settings can't point the extension elsewhere.
 - A paired phone can read and type into your terminals and answer Claude, but can't change project folders, the editor command, allowed hosts or history, install hooks, rotate the token or pair devices. Requests through `tailscale serve` always count as remote, and Tailscale Funnel is refused.
 - Untrusted repositories: before the first board Claude session in a folder whose Claude settings or `.mcp.json` can run commands or widen permissions, a trust card lists what was found and nothing starts until you trust it. Git status is skipped for repos whose own config runs commands, and text printed in a terminal can't plant a fake command for Rerun.
-- It never reads your Claude credentials (`~/.claude/.credentials*`, the Keychain, `~/.claude.json`) and never asks for an API key. If `ANTHROPIC_API_KEY` is set in the server's environment, the Agent SDK bills that key instead; `doctor` warns about it.
+- Board sessions run through your locally installed, signed-in Claude Code: the Agent SDK picks up whatever auth Claude Code already has. Yardmaster never reads or stores your credentials (`~/.claude/.credentials*`, the Keychain, `~/.claude.json`) and never asks for them or for an API key. If `ANTHROPIC_API_KEY` is set in the server's environment, the Agent SDK bills that key instead; `doctor` warns about it.
 - It makes no network calls of its own, except the push notifications you turn on, which go through your browser's push service. Fonts and assets are bundled. Notifications show on the lock screen with secrets masked; **Hide details** leaves only the project name.
 - Terminal output and transcripts stay in memory and in a local SQLite file under `~/.yardmaster` (owner only). The **Redact secrets** setting masks common secret patterns on screen.
 
@@ -162,24 +162,16 @@ Run `pnpm yardmaster doctor` first. It checks Node.js, the token, whether the se
 
 ## Contributing
 
+Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the commands, the engineering conventions and the privacy rules. In short:
+
 ```bash
 pnpm dev:demo       # server and web in watch mode (web on http://127.0.0.1:4327), with synthetic demo data
 pnpm check          # privacy check, lint, typecheck and unit tests
 pnpm e2e            # Playwright against the demo board
-pnpm shots          # screenshots into artifacts/shots/
 ```
 
-- Read [docs/PRD.md](docs/PRD.md) for the product and [docs/DESIGN.md](docs/DESIGN.md) for the UI and motion spec, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit. [CLAUDE.md](CLAUDE.md) has the engineering conventions.
-- This is a public repo: never commit personal or machine-specific data. Fixtures and demo data are synthetic. `scripts/privacy-check.sh` runs before every commit and must pass.
-- `pnpm check` must pass before a change is done. UI changes follow DESIGN.md and come with screenshots from demo mode; refresh the README images with `scripts/readme-shots.sh` after `pnpm shots` and `pnpm e2e`.
+Read [docs/PRD.md](docs/PRD.md) for the product, [docs/DESIGN.md](docs/DESIGN.md) for the UI and motion spec, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit.
 
-### Building with the loop
+## License
 
-Most of this repo is built task by task from [PLAN.md](PLAN.md) by an unattended Claude Code loop:
-
-```bash
-loop/loop.sh            # runs one PLAN.md task per iteration, commits, pushes
-touch loop/.state/STOP  # stop after the current iteration
-```
-
-The loop pauses at tasks tagged **[HUMAN]**, such as installing the hooks and the extension on your machine.
+[MIT](LICENSE). The visual effects adapted from React Bits (listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)) carry their own terms: MIT + Commons Clause.

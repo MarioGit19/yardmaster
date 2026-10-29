@@ -118,7 +118,7 @@ for (const layout of FOCUS_LAYOUTS) {
         );
         await expect(fork.locator('[data-fork-divider]')).toHaveCount(1);
         await expect(fork.locator('[data-inherited]').first()).toBeAttached();
-        // The parent's messages read dimmer, but still meet AA (13.4f: they were at 55% opacity).
+        // The parent's messages read dimmer, but still meet AA (they once sat at 55% opacity, below it).
         await settleAnimations(page);
         const { violations } = await new AxeBuilder({ page })
           .include('[data-inherited]')

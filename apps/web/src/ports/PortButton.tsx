@@ -54,7 +54,7 @@ const TipButton = forwardRef<HTMLButtonElement, ButtonProps>(function TipButton(
 });
 
 /**
- * A listening port as a button (12.6e2). Without Tailscale it copies `localhost:<port>`. With
+ * A listening port as a button. Without Tailscale it copies `localhost:<port>`. With
  * it, on the Mac it opens a small menu (Copy, Open on phone); on the phone it opens the port's
  * tailnet URL right away, sharing it first. A shared port carries the "on phone" mark.
  */

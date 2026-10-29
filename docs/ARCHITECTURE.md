@@ -92,7 +92,7 @@ With no hook for a live process the status falls back to "unknown, alive"; once 
 
 Board sessions run in-process with `query()` in streaming-input mode: the prompt is an async queue the server pushes each user message into. The `Query` handle provides `interrupt()`, `setPermissionMode()` and `setModel()`. Approvals come through `canUseTool`, answered with allow (optionally with updated permissions from the suggestions) or deny with a message. The SDK's `session_state_changed` message (`idle`, `running`, `requires_action`) drives a board session's status directly. History uses `listSessions` and `getSessionMessages`.
 
-The SDK uses the local Claude Code login of whoever runs Yardmaster. Yardmaster never reads, stores or sends credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead, and `doctor` warns about it.
+Board sessions run through the locally installed, signed-in Claude Code of whoever runs Yardmaster: the SDK picks up whatever auth Claude Code already has. Yardmaster never reads, stores or asks for credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead, and `doctor` warns about it.
 
 ### Transcripts
 

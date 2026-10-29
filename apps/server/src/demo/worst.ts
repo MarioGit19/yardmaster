@@ -16,7 +16,7 @@ import {
 import { BoardStore } from '../store.js';
 import { DEMO_HOME } from './content.js';
 
-// The `?worst=1` demo board (PLAN 7.14): realistic worst-case data for layout testing. Long
+// The `?worst=1` demo board: realistic worst-case data for layout testing. Long
 // names, branches and commands, empty and 99+ collections, huge token counts, non-Latin text,
 // emoji and missing fields. Static apart from a little live output; everything is made up.
 

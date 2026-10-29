@@ -122,7 +122,7 @@ for (const ambient of ['veil', 'aurora'] as const) {
   });
 }
 
-// 11.6: the Grid's 3D network (one WebGL context, instanced packets, projected labels).
+// The Grid's 3D network (one WebGL context, instanced packets, projected labels).
 test('@perf the Grid 3D network keeps 55 fps under the stress load', async ({ page }) => {
   test.slow();
   await fullMotion(page);
@@ -139,7 +139,7 @@ test('@perf the Grid 3D network keeps 55 fps under the stress load', async ({ pa
   expect(stats.longTasks).toEqual([]);
 });
 
-// 11.10: every other layout under the same load (the Grid's 2D map without WebGL).
+// Every other layout under the same load (the Grid's 2D map without WebGL).
 const LAYOUT_ITEMS = {
   office: '[data-room]',
   'grid 2d': '[data-grid-node]',
@@ -196,7 +196,7 @@ test('@perf focus view keeps 55 fps with a log firehose on screen', async ({ pag
   expect(stats.longTasks).toEqual([]);
 });
 
-// 12.6h: the Grid's workspace skin (holo screens lit by activity, the floor) under the same load,
+// The Grid's workspace skin (holo screens lit by activity, the floor) under the same load,
 // opened from the 3D cockpit as a user would.
 test('@perf the Grid workspace keeps 55 fps with a log firehose on screen', async ({ page }) => {
   test.slow();

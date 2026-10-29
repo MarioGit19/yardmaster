@@ -176,7 +176,7 @@ const SCENARIOS = {
     });
   },
 
-  /** 11.1: switching layouts cross-fades the overview; the Actor inspector opens and closes. */
+  /** Switching layouts cross-fades the overview; the Actor inspector opens and closes. */
   async layouts(r: Recorder) {
     const { page } = r;
     await openOverview(page);
@@ -203,7 +203,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 11.3: the Office building: live activity, a character walking to a new station, a name tag. */
+  /** The Office building: live activity, a character walking to a new station, a name tag. */
   async office(r: Recorder) {
     const { page } = r;
     await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
@@ -231,7 +231,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 11.4: the Office room view: zoom in, into the workspace and back, zoom out. */
+  /** The Office room view: zoom in, into the workspace and back, zoom out. */
   async room(r: Recorder) {
     const { page } = r;
     await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'office'));
@@ -279,7 +279,7 @@ const SCENARIOS = {
   },
 
   /**
-   * 11.5: the Grid's 2D map: packets on the pipelines, a burst, and the flat cockpit. Without
+   * The Grid's 2D map: packets on the pipelines, a burst, and the flat cockpit. Without
    * WebGL, so Full motion shows the map rather than the 3D network (`grid3d`).
    */
   async grid(r: Recorder) {
@@ -328,7 +328,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 11.6: the Grid's 3D network: the idle orbit, packets, drag, double-click reset, zoom. */
+  /** The Grid's 3D network: the idle orbit, packets, drag, double-click reset, zoom. */
   async grid3d(r: Recorder) {
     const { page } = r;
     await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'grid'));
@@ -409,7 +409,7 @@ const SCENARIOS = {
         await page.waitForTimeout(700);
       },
     );
-    // 11.7: the dive, the phase-in, a screen to the center and back, the reverse dive.
+    // The dive, the phase-in, a screen to the center and back, the reverse dive.
     const nodeId = await page
       .locator('[data-grid-label] [data-grid-node]', {
         has: page.locator('[data-scene-actor^="t:"]'),
@@ -455,7 +455,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 12.6j: the Transit concourse: trains at their stations, the service log, the board. */
+  /** The Transit concourse: trains at their stations, the service log, the board. */
   async transit(r: Recorder) {
     const { page } = r;
     await page.addInitScript(() => localStorage.setItem('yardmaster.layout', 'transit'));
@@ -1210,7 +1210,7 @@ const SCENARIOS = {
     );
   },
 
-  /** 12.7: the onboarding's brand moment, the first time this browser opens the guide. */
+  /** The onboarding's brand moment, the first time this browser opens the guide. */
   async brand(r: Recorder) {
     const { page } = r;
     // Measure the guide's header with the moment marked as seen, then forget it so it plays.

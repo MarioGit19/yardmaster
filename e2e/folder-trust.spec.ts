@@ -1,7 +1,7 @@
 import { type DemoBoard, startDemoBoard } from './board.js';
 import { expect, signedInState, test } from './fixtures.js';
 
-// Folder trust (14.4): the demo's `cloned-tool` folder has Claude settings that run a SessionStart
+// Folder trust: the demo's `cloned-tool` folder has Claude settings that run a SessionStart
 // hook and pre-approve tools (apps/server/src/demo/library.ts). Its own board: it adds a project
 // and trusts a folder, which the shared board's other specs shouldn't see.
 

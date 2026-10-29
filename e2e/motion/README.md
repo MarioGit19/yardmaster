@@ -3,7 +3,7 @@
 `pnpm motion:record [scenario]` builds the web app, boots `--demo` with a throwaway home, and
 records a scripted walkthrough in full Chromium: 1440×900 (390×844 touch for `phone`), dark
 theme, motion level Full. Each scripted moment becomes a contact sheet in `artifacts/motion/`
-(gitignored). Animation tasks must run it and look at the sheets before they are ticked.
+(gitignored). Run it after changing an animation and look at the sheets before calling the change done.
 
 | Scenario   | Moments                                                                      |
 | ---------- | ---------------------------------------------------------------------------- |

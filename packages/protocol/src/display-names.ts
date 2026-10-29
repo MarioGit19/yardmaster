@@ -116,7 +116,7 @@ export interface TerminalNameContext {
   running?: string | null;
   /** The last command the terminal ran. */
   last?: string | null;
-  /** The live Claude session running in it (10.9). */
+  /** The live Claude session running in it. */
   session?: SessionNameFields | null;
 }
 

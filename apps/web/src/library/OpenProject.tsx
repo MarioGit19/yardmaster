@@ -481,7 +481,7 @@ function FolderItem({
 }
 
 /**
- * Forget a recent project (12.6e) without picking its row: the confirm opens over the picker.
+ * Forget a recent project without picking its row: the confirm opens over the picker.
  * A pointer target only: a control inside an option isn't reachable (axe `nested-interactive`),
  * so the keyboard forgets the selected row with ⌘⌫ (and ⌘K lists "Forget …").
  */

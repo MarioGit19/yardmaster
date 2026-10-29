@@ -36,7 +36,7 @@ case "$mode" in
       esac
     done < <(git log --format='%ae%n%ce' "$range" | sort -u)
     if git log --format='%B' "$range" | grep -qiE '^co-authored-by:'; then
-      echo "✗ commit message contains a Co-Authored-By trailer (maintainer must be sole author)"; fail=1
+      echo "✗ commit message contains a Co-Authored-By trailer (commits in this repo carry no co-author trailers)"; fail=1
     fi
     ;;
   all|*)

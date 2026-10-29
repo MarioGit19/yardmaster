@@ -33,7 +33,7 @@ export const ServerStatus = z.object({
   watched: z.boolean().optional(),
   /** Board sessions with a running query. */
   boardSessions: z.number().int().nonnegative().optional(),
-  /** The editor CLI "Open in Cursor" runs (12.3), or null when none was found. */
+  /** The editor CLI "Open in Cursor" runs, or null when none was found. */
   editorCli: z
     .object({ path: z.string(), app: EditorApp, configured: z.boolean() })
     .nullable()
@@ -133,7 +133,7 @@ export const BoardSettings = z.object({
   editorCli: EditorCliPath.nullable(),
   /** `remote.allowedHosts`: Tailscale names the board answers on over HTTPS (F27), none by default. */
   remoteAllowedHosts: z.array(RemoteHost).max(REMOTE_MAX_HOSTS),
-  /** `notify.events`: what a push notification is sent for (12.6e3). */
+  /** `notify.events`: what a push notification is sent for. */
   notifyEvents: z.array(NotifyEvent).max(NotifyEvent.options.length),
   /** `notify.hideDetails`: a push says only "acme-shop needs you", nothing about the work. */
   notifyHideDetails: z.boolean(),
@@ -279,7 +279,7 @@ export type PairedDevicesResponse = z.infer<typeof PairedDevicesResponse>;
 
 export const PortNumber = z.coerce.number().int().min(1).max(65535);
 
-/** Why sharing dev servers on the phone is off (12.6e2). */
+/** Why sharing dev servers on the phone is off. */
 export const PortShareUnavailable = z.enum([
   /** No `tailscale` on PATH or in the macOS app bundle. */
   'not_installed',

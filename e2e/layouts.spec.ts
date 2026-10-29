@@ -1521,7 +1521,7 @@ test.describe('the Retro console', () => {
   });
 });
 
-// 11.10: the phone pass. Every layout and enter view on an iPhone profile (touch, 390 px wide),
+// The phone pass. Every layout and enter view on an iPhone profile (touch, 390 px wide),
 // in Chromium: every tap target is at least 44 px, an actor opens the inspector as a bottom
 // sheet, and the back gesture closes the sheet and leaves the enter view, like Esc.
 const { defaultBrowserType: _webkit, ...iPhone } = devices['iPhone 13'];
@@ -1630,7 +1630,7 @@ const ENTERED_ACTORS = {
   grid: '[data-grid-cockpit] [data-scene-actor]',
 } as const;
 
-// 11.10: DESIGN.md §10.7 on the worst-case board (`?worst=1`): long names, a fleet of 231
+// DESIGN.md §10.7 on the worst-case board (`?worst=1`): long names, a fleet of 231
 // actors, an empty project and one with nothing but errors.
 test.describe('the layouts with worst-case data', () => {
   const openWorst = async (page: Page, name: string) => {

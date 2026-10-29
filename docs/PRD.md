@@ -2,7 +2,7 @@
 
 > A local "mission control" for everything you're running across your projects: every Cursor/VS Code terminal, every dev server, every Claude Code session, all in one live, animated dashboard.
 
-Status: Draft v1 · Owner: repo maintainer · Last updated: 2026-10-22
+Version 1 · Last updated: 2026-10-29
 
 ---
 
@@ -23,7 +23,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 2. **Act from the board.** Approve or deny Claude permission requests, chat with Claude, send input or Ctrl+C to terminals, restart commands, start new Claude sessions.
 3. **Zero change to the existing workflow.** People keep using Cursor and its terminals exactly as before. Yardmaster observes and mirrors, and only acts when asked.
 4. **Premium, alive UI.** A dashboard that feels like a high-end product: fluid motion, ambient animation tied to real activity, polished micro-interactions, and still fast.
-5. **Private by design and installable by anyone.** Runs entirely on localhost. Each installer uses their **own** Claude Code login or subscription. No telemetry, no cloud, no shared credentials.
+5. **Private by design and installable by anyone.** Runs entirely on localhost. Board sessions run through each user's **own** locally installed and signed-in Claude Code. No telemetry, no cloud, no shared credentials.
 
 ### Non-goals (v1)
 
@@ -195,7 +195,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - `CanUseTool(toolName, input, { signal, suggestions, blockedPath, … })` returns `{ behavior: 'allow', updatedInput?, updatedPermissions? } | { behavior: 'deny', message, interrupt? }`.
 - `SDKMessage` includes a `system/session_state_changed` message with `state: 'idle' | 'running' | 'requires_action'`, which drives board-session status directly.
 - History helpers: `listSessions({ dir, limit, offset })`, `getSessionInfo`, `getSessionMessages(sessionId, { dir })`, `getSubagentMessages`, `forkSession`, `renameSession`, `tagSession`.
-- **Auth:** the SDK uses the local Claude Code login of whoever runs Yardmaster. Yardmaster never reads, stores or transmits credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead. `doctor` warns about this.
+- **Auth:** board sessions run through the locally installed, signed-in Claude Code of whoever runs Yardmaster: the SDK picks up whatever auth Claude Code already has. Yardmaster never reads, stores, transmits or asks for credentials. If `ANTHROPIC_API_KEY` is set in the server's environment, the SDK bills that key instead. `doctor` warns about this.
 - Multi-turn: use streaming input mode, where the prompt is an async queue we push user messages into.
 
 ### 6.3 Transcripts (`~/.claude/projects/<encoded-cwd>/<session_id>.jsonl`)
@@ -244,7 +244,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
    - **Session records:** the server keeps each session's id, kind (local, or remote for a phone), a label from the User-Agent, created and last-used times, and a sha256 of its secret, never the secret. Settings → Data and security lists them and can sign any of them out (a phone only itself, item 11), which closes its open sockets (4401) and drops its push subscriptions. Remote sessions end after 30 days unused (sliding; an open board socket's messages count as use, and an hourly sweep ends lapsed sessions and closes their sockets even if nothing asks for them); local ones last until signed out. A local session counts only on the loopback host and a remote one only over Tailscale.
    - **Rotation** (`POST /api/token/rotate`) ends every session, forgets every live code, and closes every open board and editor socket, so they re-authenticate; the calling browser is handed a new session. Sessions are sealed to the token they were made under, so a token changed on disk while the board was down (`yardmaster token --rotate`) ends them all at the next start.
    - Every `/api` route except `/api/health` requires a browser session or the token header.
-4. **No credentials:** Yardmaster never reads `~/.claude/.credentials*`, the Keychain or `~/.claude.json`, and it never asks for an API key. Each user runs with their own Claude Code login.
+4. **No credentials:** Yardmaster never reads `~/.claude/.credentials*`, the Keychain or `~/.claude.json`, and it never asks for an API key. Board sessions run through each user's own signed-in Claude Code.
 5. **No telemetry,** no external network calls at runtime. Fonts and assets are bundled.
 6. **Rendering safety:** markdown is rendered without raw HTML. Terminal output goes only to xterm (never `innerHTML`).
 7. **Secrets in output:** terminal and transcript data stays in memory and local sqlite under `~/.yardmaster`. A "redact" setting masks common secret patterns in the UI (`sk-ant-…`, `ghp_…`, `AKIA…`, `-----BEGIN … KEY-----`, `.env`-style `KEY=value` for names containing SECRET|TOKEN|KEY|PASSWORD).
@@ -316,7 +316,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 - **M3.6 Workspaces:** project library and launch, board terminals, phone access.
 - **M4 Stretch:** away mode, terminal reply, board-owned PTYs, launch profiles.
 
-## 13. Open questions
+## 13. Decisions
 
-- Should we publish to npm (`npx yardmaster`) and the VS Code Marketplace / Open VSX, or keep it source-install only for v1? (Default: source install plus a `.vsix` from CI artifacts.)
-- License choice (MIT suggested), to be decided by the maintainer before the first public release.
+- **Distribution:** v1 installs from source, with the editor extension as a `.vsix` from CI artifacts. Publishing to npm (`npx yardmaster`) and the VS Code Marketplace / Open VSX may follow later.
+- **License:** MIT (`LICENSE`). The adapted React Bits effects keep their own terms (`THIRD_PARTY_NOTICES.md`).

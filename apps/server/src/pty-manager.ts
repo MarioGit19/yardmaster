@@ -362,7 +362,7 @@ export class PtyManager {
   }
 
   /**
-   * A project closed (12.6e): its running board terminals get Ctrl+C, and any still running
+   * A project closed: its running board terminals get Ctrl+C, and any still running
    * `graceMs` later are killed.
    */
   stopProject(projectId: string, graceMs = STOP_GRACE_MS): void {

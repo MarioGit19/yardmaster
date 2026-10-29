@@ -460,7 +460,7 @@ const SHARE_UNAVAILABLE: Record<PortShareUnavailable, string> = {
   not_connected: 'Tailscale isn’t running or signed in on this Mac.',
 };
 
-/** Dev servers on the phone (12.6e2): whether Open on phone shows, and what is shared now. */
+/** Dev servers on the phone: whether Open on phone shows, and what is shared now. */
 function DevServersRow() {
   const shares = usePortShares();
   const [stopping, setStopping] = useState<number | null>(null);

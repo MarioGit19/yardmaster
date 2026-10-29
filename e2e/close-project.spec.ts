@@ -2,7 +2,7 @@ import { devices, type Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
 import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
-// 12.6e: closing and forgetting projects, on their own demo board (closing changes what it shows).
+// Closing and forgetting projects, on their own demo board (closing changes what it shows).
 
 let board: DemoBoard;
 

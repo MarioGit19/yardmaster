@@ -2,7 +2,7 @@
 
 The UI has one job: make the state of many projects readable at a glance, and make it feel **alive**. Motion is not decoration here. Every animation encodes real activity: something is thinking, something is streaming, something needs you.
 
-Read this before any UI task. For UI work, also load the `frontend-design` skill if it's available.
+Read this before changing the UI.
 
 ---
 
@@ -90,7 +90,7 @@ export const ease = { out: [0.16, 1, 0.3, 1], inOut: [0.65, 0, 0.35, 1] };
 
 ### Third-party effects
 
-Visual effects may be adapted from React Bits (reference copy in `.claude/references/react-bits/`, fetched by `scripts/setup-skills.sh`) into `apps/web/src/fx/`. Rules: adapt to our tokens, status colors and motion levels; pause when hidden or off screen; no new dependencies (no `gsap`; `three` only inside the Grid layout chunk); an effect that uses WebGL replaces the ambient field while shown, so there is still one WebGL context; keep the upstream copyright notice in the file header and list the component in `THIRD_PARTY_NOTICES.md`. React Bits is MIT + Commons Clause: fine to ship inside Yardmaster, never to publish the components on their own.
+Visual effects may be adapted from React Bits (its license and the adapted components are listed in `THIRD_PARTY_NOTICES.md`) into `apps/web/src/fx/`. Rules: adapt to our tokens, status colors and motion levels; pause when hidden or off screen; no new dependencies (no `gsap`; `three` only inside the Grid layout chunk); an effect that uses WebGL replaces the ambient field while shown, so there is still one WebGL context; keep the upstream copyright notice in the file header and list the component in `THIRD_PARTY_NOTICES.md`. React Bits is MIT + Commons Clause: fine to ship inside Yardmaster, never to publish the components on their own.
 
 ### Motion levels (Settings, default follows OS)
 
@@ -259,7 +259,7 @@ Every project has a small original character, the **crew member**, that acts out
 - Every action is reachable from the keyboard and appears in ⌘K with its shortcut.
 - **Cursor:** everything clickable shows the pointer. A base rule in `styles/index.css` gives it to `button`, `a[href]`, `summary`, `select`, `label[for]` and the interactive roles (`button`, `tab`, `menuitem`, `option`, `switch`, …), and `not-allowed` to disabled controls. Build pressables as a real `button`/link or give them a role (with keyboard handling); use `cursor-pointer` only where no role fits (a card holding its own buttons, a canvas hit area). Special cursors stay: `col-resize` on dividers, `grab`/`grabbing` on draggables, the text cursor in terminals. The `cursor` e2e check enforces it; mark a deliberate arrow with `data-cursor="default"`.
 
-## 9. Visual QA checklist (used by the loop's screenshot review tasks)
+## 9. Visual QA checklist
 
 - [ ] No element touches the viewport edge without padding. 16px minimum gutter at 390px width.
 - [ ] Phones (§11): no sideways page scroll and nothing spilling out of its container at 360, 390 and 412 px and in landscape; the composer stays visible with the keyboard open.

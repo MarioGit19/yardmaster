@@ -783,7 +783,7 @@ test.describe('activity', () => {
   }
 });
 
-// The `?worst=1` demo board (PLAN 7.14): worst-case names, counts and missing fields at every
+// The `?worst=1` demo board: worst-case names, counts and missing fields at every
 // width, plus the focus view of the longest project, the Attention Center and a lane peek.
 test.describe('worst case', () => {
   // Ten heavy pages: one worker, in turn, so the rest of the shots keep their CPU.
@@ -1109,7 +1109,7 @@ test.describe('ambient styles', () => {
   }
 });
 
-// A terminal running claude (10.9): its tab, its chat (beside, or its page on phones), the raw
+// A terminal running claude: its tab, its chat (beside, or its page on phones), the raw
 // TUI, and the new-terminal popover (the + New sheet on phones).
 test.describe('claude terminals', () => {
   for (const theme of THEMES) {
@@ -1243,8 +1243,8 @@ test.describe('background work', () => {
   }
 });
 
-// 11.1: the Actor inspector on Minimal (popover, and the bottom sheet on a phone); 11.3: the
-// Office building; 11.4: its room view.
+// The Actor inspector on Minimal (popover, and the bottom sheet on a phone); the
+// Office building; its room view.
 test.describe('layouts', () => {
   for (const theme of THEMES) {
     test.describe(theme, () => {
@@ -1316,7 +1316,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.4: the room view, mid-zoom and settled, with the actor panel (a sheet on a phone).
+      // The room view, mid-zoom and settled, with the actor panel (a sheet on a phone).
       for (const viewport of [
         { width: 1440, height: 900 },
         { width: 390, height: 844 },
@@ -1344,7 +1344,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.5: the Grid's 2D map (a trunk on a phone), at rest and under demo activity, and the
+      // The Grid's 2D map (a trunk on a phone), at rest and under demo activity, and the
       // flat cockpit of a node. Without WebGL, so the wide views show the map, not the 3D network.
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -1381,7 +1381,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.6: the Grid's 3D network, at rest and under demo activity, and with a node hovered.
+      // The Grid's 3D network, at rest and under demo activity, and with a node hovered.
       for (const viewport of [
         { width: 1440, height: 900 },
         { width: 1920, height: 1080 },
@@ -1414,7 +1414,7 @@ test.describe('layouts', () => {
           await page.waitForTimeout(500);
           await shot('hover');
 
-          // 11.7: the dive into a node with a terminal, mid-flight and at the cockpit, then a
+          // The dive into a node with a terminal, mid-flight and at the cockpit, then a
           // terminal screen brought to the center.
           const nodeId = await page
             .locator('[data-grid-label] [data-grid-node]', {
@@ -1439,7 +1439,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 12.6j: the Transit concourse (the departures board beside the line map; on a phone the
+      // The Transit concourse (the departures board beside the line map; on a phone the
       // board above the station lists), at rest and under demo activity, plus a service-log
       // bin's hover card, a board row lighting its station, and a station's inspector.
       for (const viewport of [
@@ -1488,7 +1488,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.9: the Retro console at rest and under demo activity, a frame focused by its number,
+      // The Retro console at rest and under demo activity, a frame focused by its number,
       // and an actor's inspector.
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -1527,7 +1527,7 @@ test.describe('layouts', () => {
         });
       }
 
-      // 11.9: 20 projects (`--demo-stress --demo-projects 20`) on one screen, and on a phone.
+      // 20 projects (`--demo-stress --demo-projects 20`) on one screen, and on a phone.
       test('retro stress', async ({ browser }) => {
         test.slow();
         const board = await startBoard({ demo: true, stress: true, projects: 20 });
@@ -1565,7 +1565,7 @@ test.describe('layouts', () => {
   }
 });
 
-// 11.10: every layout on the worst-case board (long names, a fleet of 231 actors, an empty
+// Every layout on the worst-case board (long names, a fleet of 231 actors, an empty
 // project, one with only errors, non-Latin and emoji names), with its enter view, and with 20
 // projects (`--demo-stress --demo-projects 20`). For the DESIGN.md §10.7 review.
 const LAYOUT_OVERVIEWS = {
@@ -1624,7 +1624,7 @@ test.describe('layouts worst case', () => {
             await page.waitForTimeout(900);
             await shot('enter', false);
             if (viewport.width >= 720) {
-              // 11.10b: one screen beside the middle one shows as a centered pair, not an arc
+              // One screen beside the middle one shows as a centered pair, not an arc
               // with an empty side.
               await page.keyboard.press('Escape');
               await expect(page.locator('[data-grid-cockpit]')).toHaveCount(0);
@@ -1695,7 +1695,7 @@ test.describe('retro amber', () => {
   }
 });
 
-// 12.6m: a long Retro conversation in every phosphor, at 390 and 1440 in both themes: turn
+// A long Retro conversation in every phosphor, at 390 and 1440 in both themes: turn
 // headers, your lines brighter than Claude's, tool calls dim and indented, code in a box.
 const PHOSPHORS = ['green', 'amber', 'red', 'purple', 'cyan', 'white'] as const;
 test.describe('retro conversation', () => {
@@ -1745,7 +1745,7 @@ test.describe('grid reduced', () => {
   });
 });
 
-// Settings → Projects (12.1): two library roots, one readable and one blocked by macOS privacy
+// Settings → Projects: two library roots, one readable and one blocked by macOS privacy
 // settings. Both routes are faked for this page only; the shared demo board keeps its one root.
 for (const theme of THEMES) {
   for (const width of [1440, 390]) {
@@ -1793,7 +1793,7 @@ for (const theme of THEMES) {
   }
 }
 
-// Open project (12.2): the picker over the demo's synthetic library, and the launch sheet with
+// Open project: the picker over the demo's synthetic library, and the launch sheet with
 // all three options ticked. Nothing is launched, so the shared board doesn't change.
 for (const theme of THEMES) {
   for (const width of [1440, 390]) {
@@ -1829,7 +1829,7 @@ for (const theme of THEMES) {
   }
 }
 
-// Board terminals (12.4): a folder opened with only a terminal runs it on the board, with the
+// Board terminals: a folder opened with only a terminal runs it on the board, with the
 // origin mark on its tab and the note in place of the command line. Its own board: it adds a project.
 test.describe('board terminal', () => {
   for (const theme of THEMES) {
@@ -1886,7 +1886,7 @@ test.describe('board terminal', () => {
   }
 });
 
-// 14.4: the trust card before a board session in the demo's cloned folder, whose Claude settings
+// The trust card before a board session in the demo's cloned folder, whose Claude settings
 // run a hook and pre-approve tools. Its own board: opening the folder adds a project. Cancel leaves
 // it untrusted, so every width shows the card.
 test.describe('folder trust', () => {
@@ -1938,7 +1938,7 @@ test.describe('folder trust', () => {
   }
 });
 
-// 12.5: the phone pass on an iPhone profile (touch, 390 px) in Chromium: the overview in every
+// The phone pass on an iPhone profile (touch, 390 px) in Chromium: the overview in every
 // layout, the picker and launch sheet, the focus view's tabs and composer, the Attention Center,
 // and Settings → Phone with a host, a live pairing code and paired devices (faked for this page).
 const { defaultBrowserType: _webkit, ...iPhone } = devices['iPhone 13'];
@@ -2102,7 +2102,7 @@ for (const theme of THEMES) {
   });
 }
 
-// 12.6b: the phone shell (DESIGN.md §11) at 360, 390 and 412: each tab and the workspace, on an
+// The phone shell (DESIGN.md §11) at 360, 390 and 412: each tab and the workspace, on an
 // Android-like touch profile.
 const { defaultBrowserType: _android, ...galaxy } = devices['Galaxy S24'];
 const SHELL_TABS = [
@@ -2134,7 +2134,7 @@ for (const theme of THEMES) {
         }
       });
 
-      // 12.6e4: the project hub, each kind of item page, the switcher, + New and the pages.
+      // The project hub, each kind of item page, the switcher, + New and the pages.
       test('workspace', async ({ page }) => {
         test.slow();
         await disableWebgl(page);
@@ -2202,7 +2202,7 @@ for (const theme of THEMES) {
   }
 }
 
-// 12.6c: the worst-case board on phones (long names, branches and commands, the fleet of
+// The worst-case board on phones (long names, branches and commands, the fleet of
 // terminals and sessions), for the fit sweep's review: the overview in Minimal, Grid and Retro,
 // the tabs, and the longest project's workspace.
 const FIT_SIZES = [
@@ -2273,7 +2273,7 @@ for (const size of FIT_SIZES) {
   }
 }
 
-// 12.6d: every layout's phone version inside the phone shell at 360, 390 and 412 in both themes:
+// Every layout's phone version inside the phone shell at 360, 390 and 412 in both themes:
 // the overview, the Transit's station lists, the Office room and the Grid cockpit with its
 // next screen, and the inspector sheet.
 for (const theme of THEMES) {
@@ -2350,7 +2350,7 @@ for (const theme of THEMES) {
   }
 }
 
-// Settings → Notifications (12.6e3), with two subscribed devices. The headless shell reports
+// Settings → Notifications, with two subscribed devices. The headless shell reports
 // notifications as blocked, so the page sees them as not asked yet.
 for (const theme of THEMES) {
   for (const width of [1440, 390]) {
@@ -2402,7 +2402,7 @@ for (const theme of THEMES) {
   }
 }
 
-// 12.6g: each layout's workspace skin (DESIGN.md §10.8, §10.7) at 1440 and 390 in both themes: the
+// Each layout's workspace skin (DESIGN.md §10.8, §10.7) at 1440 and 390 in both themes: the
 // project at rest with its running terminal, a Claude session streaming, and a waiting approval.
 const SKIN_WAITING: Record<FocusLayout, { item: string; id: string }> = {
   minimal: { item: '[data-pod][data-tone="wait"]', id: 'data-pod' },
@@ -2504,7 +2504,7 @@ test.describe('workspace skins', () => {
   }
 });
 
-// 12.7: the Yardmaster brand in place: the HUD lockup, Settings → About, the onboarding header
+// The Yardmaster brand in place: the HUD lockup, Settings → About, the onboarding header
 // and the app icon on a phone's home screen, in both themes.
 test.describe('brand', () => {
   for (const theme of THEMES) {

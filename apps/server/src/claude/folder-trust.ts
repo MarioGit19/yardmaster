@@ -13,7 +13,7 @@ import {
 import { z } from 'zod';
 import type { ActionResult } from '../actions.js';
 
-// Folder trust for board Claude sessions (PLAN 14.4). A headless SDK run loads the folder's
+// Folder trust for board Claude sessions. A headless SDK run loads the folder's
 // `.claude/settings*.json` and `.mcp.json` without the CLI's trust dialog, so a cloned repo could
 // run a `SessionStart` hook or pre-approve Bash the moment a board session starts there.
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ApprovalId, ProjectId, Timestamp } from './domain.js';
 
-// Web Push notifications (12.6e3): the events, the subscriptions and what the service worker gets.
+// Web Push notifications: the events, the subscriptions and what the service worker gets.
 
 /** The events a push can be about, each a toggle in Settings → Notifications. */
 export const NOTIFY_EVENTS = [

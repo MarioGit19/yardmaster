@@ -35,7 +35,7 @@ function bootMark(): Plugin {
 }
 
 /**
- * Moves browser storage from the old c-board keys (12.7a) in a classic inline script, which runs
+ * Moves browser storage from the old c-board keys in a classic inline script, which runs
  * before the app's modules. A module can't: shared chunks run before the entry's own code.
  */
 function storageMigration(): Plugin {

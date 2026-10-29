@@ -20,7 +20,7 @@ export function demoFolderHasGit(path: string): boolean {
   return folder?.git ?? DEMO_PROJECTS.some((p) => p.path === path);
 }
 
-/** The demo's cloned repo: its Claude settings run a hook and pre-approve tools (14.4). */
+/** The demo's cloned repo: its Claude settings run a hook and pre-approve tools. */
 export const DEMO_UNTRUSTED_FOLDER = `${DEMO_HOME}/cloned-tool`;
 
 const DEMO_TRUST_FILES: Record<string, unknown> = {

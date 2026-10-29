@@ -70,7 +70,7 @@ export interface SessionRunnerOptions {
   onActivity?: (event: ActivityEvent) => void;
   /** Pending approvals expire (deny) after this long. `null`, the default: they wait. */
   approvalTimeoutMs?: number | null;
-  /** Folder trust (14.4): nothing launches in a folder whose settings need the user's yes. */
+  /** Folder trust: nothing launches in a folder whose settings need the user's yes. */
   trust?: Pick<FolderTrust, 'review' | 'trust'> | null;
 }
 
@@ -444,7 +444,7 @@ export class SessionRunner {
     await this.suspend([...this.runs.values()]);
   }
 
-  /** A project closed (12.6e): its running board sessions end as `interrupted`, to resume later. */
+  /** A project closed: its running board sessions end as `interrupted`, to resume later. */
   async suspendProject(projectId: string): Promise<void> {
     await this.suspend(
       [...this.runs.values()].filter(

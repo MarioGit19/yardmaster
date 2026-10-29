@@ -26,7 +26,7 @@ import {
 const dismiss = () => closeRequest.set(null);
 
 /**
- * The confirm before closing or forgetting a project (12.6e): what still runs there and what
+ * The confirm before closing or forgetting a project: what still runs there and what
  * happens to it, and a checkbox to close its editor window too. A small glass modal on wide
  * screens, a bottom sheet on phones.
  */

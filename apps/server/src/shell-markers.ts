@@ -1,11 +1,11 @@
 /**
- * Shell integration markers in a board terminal's pty stream (12.6a): FinalTerm's OSC 133
+ * Shell integration markers in a board terminal's pty stream: FinalTerm's OSC 133
  * (`A` prompt, `B` input, `C` command runs, `D;<code>` it ended), VS Code's OSC 633 (the same
  * letters, plus `E;<command line>;<nonce>` and `P;Cwd=<dir>;<nonce>`) and OSC 7
  * (`file://host/dir;<nonce>`).
  *
  * Anything a terminal prints can contain these sequences (`cat` a hostile README), so the ones
- * that carry data need the terminal's nonce, which only our shell integration knows (14.4).
+ * that carry data need the terminal's nonce, which only our shell integration knows.
  * Without it they are dropped, and a terminal without a nonce takes none of them.
  */
 export type ShellMarker =

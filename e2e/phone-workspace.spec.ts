@@ -2,7 +2,7 @@ import { devices, type Locator, type Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
 import { expect, openRoute, signedInState, test } from './fixtures.js';
 
-// 12.6e4: the phone workspace as a project hub (DESIGN.md §11) on an Android (412) and an iPhone
+// The phone workspace as a project hub (DESIGN.md §11) on an Android (412) and an iPhone
 // (390) profile: every reachability path in at most two taps from the overview, the switcher and
 // swipes between items, one card per Claude terminal, words on every button, deep links with the
 // hub underneath, the first-visit hint and a board terminal's key bar.

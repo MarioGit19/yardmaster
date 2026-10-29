@@ -80,7 +80,7 @@ function useNow(intervalMs: number): number {
   return now;
 }
 
-/** Settings → Notifications (12.6e3): Web Push on this device, the events, and the devices. */
+/** Settings → Notifications: Web Push on this device, the events, and the devices. */
 export function NotificationSettings({ server }: { server: ServerSettings }) {
   const { devices, failed, reload } = usePushDevices();
   return (

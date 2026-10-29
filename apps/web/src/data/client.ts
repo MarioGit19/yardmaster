@@ -83,7 +83,7 @@ export type ChunkListener = (chunk: string, info: ChunkInfo) => void;
 
 /**
  * `sessionId`: the session the action started, if any. `editor`: the editor a launch opened.
- * `trust`: the folder a board session needs trusted first (14.4).
+ * `trust`: the folder a board session needs trusted first.
  */
 export type RequestResult =
   | { ok: true; sessionId?: string; editor?: EditorApp }
@@ -254,7 +254,7 @@ export class BoardClient {
 
   /**
    * Whether this tab is visible and focused, and its browser's push subscription: the server skips
-   * the push for a device looking at the board (12.6e3). Sent again on every reconnect.
+   * the push for a device looking at the board. Sent again on every reconnect.
    */
   setPresence(focused: boolean, pushId: string | null): void {
     if (focused === this.presence.focused && pushId === this.presence.pushId) return;

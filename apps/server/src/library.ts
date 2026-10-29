@@ -140,7 +140,7 @@ export class ProjectLibrary implements LibrarySource {
 
   /**
    * The realpath of `path` if it may be opened as a library folder: a visible directory inside a
-   * root after resolving symlinks on both sides, or null. Launches (12.3) go through this.
+   * root after resolving symlinks on both sides, or null. Launches go through this.
    */
   async resolve(roots: readonly string[], path: string): Promise<string | null> {
     if (!isAbsolute(path)) return null;

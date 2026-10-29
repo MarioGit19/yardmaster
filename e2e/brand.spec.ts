@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js';
 
-// 12.7: the Yardmaster brand assets the web build renders, and the onboarding's brand moment.
+// The Yardmaster brand assets the web build renders, and the onboarding's brand moment.
 
 test('the build serves the manifest, its icons and the static brand assets', async ({
   request,
@@ -60,7 +60,7 @@ test('Reduced motion shows the still mark', async ({ page }) => {
   expect(await page.evaluate(() => localStorage.getItem('yardmaster.brandIntro'))).toBeNull();
 });
 
-test('preferences saved under the old c-board names carry over (12.7a)', async ({ page }) => {
+test('preferences saved under the old c-board names carry over', async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem('seeded')) return;
     sessionStorage.setItem('seeded', '1');

@@ -392,8 +392,8 @@ describe('SessionDiscovery history', () => {
     expect(listHistory).toHaveBeenCalledTimes(2);
   });
 
-  // 10.9e: the board lists sessions it knows above History; when the newest 20 listed were all
-  // on the board (the build loop starts one per task), History came back empty.
+  // The board lists sessions it knows above History; when the newest 20 listed were all
+  // on the board (a script that runs Claude Code headless starts many), History came back empty.
   it('reaches past the sessions on the board to fill the history', async () => {
     const ids = Array.from(
       { length: 30 },

@@ -92,7 +92,7 @@ export const Project = z.object({
   createdAt: Timestamp,
   lastActivityAt: Timestamp.nullable(),
   /**
-   * When the user closed the project (12.6e). It stays off the overview, the rail and the phone
+   * When the user closed the project. It stays off the overview, the rail and the phone
    * list until something new happens there; the server clears it then.
    */
   closedAt: Timestamp.nullable().optional(),

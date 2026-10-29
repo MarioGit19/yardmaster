@@ -25,7 +25,7 @@ import {
 const dismiss = () => portShareRequest.set(null);
 
 /**
- * Open on phone (12.6e2): shares the port on the tailnet with `tailscale serve`, then shows its
+ * Open on phone: shares the port on the tailnet with `tailscale serve`, then shows its
  * link with Copy, Open and, on the Mac, a QR code. A glass modal on wide screens, a bottom
  * sheet on phones.
  */

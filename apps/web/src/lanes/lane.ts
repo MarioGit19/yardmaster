@@ -75,7 +75,7 @@ export function shownCommand(commandLine: string | null | undefined): string | n
 export interface LaneView {
   /** The running or last command, every character visible; null when none is known. */
   command: string | null;
-  /** The command may be typed again: it has no control characters (14.4). */
+  /** The command may be typed again: it has no control characters. */
   safe: boolean;
   running: boolean;
   /** When the running command started. */

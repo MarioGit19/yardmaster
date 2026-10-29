@@ -108,7 +108,7 @@ export class BoardStore {
     this.remove('projects', id);
   }
 
-  /** The user closed it (12.6e): hidden until something new happens there. */
+  /** The user closed it: hidden until something new happens there. */
   closeProject(id: string, ts = this.now()): void {
     if (this.state.projects[id]) this.merge('projects', id, { closedAt: ts });
   }

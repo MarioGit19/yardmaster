@@ -1,7 +1,7 @@
 import { devices, type Page } from '@playwright/test';
 import { expect, openRoute, test } from './fixtures.js';
 
-// 12.6b: the phone shell (DESIGN.md §11) on an Android (Galaxy S-class) and an iPhone profile, in
+// The phone shell (DESIGN.md §11) on an Android (Galaxy S-class) and an iPhone profile, in
 // Chromium: every tab, a project's workspace, swiping its tabs, a reply with the viewport shrunk
 // as by the on-screen keyboard, and back.
 const { defaultBrowserType: _android, ...galaxy } = devices['Galaxy S24'];

@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { devices, type Page } from '@playwright/test';
 import { disableWebgl, expect, FOCUS_LAYOUTS, type FocusLayout, test } from './fixtures.js';
 
-// 13.2: axe on every route, every layout's overview and its enter view, the inspector, the picker
+// Axe on every route, every layout's overview and its enter view, the inspector, the picker
 // and launch sheet, ⌘K, the Attention Center, Settings and the phone screens, in both themes at
 // 1440 and 390 (0 serious or critical issues). Motion is Off so contrast is read from settled
 // colors. The terminal's own output colors are the program's, so xterm is left out. Each

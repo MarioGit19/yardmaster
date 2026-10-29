@@ -354,7 +354,7 @@ export class DemoSimulator {
   }
 
   /**
-   * A library folder opened from the board (12.2): it joins the demo board without an editor
+   * A library folder opened from the board: it joins the demo board without an editor
    * window or terminals, ready for a session, a terminal or "Open in Cursor".
    */
   addProject(project: Project, git: boolean): void {
@@ -513,7 +513,7 @@ export class DemoSimulator {
     for (const project of this.projects) this.seedInterrupted(project);
   }
 
-  /** A board session left `interrupted` by a restart (10.9e); resuming it runs the demo query. */
+  /** A board session left `interrupted` by a restart; resuming it runs the demo query. */
   private seedInterrupted(project: ProjectCtx): void {
     const def = project.def.interrupted;
     if (!def) return;

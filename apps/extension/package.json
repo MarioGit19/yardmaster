@@ -3,6 +3,7 @@
   "displayName": "Yardmaster",
   "description": "Mirrors this window's terminals to the local Yardmaster dashboard.",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "publisher": "yardmaster",
   "engines": {

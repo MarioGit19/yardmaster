@@ -1,6 +1,6 @@
 import type { FolderTrustReview, TrustFinding, TrustFindingKind } from '@yardmaster/protocol';
 
-// Folder trust (14.4): a board session's folder whose Claude settings can run code waits for the
+// Folder trust: a board session's folder whose Claude settings can run code waits for the
 // user's yes. The client's trust gate queues the reviews here and the trust card answers them.
 
 export interface TrustRequest {

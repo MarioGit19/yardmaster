@@ -63,7 +63,7 @@ function createSharesStore() {
   return store;
 }
 
-/** The ports on the tailnet (12.6e2), shared by every port chip on screen. */
+/** The ports on the tailnet, shared by every port chip on screen. */
 export const portShares = createSharesStore();
 
 export const usePortShares = (): Shares =>

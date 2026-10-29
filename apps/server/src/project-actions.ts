@@ -48,7 +48,7 @@ export function libraryGuard(options: Pick<ProjectActionsOptions, 'store' | 'lib
 /**
  * `project.add` from the open-project picker (F25): only a folder the library resolves inside a
  * configured root joins the board. A folder already on it is left as it is.
- * `project.openInEditor` (12.3) runs the editor CLI on a library project's folder.
+ * `project.openInEditor` runs the editor CLI on a library project's folder.
  */
 export function createProjectActions(
   options: ProjectActionsOptions,
@@ -97,7 +97,7 @@ export interface LaunchGuardOptions
   router: EditorRouter;
   /** The editor bridge's `terminal.create`. */
   editorTerminal: ActionHandler<'terminal.create'>;
-  /** Board-owned terminals (12.4), for a project no connected editor window has open. */
+  /** Board-owned terminals, for a project no connected editor window has open. */
   boardTerminal?: ActionHandler<'terminal.create'>;
   sessionCreate: ActionHandler<'session.create'>;
 }
@@ -148,7 +148,7 @@ export interface CloseActionsOptions {
 export const WINDOW_NOT_CLOSED = 'window_not_closed';
 
 /**
- * `project.close` (12.6e): stops what the board owns in the project (terminal-origin sessions
+ * `project.close`: stops what the board owns in the project (terminal-origin sessions
  * and editor terminals keep running, just hidden), optionally closes its editor windows, unpins
  * it and marks it closed. `project.forget` does the same, then drops it from the board and so
  * from the picker's recents; it comes back only when it is opened again or something runs there.

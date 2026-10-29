@@ -128,7 +128,7 @@ const terminalUrl = (projectId: string | null, terminalId: string) =>
   projectId ? `/#/p/${encode(projectId)}/t/${encode(terminalId)}` : '/';
 
 /**
- * Push notifications (12.6e3). Watches the board's patches for the events Settings turns on
+ * Push notifications. Watches the board's patches for the events Settings turns on
  * (Claude needs you, a long turn or command finished, a crash, background work done), then pushes
  * them to every subscribed browser but the ones looking at the board, at most one per project per
  * 20 s (later events replace it by `tag`), and closes a request's notification once it is answered.

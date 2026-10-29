@@ -388,7 +388,7 @@ describe('/ws/ui messages', () => {
       },
       // The session an action started travels back with the result.
       'session.close': () => ({ ok: true, sessionId: 'sess-2' }),
-      // So does the review of a folder a board session can't start in yet (14.4).
+      // So does the review of a folder a board session can't start in yet.
       'session.create': () => ({ ok: false, error: 'folder_untrusted', trust: REVIEW }),
     };
     const { port, origin } = await boot(actions);
