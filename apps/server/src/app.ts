@@ -176,6 +176,9 @@ export interface BuildOptions {
   watched?: boolean;
 }
 
+/** How often lapsed phone sessions are ended while nothing asks for them. */
+const SESSION_SWEEP_MS = 60 * 60 * 1000;
+
 /** Tools whose completion can change a repository's state. */
 const GIT_TOUCHING_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit', 'Bash']);
 
@@ -549,8 +552,14 @@ export async function buildServer(
     : undefined;
   registerUiGateway(app, gateway, worstGateway, (request, socket) => {
     const session = request.browserSession();
-    if (session !== null) sessions.track(session, socket, WS_UNAUTHORIZED);
+    if (session === null) return;
+    sessions.track(session, socket, WS_UNAUTHORIZED);
+    // An open board counts as use; a phone's session that lapses closes its socket.
+    socket.on('message', () => sessions.touch(session));
   });
+  const sessionSweep = setInterval(() => sessions.sweep(), SESSION_SWEEP_MS);
+  sessionSweep.unref();
+  app.addHook('onClose', async () => clearInterval(sessionSweep));
   const gitOptions = options.demo ? false : (options.git ?? {});
   const gitScanner =
     gitOptions === false

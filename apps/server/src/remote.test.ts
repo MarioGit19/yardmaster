@@ -367,6 +367,45 @@ describe('a paired phone', () => {
     expect(instance.browserSessions.list().map((s) => s.id)).toEqual([mac.session.id]);
   });
 
+  it('manages only its own notification subscriptions', async () => {
+    const instance = await server();
+    const first = await pair(instance);
+    const second = await pair(instance);
+    const subscribe = async (phone: Record<string, string>, n: number) => {
+      const res = await call(
+        instance,
+        'POST',
+        '/api/push/subscriptions',
+        { ...remote, ...phone },
+        {
+          endpoint: `https://web.push.apple.com/QHx${n}`,
+          keys: { p256dh: `BKey${n}`, auth: `auth${n}` },
+        },
+      );
+      expect(res.statusCode).toBe(200);
+      return (res.json() as { id: string }).id;
+    };
+    const mine = await subscribe(first, 1);
+    const theirs = await subscribe(second, 2);
+    const asFirst = { ...remote, ...first };
+    for (const [method, url, body] of [
+      ['DELETE', `/api/push/subscriptions/${theirs}`, undefined],
+      ['POST', '/api/push/test', { id: theirs }],
+    ] as const) {
+      const res = await call(instance, method, url, asFirst, body);
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'local_only' });
+    }
+    expect(instance.pushSubscriptions.list()).toHaveLength(2);
+
+    const own = await call(instance, 'DELETE', `/api/push/subscriptions/${mine}`, asFirst);
+    expect(own.statusCode).toBe(200);
+    // This machine manages every device's notifications.
+    const mac = await call(instance, 'DELETE', `/api/push/subscriptions/${theirs}`, local);
+    expect(mac.statusCode).toBe(200);
+    expect(instance.pushSubscriptions.list()).toEqual([]);
+  });
+
   it('never posts hook events or permission requests', async () => {
     const instance = await server();
     const phone = await pair(instance);
@@ -631,6 +670,26 @@ describe('paired devices', () => {
     expect(sessions.list().map((s) => s.id)).toEqual([mac.session.id]);
     // Sessions on this machine last until revoked.
     expect(sessions.verify(mac.secret, 'local')).toBe(mac.session.id);
+  });
+
+  it('slide with an open board, and close its socket once they lapse unused', () => {
+    let now = 1_700_000_000_000;
+    const sessions = new BrowserSessions({ load: () => [], save: () => {}, now: () => now });
+    const phone = sessions.create('remote', IPHONE_UA);
+    const socket = { close: vi.fn(), once: vi.fn() };
+    sessions.track(phone.session.id, socket, 4401);
+    // Messages on the open socket count as use.
+    now += REMOTE_SESSION_IDLE_MS - 60_000;
+    sessions.touch(phone.session.id);
+    now += REMOTE_SESSION_IDLE_MS - 60_000;
+    sessions.sweep();
+    expect(socket.close).not.toHaveBeenCalled();
+    // Idle past the limit: the sweep ends it without any request, and closes the socket.
+    now += REMOTE_SESSION_IDLE_MS;
+    sessions.touch(phone.session.id);
+    sessions.sweep();
+    expect(socket.close).toHaveBeenCalledWith(4401, 'signed_out');
+    expect(sessions.list()).toEqual([]);
   });
 });
 

@@ -7,8 +7,18 @@ import {
   type GitInfo,
 } from '@yardmaster/protocol';
 
-/** Arguments for `git status`; `-z` keeps paths unquoted and NUL-separated. */
-export const GIT_STATUS_ARGS = ['status', '--porcelain=v2', '--branch', '-z'] as const;
+/**
+ * Arguments for `git status`; `-z` keeps paths unquoted and NUL-separated. Submodules are
+ * skipped: status would run git inside each one under that submodule's own config
+ * (`.git/modules/<name>/config`), whose filter drivers the config check never sees.
+ */
+export const GIT_STATUS_ARGS = [
+  'status',
+  '--porcelain=v2',
+  '--branch',
+  '-z',
+  '--ignore-submodules=all',
+] as const;
 
 /**
  * Arguments that list the repository's own config keys (local and worktree scope, includes

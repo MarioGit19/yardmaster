@@ -13,7 +13,7 @@ import {
   PushSubscriptionInput,
   PushTestRequest,
 } from '@yardmaster/protocol';
-import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import webpush from 'web-push';
 import { z } from 'zod';
 import type { ActionResult } from './actions.js';
@@ -276,6 +276,12 @@ export interface PushRoutesOptions {
   logger: FastifyBaseLogger;
 }
 
+/** A phone manages only its own subscriptions; this machine manages every one (PRD §8 item 11). */
+function mayManage(request: FastifyRequest, subscription: StoredSubscription | undefined): boolean {
+  if (!request.isRemote() || subscription === undefined) return true;
+  return subscription.deviceId !== null && subscription.deviceId === request.browserSession();
+}
+
 /** Push subscriptions, the test push and notification actions, all behind the auth guard. */
 export function registerPushRoutes(app: FastifyInstance, options: PushRoutesOptions): void {
   const { subscriptions } = options;
@@ -303,6 +309,9 @@ export function registerPushRoutes(app: FastifyInstance, options: PushRoutesOpti
   app.delete('/api/push/subscriptions/:id', async (request, reply) => {
     const params = IdParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: 'bad_request' });
+    if (!mayManage(request, subscriptions.get(params.data.id))) {
+      return reply.code(403).send({ error: 'local_only' });
+    }
     if (!subscriptions.remove(params.data.id)) {
       return reply.code(404).send({ error: 'unknown_subscription' });
     }
@@ -314,6 +323,7 @@ export function registerPushRoutes(app: FastifyInstance, options: PushRoutesOpti
     if (!body.success) return reply.code(400).send({ error: 'bad_request' });
     const subscription = subscriptions.get(body.data.id);
     if (!subscription) return reply.code(404).send({ error: 'unknown_subscription' });
+    if (!mayManage(request, subscription)) return reply.code(403).send({ error: 'local_only' });
     const result = await options.test(subscription);
     if (result.ok) return { ok: true };
     if (result.gone) {

@@ -161,6 +161,21 @@ export class BrowserSessions {
     return id;
   }
 
+  /** Marks a live session as used (its open board socket), sliding a phone's 30 days. */
+  touch(id: string): void {
+    const session = this.sessions.find((s) => s.id === id);
+    if (!session) return;
+    const now = this.now();
+    if (this.expired(session, now) || now - session.lastSeenAt < SEEN_WRITE_MS) return;
+    session.lastSeenAt = now;
+    this.persist();
+  }
+
+  /** Ends sessions that expired, closing their open sockets, even if nothing asks for them. */
+  sweep(): void {
+    this.live();
+  }
+
   has(id: string): boolean {
     return this.live().some((s) => s.id === id);
   }

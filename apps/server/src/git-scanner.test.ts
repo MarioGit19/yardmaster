@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -323,5 +323,48 @@ describe('runGit', () => {
     expect(calls).toEqual(['config', 'config', 'status']);
     expect(store.state.projects['p-evil']?.git).toMatchObject({ dirty: 2 });
     expect(store.state.projects['p-evil']?.git?.statusSkipped).toBeUndefined();
+  });
+  it('never runs a filter driver from a submodule’s own config', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'ym-git-'));
+    const marker = join(dir, 'ran');
+    const outer = join(dir, 'outer');
+    const sub = join(outer, 'vendor');
+    const git = (cwd: string, ...args: string[]) =>
+      exec('git', ['-C', cwd, '-c', 'user.name=Dev', '-c', 'user.email=dev@example.com', ...args], {
+        env: gitEnv(),
+      });
+    await git(dir, 'init', '-q', outer);
+    await git(outer, 'init', '-q', sub);
+    writeFileSync(join(sub, 'notes.md'), 'hello\n');
+    await git(sub, 'add', 'notes.md');
+    await git(sub, 'commit', '-q', '-m', 'Initial commit');
+    // The outer repository's config is clean; the submodule's isn't.
+    await git(sub, 'config', 'filter.evil.clean', `touch ${marker}; cat`);
+    writeFileSync(join(sub, '.gitattributes'), '* filter=evil\n');
+    await git(outer, 'add', 'vendor');
+    await git(outer, 'commit', '-q', '-m', 'Add vendor');
+    // A changed mtime makes status compare the file's content, through the filter.
+    utimesSync(join(sub, 'notes.md'), new Date(T0), new Date(T0));
+    const store = new BoardStore({ autoFlush: false, now: () => T0 });
+    store.upsertProject({
+      id: 'p-outer',
+      path: outer,
+      name: 'outer',
+      accent: 0,
+      source: 'manual',
+      git: null,
+      createdAt: T0,
+      lastActivityAt: null,
+    });
+    const scanner = new GitScanner({
+      store,
+      logger: { warn: vi.fn(), debug: vi.fn() },
+      active: () => true,
+      run: runGit,
+    });
+    await scanner.tick();
+    expect(store.state.projects['p-outer']?.git?.statusSkipped).toBeUndefined();
+    expect(store.state.projects['p-outer']?.git?.branch).not.toBeNull();
+    expect(existsSync(marker)).toBe(false);
   });
 });
