@@ -24,9 +24,9 @@ On the Mac, open Yardmaster → **Settings → Phone → Allowed hosts** and add
 
 ## 4. Scan the QR code
 
-Still on the Mac, click **Show pairing code**. Point your phone's camera at the QR code and open the link. The code works once and expires after 5 minutes; it signs that browser in with its own device key. The access token never leaves the Mac.
+Still on the Mac, click **Show pairing code**. Point your phone's camera at the QR code and open the link. The code works once and expires after 5 minutes; it signs that browser in with its own session, kept in the browser's storage for the board's address only (never a cookie, so dev servers you open on the phone never see it). The access token never leaves the Mac.
 
-Your phone now appears under **Paired devices**. It stays signed in until you **revoke** it there, which also disconnects it right away. Add Yardmaster to your home screen for a full-screen board.
+Your phone now appears under **Paired devices**. It stays signed in until you **revoke** it there (or under Settings → Data and security → Signed-in browsers), which also disconnects it right away, or until it goes 30 days without opening the board. Add Yardmaster to your home screen for a full-screen board.
 
 ## Dev servers on your phone
 

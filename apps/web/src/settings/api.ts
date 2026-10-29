@@ -2,6 +2,7 @@ import {
   ApiError,
   BoardSettings,
   type BoardSettingsPatch,
+  BrowserSessionsResponse,
   HooksInstallResponse,
   HooksPlanResponse,
   HooksStatusResponse,
@@ -12,8 +13,10 @@ import {
   PortShare,
   PortSharesResponse,
   PushInfoResponse,
+  RotateTokenResponse,
   ServerStatus,
 } from '@yardmaster/protocol';
+import { boardFetch } from '../auth/session.js';
 
 /** A failed settings call: the HTTP status plus the server's error code and message, if any. */
 export class ApiRequestError extends Error {
@@ -33,9 +36,8 @@ async function request<T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const res = await fetch(url, {
+  const res = await boardFetch(url, {
     method,
-    credentials: 'same-origin',
     headers: {
       accept: 'application/json',
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
@@ -68,7 +70,11 @@ export const api = {
   planHooks: () => request(HooksPlanResponse, 'POST', '/api/hooks/plan', {}),
   installHooks: (fingerprint: string) =>
     request(HooksInstallResponse, 'POST', '/api/hooks/install', { fingerprint }),
-  rotateToken: () => request(OkResponse, 'POST', '/api/token/rotate', {}),
+  rotateToken: () => request(RotateTokenResponse, 'POST', '/api/token/rotate', {}),
+  sessions: (signal?: AbortSignal) =>
+    request(BrowserSessionsResponse, 'GET', '/api/sessions', undefined, signal),
+  revokeSession: (id: string) =>
+    request(OkResponse, 'DELETE', `/api/sessions/${encodeURIComponent(id)}`),
   library: (signal?: AbortSignal) =>
     request(LibraryResponse, 'GET', '/api/library', undefined, signal),
   pair: (host?: string) =>

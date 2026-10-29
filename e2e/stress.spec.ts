@@ -24,7 +24,7 @@ const test = base.extend<object, { stressBoard: DemoBoard }>({
   ],
   baseURL: async ({ stressBoard }, use) => use(stressBoard.url),
   storageState: async ({ stressBoard }, use) =>
-    use(signedInState(stressBoard.url, stressBoard.cookie)),
+    use(signedInState(stressBoard.url, stressBoard.session)),
 });
 
 // Stopped as soon as the file is done, not when the worker exits: the parallel suite runs next.

@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../ambient/style.js';
+import { setSessionSecret } from '../auth/session.js';
 import { Wordmark } from '../brand/Logo.js';
 import { TAGLINE } from '../brand/name.js';
 import { selectWindows, useBoardList } from '../data/index.js';
@@ -32,6 +33,7 @@ import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { NotificationSettings } from '../settings/NotificationSettings.js';
 import { PhoneSettings } from '../settings/PhoneSettings.js';
 import { redactPreference } from '../settings/prefs.js';
+import { SessionsRow } from '../settings/SessionsSettings.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
 import { formatDateTime, formatWhen } from '../time.js';
@@ -182,6 +184,7 @@ export function SettingsView() {
 
         <SettingsSection title="Data and security">
           <RetentionRow server={server} />
+          <SessionsRow />
           <TokenRow demo={demo} />
         </SettingsSection>
 
@@ -681,7 +684,7 @@ function RetentionRow({ server: { settings, update } }: { server: ServerSettings
   );
 }
 
-/** Replaces the install token: this browser stays signed in, everything else signs in again. */
+/** Replaces the install token: this browser stays signed in, every other one signs in again. */
 function TokenRow({ demo }: { demo: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -689,10 +692,12 @@ function TokenRow({ demo }: { demo: boolean }) {
   const rotate = async () => {
     setBusy(true);
     try {
-      await api.rotateToken();
+      const { session } = await api.rotateToken();
+      // Every session ended: this browser carries on with the new one it was handed.
+      if (session) setSessionSecret(session);
       toast.success('Token rotated', {
         description:
-          'Other browsers sign in again with `yardmaster start`. Editors reconnect on their own.',
+          'Every other browser and phone signs in again. Editors reconnect on their own.',
       });
     } catch {
       toast.error('Could not rotate the token');

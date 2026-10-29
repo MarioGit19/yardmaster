@@ -10,7 +10,8 @@ import { COMMAND_ERRORS, EDITOR_WS_PATH } from './editor-gateway.js';
 import { ROUTE_ERRORS } from './editor-router.js';
 import { localSocket, localWebSocket } from './local-channel.test-helpers.js';
 import { OUTSIDE_LIBRARY } from './project-actions.js';
-import { createSessionValue, TOKEN_HEADER } from './security.js';
+import { TOKEN_HEADER } from './security.js';
+import { sessionHeader } from './sessions.test-helpers.js';
 import { TERMINAL_REPLY_DISABLED } from './terminal-reply.js';
 import { generateToken } from './token.js';
 import { UI_WS_PATH } from './ui-gateway.js';
@@ -130,7 +131,7 @@ async function ui(port: number): Promise<Peer<ServerToUi>> {
   const socket = new WebSocket(`ws://127.0.0.1:${port}${UI_WS_PATH}`, {
     headers: {
       origin: `http://127.0.0.1:${port}`,
-      cookie: `yardmaster_session=${createSessionValue(token)}`,
+      ...sessionHeader(app as FastifyInstance),
     },
   });
   const peer = new Peer<ServerToUi>(socket, (data) => {

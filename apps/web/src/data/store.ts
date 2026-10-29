@@ -12,9 +12,16 @@ import { ingestEvents, ingestOutput, type Pulses } from './activity.js';
 /**
  * `connecting`: first attempt; `syncing`: socket open, waiting for the snapshot;
  * `live`: snapshot applied, patches flowing; `reconnecting`: waiting to retry;
+ * `signedOut`: the board refused this browser's session, so it waits for a sign-in;
  * `stopped`: the client was shut down.
  */
-export type ConnectionStatus = 'connecting' | 'syncing' | 'live' | 'reconnecting' | 'stopped';
+export type ConnectionStatus =
+  | 'connecting'
+  | 'syncing'
+  | 'live'
+  | 'reconnecting'
+  | 'signedOut'
+  | 'stopped';
 
 export interface ConnectionState {
   status: ConnectionStatus;

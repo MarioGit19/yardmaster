@@ -188,8 +188,8 @@ describe('push routes', () => {
       ...remote,
       'user-agent': IPHONE_UA,
     });
-    const cookie = String(paired.headers['set-cookie']).split(';', 1)[0] ?? '';
-    const phone = { ...remote, cookie, 'user-agent': IPHONE_UA };
+    const secret = /name="yardmaster-session" content="([^"]+)"/.exec(paired.body)?.[1] ?? '';
+    const phone = { ...remote, 'x-yardmaster-session': secret, 'user-agent': IPHONE_UA };
     const sub = await call(instance, 'POST', '/api/push/subscriptions', subscription(1), phone);
     expect(sub.statusCode).toBe(200);
     await call(instance, 'POST', '/api/push/subscriptions', subscription(2));
@@ -200,6 +200,19 @@ describe('push routes', () => {
     const left = (await call(instance, 'GET', '/api/push')).json().devices;
     expect(left).toHaveLength(1);
     expect(left[0].id).not.toBe(sub.json().id);
+  });
+
+  it('belong to the browser session that added them, and end with it', async () => {
+    const instance = await server();
+    const mac = instance.browserSessions.create('local', undefined);
+    const sub = await call(instance, 'POST', '/api/push/subscriptions', subscription(1), {
+      host: '127.0.0.1:4317',
+      'x-yardmaster-session': mac.secret,
+    });
+    expect(sub.statusCode).toBe(200);
+    expect(instance.pushSubscriptions.list()[0]?.deviceId).toBe(mac.session.id);
+    instance.browserSessions.revoke(mac.session.id);
+    expect(instance.pushSubscriptions.list()).toEqual([]);
   });
 
   it('save the notification settings with the board settings', async () => {

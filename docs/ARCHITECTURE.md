@@ -140,6 +140,6 @@ The full list is in [PRD §8](PRD.md#8-security-and-privacy-requirements). In sh
 
 - The server binds `127.0.0.1` and rejects requests whose `Host` is not the board's own (DNS-rebinding defence). `/ws/ui` accepts only the board's origin.
 - Editors and hooks connect only through the local socket `~/.yardmaster/board.sock`, and check it is a socket the user owns before they send anything; their routes are refused over TCP.
-- A per-install token guards everything. Browsers sign in once through a one-time link and get an `HttpOnly`, `SameSite=Strict` session cookie; phones pair with a single-use QR code and can be revoked.
+- A per-install token guards everything for the CLI, the extension and the hooks. Browsers sign in through a one-time link (`/auth?c=`) and get their own session secret, kept in the board origin's storage and sent as a header (a WebSocket subprotocol on `/ws/ui`), never a cookie; phones pair with a single-use QR code. Every session can be signed out from Settings, and rotating the token ends them all.
 - Processes are spawned with `execFile` and argument arrays, never shell strings. Markdown renders without raw HTML, and terminal output only ever goes to xterm.
 - Remote access is off by default: only allowed Tailscale `*.ts.net` hosts, over HTTPS, while the server still binds `127.0.0.1`.

@@ -89,7 +89,7 @@ test('the approvals sheet shows the pointer on everything clickable', async ({ b
   const board = await startDemoBoard();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport: { width: 1440, height: 900 },
   });
   try {

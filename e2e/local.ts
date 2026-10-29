@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { request } from 'node:http';
 import { connect } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,4 +76,33 @@ export async function connectEditor(
     }),
   );
   return socket;
+}
+
+/** A fresh one-time sign-in link, asked over the socket the way `yardmaster open` does. */
+export async function signInLink(board: DemoBoard): Promise<string> {
+  const token = (await readFile(join(board.home, 'token'), 'utf8')).trim();
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        socketPath: socketOf(board),
+        path: '/api/local/dashboard-link',
+        method: 'POST',
+        headers: { 'x-yardmaster-token': token },
+      },
+      (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          const url = (JSON.parse(body) as { url?: string }).url;
+          if (res.statusCode === 200 && url) resolve(url);
+          else reject(new Error(`no sign-in link: HTTP ${res.statusCode}`));
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
 }

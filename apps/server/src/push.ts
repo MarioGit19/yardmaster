@@ -90,7 +90,7 @@ export function isPushServiceEndpoint(endpoint: string): boolean {
 
 const StoredSubscription = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
-  /** The paired device it belongs to (12.5), or null for a browser on this machine. */
+  /** The browser session it belongs to, or null when added with the token (tools, tests). */
   deviceId: z.string().max(64).nullable(),
   name: z.string().max(80),
   endpoint: z.string().max(2048),
@@ -161,7 +161,27 @@ export class PushSubscriptions {
     return true;
   }
 
-  /** Drops every subscription of a revoked paired device. */
+  /** Moves a session's subscriptions to the session that replaces it. */
+  moveDevice(from: string, to: string): void {
+    let moved = false;
+    for (const item of this.items) {
+      if (item.deviceId !== from) continue;
+      item.deviceId = to;
+      moved = true;
+    }
+    if (moved) this.persist();
+  }
+
+  /** Keeps only subscriptions of live sessions: a signed-out browser gets no notifications. */
+  retainDevices(live: (deviceId: string) => boolean): number {
+    const before = this.items.length;
+    this.items = this.items.filter((s) => s.deviceId !== null && live(s.deviceId));
+    const removed = before - this.items.length;
+    if (removed > 0) this.persist();
+    return removed;
+  }
+
+  /** Drops every subscription of a session that ended. */
   removeDevice(deviceId: string): number {
     const before = this.items.length;
     this.items = this.items.filter((s) => s.deviceId !== deviceId);
@@ -274,7 +294,7 @@ export function registerPushRoutes(app: FastifyInstance, options: PushRoutesOpti
       return reply.code(422).send({ error: 'unknown_push_service' });
     }
     const id = subscriptions.add(body.data, {
-      deviceId: request.remoteDevice(),
+      deviceId: request.browserSession(),
       userAgent: request.headers['user-agent'],
     });
     return { id } satisfies PushSubscribeResponse;

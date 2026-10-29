@@ -1,6 +1,10 @@
-import { createHmac, randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
-import { LOCAL_ONLY_ROUTES } from '@yardmaster/protocol';
+import {
+  LOCAL_ONLY_ROUTES,
+  SESSION_HEADER,
+  SESSION_PROTOCOL_PREFIX,
+  SESSION_STORAGE_KEY,
+} from '@yardmaster/protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { ServerConfig } from './config.js';
@@ -11,48 +15,51 @@ import {
   LEGACY_TOKEN_HEADER,
 } from './legacy.js';
 import { isLocalChannel } from './local-channel.js';
-import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE_SEC, type RemoteDevices } from './remote.js';
+import type { BrowserSessions } from './sessions.js';
 import { tokensEqual } from './token.js';
 
-export const SESSION_COOKIE = 'yardmaster_session';
 export const TOKEN_HEADER = 'x-yardmaster-token';
+/** The cookies browsers kept before per-browser sessions. They sign nothing in any more. */
+const OLD_COOKIES = ['yardmaster_session', LEGACY_SESSION_COOKIE];
+const OLD_DEVICE_COOKIES = ['yardmaster_device', LEGACY_DEVICE_COOKIE];
 
 /** Routes under /api that stay reachable without credentials. */
 const PUBLIC_API_ROUTES = new Set(['/api/health']);
 
-const authQuery = z.object({ t: z.string().min(1).max(256).optional() });
+const authQuery = z.object({
+  c: z.string().min(1).max(256).optional(),
+  t: z.string().max(256).optional(),
+});
 const pairQuery = z.object({ c: z.string().min(1).max(256) });
-
-// The label keeps the old name, so browsers signed in before the rename stay signed in.
-function sign(token: string, nonce: string): string {
-  return createHmac('sha256', token).update(`c-board-session:${nonce}`).digest('base64url');
-}
-
-/** A cookie value bound to the current token: rotating the token invalidates every session. */
-export function createSessionValue(token: string): string {
-  const nonce = randomBytes(16).toString('base64url');
-  return `${nonce}.${sign(token, nonce)}`;
-}
-
-export function verifySessionValue(token: string, value: string): boolean {
-  const dot = value.indexOf('.');
-  if (dot <= 0 || dot !== value.lastIndexOf('.')) return false;
-  return tokensEqual(value.slice(dot + 1), sign(token, value.slice(0, dot)));
-}
 
 /** The install token header, also under its old name for one version (hooks and extensions). */
 export function tokenHeader(headers: FastifyRequest['headers']): string | undefined {
   return headerValue(headers, TOKEN_HEADER, LEGACY_TOKEN_HEADER);
 }
 
-export function readCookie(header: string | undefined, name: string): string | undefined {
-  if (!header) return undefined;
-  for (const part of header.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq === -1 || part.slice(0, eq).trim() !== name) continue;
-    return part.slice(eq + 1).trim();
+/**
+ * The session secret a browser sent: the header on fetches, or a `Sec-WebSocket-Protocol` entry
+ * on a WebSocket upgrade (browsers can't set headers there). Cookies never count.
+ */
+export function sessionSecretOf(request: FastifyRequest): string | undefined {
+  const header = request.headers[SESSION_HEADER];
+  if (typeof header === 'string') return header;
+  if (request.headers.upgrade?.toLowerCase() !== 'websocket') return undefined;
+  const protocols = request.headers['sec-websocket-protocol'];
+  if (typeof protocols !== 'string') return undefined;
+  for (const entry of protocols.split(',')) {
+    const value = entry.trim();
+    if (value.startsWith(SESSION_PROTOCOL_PREFIX)) {
+      return value.slice(SESSION_PROTOCOL_PREFIX.length);
+    }
   }
   return undefined;
+}
+
+/** The link that signs a browser in with a one-time code; in dev, on the Vite origin. */
+export function signInUrl(config: ServerConfig, port: number, code: string): string {
+  const origin = config.devOrigins[0] ?? `http://127.0.0.1:${port}`;
+  return `${origin}/auth?c=${encodeURIComponent(code)}`;
 }
 
 function isProtectedPath(path: string | undefined): boolean {
@@ -77,44 +84,21 @@ export interface SecurityOptions {
   config: ServerConfig;
   /** The install token, or a getter for one that can be rotated while the server runs. */
   token: string | (() => string);
-  /** Phone access (F27): the allowed Tailscale names and the paired devices. Off without it. */
-  remote?: { hosts: () => readonly string[]; devices: RemoteDevices };
+  /** Signed-in browsers, on this machine and paired phones. */
+  sessions: BrowserSessions;
+  /** Phone access (F27): the allowed Tailscale names. Off without it. */
+  remote?: { hosts: () => readonly string[] };
 }
 
-/** Sets the session cookie for the current token on a reply. */
-export function setSessionCookie(reply: FastifyReply, token: string): FastifyReply {
-  const cookie = [
-    `${SESSION_COOKIE}=${createSessionValue(token)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Strict',
-  ].join('; ');
-  return reply.header('set-cookie', cookie);
-}
+const expireCookie = (name: string, secure: boolean) =>
+  `${name}=; Path=/; HttpOnly; SameSite=Strict;${secure ? ' Secure;' : ''} Max-Age=0`;
 
-function deviceCookie(value: string): string {
-  return [
-    `${DEVICE_COOKIE}=${value}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Strict',
-    'Secure',
-    `Max-Age=${DEVICE_COOKIE_MAX_AGE_SEC}`,
-  ].join('; ');
-}
+const PAGE_STYLE =
+  'body{font:16px/1.5 system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0c0e;color:#e8e9ec;padding:24px;box-sizing:border-box}main{max-width:360px}h1{font-size:18px;font-weight:600;margin:0 0 8px}p{margin:0 0 8px;color:#a3a6ad}code{font:14px ui-monospace,monospace;color:#e8e9ec}';
 
-function setDeviceCookie(reply: FastifyReply, value: string): FastifyReply {
-  return reply.header('set-cookie', deviceCookie(value));
-}
-
-const PAIR_FAILED: Record<'invalid' | 'expired', string> = {
-  invalid: 'This pairing code was already used or replaced by a newer one.',
-  expired: 'This pairing code has expired.',
-};
-
-/** A plain page for the phone's browser: a pairing link is opened from the camera, not the app. */
-function pairPage(reply: FastifyReply, status: number, message: string) {
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Yardmaster</title><style>body{font:16px/1.5 system-ui,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0c0e;color:#e8e9ec;padding:24px;box-sizing:border-box}main{max-width:340px}h1{font-size:18px;font-weight:600;margin:0 0 8px}p{margin:0;color:#a3a6ad}</style></head><body><main><h1>Could not pair</h1><p>${message} On your Mac, open Yardmaster → Settings → Phone and scan a new code.</p></main></body></html>`;
+/** A plain page outside the app: sign-in and pairing links open before the app has a session. */
+function page(reply: FastifyReply, status: number, title: string, body: string) {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Yardmaster</title><style>${PAGE_STYLE}</style></head><body><main><h1>${title}</h1>${body}</main></body></html>`;
   return reply
     .code(status)
     .header('cache-control', 'no-store')
@@ -124,8 +108,51 @@ function pairPage(reply: FastifyReply, status: number, message: string) {
 }
 
 /**
- * PRD §8: Host allowlist (DNS-rebinding defence), Origin check, `/auth?t=` cookie bootstrap
- * and the token guard for `/api/*`, plus the split between the local socket (editors and
+ * Hands a fresh session secret to the board's own origin: the page stores it and opens the board.
+ * The secret is in the body only (no cookie, no URL), on a `no-store` response.
+ */
+function sessionPage(reply: FastifyReply, secret: string, remote: boolean) {
+  const store = `try{localStorage.setItem(${JSON.stringify(SESSION_STORAGE_KEY)},document.querySelector('meta[name="yardmaster-session"]').content)}catch(e){}location.replace('/')`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="yardmaster-session" content="${secret}"><title>Yardmaster</title><style>${PAGE_STYLE}</style></head><body><main><h1>Signing in…</h1><noscript><p>Yardmaster needs JavaScript.</p></noscript></main><script>${store}</script></body></html>`;
+  return reply
+    .code(200)
+    .header('cache-control', 'no-store')
+    .header('referrer-policy', 'no-referrer')
+    .header(
+      'set-cookie',
+      (remote ? [...OLD_COOKIES, ...OLD_DEVICE_COOKIES] : OLD_COOKIES).map((name) =>
+        expireCookie(name, remote),
+      ),
+    )
+    .type('text/html; charset=utf-8')
+    .send(html);
+}
+
+const SIGN_IN_HOW =
+  '<p>Run <code>yardmaster open</code> in a terminal on this computer, or use <b>Yardmaster: Open Dashboard</b> in your editor.</p>';
+
+const SIGN_IN_FAILED: Record<'invalid' | 'expired', string> = {
+  invalid: 'This sign-in link was already used.',
+  expired: 'This sign-in link has expired.',
+};
+const PAIR_FAILED: Record<'invalid' | 'expired', string> = {
+  invalid: 'This pairing code was already used or replaced by a newer one.',
+  expired: 'This pairing code has expired.',
+};
+
+/** A plain page for the phone's browser: a pairing link is opened from the camera, not the app. */
+function pairPage(reply: FastifyReply, status: number, message: string) {
+  return page(
+    reply,
+    status,
+    'Could not pair',
+    `<p>${message} On your Mac, open Yardmaster → Settings → Phone and scan a new code.</p>`,
+  );
+}
+
+/**
+ * PRD §8: Host allowlist (DNS-rebinding defence), Origin check, one-time sign-in and pairing
+ * links, and the session or token guard for `/api/*`, plus the split between the local socket (editors and
  * hooks, token only) and TCP (browsers). Register before any route.
  */
 export function registerSecurity(app: FastifyInstance, options: SecurityOptions): void {
@@ -150,7 +177,7 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   const allowedOrigins = (): Set<string> =>
     new Set([...boardHosts().map((host) => `http://${host}`), ...config.devOrigins]);
 
-  const remote = options.remote;
+  const { remote, sessions } = options;
   /** The allowed remote name a Host header is for (bare, or with :443), else null. */
   const remoteHostOf = (host: string): string | null => {
     if (!remote) return null;
@@ -158,11 +185,19 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     return remote.hosts().includes(name) ? name : null;
   };
   const remoteHosts = new WeakMap<FastifyRequest, string>();
-  const deviceCookieOf = (request: FastifyRequest): string | undefined =>
-    readCookie(request.headers.cookie, DEVICE_COOKIE) ??
-    readCookie(request.headers.cookie, LEGACY_DEVICE_COOKIE);
-  const remoteDevice = (request: FastifyRequest): string | null =>
-    remote && remoteHosts.has(request) ? remote.devices.verify(deviceCookieOf(request)) : null;
+  const verified = new WeakMap<FastifyRequest, string | null>();
+  /** The browser session behind a TCP request (a phone's over Tailscale), or null. */
+  const browserSession = (request: FastifyRequest): string | null => {
+    if (isLocalChannel(request.raw)) return null;
+    const known = verified.get(request);
+    if (known !== undefined) return known;
+    const id = sessions.verify(
+      sessionSecretOf(request),
+      remoteHosts.has(request) ? 'remote' : 'local',
+    );
+    verified.set(request, id);
+    return id;
+  };
 
   const hasToken = (request: FastifyRequest): boolean => {
     const header = tokenHeader(request.headers);
@@ -172,14 +207,9 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   const isAuthorized = (request: FastifyRequest): boolean => {
     // The socket takes the token header only: no browser can reach it.
     if (isLocalChannel(request.raw)) return hasToken(request);
-    // Over Tailscale only a paired device's own cookie counts, never the token (PRD §8 item 12).
-    if (remoteHosts.has(request)) return remoteDevice(request) !== null;
-    if (hasToken(request)) return true;
-    const token = currentToken();
-    return [SESSION_COOKIE, LEGACY_SESSION_COOKIE].some((name) => {
-      const cookie = readCookie(request.headers.cookie, name);
-      return cookie !== undefined && verifySessionValue(token, cookie);
-    });
+    // Over Tailscale only a paired phone's own session counts, never the token (PRD §8 item 12).
+    if (remoteHosts.has(request)) return browserSession(request) !== null;
+    return hasToken(request) || browserSession(request) !== null;
   };
 
   const deny = (reply: FastifyReply, status: 401 | 403 | 404, error: string) =>
@@ -194,8 +224,8 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   app.decorateRequest('isRemote', function (this: FastifyRequest) {
     return remoteHosts.has(this);
   });
-  app.decorateRequest('remoteDevice', function (this: FastifyRequest) {
-    return remoteDevice(this);
+  app.decorateRequest('browserSession', function (this: FastifyRequest) {
+    return browserSession(this);
   });
 
   app.addHook('onRequest', async (request, reply) => {
@@ -238,18 +268,6 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
         return deny(reply, 403, 'forbidden_origin');
       }
       remoteHosts.set(request, remoteHost);
-      // A phone paired before the rename carries the old cookie: move it to the new name.
-      const legacyDevice = readCookie(request.headers.cookie, LEGACY_DEVICE_COOKIE);
-      if (
-        legacyDevice !== undefined &&
-        readCookie(request.headers.cookie, DEVICE_COOKIE) === undefined &&
-        remoteDevice(request) !== null
-      ) {
-        reply.header('set-cookie', [
-          deviceCookie(legacyDevice),
-          `${LEGACY_DEVICE_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0`,
-        ]);
-      }
     } else if (origin !== undefined && !allowedOrigins().has(origin)) {
       request.log.warn({ origin }, 'rejected cross-origin request');
       return deny(reply, 403, 'forbidden_origin');
@@ -265,19 +283,34 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     }
   });
 
+  // A one-time sign-in code (`yardmaster start`, `yardmaster open`, the editor's Open Dashboard).
   app.get('/auth', async (request, reply) => {
     reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer');
-    // The raw token never travels to another device: phones pair instead.
+    // Nothing signs a browser in on another device: phones pair instead.
     if (request.isRemote()) return deny(reply, 403, 'pair_required');
     const query = authQuery.safeParse(request.query);
-    const t = query.success ? query.data.t : undefined;
-
-    const token = currentToken();
-    if (t !== undefined && tokensEqual(t, token)) {
-      return setSessionCookie(reply, token).redirect('/', 302);
+    const { c, t } = query.success ? query.data : {};
+    if (c === undefined) {
+      // `?t=<token>` links put the install token in browser history: they no longer sign in.
+      return page(
+        reply,
+        t === undefined ? 400 : 410,
+        t === undefined ? 'Sign in to Yardmaster' : 'Use the new sign-in link',
+        `${t === undefined ? '' : '<p>Sign-in links with the access token no longer work. Yardmaster now uses one-time links.</p>'}${SIGN_IN_HOW}`,
+      );
     }
-    if (t === undefined && isAuthorized(request)) return reply.redirect('/', 302);
-    return deny(reply, 401, 'unauthorized');
+    const result = sessions.redeemSignIn(c, request.headers['user-agent']);
+    if (!result.ok) {
+      request.log.warn({ reason: result.error }, 'refused a sign-in code');
+      return page(
+        reply,
+        401,
+        'Could not sign in',
+        `<p>${SIGN_IN_FAILED[result.error]}</p>${SIGN_IN_HOW}`,
+      );
+    }
+    request.log.info({ browser: result.session.name }, 'signed in a browser');
+    return sessionPage(reply, result.secret, false);
   });
 
   // The pairing link a phone opens from the QR code: spends the code, sets the device cookie.
@@ -287,28 +320,25 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     }
     const query = pairQuery.safeParse(request.query);
     if (!query.success) return pairPage(reply, 401, PAIR_FAILED.invalid);
-    const result = remote.devices.redeem(query.data.c, request.headers['user-agent']);
+    const result = sessions.redeemPairing(query.data.c, request.headers['user-agent']);
     if (!result.ok) {
       request.log.warn({ reason: result.error }, 'refused a pairing code');
       return pairPage(reply, 401, PAIR_FAILED[result.error]);
     }
-    request.log.info({ device: result.device.name }, 'paired a device');
-    return setDeviceCookie(reply, result.cookie)
-      .header('cache-control', 'no-store')
-      .header('referrer-policy', 'no-referrer')
-      .redirect('/', 302);
+    request.log.info({ device: result.session.name }, 'paired a device');
+    return sessionPage(reply, result.secret, true);
   });
 }
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** True when the request carries a valid `X-Yardmaster-Token` header or session cookie. */
+    /** True when the request carries a valid `X-Yardmaster-Token` header or browser session. */
     isAuthorized(): boolean;
     /** True when the request came in on the local socket (editors and hooks). */
     isLocalChannel(): boolean;
     /** True when the request came in on an allowed remote (Tailscale) host. */
     isRemote(): boolean;
-    /** The paired device behind a remote request, or null. */
-    remoteDevice(): string | null;
+    /** The browser session behind the request (local or a paired phone's), or null. */
+    browserSession(): string | null;
   }
 }

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, openRoute, test } from './fixtures.js';
+import { expect, openRoute, sessionHeader, test } from './fixtures.js';
 
 /** The demo renames orbit-api's `zsh` to `backend` this long after it starts (demo/content.ts). */
 const DEMO_RENAME_MS = 20_000;
@@ -23,7 +23,7 @@ test('a terminal renamed in the editor shows its new name in its tab and lane', 
   const tab = page.locator(`[data-terminal-stack] [data-tab="${RENAMED}"]`);
   await expect(tab).toBeAttached();
 
-  const status = await page.request.get('/api/status');
+  const status = await page.request.get('/api/status', { headers: sessionHeader() });
   const { uptimeMs } = (await status.json()) as { uptimeMs: number };
   const untilRename = DEMO_RENAME_MS - uptimeMs;
   if (untilRename > 1_000) {

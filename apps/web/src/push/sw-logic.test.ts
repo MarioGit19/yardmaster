@@ -35,6 +35,7 @@ function deps(
   return {
     origin: ORIGIN,
     fetch: vi.fn(async () => ({ ok })),
+    session: async () => 'sess-1234.secret-abcdefghijklmnopqrstuv',
     windows: async () => windows,
     openWindow: vi.fn(async () => null),
   };
@@ -77,7 +78,11 @@ describe('routeClick', () => {
         '/api/approvals/ap-1/decision',
         expect.objectContaining({
           method: 'POST',
-          credentials: 'same-origin',
+          // The session from IndexedDB, never a cookie.
+          credentials: 'omit',
+          headers: expect.objectContaining({
+            'x-yardmaster-session': 'sess-1234.secret-abcdefghijklmnopqrstuv',
+          }),
           body: JSON.stringify({ decision: action }),
         }),
       );

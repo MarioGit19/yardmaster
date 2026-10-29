@@ -17,7 +17,7 @@ import { hookFixture } from './claude/fixtures.test-helpers.js';
 import { HOOK_ROUTE } from './claude/hook-ingest.js';
 import type { ServerConfig } from './config.js';
 import { localInject } from './local-channel.test-helpers.js';
-import { SESSION_COOKIE } from './security.js';
+import { sessionHeader } from './sessions.test-helpers.js';
 import {
   diskHookSettings,
   editorCliSetting,
@@ -359,18 +359,54 @@ describe('settings routes', () => {
     }
   });
 
-  it('rotates the token: the old one stops working, this browser stays signed in', async () => {
-    const { token, home } = await boot();
-    const res = await call('POST', '/api/token/rotate', token);
+  it('rotates the token: the old one and every session stop working, this browser stays in', async () => {
+    const { token, home, app } = await boot();
+    const mine = sessionHeader(app, 'Mozilla/5.0 (Macintosh) Chrome/140.0 Safari/537.36');
+    const other = sessionHeader(app);
+    const res = await call('POST', '/api/token/rotate', null, {}, mine);
     expect(res.statusCode).toBe(200);
-    const cookie = String(res.headers['set-cookie']).split(';', 1)[0] as string;
-    expect(cookie.startsWith(`${SESSION_COOKIE}=`)).toBe(true);
+    expect(res.headers['set-cookie']).toBeUndefined();
+    const body = res.json() as { ok: true; session: string };
+    expect(body.session).toMatch(/^[\w-]+\.[\w-]+$/);
 
     const next = (await readFile(join(home, 'token'), 'utf8')).trim();
     expect(next).not.toBe(token);
     expect((await call('GET', '/api/settings', token)).statusCode).toBe(401);
     expect((await call('GET', '/api/settings', next)).statusCode).toBe(200);
-    expect((await call('GET', '/api/settings', null, undefined, { cookie })).statusCode).toBe(200);
+    expect((await call('GET', '/api/settings', null, undefined, mine)).statusCode).toBe(401);
+    expect((await call('GET', '/api/settings', null, undefined, other)).statusCode).toBe(401);
+    const fresh = { 'x-yardmaster-session': body.session };
+    expect((await call('GET', '/api/settings', null, undefined, fresh)).statusCode).toBe(200);
+    expect(app.browserSessions.list()).toHaveLength(1);
+  });
+
+  it('ends every session when the token changed on disk while the board was down', async () => {
+    const { app: first, config } = await boot();
+    sessionHeader(first);
+    expect(first.browserSessions.list()).toHaveLength(1);
+    await first.close();
+    app = await buildServer(config, {
+      token: generateToken(),
+      dbPath: join(config.home, 'board.db'),
+      processes: false,
+      git: false,
+      hookSettings: memoryHookSettings(),
+    });
+    expect(app.browserSessions.list()).toEqual([]);
+  });
+
+  it('keeps sessions across a restart with the same token', async () => {
+    const { app: first, config, token } = await boot();
+    const header = sessionHeader(first);
+    await first.close();
+    app = await buildServer(config, {
+      token,
+      dbPath: join(config.home, 'board.db'),
+      processes: false,
+      git: false,
+      hookSettings: memoryHookSettings(),
+    });
+    expect((await call('GET', '/api/settings', null, undefined, header)).statusCode).toBe(200);
   });
 
   it('never rotates in demo mode', async () => {

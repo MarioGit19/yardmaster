@@ -38,7 +38,6 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
 import type { Persistence } from './persistence.js';
 import { REMOTE_HOSTS_KEY, remoteHosts } from './remote.js';
-import { setSessionCookie } from './security.js';
 import { LEGACY_TERMINAL_REPLY_KEY, TERMINAL_REPLY_KEY } from './terminal-reply.js';
 import { generateToken, writeToken } from './token.js';
 
@@ -207,8 +206,18 @@ export interface SettingsRoutesOptions {
   /** Settings loaded at boot; kept in sync with writes. */
   settings: Record<string, unknown>;
   hookSettings: HookSettingsFile;
-  /** Rotates the token, or null when the board can't (demo mode). */
-  rotateToken: (() => Promise<string>) | null;
+  /**
+   * Rotates the token and ends every session, or null when the board can't (demo mode). Returns
+   * a fresh session secret for the calling browser, if it had one.
+   */
+  rotateToken: ((caller: RotateCaller) => Promise<{ session?: string }>) | null;
+}
+
+/** Who asked for a rotation: their browser session (if any) is replaced, not ended. */
+export interface RotateCaller {
+  session: string | null;
+  remote: boolean;
+  userAgent: string | undefined;
 }
 
 function settingsError(reply: FastifyReply, err: unknown) {
@@ -334,12 +343,17 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
   });
 
-  app.post('/api/token/rotate', async (_request, reply) => {
+  app.post('/api/token/rotate', async (request, reply) => {
     if (!options.rotateToken) return reply.code(409).send({ error: 'demo' });
-    const token = await options.rotateToken();
+    const { session } = await options.rotateToken({
+      session: request.browserSession(),
+      remote: request.isRemote(),
+      userAgent: request.headers['user-agent'],
+    });
     app.log.info('rotated the install token from the board');
-    // Keep this browser signed in; every other one has to sign in again.
-    return setSessionCookie(reply.header('cache-control', 'no-store'), token).send({ ok: true });
+    // This browser stays signed in with a new session; every other one signs in again.
+    reply.header('cache-control', 'no-store');
+    return session === undefined ? { ok: true } : { ok: true, session };
   });
 }
 

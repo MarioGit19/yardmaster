@@ -1,5 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
-import { E2E_COOKIE, E2E_URL } from './env.js';
+import { E2E_SESSION, E2E_URL } from './env.js';
 
 export type Theme = 'dark' | 'light';
 
@@ -26,7 +26,7 @@ export const test = base.extend<{ theme: Theme; layout: FocusLayout }>({
   layout: ['minimal', { option: true }],
   baseURL: async ({}, use) => use(required(E2E_URL)),
   colorScheme: async ({ theme }, use) => use(theme),
-  storageState: async ({}, use) => use(signedInState(required(E2E_URL), required(E2E_COOKIE))),
+  storageState: async ({}, use) => use(signedInState(required(E2E_URL), required(E2E_SESSION))),
   page: async ({ page, theme, layout }, use) => {
     await page.addInitScript((value) => localStorage.setItem('yardmaster.theme', value), theme);
     if (layout !== 'minimal') {
@@ -38,25 +38,17 @@ export const test = base.extend<{ theme: Theme; layout: FocusLayout }>({
 
 export { expect };
 
-/** Browser storage holding the board's session cookie (`name=value`) for `origin`. */
-export function signedInState(origin: string, cookie: string) {
-  const url = new URL(origin);
-  const [name = '', value = ''] = cookie.split(/=(.*)/s);
+/** Browser storage holding a board session secret in `origin`'s localStorage, as sign-in leaves it. */
+export function signedInState(origin: string, session: string) {
   return {
-    cookies: [
-      {
-        name,
-        value,
-        domain: url.hostname,
-        path: '/',
-        expires: -1,
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Strict' as const,
-      },
-    ],
-    origins: [],
+    cookies: [],
+    origins: [{ origin, localStorage: [{ name: 'yardmaster.session', value: session }] }],
   };
+}
+
+/** The header that signs an API request (`page.request`, `fetch`) in to the board. */
+export function sessionHeader(session: string = required(E2E_SESSION)): Record<string, string> {
+  return { 'x-yardmaster-session': session };
 }
 
 /**

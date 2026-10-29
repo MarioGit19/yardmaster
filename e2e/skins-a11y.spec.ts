@@ -87,7 +87,7 @@ for (const phosphor of ['green', 'amber', 'red', 'purple', 'cyan', 'white'] as c
         const context = await browser.newContext({
           colorScheme: theme,
           baseURL: board.url,
-          storageState: signedInState(board.url, board.cookie),
+          storageState: signedInState(board.url, board.session),
         });
         const page = await context.newPage();
         await disableWebgl(page);

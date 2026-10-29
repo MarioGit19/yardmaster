@@ -8,6 +8,11 @@
       "types": "./src/index.ts",
       "yardmaster-build": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./session-keys": {
+      "types": "./src/session-keys.ts",
+      "yardmaster-build": "./dist/session-keys.js",
+      "default": "./src/session-keys.ts"
     }
   },
   "scripts": {

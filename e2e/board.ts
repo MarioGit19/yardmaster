@@ -11,8 +11,8 @@ const BOOT_TIMEOUT_MS = 30_000;
 export interface DemoBoard {
   /** Origin, e.g. `http://127.0.0.1:51234`. */
   url: string;
-  /** `name=value` of the session cookie. */
-  cookie: string;
+  /** A browser session secret, signed in through a one-time `/auth?c=` link. */
+  session: string;
   /** The throwaway `YARDMASTER_HOME`. */
   home: string;
   /** The throwaway `CLAUDE_CONFIG_DIR` (inside `home`). */
@@ -21,7 +21,7 @@ export interface DemoBoard {
   stop(): Promise<void>;
 }
 
-/** Resolves with the sign-in URL the CLI prints once the server is listening. */
+/** Resolves with the one-time sign-in URL the CLI prints once the server is listening. */
 function waitForAuthUrl(child: ChildProcess): Promise<string> {
   return new Promise((resolve, reject) => {
     let output = '';
@@ -32,7 +32,7 @@ function waitForAuthUrl(child: ChildProcess): Promise<string> {
     };
     const onData = (chunk: Buffer) => {
       output += chunk.toString();
-      const match = /(http:\/\/\S+\/auth\?t=\S+)/.exec(output);
+      const match = /(http:\/\/\S+\/auth\?c=\S+)/.exec(output);
       if (!match?.[1]) return;
       clearTimeout(timer);
       resolve(match[1]);
@@ -44,9 +44,14 @@ function waitForAuthUrl(child: ChildProcess): Promise<string> {
   });
 }
 
+/** The secret a sign-in or pairing page hands to the board's origin, or null. */
+export function sessionFromPage(html: string): string | null {
+  return /<meta name="yardmaster-session" content="([^"]+)">/.exec(html)?.[1] ?? null;
+}
+
 /**
  * Boots `yardmaster start --demo --no-open` on a random port with a throwaway home, then signs in
- * through `/auth?t=` and returns the origin and session cookie.
+ * through the one-time `/auth?c=` link and returns the origin and the session secret.
  */
 export function startDemoBoard(): Promise<DemoBoard> {
   return startBoard({ demo: true });
@@ -102,11 +107,11 @@ export async function startBoard({
   try {
     const authUrl = await waitForAuthUrl(child);
     const response = await fetch(authUrl, { redirect: 'manual' });
-    const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];
-    if (response.status !== 302 || !cookie) {
+    const session = sessionFromPage(await response.text());
+    if (response.status !== 200 || !session) {
       throw new Error(`sign-in through /auth failed with HTTP ${response.status}`);
     }
-    return { url: new URL(authUrl).origin, cookie, home, claudeDir, stop };
+    return { url: new URL(authUrl).origin, session, home, claudeDir, stop };
   } catch (err) {
     await stop();
     throw err;

@@ -7,7 +7,7 @@ async function openBoard(browser: Browser): Promise<{ page: Page; stop(): Promis
   const board = await startDemoBoard();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
   });
   const stop = async () => {
     await context.close();

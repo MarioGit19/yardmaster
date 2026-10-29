@@ -32,7 +32,7 @@ test('opens a library folder with Cursor, a terminal and a Claude session', asyn
   test.slow();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport: { width: 1440, height: 900 },
   });
   try {
@@ -116,7 +116,7 @@ test('opens a library folder with Cursor, a terminal and a Claude session', asyn
 test('starts only a terminal from the rail button', async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport: { width: 1440, height: 900 },
   });
   try {

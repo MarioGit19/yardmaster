@@ -1,6 +1,6 @@
 import { devices, type Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
-import { expect, signedInState, test } from './fixtures.js';
+import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
 // 12.6e2: dev servers on the phone. The demo simulates Tailscale (`demo-mac.tailnet-demo.ts.net`),
 // on its own board so the shared ports never show up in other specs' screenshots.
@@ -28,7 +28,11 @@ async function portOwner(
   port: number,
 ): Promise<{ projectId: string; terminalId: string }> {
   const owner = await page.evaluate(async (wanted) => {
-    const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/ui`);
+    const session = localStorage.getItem('yardmaster.session');
+    const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/ui`, [
+      'yardmaster',
+      `yardmaster.session.${session}`,
+    ]);
     const snapshot = await new Promise<{
       ports: Record<string, { port: number; terminalId: string | null; projectId: string | null }>;
     }>((resolve) => {
@@ -48,7 +52,9 @@ async function portOwner(
 }
 
 async function sharedPorts(page: Page): Promise<number[]> {
-  const res = await page.request.get('/api/ports/shares');
+  const res = await page.request.get('/api/ports/shares', {
+    headers: sessionHeader(board.session),
+  });
   const body = (await res.json()) as {
     available: boolean;
     shares: { port: number; mine: boolean }[];
@@ -64,7 +70,7 @@ test.describe('on a desktop', () => {
     test.slow();
     const context = await browser.newContext({
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
       viewport: { width: 1440, height: 900 },
     });
     try {
@@ -121,7 +127,7 @@ test.describe('on a phone', () => {
       ...galaxy,
       viewport: { width: 412, height: 915 },
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
     });
     try {
       const page = await context.newPage();

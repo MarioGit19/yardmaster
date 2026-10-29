@@ -77,7 +77,7 @@ async function openBoard(
   const context = await browser.newContext({
     ...options,
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
   });
   const stop = async () => {
     await context.close();
@@ -1389,7 +1389,7 @@ test.describe('the Retro console', () => {
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
     });
     try {
       const page = await context.newPage();

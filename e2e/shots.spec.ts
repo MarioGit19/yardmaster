@@ -73,6 +73,68 @@ for (const theme of THEMES) {
   }
 }
 
+// The board asks a browser without a live session to sign in again; a phone (over its ts.net name)
+// to pair again. Settings' full-page shots above carry the signed-in browsers list.
+test.describe('sign in again', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      test(`${viewport.width}-${theme}`, async ({ browser, baseURL }) => {
+        const context = await browser.newContext({
+          baseURL,
+          viewport,
+          colorScheme: theme,
+          // Not signed in: the fixtures' session would otherwise carry over.
+          storageState: { cookies: [], origins: [] },
+        });
+        await context.addInitScript(
+          (value) => localStorage.setItem('yardmaster.theme', value),
+          theme,
+        );
+        try {
+          const page = await context.newPage();
+          await page.goto('/');
+          await expect(page.locator('[data-sign-in]')).toBeVisible();
+          await page.waitForTimeout(600);
+          await page.screenshot({
+            path: new URL(`sign-in-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        } finally {
+          await context.close();
+        }
+      });
+    }
+  }
+});
+
+// Settings → Data and security: every signed-in browser and phone, this one marked.
+test.describe('signed-in browsers', () => {
+  for (const theme of THEMES) {
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      test.describe(`${viewport.width}-${theme}`, () => {
+        test.use({ theme, viewport });
+        test('settings', async ({ page }) => {
+          await openRoute(page, '/settings');
+          const section = page.getByRole('region', { name: 'Data and security' });
+          await section.locator('[data-setting="sessions"] [data-current]').waitFor();
+          await section.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(400);
+          await section.screenshot({
+            path: new URL(`settings-sessions-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        });
+      });
+    }
+  }
+});
+
 // Ambient field at rest and at full energy (debug slider on /_tokens), and the Reduced field.
 test.describe('ambient field', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
@@ -1478,7 +1540,7 @@ test.describe('layouts', () => {
               viewport,
               colorScheme: theme,
               baseURL: board.url,
-              storageState: signedInState(board.url, board.cookie),
+              storageState: signedInState(board.url, board.session),
             });
             const page = await context.newPage();
             await page.addInitScript((t) => {
@@ -1589,7 +1651,7 @@ test.describe('layouts stress', () => {
           viewport: { width: 1440, height: 900 },
           colorScheme: 'dark',
           baseURL: board.url,
-          storageState: signedInState(board.url, board.cookie),
+          storageState: signedInState(board.url, board.session),
         });
         const page = await context.newPage();
         await page.addInitScript((l) => {
@@ -1783,7 +1845,7 @@ test.describe('board terminal', () => {
             viewport,
             colorScheme: theme,
             baseURL: board.url,
-            storageState: signedInState(board.url, board.cookie),
+            storageState: signedInState(board.url, board.session),
           });
           const page = await context.newPage();
           await page.addInitScript((t) => localStorage.setItem('yardmaster.theme', t), theme);

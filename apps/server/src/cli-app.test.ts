@@ -145,6 +145,7 @@ describe('the rename from c-board', () => {
           return {
             server: { address: () => ({ port: 4317, address: '127.0.0.1', family: 'IPv4' }) },
             log: { info: () => {} },
+            browserSessions: { createSignInCode: () => ({ code: 'one-time-code', expiresAt: 0 }) },
           } as unknown as FastifyInstance;
         },
         openBrowser: async () => false,
@@ -176,6 +177,7 @@ describe('yardmaster start', () => {
       return {
         server: { address: () => ({ port, address: '127.0.0.1', family: 'IPv4' }) },
         log: { info: () => {} },
+        browserSessions: { createSignInCode: () => ({ code: 'one-time-code', expiresAt: 0 }) },
       } as unknown as FastifyInstance;
     };
     return { calls, startServer };
@@ -191,7 +193,8 @@ describe('yardmaster start', () => {
     const token = (await readFile(join(home, '.yardmaster', 'token'), 'utf8')).trim();
     expect(calls[0]?.[1]).toMatchObject({ token, demo: false });
     expect(calls[0]?.[1].webRoot).toMatch(/web[/\\]dist$/);
-    expect(openBrowser).toHaveBeenCalledWith(`http://127.0.0.1:4317/auth?t=${token}`);
+    // A one-time code, never the install token, so the token stays out of browser history.
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4317/auth?c=one-time-code');
     expect(onStarted).toHaveBeenCalledOnce();
     expect(t.out()).toContain('running at http://127.0.0.1:4317 (opened in your browser)');
     expect(t.out()).not.toContain(token);
@@ -205,7 +208,8 @@ describe('yardmaster start', () => {
     expect(await runCli(['start', '--demo', '--no-open'], t.io)).toBeNull();
     expect(calls[0]?.[1].demo).toBe(true);
     expect(openBrowser).not.toHaveBeenCalled();
-    expect(t.out()).toMatch(/Sign in with: http:\/\/127\.0\.0\.1:4318\/auth\?t=[\w-]{43}\n/);
+    expect(t.out()).toContain('Sign in with: http://127.0.0.1:4318/auth?c=one-time-code\n');
+    expect(t.out()).toContain('single use');
   });
 
   it('treats bare flags as start', async () => {
@@ -240,7 +244,17 @@ describe('yardmaster start', () => {
     const { startServer } = fakeServer(4317);
     const t = testIo({}, { startServer, openBrowser: async () => false });
     await runCli(['start'], t.io);
-    expect(t.out()).toContain('Sign in with: http://127.0.0.1:4317/auth?t=');
+    expect(t.out()).toContain('Sign in with: http://127.0.0.1:4317/auth?c=');
+  });
+
+  it('signs in on the dev server when one is configured', async () => {
+    const { startServer } = fakeServer(4317);
+    const t = testIo(
+      { YARDMASTER_DEV_ORIGINS: 'http://127.0.0.1:4327' },
+      { startServer, openBrowser: async () => false },
+    );
+    await runCli(['start', '--no-open'], t.io);
+    expect(t.out()).toContain('Sign in with: http://127.0.0.1:4327/auth?c=one-time-code');
   });
 
   it('explains a busy port', async () => {
@@ -267,6 +281,57 @@ describe('yardmaster start', () => {
   });
 });
 
+describe('yardmaster open', () => {
+  it('opens a one-time link from the running board', async () => {
+    const openBrowser = vi.fn(async () => true);
+    const requestSignInLink = vi.fn(async () => ({
+      ok: true as const,
+      url: 'http://127.0.0.1:4317/auth?c=fresh',
+    }));
+    const t = testIo({}, { openBrowser, requestSignInLink });
+    expect(await runCli(['open'], t.io)).toBe(0);
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:4317/auth?c=fresh');
+    expect(t.out()).toContain('Opened Yardmaster');
+  });
+
+  it('--print prints it instead', async () => {
+    const openBrowser = vi.fn(async () => true);
+    const requestSignInLink = async () => ({
+      ok: true as const,
+      url: 'http://127.0.0.1:4317/auth?c=fresh',
+    });
+    const t = testIo({}, { openBrowser, requestSignInLink });
+    expect(await runCli(['open', '--print'], t.io)).toBe(0);
+    expect(openBrowser).not.toHaveBeenCalled();
+    expect(t.out()).toContain('Sign in with: http://127.0.0.1:4317/auth?c=fresh');
+  });
+
+  it('says so when the board isn’t running', async () => {
+    const t = testIo({}, { openBrowser: async () => true });
+    expect(await runCli(['open'], t.io)).toBe(1);
+    expect(t.err()).toContain('Yardmaster is not running');
+  });
+
+  it('asks the real board over its socket with the token', async () => {
+    let app: FastifyInstance | undefined;
+    const started = testIo(
+      { YARDMASTER_PORT: '0' },
+      { openBrowser: async () => true, onStarted: (s) => (app = s) },
+    );
+    expect(await runCli(['start', '--no-open'], started.io)).toBeNull();
+    if (!app) throw new Error('server did not start');
+    closers.push(() => (app as FastifyInstance).close());
+    const port = (app.server.address() as { port: number }).port;
+    const t = testIo({ YARDMASTER_PORT: '0' });
+    expect(await runCli(['open', '--print'], t.io)).toBe(0);
+    const url = /Sign in with: (\S+)/.exec(t.out())?.[1] ?? '';
+    expect(url).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${port}/auth\\?c=[\\w-]+$`));
+    const res = await fetch(url, { headers: { host: `127.0.0.1:${port}` } });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('yardmaster-session');
+  });
+});
+
 describe('default doctor deps', () => {
   it('detects a busy port', async () => {
     const deps = defaultDoctorDeps(home, {});
@@ -290,7 +355,7 @@ describe('default doctor deps', () => {
 });
 
 describe('browserCommand', () => {
-  const url = 'http://127.0.0.1:4317/auth?t=abc';
+  const url = 'http://127.0.0.1:4317/auth?c=abc';
   it('picks the platform opener', () => {
     expect(browserCommand(url, 'darwin')).toEqual(['open', [url]]);
     expect(browserCommand(url, 'linux')).toEqual(['xdg-open', [url]]);

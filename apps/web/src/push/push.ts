@@ -1,5 +1,6 @@
 import { PushSubscribeResponse } from '@yardmaster/protocol';
 import { useEffect, useSyncExternalStore } from 'react';
+import { boardFetch } from '../auth/session.js';
 import type { BoardClient } from '../data/client.js';
 import { useBoardClient } from '../data/index.js';
 import { api } from '../settings/api.js';
@@ -101,9 +102,8 @@ async function registration(): Promise<ServiceWorkerRegistration> {
 }
 
 async function sendSubscription(subscription: PushSubscription): Promise<string> {
-  const res = await fetch('/api/push/subscriptions', {
+  const res = await boardFetch('/api/push/subscriptions', {
     method: 'POST',
-    credentials: 'same-origin',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(subscription.toJSON()),
   });

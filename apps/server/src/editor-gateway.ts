@@ -221,6 +221,11 @@ export class EditorGateway {
     socket.on('error', (error) => this.log.debug({ err: error }, 'editor socket error'));
   }
 
+  /** Closes every editor socket (token rotation): editors reconnect with the new token. */
+  disconnectAll(code: number, reason: string): void {
+    for (const connection of this.connections) connection.socket.close(code, reason);
+  }
+
   close(): void {
     for (const entry of this.windows.values()) clearTimeout(entry.removeTimer);
     this.windows.clear();

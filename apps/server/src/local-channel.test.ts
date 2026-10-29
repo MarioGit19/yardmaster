@@ -118,7 +118,11 @@ describe('the local socket', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     const { url } = DashboardLinkResponse.parse(res.json());
-    expect(url).toBe(`http://${host(server)}/auth?t=${token}`);
+    // A one-time code, never the install token.
+    expect(url).toMatch(new RegExp(`^http://${host(server)}/auth\\?c=[\\w-]+$`));
+    expect(url).not.toContain(token);
+    const code = new URL(url).searchParams.get('c') ?? '';
+    expect(server.browserSessions.redeemSignIn(code, undefined).ok).toBe(true);
     const unauthorized = await localInject(server, {
       method: 'POST',
       url: '/api/local/dashboard-link',

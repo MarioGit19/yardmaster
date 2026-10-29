@@ -1354,7 +1354,7 @@ async function record(browser: Browser, scenario: Scenario, ffmpeg: boolean, red
   const videoDir = join(board.home, 'video');
   const options: BrowserContextOptions = {
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport,
     colorScheme: 'dark',
     reducedMotion: 'no-preference',

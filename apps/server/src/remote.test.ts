@@ -1,12 +1,13 @@
-import { PAIRING_CODE_TTL_MS } from '@yardmaster/protocol';
+import { PAIRING_CODE_TTL_MS, REMOTE_SESSION_IDLE_MS, SESSION_HEADER } from '@yardmaster/protocol';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { buildServer, startServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { EDITOR_WS_PATH } from './editor-gateway.js';
-import { DEVICE_COOKIE, deviceName, RemoteDevices, remoteHosts } from './remote.js';
+import { deviceName, LEGACY_DEVICES_KEY, remoteHosts } from './remote.js';
 import { TOKEN_HEADER } from './security.js';
+import { BrowserSessions } from './sessions.js';
 import { generateToken } from './token.js';
 import { UI_WS_PATH } from './ui-gateway.js';
 
@@ -68,16 +69,24 @@ async function pairingPath(instance: FastifyInstance): Promise<string> {
   return `${url.pathname}${url.search}`;
 }
 
-/** Pairs a phone and returns its device cookie (`name=value`). */
-async function pair(instance: FastifyInstance): Promise<string> {
+/** The secret a pairing page hands to the phone's origin. */
+function pageSecret(html: string): string {
+  const match = /<meta name="yardmaster-session" content="([^"]+)">/.exec(html);
+  if (!match?.[1]) throw new Error('expected a session page');
+  return match[1];
+}
+
+/** Pairs a phone and returns its session header. */
+async function pair(instance: FastifyInstance): Promise<Record<string, string>> {
   const res = await call(instance, 'GET', await pairingPath(instance), {
     ...remote,
     'user-agent': IPHONE_UA,
   });
-  expect(res.statusCode).toBe(302);
-  const header = String(res.headers['set-cookie']);
-  return header.split(';', 1)[0] ?? '';
+  expect(res.statusCode).toBe(200);
+  return { [SESSION_HEADER]: pageSecret(res.body) };
 }
+
+const idOf = (header: Record<string, string>) => header[SESSION_HEADER]?.split('.')[0];
 
 describe('remote hosts', () => {
   it('are off by default', async () => {
@@ -144,7 +153,10 @@ describe('remote hosts', () => {
     const auth = await call(instance, 'GET', `/auth?t=${token}`, remote);
     expect(auth.statusCode).toBe(403);
     expect(auth.json()).toEqual({ error: 'pair_required' });
-    expect(auth.headers['set-cookie']).toBeUndefined();
+    const code = instance.browserSessions.createSignInCode().code;
+    const signIn = await call(instance, 'GET', `/auth?c=${code}`, remote);
+    expect(signIn.statusCode).toBe(403);
+    expect(instance.browserSessions.list()).toEqual([]);
   });
 
   it('never open the editor socket, even with the token', async () => {
@@ -193,55 +205,72 @@ describe('remote hosts', () => {
 });
 
 describe('pairing', () => {
-  it('signs a phone in with a one-time code and a Secure device cookie', async () => {
+  it('signs a phone in with a one-time code, handing its secret to the phone’s origin', async () => {
     const instance = await server();
     const path = await pairingPath(instance);
     const res = await call(instance, 'GET', path, { ...remote, 'user-agent': IPHONE_UA });
-    expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe('/');
-    const header = String(res.headers['set-cookie']);
-    expect(header).toMatch(new RegExp(`^${DEVICE_COOKIE}=`));
-    for (const attr of ['HttpOnly', 'SameSite=Strict', 'Secure', 'Path=/']) {
-      expect(header).toContain(attr);
-    }
-    const cookie = header.split(';', 1)[0] ?? '';
-    const settings = await call(instance, 'GET', '/api/settings', { ...remote, cookie });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.headers['referrer-policy']).toBe('no-referrer');
+    // The old device cookies are cleared; no new credential goes into a cookie.
+    const set = [res.headers['set-cookie'] ?? []].flat().map(String);
+    expect(set.some((c) => c.startsWith('yardmaster_device=;') && c.includes('Max-Age=0'))).toBe(
+      true,
+    );
+    for (const cookie of set) expect(cookie).toMatch(/^\w+=; /);
+    const phone = { [SESSION_HEADER]: pageSecret(res.body) };
+    const settings = await call(instance, 'GET', '/api/settings', { ...remote, ...phone });
     expect(settings.statusCode).toBe(200);
-    // The device cookie is for the phone's host only, not for the local board.
+    // The phone's session is for the phone's host only, not for the local board.
     const onLocal = await instance.inject({
       method: 'GET',
       url: '/api/settings',
-      headers: { ...local, cookie },
+      headers: { ...local, ...phone },
     });
     expect(onLocal.statusCode).toBe(401);
   });
 
-  it('keeps a phone paired before the rename signed in and moves its cookie', async () => {
+  it('signs nothing in with a device cookie from before per-browser sessions', async () => {
     const instance = await server();
-    const value = (await pair(instance)).split('=')[1] ?? '';
-    const cookie = `cboard_device=${value}`;
-    const res = await call(instance, 'GET', '/api/settings', { ...remote, cookie });
-    expect(res.statusCode).toBe(200);
-    const set = [res.headers['set-cookie']].flat().map(String);
-    expect(set[0]).toMatch(new RegExp(`^${DEVICE_COOKIE}=${value.replace('.', '\\.')};`));
-    expect(set[0]).toContain('Secure');
-    expect(set[1]).toMatch(/^cboard_device=;.*Max-Age=0/);
-    // A forged old cookie gets nothing, and no new cookie.
-    const forged = await call(instance, 'GET', '/api/settings', {
-      ...remote,
-      cookie: 'cboard_device=forged.secret',
-    });
-    expect(forged.statusCode).toBe(401);
-    expect(forged.headers['set-cookie']).toBeUndefined();
+    const phone = await pair(instance);
+    const value = phone[SESSION_HEADER] as string;
+    for (const cookie of [`yardmaster_device=${value}`, `cboard_device=${value}`]) {
+      const res = await call(instance, 'GET', '/api/settings', { ...remote, cookie });
+      expect(res.statusCode).toBe(401);
+      expect(res.headers['set-cookie']).toBeUndefined();
+    }
+  });
+
+  it('drops the device list paired with cookies, so those phones pair again', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { Persistence } = await import('./persistence.js');
+    const home = await mkdtemp(join(tmpdir(), 'yardmaster-remote-'));
+    try {
+      const dbPath = join(home, 'board.db');
+      const db = new Persistence({ home, path: dbPath });
+      db.setSetting(LEGACY_DEVICES_KEY, [
+        { id: 'old-phone-1', name: 'iPhone', hash: 'x', pairedAt: 1, lastSeenAt: 1 },
+      ]);
+      db.close();
+      app = await buildServer({ ...config, home }, { token, dbPath, processes: false, git: false });
+      expect(app.settings[LEGACY_DEVICES_KEY]).toBeUndefined();
+      expect(app.browserSessions.list()).toEqual([]);
+    } finally {
+      await app?.close();
+      app = undefined;
+      await rm(home, { recursive: true, force: true });
+    }
   });
 
   it('spends a code on first use', async () => {
     const instance = await server();
     const path = await pairingPath(instance);
-    expect((await call(instance, 'GET', path, remote)).statusCode).toBe(302);
+    expect((await call(instance, 'GET', path, remote)).statusCode).toBe(200);
     const again = await call(instance, 'GET', path, remote);
     expect(again.statusCode).toBe(401);
-    expect(again.headers['set-cookie']).toBeUndefined();
+    expect(again.body).not.toContain('yardmaster-session');
     expect(again.body).toContain('already used');
   });
 
@@ -253,7 +282,7 @@ describe('pairing', () => {
     now.mockReturnValue(start + PAIRING_CODE_TTL_MS + 1);
     const late = await call(instance, 'GET', path, remote);
     expect(late.statusCode).toBe(401);
-    expect(late.headers['set-cookie']).toBeUndefined();
+    expect(late.body).not.toContain('yardmaster-session');
     expect(late.body).toContain('expired');
     now.mockReturnValue(start);
     expect((await call(instance, 'GET', path, remote)).statusCode).toBe(401);
@@ -265,7 +294,7 @@ describe('pairing', () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(start);
     const path = await pairingPath(instance);
     now.mockReturnValue(start + PAIRING_CODE_TTL_MS - 1);
-    expect((await call(instance, 'GET', path, remote)).statusCode).toBe(302);
+    expect((await call(instance, 'GET', path, remote)).statusCode).toBe(200);
   });
 
   it('keeps one live code: a new one replaces the last', async () => {
@@ -273,7 +302,7 @@ describe('pairing', () => {
     const first = await pairingPath(instance);
     const second = await pairingPath(instance);
     expect((await call(instance, 'GET', first, remote)).statusCode).toBe(401);
-    expect((await call(instance, 'GET', second, remote)).statusCode).toBe(302);
+    expect((await call(instance, 'GET', second, remote)).statusCode).toBe(200);
   });
 
   it('refuses wrong, missing and local codes', async () => {
@@ -287,8 +316,8 @@ describe('pairing', () => {
 
   it('only makes codes on this machine, and only for a listed host', async () => {
     const instance = await server();
-    const cookie = await pair(instance);
-    const fromPhone = await call(instance, 'POST', '/api/remote/pair', { ...remote, cookie }, {});
+    const phone = await pair(instance);
+    const fromPhone = await call(instance, 'POST', '/api/remote/pair', { ...remote, ...phone }, {});
     expect(fromPhone.statusCode).toBe(403);
     expect(fromPhone.json()).toEqual({ error: 'local_only' });
     const unlisted = await call(instance, 'POST', '/api/remote/pair', local, {
@@ -314,8 +343,8 @@ describe('pairing', () => {
 describe('paired devices', () => {
   it('are listed without secrets, the calling one marked', async () => {
     const instance = await server();
-    const cookie = await pair(instance);
-    const res = await call(instance, 'GET', '/api/remote/devices', { ...remote, cookie });
+    const phone = await pair(instance);
+    const res = await call(instance, 'GET', '/api/remote/devices', { ...remote, ...phone });
     const { devices } = res.json();
     expect(devices).toHaveLength(1);
     expect(devices[0]).toMatchObject({ name: 'iPhone · Safari', current: true });
@@ -324,6 +353,11 @@ describe('paired devices', () => {
     );
     const fromMac = await call(instance, 'GET', '/api/remote/devices', local);
     expect(fromMac.json().devices[0].current).toBe(false);
+    // Browsers on this machine are sessions too, but not paired devices.
+    instance.browserSessions.create('local', undefined);
+    expect((await call(instance, 'GET', '/api/remote/devices', local)).json().devices).toHaveLength(
+      1,
+    );
   });
 
   it('can be revoked, which signs that device out and leaves the others', async () => {
@@ -331,17 +365,21 @@ describe('paired devices', () => {
     const first = await pair(instance);
     const second = await pair(instance);
     const { devices } = (await call(instance, 'GET', '/api/remote/devices', local)).json();
-    const firstId = first.split('=')[1]?.split('.')[0];
+    const firstId = idOf(first);
     expect(devices.map((d: { id: string }) => d.id)).toContain(firstId);
 
     const res = await call(instance, 'DELETE', `/api/remote/devices/${firstId}`, local);
     expect(res.statusCode).toBe(200);
-    const revoked = await call(instance, 'GET', '/api/settings', { ...remote, cookie: first });
+    const revoked = await call(instance, 'GET', '/api/settings', { ...remote, ...first });
     expect(revoked.statusCode).toBe(401);
-    const kept = await call(instance, 'GET', '/api/settings', { ...remote, cookie: second });
+    const kept = await call(instance, 'GET', '/api/settings', { ...remote, ...second });
     expect(kept.statusCode).toBe(200);
     const unknown = await call(instance, 'DELETE', `/api/remote/devices/${firstId}`, local);
     expect(unknown.statusCode).toBe(404);
+    // A browser on this machine isn't a paired device.
+    const mac = instance.browserSessions.create('local', undefined);
+    const notPhone = await call(instance, 'DELETE', `/api/remote/devices/${mac.session.id}`, local);
+    expect(notPhone.statusCode).toBe(404);
   });
 
   it('revoking closes the device’s open board socket', async () => {
@@ -368,11 +406,11 @@ describe('paired devices', () => {
       url: `${url.pathname}${url.search}`,
       headers: remote,
     });
-    const cookie = String(paired.headers['set-cookie']).split(';', 1)[0] ?? '';
-    const id = cookie.split('=')[1]?.split('.')[0];
+    const phone = { [SESSION_HEADER]: pageSecret(paired.body) };
+    const id = idOf(phone);
 
     const socket = new WebSocket(`ws://127.0.0.1:${port(app)}${UI_WS_PATH}`, {
-      headers: { ...remote, origin: `https://${PHONE_HOST}`, cookie },
+      headers: { ...remote, origin: `https://${PHONE_HOST}`, ...phone },
     });
     sockets.push(socket);
     await new Promise<void>((resolve, reject) => {
@@ -384,24 +422,41 @@ describe('paired devices', () => {
     expect(await closed).toBe(4401);
   });
 
-  it('persist across restarts', async () => {
+  it('persist across restarts, without their secrets', async () => {
     let saved: unknown = [];
     const make = () =>
-      new RemoteDevices({
+      new BrowserSessions({
         load: () => saved,
-        save: (devices) => {
-          saved = structuredClone(devices);
+        save: (list) => {
+          saved = structuredClone(list);
         },
       });
-    const devices = make();
-    const { code } = devices.createCode();
-    const result = devices.redeem(code, IPHONE_UA);
+    const sessions = make();
+    const { code } = sessions.createPairingCode();
+    const result = sessions.redeemPairing(code, IPHONE_UA);
     if (!result.ok) throw new Error('expected a pairing');
     const restarted = make();
-    expect(restarted.verify(result.cookie)).toBe(result.device.id);
-    expect(restarted.verify(`${result.device.id}.wrong-secret`)).toBeNull();
-    expect(restarted.verify('garbage')).toBeNull();
-    expect(JSON.stringify(saved)).not.toContain(result.cookie.split('.')[1]);
+    expect(restarted.verify(result.secret, 'remote')).toBe(result.session.id);
+    expect(restarted.verify(result.secret, 'local')).toBeNull();
+    expect(restarted.verify(`${result.session.id}.wrong-secret`, 'remote')).toBeNull();
+    expect(restarted.verify('garbage', 'remote')).toBeNull();
+    expect(JSON.stringify(saved)).not.toContain(result.secret.split('.')[1]);
+  });
+
+  it('expire after 30 days unused, sliding with use', () => {
+    let now = 1_700_000_000_000;
+    const sessions = new BrowserSessions({ load: () => [], save: () => {}, now: () => now });
+    const phone = sessions.create('remote', IPHONE_UA);
+    const mac = sessions.create('local', undefined);
+    now += REMOTE_SESSION_IDLE_MS - 60_000;
+    expect(sessions.verify(phone.secret, 'remote')).toBe(phone.session.id);
+    now += REMOTE_SESSION_IDLE_MS - 60_000;
+    expect(sessions.verify(phone.secret, 'remote')).toBe(phone.session.id);
+    now += REMOTE_SESSION_IDLE_MS + 1;
+    expect(sessions.verify(phone.secret, 'remote')).toBeNull();
+    expect(sessions.list().map((s) => s.id)).toEqual([mac.session.id]);
+    // Sessions on this machine last until revoked.
+    expect(sessions.verify(mac.secret, 'local')).toBe(mac.session.id);
   });
 });
 

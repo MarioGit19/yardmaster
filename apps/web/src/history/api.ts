@@ -1,5 +1,6 @@
 import { type SessionHistoryEntry, SessionHistoryResponse } from '@yardmaster/protocol';
 import { useEffect, useState } from 'react';
+import { boardFetch } from '../auth/session.js';
 
 export type HistoryState =
   | { status: 'loading' }
@@ -11,8 +12,7 @@ export async function fetchSessionHistory(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<SessionHistoryEntry[]> {
-  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/sessions`, {
-    credentials: 'same-origin',
+  const res = await boardFetch(`/api/projects/${encodeURIComponent(projectId)}/sessions`, {
     headers: { accept: 'application/json' },
     ...(signal ? { signal } : {}),
   });

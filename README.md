@@ -99,7 +99,7 @@ To get a global `yardmaster` command, run `npm i -g .` in the clone after `pnpm 
 pnpm board          # builds, then serves the board on http://127.0.0.1:4317
 ```
 
-It prints a one-time sign-in link; open it in your browser. A first-run guide checks each step below with you.
+It prints a one-time sign-in link (single use, valid for 5 minutes); open it in your browser. `pnpm yardmaster open` makes a new one for another browser. A first-run guide checks each step below with you.
 
 **2. Install the Claude Code hooks.** They are merged into `~/.claude/settings.json` after a timestamped backup, and never touch your other hooks. Add `--dry-run` to see the diff first, or `--away` to also install the away-mode permission hook.
 
@@ -130,7 +130,7 @@ Yardmaster only ever listens on `127.0.0.1`. To use it from your phone, put both
 
 **Yardmaster runs locally, uses your own Claude Code login, and has no telemetry.**
 
-- The server binds `127.0.0.1` only, checks the `Host` and `Origin` of every request, and requires a per-install token (`~/.yardmaster/token`, mode 0600) or a session cookie.
+- The server binds `127.0.0.1` only, checks the `Host` and `Origin` of every request, and requires a per-install token (`~/.yardmaster/token`, mode 0600) or a browser session. Each browser signs in with a one-time link and keeps its own session in the board's own storage, never in a cookie, so dev servers on other ports of the same host never see it. Settings lists every signed-in browser and phone and can sign any of them out.
 - The editor extension and the Claude hooks talk to it only through a socket in `~/.yardmaster` that only you can reach, so another program holding the port can't collect the token or answer in Yardmaster's place.
 - It never reads your Claude credentials (`~/.claude/.credentials*`, the Keychain, `~/.claude.json`) and never asks for an API key. If `ANTHROPIC_API_KEY` is set in the server's environment, the Agent SDK bills that key instead; `doctor` warns about it.
 - It makes no network calls of its own. Fonts and assets are bundled.
@@ -154,12 +154,12 @@ Run `pnpm yardmaster doctor` first. It checks Node.js, the token, whether the se
 - **No Claude sessions show up:** check `pnpm yardmaster hooks status`, then restart your Claude sessions: Claude Code reads its hooks when a session starts.
 - **A terminal says "output unavailable":** it was running before the extension started. Restart the command.
 - **Board sessions were interrupted:** the server restarted (for example `pnpm dev` after an edit). Use **Resume**; `pnpm board` gives you a board that stays up.
-- **Signed out in the browser:** run `pnpm board` again and open the sign-in link it prints. `pnpm yardmaster token --rotate` signs out every browser.
+- **Signed out in the browser:** run `pnpm yardmaster open` (or Yardmaster: Open Dashboard in your editor) for a new one-time sign-in link. `pnpm yardmaster token --rotate` signs out every browser and phone.
 
 ## Contributing
 
 ```bash
-pnpm dev:demo       # server and web in watch mode, with synthetic demo data
+pnpm dev:demo       # server and web in watch mode (web on http://127.0.0.1:4327), with synthetic demo data
 pnpm check          # privacy check, lint, typecheck and unit tests
 pnpm e2e            # Playwright against the demo board
 pnpm shots          # screenshots into artifacts/shots/

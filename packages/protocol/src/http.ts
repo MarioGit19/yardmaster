@@ -235,7 +235,7 @@ export const HooksInstallResponse = z.object({
 });
 export type HooksInstallResponse = z.infer<typeof HooksInstallResponse>;
 
-/** `POST /api/token/rotate`: also sets a fresh session cookie for the calling browser. */
+/** A plain success. */
 export const OkResponse = z.object({ ok: z.literal(true) });
 export type OkResponse = z.infer<typeof OkResponse>;
 

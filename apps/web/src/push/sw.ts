@@ -1,3 +1,4 @@
+import { readStoredSession } from '../auth/idb.js';
 import {
   closeAnswered,
   readPayload,
@@ -26,6 +27,7 @@ interface NotificationEvent extends ExtendableEvent {
 }
 interface WorkerScope {
   location: Location;
+  indexedDB: IDBFactory;
   registration: {
     showNotification(title: string, options: object): Promise<void>;
     getNotifications(filter?: { tag?: string }): Promise<ShownNotification[]>;
@@ -78,6 +80,7 @@ worker.addEventListener('notificationclick', (event) => {
     routeClick(action, notification.data, {
       origin: worker.location.origin,
       fetch: (url, init) => fetch(url, init),
+      session: () => readStoredSession(worker.indexedDB),
       windows: () => worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
       openWindow: (url) => worker.clients.openWindow(url),
     }),

@@ -151,7 +151,7 @@ for (const profile of PROFILES) {
       const context = await browser.newContext({
         ...profile.device,
         baseURL: board.url,
-        storageState: signedInState(board.url, board.cookie),
+        storageState: signedInState(board.url, board.session),
       });
       try {
         const page = await context.newPage();
@@ -325,7 +325,7 @@ test.describe('board terminal on a phone', () => {
       ...PROFILES[0].device,
       viewport: { width, height },
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
     });
     await context.addInitScript(NO_WEBGL);
     try {

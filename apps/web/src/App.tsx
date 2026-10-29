@@ -6,6 +6,8 @@ import { AmbientField } from './ambient/AmbientField.js';
 import { useBackdropTaken } from './ambient/backdrop.js';
 import { AttentionAlerts } from './attention/AttentionAlerts.js';
 import { AttentionCenter, AttentionPage } from './attention/AttentionCenter.js';
+import { SignInScreen } from './auth/SignInScreen.js';
+import { useSignedOut } from './auth/session.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { useLayoutShortcuts } from './layouts/LayoutStage.js';
@@ -145,6 +147,15 @@ function AmbientGate() {
 export function App({ locationHook = useHashLocation }: { locationHook?: BaseLocationHook }) {
   useTheme();
   useLayoutShortcuts();
+  const signedOut = useSignedOut();
+  if (signedOut) {
+    return (
+      <MotionRoot>
+        <AmbientGate />
+        <SignInScreen />
+      </MotionRoot>
+    );
+  }
   return (
     <MotionRoot>
       <AmbientGate />

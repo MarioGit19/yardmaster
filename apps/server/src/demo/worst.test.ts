@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { startServer } from '../app.js';
 import type { ServerConfig } from '../config.js';
-import { createSessionValue } from '../security.js';
+import { sessionHeader } from '../sessions.test-helpers.js';
 import { generateToken } from '../token.js';
 import { UI_WS_PATH } from '../ui-gateway.js';
 import { WorstBoard } from './worst.js';
@@ -95,7 +95,7 @@ describe('WorstBoard', () => {
 async function snapshot(port: number, query = ''): Promise<BoardState> {
   const origin = `http://127.0.0.1:${port}`;
   const socket = new WebSocket(`ws://127.0.0.1:${port}${UI_WS_PATH}${query}`, {
-    headers: { origin, cookie: `yardmaster_session=${createSessionValue(token)}` },
+    headers: { origin, ...sessionHeader(app as FastifyInstance) },
   });
   sockets.push(socket);
   return new Promise((resolve, reject) => {

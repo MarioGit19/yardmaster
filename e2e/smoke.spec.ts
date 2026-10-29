@@ -16,7 +16,7 @@ test('the demo board loads, navigates to a project and opens settings', async ({
   expect(errors).toEqual([]);
 });
 
-test('the API rejects requests without the session cookie', async ({ baseURL }) => {
+test('the API rejects requests without a session', async ({ baseURL }) => {
   const response = await fetch(new URL('/api/status', baseURL));
   expect(response.status).toBe(401);
 });

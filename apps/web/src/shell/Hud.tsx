@@ -68,6 +68,8 @@ export function connectionView(connection: ConnectionState): { tone: Tone; label
       return { tone: 'err', label: 'Reconnecting…' };
     case 'stopped':
       return { tone: 'idle', label: 'Offline' };
+    case 'signedOut':
+      return { tone: 'idle', label: 'Signed out' };
   }
 }
 

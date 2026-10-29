@@ -1,15 +1,10 @@
+import { SESSION_HEADER } from '@yardmaster/protocol';
 import Fastify, { type FastifyInstance, type InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildServer, startServer } from './app.js';
 import type { ServerConfig } from './config.js';
-import {
-  createSessionValue,
-  readCookie,
-  registerSecurity,
-  SESSION_COOKIE,
-  TOKEN_HEADER,
-  verifySessionValue,
-} from './security.js';
+import { registerSecurity, signInUrl, TOKEN_HEADER } from './security.js';
+import { BrowserSessions } from './sessions.js';
 import { generateToken } from './token.js';
 
 const config: ServerConfig = {
@@ -38,9 +33,12 @@ async function server(overrides: Partial<ServerConfig> = {}): Promise<FastifyIns
 }
 
 /** A bare app with the security layer and protected probe routes (real ones come later). */
+let probeSessions: BrowserSessions;
+
 async function withProbe(): Promise<FastifyInstance> {
   app = Fastify();
-  registerSecurity(app, { config, token });
+  probeSessions = new BrowserSessions({ load: () => [], save: () => {} });
+  registerSecurity(app, { config, token, sessions: probeSessions });
   app.get('/api/probe', async (request) => ({ authorized: request.isAuthorized() }));
   app.post('/api/probe', async () => ({ ok: true }));
   await app.ready();
@@ -51,10 +49,16 @@ function get(instance: FastifyInstance, url: string, headers: InjectOptions['hea
   return instance.inject({ method: 'GET', url, headers: { host, ...headers } });
 }
 
-function sessionCookie(setCookie: string | string[] | undefined): string {
-  const header = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-  if (!header) throw new Error('expected a Set-Cookie header');
-  return header.split(';', 1)[0] ?? '';
+/** The secret a sign-in page hands to the board's origin. */
+function pageSecret(html: string): string {
+  const match = /<meta name="yardmaster-session" content="([^"]+)">/.exec(html);
+  if (!match?.[1]) throw new Error('expected a session page');
+  return match[1];
+}
+
+/** A one-time sign-in code, as `yardmaster start` mints it. */
+function signInCode(instance: FastifyInstance): string {
+  return instance.browserSessions.createSignInCode().code;
 }
 
 describe('Host allowlist', () => {
@@ -85,9 +89,12 @@ describe('Host allowlist', () => {
   });
 
   it('rejects a wrong Host on /auth', async () => {
-    const res = await get(await server(), `/auth?t=${token}`, { host: 'rebind.example.test:4317' });
+    const instance = await server();
+    const res = await get(instance, `/auth?c=${signInCode(instance)}`, {
+      host: 'rebind.example.test:4317',
+    });
     expect(res.statusCode).toBe(403);
-    expect(res.headers['set-cookie']).toBeUndefined();
+    expect(res.body).not.toContain('yardmaster-session');
   });
 
   it('accepts the bracketed IPv6 host when bound to ::1', async () => {
@@ -187,16 +194,12 @@ describe('API auth guard', () => {
     expect(res.json()).toEqual({ authorized: true });
   });
 
-  it('accepts the old X-CBoard-Token header and session cookie for one version', async () => {
+  it('accepts the old X-CBoard-Token header for one version, but no cookie', async () => {
     const instance = await withProbe();
     const byHeader = await get(instance, '/api/probe', { 'x-cboard-token': token });
     expect(byHeader.json()).toEqual({ authorized: true });
     const wrong = await get(instance, '/api/probe', { 'x-cboard-token': generateToken() });
     expect(wrong.statusCode).toBe(401);
-    const byCookie = await get(instance, '/api/probe', {
-      cookie: `cboard_session=${createSessionValue(token)}`,
-    });
-    expect(byCookie.json()).toEqual({ authorized: true });
   });
 
   it('guards percent-encoded variants of /api routes', async () => {
@@ -207,73 +210,124 @@ describe('API auth guard', () => {
     }
   });
 
-  it('rejects a forged or stale session cookie', async () => {
+  it('accepts a live session header and refuses a forged, revoked or remote one', async () => {
     const instance = await withProbe();
-    const forged = `${SESSION_COOKIE}=${createSessionValue(generateToken())}`;
-    expect((await get(instance, '/api/probe', { cookie: forged })).statusCode).toBe(401);
-    expect(
-      (await get(instance, '/api/probe', { cookie: `${SESSION_COOKIE}=garbage` })).statusCode,
-    ).toBe(401);
-    const valid = `${SESSION_COOKIE}=${createSessionValue(token)}`;
-    expect((await get(instance, '/api/probe', { cookie: valid })).json()).toEqual({
-      authorized: true,
-    });
+    const local = probeSessions.create('local', undefined);
+    const ok = await get(instance, '/api/probe', { [SESSION_HEADER]: local.secret });
+    expect(ok.json()).toEqual({ authorized: true });
+
+    const [id] = local.secret.split('.');
+    for (const forged of [`${id}.${generateToken()}`, 'garbage', `${local.secret}x`, '']) {
+      expect((await get(instance, '/api/probe', { [SESSION_HEADER]: forged })).statusCode).toBe(
+        401,
+      );
+    }
+    // A phone's session counts only over Tailscale.
+    const phone = probeSessions.create('remote', undefined);
+    expect((await get(instance, '/api/probe', { [SESSION_HEADER]: phone.secret })).statusCode).toBe(
+      401,
+    );
+    probeSessions.revoke(local.session.id);
+    expect((await get(instance, '/api/probe', { [SESSION_HEADER]: local.secret })).statusCode).toBe(
+      401,
+    );
+  });
+
+  it('ignores every cookie: a browser sends the board’s host cookies to any port', async () => {
+    const instance = await withProbe();
+    const secret = probeSessions.create('local', undefined).secret;
+    const cookie = [
+      `yardmaster_session=${secret}`,
+      `cboard_session=${secret}`,
+      `yardmaster_device=${secret}`,
+      `${SESSION_HEADER}=${secret}`,
+      'theme=dark',
+    ].join('; ');
+    const res = await get(instance, '/api/probe', { cookie });
+    expect(res.statusCode).toBe(401);
   });
 });
 
-describe('/auth cookie flow', () => {
-  it('sets a signed HttpOnly SameSite=Strict cookie and redirects to /', async () => {
+describe('sessionSecretOf', () => {
+  it('reads the subprotocol only on a WebSocket upgrade', async () => {
+    const instance = await withProbe();
+    const secret = probeSessions.create('local', undefined).secret;
+    const protocols = `yardmaster, yardmaster.session.${secret}`;
+    const plain = await get(instance, '/api/probe', { 'sec-websocket-protocol': protocols });
+    expect(plain.statusCode).toBe(401);
+  });
+});
+
+describe('/auth one-time sign-in', () => {
+  it('spends a code once and hands the secret to the page, never in a cookie or URL', async () => {
     const instance = await server();
-    const res = await get(instance, `/auth?t=${token}`);
-    expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe('/');
+    const code = signInCode(instance);
+    const res = await get(instance, `/auth?c=${code}`, {
+      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140.0 Safari/537.36',
+    });
+    expect(res.statusCode).toBe(200);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['referrer-policy']).toBe('no-referrer');
+    expect(res.headers.location).toBeUndefined();
+    // Only expired old cookies, never a credential.
+    for (const cookie of [res.headers['set-cookie'] ?? []].flat()) {
+      expect(cookie).toMatch(/^\w+=; .*Max-Age=0$/);
+    }
+    const secret = pageSecret(res.body);
+    expect(res.body).not.toContain(token);
+    expect(res.body).toContain('localStorage.setItem("yardmaster.session"');
 
-    const setCookie = String(res.headers['set-cookie']);
-    expect(setCookie).toMatch(new RegExp(`^${SESSION_COOKIE}=`));
-    expect(setCookie).toContain('HttpOnly');
-    expect(setCookie).toContain('SameSite=Strict');
-    expect(setCookie).toContain('Path=/');
-    // The cookie is derived from the token, never the token itself.
-    expect(setCookie).not.toContain(token);
-
-    const cookie = sessionCookie(res.headers['set-cookie']);
-    const authed = await get(instance, '/api/nope', { cookie: `theme=dark; ${cookie}` });
+    const authed = await get(instance, '/api/nope', { [SESSION_HEADER]: secret });
     // Authorized, so the request reaches routing (404) instead of the guard (401).
     expect(authed.statusCode).toBe(404);
+    expect(instance.browserSessions.list()).toMatchObject([
+      { kind: 'local', name: 'Mac · Chrome' },
+    ]);
+
+    const again = await get(instance, `/auth?c=${code}`);
+    expect(again.statusCode).toBe(401);
+    expect(again.body).toContain('already used');
+    expect(again.body).not.toContain('yardmaster-session');
   });
 
-  it('rejects a wrong or missing token without setting a cookie', async () => {
+  it('refuses an expired code', async () => {
+    let now = 1_000_000;
+    const sessions = new BrowserSessions({ load: () => [], save: () => {}, now: () => now });
+    const { code } = sessions.createSignInCode();
+    now += 5 * 60 * 1000 + 1;
+    expect(sessions.redeemSignIn(code, undefined)).toEqual({ ok: false, error: 'expired' });
+    // Spent anyway.
+    expect(sessions.redeemSignIn(code, undefined)).toEqual({ ok: false, error: 'invalid' });
+  });
+
+  it('never signs in with the install token: `?t=` shows the new-link page', async () => {
     const instance = await server();
-    for (const url of [`/auth?t=${generateToken()}`, '/auth', '/auth?t=', '/auth?t=a&t=b']) {
+    for (const url of [`/auth?t=${token}`, `/auth?t=${generateToken()}`, '/auth?t=']) {
       const res = await get(instance, url);
-      expect(res.statusCode, url).toBe(401);
-      expect(res.headers['set-cookie'], url).toBeUndefined();
+      expect(res.statusCode, url).toBe(410);
+      expect(res.body).toContain('Use the new sign-in link');
+      expect(res.body).toContain('yardmaster open');
+      expect(res.body).not.toContain('yardmaster-session');
+      expect(res.headers['cache-control']).toBe('no-store');
     }
+    expect(instance.browserSessions.list()).toEqual([]);
   });
 
-  it('redirects an already authenticated browser without a token', async () => {
+  it('refuses a missing, wrong or doubled code', async () => {
     const instance = await server();
-    const cookie = sessionCookie((await get(instance, `/auth?t=${token}`)).headers['set-cookie']);
-    const res = await get(instance, '/auth', { cookie });
-    expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe('/');
+    signInCode(instance);
+    for (const url of ['/auth', `/auth?c=${generateToken()}`, '/auth?c=a&c=b']) {
+      const res = await get(instance, url);
+      expect([400, 401], url).toContain(res.statusCode);
+      expect(res.body, url).not.toContain('yardmaster-session');
+    }
+    expect(instance.browserSessions.list()).toEqual([]);
   });
 
-  it('invalidates cookies when the token changes', async () => {
-    const cookie = createSessionValue(token);
-    expect(verifySessionValue(token, cookie)).toBe(true);
-    expect(verifySessionValue(generateToken(), cookie)).toBe(false);
-    expect(verifySessionValue(token, `${cookie}.extra`)).toBe(false);
-    expect(verifySessionValue(token, `.${cookie}`)).toBe(false);
-  });
-});
-
-describe('readCookie', () => {
-  it('finds a cookie among others', () => {
-    expect(readCookie('a=1; yardmaster_session=x.y; b=2', SESSION_COOKIE)).toBe('x.y');
-    expect(readCookie('xyardmaster_session=nope', SESSION_COOKIE)).toBeUndefined();
-    expect(readCookie(undefined, SESSION_COOKIE)).toBeUndefined();
+  it('builds the link on the board, or on the dev server in dev', () => {
+    expect(signInUrl(config, 4317, 'abc')).toBe('http://127.0.0.1:4317/auth?c=abc');
+    expect(signInUrl({ ...config, devOrigins: ['http://127.0.0.1:4327'] }, 4317, 'a+b')).toBe(
+      'http://127.0.0.1:4327/auth?c=a%2Bb',
+    );
   });
 });

@@ -7,6 +7,7 @@ import {
   type StreamId,
   type UiAction,
   type UiToServer,
+  WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
 import type { BoardStore } from './store.js';
 
@@ -27,10 +28,18 @@ export interface Logger {
   warn(message: string, detail?: unknown): void;
 }
 
+/** How the socket signs in: subprotocols carrying the session, and what to do when refused. */
+export interface SocketAuth {
+  protocols(): string[];
+  /** The board closed the socket with `WS_UNAUTHORIZED`; `protocols` are the ones it refused. */
+  refused(protocols: readonly string[]): void;
+}
+
 export interface BoardClientOptions {
   url: string;
   store: BoardStore;
-  createSocket?: (url: string) => SocketLike;
+  createSocket?: (url: string, protocols: string[]) => SocketLike;
+  auth?: SocketAuth;
   /** First retry delay; doubles per failed attempt. */
   baseDelayMs?: number;
   maxDelayMs?: number;
@@ -110,7 +119,8 @@ const consoleLogger: Logger = {
 export class BoardClient {
   private readonly url: string;
   private readonly store: BoardStore;
-  private readonly createSocket: (url: string) => SocketLike;
+  private readonly createSocket: (url: string, protocols: string[]) => SocketLike;
+  private readonly auth: SocketAuth | undefined;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
   private readonly requestTimeoutMs: number;
@@ -133,7 +143,9 @@ export class BoardClient {
     this.url = options.url;
     this.store = options.store;
     this.createSocket =
-      options.createSocket ?? ((url) => new WebSocket(url) as unknown as SocketLike);
+      options.createSocket ??
+      ((url, protocols) => new WebSocket(url, protocols) as unknown as SocketLike);
+    this.auth = options.auth;
     this.baseDelayMs = options.baseDelayMs ?? BASE_DELAY_MS;
     this.maxDelayMs = options.maxDelayMs ?? MAX_DELAY_MS;
     this.requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -157,9 +169,18 @@ export class BoardClient {
     this.store.getState().setConnection({ status: 'stopped', retryAt: null });
   }
 
+  /** Connects again after a sign-in, if the board had refused this browser. */
+  resume(): void {
+    if (!this.running || this.socket) return;
+    if (this.store.getState().connection.status !== 'signedOut') return;
+    this.attempt = 0;
+    this.connect();
+  }
+
   /** Skips the remaining backoff, e.g. when the browser comes back online. */
   reconnectNow(): void {
     if (!this.running || this.socket) return;
+    if (this.store.getState().connection.status === 'signedOut') return;
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
     this.connect();
@@ -263,8 +284,9 @@ export class BoardClient {
       retryAt: null,
     });
     let socket: SocketLike;
+    const protocols = this.auth?.protocols() ?? [];
     try {
-      socket = this.createSocket(this.url);
+      socket = this.createSocket(this.url, protocols);
     } catch (error) {
       this.log.warn('could not open the board socket', error);
       this.scheduleRetry();
@@ -279,12 +301,21 @@ export class BoardClient {
       if (this.socket === socket) this.onRaw(event.data);
     };
     socket.onerror = () => {};
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (this.socket !== socket) return;
       this.socket = null;
       this.synced = false;
       this.failPending('disconnected');
-      if (this.running) this.scheduleRetry();
+      if (!this.running) return;
+      if ((event as { code?: unknown } | null)?.code === WS_UNAUTHORIZED) {
+        // Retrying can't help: wait for a sign-in (`resume`).
+        clearTimeout(this.retryTimer);
+        this.retryTimer = undefined;
+        this.store.getState().setConnection({ status: 'signedOut', retryAt: null });
+        this.auth?.refused(protocols);
+        return;
+      }
+      this.scheduleRetry();
     };
   }
 

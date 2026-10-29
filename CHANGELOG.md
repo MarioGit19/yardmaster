@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Browsers sign in with one-time links and their own sessions
+
+- **Sign in once more:** browsers and phones signed in before this version see a "Sign in again" screen. On this computer, run `yardmaster open` (or Yardmaster: Open Dashboard in your editor); pair phones again from Settings → Phone.
+- Sign-in links are one-time codes (`/auth?c=…`, single use, valid for 5 minutes) instead of links carrying the access token, which ended up in browser history. Old `/auth?t=…` links no longer sign in. `yardmaster start` prints one, and the new `yardmaster open` makes another.
+- Each browser and phone keeps its own session in the board's own storage and sends it with each request, never as a cookie: browsers send a host's cookies to every port on it, so a dev server on another port (or one shared to your phone) could have picked it up.
+- Settings → Data and security lists every signed-in browser and phone and signs any of them out at once. Phones sign out after 30 days unused.
+- Rotating the token now ends every session and closes open board and editor connections, so they sign in again; the browser that rotated stays signed in.
+- `pnpm dev` serves the web app on `http://127.0.0.1:4327` instead of port 5173.
+
 ### Editors and hooks connect through a private socket
 
 - The server also listens on `~/.yardmaster/board.sock` (owner only). The extension, the Claude hooks and `yardmaster doctor` talk to it there and never send the token to the TCP port, so a program that grabs port 4317 while Yardmaster is off gets nothing and can't answer for it. The editor and hook routes are refused over TCP.

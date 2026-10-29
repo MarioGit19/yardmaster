@@ -20,7 +20,7 @@ test('types straight into a board terminal, which survives a reload', async ({ b
   test.slow();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport: { width: 1440, height: 900 },
   });
   // The WebGL renderer draws text into a canvas; the DOM fallback keeps it readable here.
@@ -95,7 +95,7 @@ test('a command in a board terminal shows as running, in the focus view and ever
   test.slow();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     viewport: { width: 1440, height: 900 },
   });
   await context.addInitScript(() => {

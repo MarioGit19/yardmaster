@@ -10,6 +10,7 @@ import {
   type StreamId,
   TRANSCRIPT_STREAM_PREFIX,
   type UiToServer,
+  WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
@@ -179,6 +180,11 @@ export class UiGateway {
     const data = this.encode(message);
     if (data === undefined) return;
     for (const client of this.clients) this.sendRaw(client, data);
+  }
+
+  /** Closes every client socket, e.g. with `WS_UNAUTHORIZED` when the token is rotated. */
+  disconnectAll(code: number, reason: string): void {
+    for (const client of this.clients) client.socket.close(code, reason);
   }
 
   close(): void {
@@ -358,16 +364,17 @@ async function settle(run: () => ActionResult | Promise<ActionResult>): Promise<
 }
 
 /**
- * `/ws/ui`. Only the board's own origin (or a configured dev origin) with a valid
- * session gets through: the security layer rejects foreign origins, and here an
- * absent Origin is refused too, since browsers always send one on WebSocket upgrades.
+ * `/ws/ui`. Only the board's own origin (or a configured dev origin) gets through: the security
+ * layer rejects foreign origins, and here an absent Origin is refused too, since browsers always
+ * send one on WebSocket upgrades. A socket without a valid session is accepted and closed at once
+ * with `WS_UNAUTHORIZED`, so the app can tell "signed out" from "offline".
  */
 export function registerUiGateway(
   app: FastifyInstance,
   gateway: UiGateway,
   /** Demo mode's worst-case board, for sockets opened with `?worst=1` (PLAN 7.14). */
   worst?: UiGateway,
-  /** Sees every accepted socket, e.g. to close a paired phone's when it is revoked. */
+  /** Sees every accepted socket, e.g. to close a session's sockets when it is revoked. */
   onSocket?: (request: FastifyRequest, socket: WebSocket) => void,
 ): void {
   app.get(
@@ -378,10 +385,13 @@ export function registerUiGateway(
         if (request.headers.origin === undefined) {
           return reply.code(403).send({ error: 'forbidden_origin' });
         }
-        if (!request.isAuthorized()) return reply.code(401).send({ error: 'unauthorized' });
       },
     },
     (socket, request) => {
+      if (!request.isAuthorized()) {
+        socket.close(WS_UNAUTHORIZED, 'unauthorized');
+        return;
+      }
       onSocket?.(request, socket);
       const wantsWorst = WorstQuery.safeParse(request.query).data?.worst === '1';
       (worst && wantsWorst ? worst : gateway).connect(socket);

@@ -1,6 +1,6 @@
 import { devices, type Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
-import { expect, signedInState, test } from './fixtures.js';
+import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
 // 12.6e: closing and forgetting projects, on their own demo board (closing changes what it shows).
 
@@ -15,7 +15,7 @@ test.afterAll(async () => {
 });
 
 async function liveBoardTerminals(page: Page): Promise<number> {
-  const response = await page.request.get('/api/status');
+  const response = await page.request.get('/api/status', { headers: sessionHeader(board.session) });
   const status = (await response.json()) as { boardTerminals: { live: number } };
   return status.boardTerminals.live;
 }
@@ -23,7 +23,12 @@ async function liveBoardTerminals(page: Page): Promise<number> {
 /** `terminal.create` straight over `/ws/ui`, as another tab would: no board view opens it. */
 async function createTerminal(page: Page, projectId: string): Promise<void> {
   const ok = await page.evaluate(async (id) => {
-    const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/ui`);
+    // Signed in like the app: the session from this origin's storage, as a subprotocol.
+    const session = localStorage.getItem('yardmaster.session');
+    const ws = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/ui`, [
+      'yardmaster',
+      `yardmaster.session.${session}`,
+    ]);
     await new Promise((resolve) => {
       ws.onopen = resolve;
     });
@@ -60,7 +65,7 @@ test.describe('on a desktop', () => {
     test.slow();
     const context = await browser.newContext({
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
       viewport: { width: 1440, height: 900 },
     });
     try {
@@ -166,7 +171,7 @@ test.describe('on a phone', () => {
       ...iPhone,
       viewport: { width: 390, height: 844 },
       baseURL: board.url,
-      storageState: signedInState(board.url, board.cookie),
+      storageState: signedInState(board.url, board.session),
     });
     try {
       const page = await context.newPage();

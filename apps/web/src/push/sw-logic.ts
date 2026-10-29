@@ -1,4 +1,5 @@
 import type { PushPayload } from '@yardmaster/protocol';
+import { SESSION_HEADER } from '@yardmaster/protocol/session-keys';
 
 // The service worker's logic, kept free of imports with runtime code: `sw.ts` bundles it into one
 // classic script, and the tests run it without a worker.
@@ -107,6 +108,8 @@ export interface ClickDeps {
   /** The board's origin (the worker's own). */
   origin: string;
   fetch(url: string, init: RequestInit): Promise<{ ok: boolean }>;
+  /** This browser's session secret (the page keeps a copy in IndexedDB), or null. */
+  session(): Promise<string | null>;
   windows(): Promise<readonly WindowLike[]>;
   openWindow(url: string): Promise<unknown>;
 }
@@ -140,10 +143,14 @@ export async function routeClick(
   const { url, approvalId } = readData(data);
   if ((action === 'allow' || action === 'deny') && approvalId) {
     try {
+      const secret = await deps.session();
       const res = await deps.fetch(`/api/approvals/${encodeURIComponent(approvalId)}/decision`, {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
+        credentials: 'omit',
+        headers: {
+          'content-type': 'application/json',
+          ...(secret === null ? {} : { [SESSION_HEADER]: secret }),
+        },
         body: JSON.stringify({ decision: action }),
       });
       if (res.ok) return 'decided';

@@ -76,7 +76,7 @@ function parseDevOrigins(raw: string | undefined): string[] {
     }
     if (url.protocol !== 'http:' || !isLoopbackHost(url.hostname) || url.origin !== value) {
       throw new ConfigError(
-        `YARDMASTER_DEV_ORIGINS entries must be loopback http origins like http://localhost:5173, got "${value}"`,
+        `YARDMASTER_DEV_ORIGINS entries must be loopback http origins like http://127.0.0.1:4327, got "${value}"`,
       );
     }
     return url.origin;

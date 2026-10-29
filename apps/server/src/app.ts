@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import websocket from '@fastify/websocket';
 import {
@@ -12,6 +13,8 @@ import {
   ProjectId,
   type ServerStatus,
   type SessionHistoryResponse,
+  UI_WS_PROTOCOL,
+  WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import { pino } from 'pino';
@@ -71,9 +74,15 @@ import {
   type VapidKeys,
   webPushSender,
 } from './push.js';
-import { DEVICES_KEY, RemoteDevices, registerRemoteRoutes, remoteHosts } from './remote.js';
-import { registerSecurity } from './security.js';
+import { LEGACY_DEVICES_KEY, registerRemoteRoutes, remoteHosts } from './remote.js';
+import { registerSecurity, signInUrl } from './security.js';
 import { SessionLinker } from './session-linker.js';
+import {
+  BrowserSessions,
+  registerSessionRoutes,
+  SESSIONS_KEY,
+  SESSIONS_TOKEN_KEY,
+} from './sessions.js';
 import {
   awaySettings,
   diskHookSettings,
@@ -186,6 +195,8 @@ declare module 'fastify' {
     pushSubscriptions: PushSubscriptions;
     /** The socket editors and hooks use; `startServer` makes it listen. */
     localChannel: LocalChannel;
+    /** Signed-in browsers and their one-time sign-in and pairing codes. */
+    browserSessions: BrowserSessions;
   }
 }
 
@@ -261,19 +272,43 @@ export async function buildServer(
 
   // Before the security layer and any route: it claims upgrade requests, and its onRequest
   // hook must run first so sockets rejected by security are cleaned up.
-  await app.register(websocket, { options: { maxPayload: MAX_UI_MESSAGE * 4 } });
-  const remoteDevices = new RemoteDevices({
-    load: () => settings[DEVICES_KEY],
-    save: (devices) => {
-      settings[DEVICES_KEY] = devices;
-      persistence.setSetting(DEVICES_KEY, devices);
+  await app.register(websocket, {
+    options: {
+      maxPayload: MAX_UI_MESSAGE * 4,
+      // The board's app also lists its session secret as a subprotocol: never echo that one.
+      handleProtocols: (protocols) => (protocols.has(UI_WS_PROTOCOL) ? UI_WS_PROTOCOL : false),
     },
   });
+  const sessions = new BrowserSessions({
+    load: () => settings[SESSIONS_KEY],
+    save: (list) => {
+      settings[SESSIONS_KEY] = list;
+      persistence.setSetting(SESSIONS_KEY, list);
+    },
+  });
+  app.decorate('browserSessions', sessions);
+  // Sessions belong to one token: `yardmaster token --rotate` while the board was down ends them.
+  const tokenSeal = (value: string) =>
+    createHash('sha256').update(`yardmaster-sessions:${value}`).digest('base64url');
+  const sealSessions = () => {
+    settings[SESSIONS_TOKEN_KEY] = tokenSeal(token);
+    persistence.setSetting(SESSIONS_TOKEN_KEY, settings[SESSIONS_TOKEN_KEY]);
+  };
+  if (settings[SESSIONS_TOKEN_KEY] !== tokenSeal(token)) {
+    sessions.revokeAll();
+    sealSessions();
+  }
+  // Phones paired with a cookie before per-browser sessions pair once more.
+  if (settings[LEGACY_DEVICES_KEY] !== undefined) {
+    delete settings[LEGACY_DEVICES_KEY];
+    persistence.setSetting(LEGACY_DEVICES_KEY, undefined);
+  }
   const allowedRemoteHosts = () => remoteHosts(settings);
   registerSecurity(app, {
     config,
     token: currentToken,
-    remote: { hosts: allowedRemoteHosts, devices: remoteDevices },
+    sessions,
+    remote: { hosts: allowedRemoteHosts },
   });
 
   // Stored for history and pushed live to the Pulse rail. Nothing emits before the app is ready.
@@ -494,8 +529,8 @@ export async function buildServer(
       })
     : undefined;
   registerUiGateway(app, gateway, worstGateway, (request, socket) => {
-    const device = request.remoteDevice();
-    if (device !== null) remoteDevices.track(device, socket);
+    const session = request.browserSession();
+    if (session !== null) sessions.track(session, socket, WS_UNAUTHORIZED);
   });
   const gitOptions = options.demo ? false : (options.git ?? {});
   const gitScanner =
@@ -546,13 +581,13 @@ export async function buildServer(
   registerAwayRoutes(app, awayApprovals);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
-  // The extension's Open Dashboard asks here (on the socket) rather than building the link
-  // itself, so it never opens a token link on a port the board doesn't hold.
+  // The extension's Open Dashboard and `yardmaster open` ask here (on the socket, with the
+  // token) for a one-time sign-in link, so they never open a link on a port the board doesn't hold.
   app.post(LOCAL_ROUTES.dashboardLink, async (_request, reply): Promise<DashboardLinkResponse> => {
     reply.header('cache-control', 'no-store');
     const address = app.server.address();
     const port = address !== null && typeof address === 'object' ? address.port : config.port;
-    return { url: `http://127.0.0.1:${port}/auth?t=${encodeURIComponent(token)}` };
+    return { url: signInUrl(config, port, sessions.createSignInCode().code) };
   });
   app.get('/api/status', async (): Promise<ServerStatus> => {
     const editors = Object.keys(store.state.windows).length;
@@ -583,13 +618,28 @@ export async function buildServer(
     // The demo board may run on a real home: never touch its token.
     rotateToken: options.demo
       ? null
-      : async () => {
+      : async (caller) => {
           token = await rotateTokenFile(config.home);
-          return token;
+          sealSessions();
+          // The caller's browser stays signed in under a new session, with its notifications.
+          const fresh =
+            caller.session === null
+              ? null
+              : sessions.create(caller.remote ? 'remote' : 'local', caller.userAgent);
+          if (caller.session !== null && fresh) {
+            pushSubscriptions.moveDevice(caller.session, fresh.session.id);
+          }
+          // Every other session ends, and every open socket signs in again.
+          sessions.revokeAll(fresh?.session.id);
+          gateway.disconnectAll(WS_UNAUTHORIZED, 'token_rotated');
+          worstGateway?.disconnectAll(WS_UNAUTHORIZED, 'token_rotated');
+          editorGateway.disconnectAll(WS_UNAUTHORIZED, 'token_rotated');
+          return fresh ? { session: fresh.secret } : {};
         },
   });
 
-  registerRemoteRoutes(app, { devices: remoteDevices, hosts: allowedRemoteHosts });
+  registerRemoteRoutes(app, { sessions, hosts: allowedRemoteHosts });
+  registerSessionRoutes(app, sessions);
 
   // Push notifications (12.6e3). The demo hands them to an outbox instead of a push service.
   const pushSubscriptions = new PushSubscriptions({
@@ -600,7 +650,9 @@ export async function buildServer(
     },
   });
   app.decorate('pushSubscriptions', pushSubscriptions);
-  remoteDevices.onRevoke((id) => pushSubscriptions.removeDevice(id));
+  // A browser that is signed out gets no more notifications.
+  pushSubscriptions.retainDevices((id) => sessions.has(id));
+  sessions.onRevoke((id) => pushSubscriptions.removeDevice(id));
   let vapid: Promise<VapidKeys> | null = null;
   const vapidKeys = (): Promise<VapidKeys> => {
     vapid ??= (

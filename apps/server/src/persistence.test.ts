@@ -322,7 +322,12 @@ describe('server boot', () => {
 
     app = await buildServer(config(), { token, processes: false });
     expect(app.store.state.projects).toEqual({ 'acme-shop': project('acme-shop') });
-    expect(app.settings).toEqual({ motion: 'off' });
+    expect(app.settings).toEqual({
+      motion: 'off',
+      // Signed-in browsers, and a seal of the token they belong to.
+      'auth.sessions': [],
+      'auth.sessionsToken': expect.any(String),
+    });
     app.store.removeProject('acme-shop');
     await app.close();
 

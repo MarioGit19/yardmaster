@@ -8,8 +8,8 @@
     "c-board": "./dist/c-board.js"
   },
   "scripts": {
-    "dev": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --no-open",
-    "dev:demo": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:5173 tsx watch src/cli.ts start --demo --no-open",
+    "dev": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:4327 tsx watch src/cli.ts start --no-open",
+    "dev:demo": "YARDMASTER_WATCH=1 YARDMASTER_DEV_ORIGINS=http://127.0.0.1:4327 tsx watch src/cli.ts start --demo --no-open",
     "start": "node dist/cli.js start",
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",

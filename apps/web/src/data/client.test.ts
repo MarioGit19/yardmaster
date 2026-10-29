@@ -7,13 +7,16 @@ import {
   type ServerToUi,
   type Terminal,
   type UiToServer,
+  WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BoardClient,
   backoffDelay,
   type ChunkInfo,
+  MAX_DELAY_MS,
   MAX_TERMINAL_INPUT,
+  type SocketAuth,
   type SocketLike,
   STREAM_HISTORY_CHARS,
 } from './client.js';
@@ -64,7 +67,10 @@ class FakeSocket implements SocketLike {
   readonly sent: UiToServer[] = [];
   closed = false;
 
-  constructor(readonly url: string) {}
+  constructor(
+    readonly url: string,
+    readonly protocols: string[] = [],
+  ) {}
 
   send(data: string): void {
     const decoded = decodeUiToServer(data);
@@ -91,9 +97,9 @@ class FakeSocket implements SocketLike {
     this.receive(makeMessage<ServerToUi>('snapshot', { state }));
   }
 
-  drop(): void {
+  drop(code = 1006): void {
     this.readyState = 3;
-    this.onclose?.({ code: 1006 });
+    this.onclose?.({ code });
   }
 
   subscribes() {
@@ -101,15 +107,15 @@ class FakeSocket implements SocketLike {
   }
 }
 
-function setup(options: { requestTimeoutMs?: number } = {}) {
+function setup(options: { requestTimeoutMs?: number; auth?: SocketAuth } = {}) {
   const sockets: FakeSocket[] = [];
   const store = createBoardStore();
   const logger = { warn: vi.fn() };
   const client = new BoardClient({
     url: 'ws://127.0.0.1:4317/ws/ui',
     store,
-    createSocket: (url) => {
-      const socket = new FakeSocket(url);
+    createSocket: (url, protocols) => {
+      const socket = new FakeSocket(url, protocols);
       sockets.push(socket);
       return socket;
     },
@@ -625,5 +631,39 @@ describe('activity', () => {
     );
     expect(store.getState().activity.map((e) => e.id)).toEqual(['evt-1', 'evt-2']);
     client.stop();
+  });
+});
+
+describe('signing in', () => {
+  it('sends the session as subprotocols on every connect', () => {
+    const protocols = vi.fn(() => ['yardmaster', 'yardmaster.session.abc.def']);
+    const { client, sockets, last } = setup({ auth: { protocols, refused: vi.fn() } });
+    client.start();
+    expect(last().protocols).toEqual(['yardmaster', 'yardmaster.session.abc.def']);
+    last().drop();
+    vi.advanceTimersByTime(MAX_DELAY_MS);
+    expect(sockets).toHaveLength(2);
+    expect(protocols).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops retrying when the board refuses the session, until resumed', () => {
+    const refused = vi.fn();
+    const auth = { protocols: () => ['yardmaster', 'yardmaster.session.old.secret'], refused };
+    const { client, sockets, store, last, connect } = setup({ auth });
+    client.start();
+    last().drop(WS_UNAUTHORIZED);
+    expect(store.getState().connection.status).toBe('signedOut');
+    expect(refused).toHaveBeenCalledWith(['yardmaster', 'yardmaster.session.old.secret']);
+    vi.advanceTimersByTime(MAX_DELAY_MS * 4);
+    client.reconnectNow();
+    expect(sockets).toHaveLength(1);
+
+    client.resume();
+    expect(sockets).toHaveLength(2);
+    connect();
+    expect(store.getState().connection.status).toBe('live');
+    // Resuming a live client does nothing.
+    client.resume();
+    expect(sockets).toHaveLength(2);
   });
 });

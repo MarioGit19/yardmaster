@@ -6,7 +6,11 @@ import {
   emptyBoardState,
   HISTORY_WINDOW_MS,
   type PatchOp,
+  SESSION_HEADER,
+  SESSION_PROTOCOL_PREFIX,
   type ServerToUi,
+  UI_WS_PROTOCOL,
+  WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { pino } from 'pino';
@@ -16,7 +20,8 @@ import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from 
 import { startServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { RingBuffer } from './ring-buffer.js';
-import { createSessionValue, TOKEN_HEADER } from './security.js';
+import { TOKEN_HEADER } from './security.js';
+import { sessionHeader } from './sessions.test-helpers.js';
 import { BoardStore, commandHeader } from './store.js';
 import { generateToken } from './token.js';
 import { UI_WS_PATH, UiGateway } from './ui-gateway.js';
@@ -106,10 +111,7 @@ class Client {
 }
 
 async function connect(port: number, origin: string): Promise<Client> {
-  const client = new Client(port, {
-    origin,
-    cookie: `yardmaster_session=${createSessionValue(token)}`,
-  });
+  const client = new Client(port, { origin, ...sessionHeader(app as FastifyInstance) });
   await client.opened();
   return client;
 }
@@ -120,6 +122,24 @@ function rejection(port: number, headers: Record<string, string>): Promise<numbe
     sockets.push(socket);
     socket.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
     socket.on('open', () => reject(new Error('connection was accepted')));
+    socket.on('error', () => {});
+  });
+}
+
+/** Opens a socket and resolves with its close code; it must close before any message. */
+function closeCode(
+  port: number,
+  headers: Record<string, string>,
+  protocols: string[] = [],
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${UI_WS_PATH}`, protocols, { headers });
+    sockets.push(socket);
+    socket.on('unexpected-response', (_req, res) =>
+      reject(new Error(`refused with HTTP ${res.statusCode}`)),
+    );
+    socket.on('message', () => reject(new Error('a signed-out socket got a message')));
+    socket.on('close', (code) => resolve(code));
     socket.on('error', () => {});
   });
 }
@@ -146,8 +166,8 @@ describe('/ws/ui connection', () => {
 
   it('rejects a foreign origin', async () => {
     const { port } = await boot();
-    const cookie = `yardmaster_session=${createSessionValue(token)}`;
-    expect(await rejection(port, { origin: 'http://evil.example', cookie })).toBe(403);
+    const session = sessionHeader(app as FastifyInstance);
+    expect(await rejection(port, { origin: 'http://evil.example', ...session })).toBe(403);
   });
 
   it('rejects a missing origin even with the token', async () => {
@@ -155,17 +175,38 @@ describe('/ws/ui connection', () => {
     expect(await rejection(port, { [TOKEN_HEADER]: token })).toBe(403);
   });
 
-  it('rejects a missing or forged session', async () => {
+  it('closes a socket without a valid session with 4401, before sending anything', async () => {
     const { port, origin } = await boot();
-    expect(await rejection(port, { origin })).toBe(401);
-    const forged = `yardmaster_session=${createSessionValue(generateToken())}`;
-    expect(await rejection(port, { origin, cookie: forged })).toBe(401);
+    expect(await closeCode(port, { origin })).toBe(WS_UNAUTHORIZED);
+    const forged = `${generateToken().slice(0, 16)}.${generateToken()}`;
+    expect(await closeCode(port, { origin, [SESSION_HEADER]: forged })).toBe(WS_UNAUTHORIZED);
+    // A browser holding an old session cookie (and the cookies of other ports) gets nothing.
+    expect(
+      await closeCode(port, { origin, cookie: `yardmaster_session=x.y; cboard_session=x.y` }),
+    ).toBe(WS_UNAUTHORIZED);
+  });
+
+  it('takes the session as a subprotocol and answers with the board protocol only', async () => {
+    const { port, origin } = await boot();
+    const secret = sessionHeader(app as FastifyInstance)[SESSION_HEADER] as string;
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${port}${UI_WS_PATH}`,
+      [UI_WS_PROTOCOL, `${SESSION_PROTOCOL_PREFIX}${secret}`],
+      { headers: { origin } },
+    );
+    sockets.push(socket);
+    const first = await new Promise<ServerToUi>((resolve, reject) => {
+      socket.once('message', (data) => resolve(JSON.parse(data.toString()) as ServerToUi));
+      socket.once('close', (code) => reject(new Error(`closed with ${code}`)));
+    });
+    expect(first.type).toBe('snapshot');
+    expect(socket.protocol).toBe(UI_WS_PROTOCOL);
   });
 
   it('rejects a foreign Host header', async () => {
     const { port, origin } = await boot();
-    const cookie = `yardmaster_session=${createSessionValue(token)}`;
-    expect(await rejection(port, { origin, cookie, host: `rebind.example:${port}` })).toBe(403);
+    const session = sessionHeader(app as FastifyInstance);
+    expect(await rejection(port, { origin, ...session, host: `rebind.example:${port}` })).toBe(403);
   });
 });
 

@@ -20,7 +20,7 @@ test('the onboarding steps tick themselves from simulated events', async ({ brow
   const board = await startBoard({ demo: false });
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
   });
   let editor: Awaited<ReturnType<typeof connectEditor>> | undefined;
   try {

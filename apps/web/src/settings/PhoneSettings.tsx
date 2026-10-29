@@ -213,7 +213,7 @@ function PairRow({
       if (added) {
         setPairing(null);
         toast.success(`${added.name} paired`, {
-          description: 'It stays signed in until you revoke it.',
+          description: 'It stays signed in until you revoke it, or for 30 days unused.',
         });
       }
     }, PAIRED_POLL_MS);
@@ -396,7 +396,7 @@ function DevicesRow({
   else if (devices === null) summary = 'Loading…';
   else if (devices.length === 0) summary = 'No phone is paired.';
   else
-    summary = `${devices.length} ${devices.length === 1 ? 'device stays' : 'devices stay'} signed in until revoked.`;
+    summary = `${devices.length} ${devices.length === 1 ? 'device stays' : 'devices stay'} signed in until revoked, or for 30 days unused.`;
 
   return (
     <div className="flex flex-col gap-3 p-5" data-setting="devices">

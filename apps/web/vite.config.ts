@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { build, defineConfig, type Plugin } from 'vite';
 import { renderLogo } from './src/brand/render.js';
 import { migrateStorage } from './src/storage-migration.js';
 
 // The server's Host/Origin checks admit the dev server through YARDMASTER_DEV_ORIGINS,
-// which the server's `dev` scripts set to this origin.
-const DEV_PORT = 5173;
+// which the server's `dev` scripts set to this origin. An unusual fixed port: the board's
+// session lives in this origin's storage, which another project's dev server must never share.
+const DEV_PORT = 4327;
 // CBOARD_PORT is the name from before the rename.
 const serverPort = Number(process.env.YARDMASTER_PORT || process.env.CBOARD_PORT) || 4317;
 const target = `http://127.0.0.1:${serverPort}`;
@@ -48,8 +49,43 @@ function storageMigration(): Plugin {
   };
 }
 
+/**
+ * The push service worker (`/sw.js`), built on its own into one classic script after the app: a
+ * module it shared with the app (the session's IndexedDB copy) would otherwise land in a shared
+ * chunk, and a classic worker can't import it. Served from the root, so its scope is the board.
+ */
+function serviceWorker(): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'service-worker',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    async closeBundle() {
+      await build({
+        configFile: false,
+        logLevel: 'warn',
+        build: {
+          outDir,
+          emptyOutDir: false,
+          copyPublicDir: false,
+          target: 'es2023',
+          sourcemap: true,
+          lib: {
+            entry: fileURLToPath(new URL('src/push/sw.ts', import.meta.url)),
+            formats: ['iife'],
+            name: 'yardmasterServiceWorker',
+            fileName: () => 'sw.js',
+          },
+        },
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), bootMark(), storageMigration()],
+  plugins: [react(), tailwindcss(), bootMark(), storageMigration(), serviceWorker()],
   server: {
     host: '127.0.0.1',
     port: DEV_PORT,
@@ -57,6 +93,7 @@ export default defineConfig({
     proxy: {
       '/api': { target },
       '/auth': { target },
+      '/pair': { target },
       '/ws': { target, ws: true },
     },
   },
@@ -65,16 +102,5 @@ export default defineConfig({
   build: {
     target: 'es2023',
     sourcemap: true,
-    rolldownOptions: {
-      // The push service worker (12.6e3) is served from the root, under a fixed name, so its
-      // scope is the whole board.
-      input: {
-        index: fileURLToPath(new URL('index.html', import.meta.url)),
-        sw: fileURLToPath(new URL('src/push/sw.ts', import.meta.url)),
-      },
-      output: {
-        entryFileNames: (chunk) => (chunk.name === 'sw' ? 'sw.js' : 'assets/[name]-[hash].js'),
-      },
-    },
   },
 });

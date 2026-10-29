@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { type DemoBoard, startDemoBoard } from './board.js';
-import { expect, signedInState, test } from './fixtures.js';
+import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 
 // 12.6e3: push notifications. The demo's push service is simulated (an outbox the server hands
 // payloads to), and the browser's PushManager is mocked, since headless Chromium has no push
@@ -66,7 +66,9 @@ async function mockPushManager(context: BrowserContext): Promise<void> {
 }
 
 async function outbox(page: Page, subscriptionId: string): Promise<ShowPayload[]> {
-  const body = (await (await page.request.get('/api/push/outbox')).json()) as Outbox;
+  const body = (await (
+    await page.request.get('/api/push/outbox', { headers: sessionHeader(board.session) })
+  ).json()) as Outbox;
   return body.sent.flatMap((s) =>
     s.subscriptionId === subscriptionId && s.payload.type === 'show' ? [s.payload] : [],
   );
@@ -78,7 +80,7 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
   test.slow();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
     permissions: ['notifications'],
     viewport: { width: 1280, height: 900 },
   });
@@ -102,7 +104,14 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
       .getByRole('button', { name: 'On' })
       .click();
     await expect
-      .poll(async () => (await (await page.request.get('/api/settings')).json()).notifyEvents)
+      .poll(
+        async () =>
+          (
+            await (
+              await page.request.get('/api/settings', { headers: sessionHeader(board.session) })
+            ).json()
+          ).notifyEvents,
+      )
       .toContain('background');
 
     await device.getByRole('button', { name: 'Send a test' }).click();
@@ -111,7 +120,10 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
     // Looking at the board: no push, the toast shows instead.
     await page.bringToFront();
     await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(true);
-    await page.request.post('/api/push/drill', { data: {} });
+    await page.request.post('/api/push/drill', {
+      data: {},
+      headers: sessionHeader(board.session),
+    });
     // Sonner keeps only the newest few toasts on screen; the rest stay in the DOM.
     await expect(page.getByText('drill-command · ✓ pnpm test')).toBeAttached();
     expect((await outbox(page, id)).filter((p) => p.title.startsWith('drill-'))).toEqual([]);
@@ -119,8 +131,10 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
     // The board tab closed: one push per kind.
     await page.close();
     const api = context.request;
-    await api.post('/api/push/drill', { data: {} });
-    const res = (await (await api.get('/api/push/outbox')).json()) as Outbox;
+    await api.post('/api/push/drill', { data: {}, headers: sessionHeader(board.session) });
+    const res = (await (
+      await api.get('/api/push/outbox', { headers: sessionHeader(board.session) })
+    ).json()) as Outbox;
     const drill = res.sent.flatMap((s) =>
       s.subscriptionId === id && s.payload.type === 'show' && s.payload.title.startsWith('drill-')
         ? [s.payload]
@@ -165,10 +179,12 @@ test('subscribes this device, sends a test, and gets one push per event kind', a
       .toEqual(drill.map((p) => p.title).sort());
   } finally {
     const api = context.request;
+    const headers = sessionHeader(board.session);
     await api.put('/api/settings', {
       data: { notifyEvents: ['needs_you', 'claude_finished', 'command_finished', 'crashed'] },
+      headers,
     });
-    if (pushId) await api.delete(`/api/push/subscriptions/${pushId}`);
+    if (pushId) await api.delete(`/api/push/subscriptions/${pushId}`, { headers });
     await context.close();
   }
 });

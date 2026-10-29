@@ -51,13 +51,13 @@ export {
 } from './persistence.js';
 export { type ReadResult, RingBuffer, type StreamChunk } from './ring-buffer.js';
 export {
-  createSessionValue,
   registerSecurity,
-  SESSION_COOKIE,
   type SecurityOptions,
+  sessionSecretOf,
+  signInUrl,
   TOKEN_HEADER,
-  verifySessionValue,
 } from './security.js';
+export { BrowserSessions, type BrowserSessionsOptions } from './sessions.js';
 export {
   BoardStore,
   type BoardStoreOptions,

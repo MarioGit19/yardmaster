@@ -1,3 +1,5 @@
+import { lstat, readFile } from 'node:fs/promises';
+import { request } from 'node:http';
 import { homedir } from 'node:os';
 import { basename, extname, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -14,6 +16,7 @@ import {
   readSettings,
   unifiedDiff,
 } from '@yardmaster/hook';
+import { DashboardLinkResponse, LOCAL_ROUTES } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import type { BuildOptions } from './app.js';
 import { ConfigError, loadConfig, type ServerConfig } from './config.js';
@@ -27,9 +30,11 @@ import {
   tildify,
 } from './doctor.js';
 import { envValue, LEGACY_COMMAND, LEGACY_NOTICE, legacyHomeFor, migrateHome } from './legacy.js';
+import { socketPath } from './local-channel.js';
 import { openBrowser } from './open-browser.js';
+import { signInUrl, TOKEN_HEADER } from './security.js';
 import { DEFAULT_WEB_ROOT, hasWebBuild } from './static.js';
-import { ensureToken, generateToken, tokenPath, writeToken } from './token.js';
+import { ensureToken, generateToken, isValidToken, tokenPath, writeToken } from './token.js';
 import { VERSION } from './version.js';
 
 export interface CliIo {
@@ -47,12 +52,19 @@ export interface CliIo {
   confirm?: (question: string) => Promise<boolean>;
   /** The name the CLI was run as; the old `c-board` prints a deprecation notice. */
   invokedAs?: string;
+  /** Asks the running board for a one-time sign-in link (`yardmaster open`). Swappable for tests. */
+  requestSignInLink?: (config: ServerConfig) => Promise<SignInLinkResult>;
 }
+
+export type SignInLinkResult =
+  | { ok: true; url: string }
+  | { ok: false; reason: 'not_running' | 'not_set_up' | 'refused' };
 
 export const USAGE = `Usage: yardmaster <command> [options]
 
 Commands:
   start [--demo] [--no-open]   Start the board and open it in your browser
+  open [--print]               Sign a browser in to the running board (a one-time link)
         [--demo-stress]        A demo board at the performance target (PRD §9)
         [--demo-projects <n>]  With --demo-stress: how many projects (default 10)
   doctor                       Check the setup and print a report
@@ -129,8 +141,10 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
   }
   io.onStarted?.(app);
 
-  const url = baseUrl({ host: config.host, port: listeningPort(app, config.port) });
-  const authUrl = `${url}/auth?t=${encodeURIComponent(token)}`;
+  const port = listeningPort(app, config.port);
+  const url = baseUrl({ host: config.host, port });
+  // A one-time code, minted in-process: the install token never goes into a URL.
+  const authUrl = signInUrl(config, port, app.browserSessions.createSignInCode().code);
   if (demo) app.log.info('demo mode: serving synthetic projects, nothing is persisted');
   if (envValue(io.env, 'WATCH') === '1') {
     io.stdout.write(
@@ -151,9 +165,81 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
   if (opened) {
     io.stdout.write(`Yardmaster is running at ${url} (opened in your browser)\n`);
   } else {
-    io.stdout.write(`Yardmaster is running at ${url}\nSign in with: ${authUrl}\n`);
+    io.stdout.write(
+      `Yardmaster is running at ${url}\nSign in with: ${authUrl}\n(single use, valid for 5 minutes; \`yardmaster open\` makes another)\n`,
+    );
   }
   return null;
+}
+
+/** Asks the board over its socket, so the token never goes to whatever holds the TCP port. */
+export async function requestSignInLink(config: ServerConfig): Promise<SignInLinkResult> {
+  const path = socketPath(config.home);
+  let token: string;
+  try {
+    const info = await lstat(path);
+    const uid = process.getuid?.();
+    if (!info.isSocket() || (uid !== undefined && info.uid !== uid)) {
+      return { ok: false, reason: 'not_running' };
+    }
+    token = (await readFile(tokenPath(config.home), 'utf8')).trim();
+  } catch {
+    return { ok: false, reason: 'not_running' };
+  }
+  if (!isValidToken(token)) return { ok: false, reason: 'not_set_up' };
+  return new Promise((done) => {
+    const req = request(
+      {
+        socketPath: path,
+        path: LOCAL_ROUTES.dashboardLink,
+        method: 'POST',
+        headers: { [TOKEN_HEADER]: token },
+        timeout: 3_000,
+      },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          text += chunk;
+        });
+        res.on('end', () => {
+          let body: unknown;
+          try {
+            body = JSON.parse(text);
+          } catch {
+            body = undefined;
+          }
+          const parsed = DashboardLinkResponse.safeParse(body);
+          done(
+            parsed.success ? { ok: true, url: parsed.data.url } : { ok: false, reason: 'refused' },
+          );
+        });
+        res.on('error', () => done({ ok: false, reason: 'not_running' }));
+      },
+    );
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => done({ ok: false, reason: 'not_running' }));
+    req.end();
+  });
+}
+
+async function open(args: string[], config: ServerConfig, io: CliIo): Promise<number> {
+  const flags = parse(args, { print: { type: 'boolean' } });
+  const link = await (io.requestSignInLink ?? requestSignInLink)(config);
+  if (!link.ok) {
+    io.stderr.write(
+      link.reason === 'refused'
+        ? 'yardmaster open: the board refused the request. Try `yardmaster doctor`.\n'
+        : 'yardmaster open: Yardmaster is not running. Start it with `yardmaster start`.\n',
+    );
+    return 1;
+  }
+  if (!flags.print && (await (io.openBrowser ?? openBrowser)(link.url))) {
+    io.stdout.write('Opened Yardmaster in your browser.\n');
+    return 0;
+  }
+  io.stdout.write(`Sign in with: ${link.url}\n(single use, valid for 5 minutes)\n`);
+  return 0;
 }
 
 async function doctor(args: string[], config: ServerConfig, io: CliIo): Promise<number> {
@@ -175,7 +261,7 @@ async function token(args: string[], config: ServerConfig, io: CliIo): Promise<n
   }
   await writeToken(config.home, generateToken());
   io.stdout.write(
-    `New token written to ${shown}. Restart Yardmaster and sign in again with \`yardmaster start\`.\n`,
+    `New token written to ${shown}. Restart Yardmaster and sign in again with \`yardmaster open\`.\n`,
   );
   return 0;
 }
@@ -265,6 +351,7 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
 
 const COMMANDS = {
   start,
+  open,
   doctor,
   token,
   hooks,
@@ -273,7 +360,7 @@ const COMMANDS = {
 } as const;
 
 /** Commands that read the data dir, so they move the old one first. */
-const USES_HOME = new Set(['start', 'doctor', 'token']);
+const USES_HOME = new Set(['start', 'open', 'doctor', 'token']);
 
 async function migrateLegacyHome(config: ServerConfig, io: CliIo): Promise<void> {
   const legacy = legacyHomeFor(io.env, io.home);

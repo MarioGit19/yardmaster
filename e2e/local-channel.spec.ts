@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type WebSocket from 'ws';
 import { type DemoBoard, startBoard } from './board.js';
-import { expect, signedInState, test } from './fixtures.js';
+import { expect, sessionHeader, signedInState, test } from './fixtures.js';
 import { connectEditor, OBSERVER_HOOK, PERMISSION_HOOK, runHook } from './local.js';
 
 // The real hook scripts and an editor connection, end to end over the board's socket (synthetic
@@ -40,7 +40,7 @@ test('hooks, terminals and away-mode approvals reach the board through its socke
   test.slow();
   const context = await browser.newContext({
     baseURL: board.url,
-    storageState: signedInState(board.url, board.cookie),
+    storageState: signedInState(board.url, board.session),
   });
   let editor: WebSocket | undefined;
   try {
@@ -75,14 +75,17 @@ test('hooks, terminals and away-mode approvals reach the board through its socke
       }),
     );
     await expect(page.locator('a[href^="#/p/"]').first()).toBeVisible();
-    const status = await page.request.get('/api/status');
+    const status = await page.request.get('/api/status', { headers: sessionHeader(board.session) });
     expect(await status.json()).toMatchObject({ editors: 1, hooks: { received: 1 } });
     await page.locator('a[href^="#/p/"]').first().click();
     await expect(page.getByText('e2e dev server').first()).toBeVisible();
     await page.goto('/#/');
 
     // Away mode: the permission hook waits on the board, which decides from the Attention Center.
-    const away = await page.request.put('/api/settings', { data: { awayMode: true } });
+    const away = await page.request.put('/api/settings', {
+      data: { awayMode: true },
+      headers: sessionHeader(board.session),
+    });
     expect(away.ok()).toBe(true);
     const ask = () => {
       const run = runHook(board, PERMISSION_HOOK, {

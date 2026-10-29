@@ -1,4 +1,4 @@
-import { expect, openRoute, test } from './fixtures.js';
+import { expect, openRoute, sessionHeader, test } from './fixtures.js';
 
 const COLUMNS = [
   { width: 390, height: 844, columns: 1 },
@@ -67,7 +67,9 @@ test('a pod menu pins its project to the overview, and unpins it', async ({ page
   const pod = page.locator(`[data-pod="${id}"]`);
   const menu = page.locator(`[data-pod-menu="${id}"]`);
   const pinned = async () =>
-    (await page.request.get('/api/settings')).json().then((s) => s.pinnedProjects as string[]);
+    (await page.request.get('/api/settings', { headers: sessionHeader() }))
+      .json()
+      .then((s) => s.pinnedProjects as string[]);
 
   await pod.click({ button: 'right', position: { x: 24, y: 24 } });
   await menu.getByRole('menuitem', { name: 'Pin to the overview' }).click();
