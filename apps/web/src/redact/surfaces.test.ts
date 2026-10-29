@@ -1,8 +1,8 @@
+import { MASK } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { redactItem } from '../claude/MessageList.js';
 import type { TranscriptRow } from '../claude/transcript.js';
 import { maskLine } from '../lanes/TerminalPeek.js';
-import { MASK } from './redact.js';
 import { reveal } from './reveal.js';
 
 const TOKEN = `${'gh'}p_${'k2M4n6P8q0'.repeat(4)}`;

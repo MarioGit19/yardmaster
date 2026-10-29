@@ -1109,7 +1109,7 @@ A security review before the repo goes public (three independent reviews of the 
   - Note: A skipped repo runs no git command at all (no branch shown). Any `core.fsmonitor` value counts, even `false`. The config check uses `git config --show-scope` (git 2.26+); on an older git it fails and the board keeps the last git info.
   - Note: `pnpm e2e` and `pnpm shots` were run in batches. Under the full parallel load, `claude-terminal` › phone, `stress` (via deps) and the shots `retro conversation`, `claude panel` and `terminal lanes` timed out waiting for the long transcript or lanes; each passed when rerun on its own.
 
-- [ ] **14.5 Notifications, supply chain and hygiene**
+- [x] **14.5 Notifications, supply chain and hygiene**
   - **Lock-screen privacy:** push titles and bodies include raw command lines, Claude tool input (for example a full Bash command) and reply text, and the UI's secret redaction (`apps/web/src/redact`) isn't applied on the server. Move the redactor to `packages/protocol` and apply it to every push payload. In Settings → Notifications, say plainly that details show on the lock screen, next to the existing "hide details" switch. Notification actions offer only Allow once and Deny, never Always allow.
   - **Dependencies:** `pnpm audit` reports `body-parser` < 2.4.0 (a DoS advisory, pulled in through the Agent SDK's MCP SDK; Yardmaster never runs that HTTP server) and one more advisory. Fix both with `pnpm.overrides`, or a newer SDK if one exists, and get `pnpm audit` to zero high or critical.
   - **CI:** pin every `uses:` in `.github/workflows/` to a full commit SHA with a version comment, and add a Dependabot config for GitHub Actions and npm.
@@ -1120,6 +1120,9 @@ A security review before the repo goes public (three independent reviews of the 
     - That a paired phone can control your terminals.
   - Link SECURITY.md from the README's Privacy section, which you also update to match 14.1–14.4.
   - **Verify:** `pnpm check && pnpm e2e`
+  - Note: The redactor is now `packages/protocol/src/redact.ts`; the notifier masks every push title and body (and the board toasts) before clipping, including the command line it clips to 80 characters. Notification actions were already Allow / Deny; Allow is now labelled "Allow once", and the decision route refuses `allowAlways` (tested).
+  - Note: `pnpm audit` is at zero via `pnpm.overrides`: `body-parser` ^2.4.0 and `@azure/msal-node` ^7.1.0. The second is a major bump under `@azure/identity` 4.14 (no release takes 7 yet); `vsce package` still works, and only `vsce publish` with Azure sign-in would use it. Private vulnerability reporting must be turned on in the repo settings for SECURITY.md's link to work.
+  - Note: `pnpm e2e` was run in batches with `--no-deps` (plus `perf-messages` and `perf-stress` on their own). `perf-messages` › 500-message scroll (one 55 ms long task), `focus` › Open workspace, `names` and `notifications` › subscribes failed once under parallel load and passed on rerun.
 
 - [ ] **14.6 Security re-audit**
   - Review the whole change set since the commit before 14.1 as an adversarial reviewer, plus the original findings listed in 14.1–14.5. For each original finding, confirm a test reproduces the attack and fails before the fix (check it out at the old commit if needed). Then look for new problems the fixes introduced: secrets in logs or URLs, races in session expiry, socket permissions, migration paths that skip a check, and routes added without the guard. Re-list every HTTP route and WS endpoint with its guard in PRD §8, and make sure nothing that changes state is unguarded. Fix up to 10 issues; add `14.6b` for the rest.

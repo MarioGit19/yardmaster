@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { parseToolCall, type TodoStatus } from '@yardmaster/protocol';
+import { parseToolCall, redact, redactDeep, type TodoStatus } from '@yardmaster/protocol';
 import { ArrowDown, ChevronRight, Eye, EyeOff, GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -15,7 +15,6 @@ import {
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import type { Caption } from '../pod/model.js';
-import { redact, redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
 import { chatColumn, useCompactChat } from './density.js';

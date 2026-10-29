@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Notifications, dependencies and reporting
+
+- Push notifications mask secrets (tokens, keys, `*_TOKEN=` values) before they leave the board, since they show on the lock screen. Settings → Notifications says so next to **Hide details**. A notification's actions are Allow once and Deny, never Always allow.
+- `pnpm audit` is clean: `body-parser` (through the Agent SDK's MCP SDK) and `@azure/msal-node` (through `vsce`) are pinned to patched versions.
+- CI pins every action to a commit SHA, and Dependabot watches actions and npm packages.
+- [SECURITY.md](SECURITY.md) explains how to report a vulnerability and what Yardmaster does and doesn't protect against.
+
 ### Untrusted projects
 
 - Before the first board Claude session in a folder whose `.claude/settings*.json` or `.mcp.json` can run commands or widen permissions (hooks, allow rules, a permission mode that asks less, env, MCP servers, plugins, command settings), a trust card lists exactly what was found, on the Mac and on phones. Nothing starts until you trust it, and changing those settings asks again. Folders without any of these start as before.

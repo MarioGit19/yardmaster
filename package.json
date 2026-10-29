@@ -43,5 +43,11 @@
   },
   "simple-git-hooks": {
     "pre-commit": "scripts/privacy-check.sh --staged && pnpm lint"
+  },
+  "pnpm": {
+    "overrides": {
+      "body-parser@>=2.0.0 <2.4.0": "^2.4.0",
+      "@azure/msal-node@<7.1.0": "^7.1.0"
+    }
   }
 }

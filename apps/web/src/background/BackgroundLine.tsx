@@ -1,8 +1,8 @@
 import type { ClaudeSession } from '@yardmaster/protocol';
+import { redact } from '@yardmaster/protocol';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLocation } from 'wouter';
 import { dur, ease } from '../motion.js';
-import { redact } from '../redact/redact.js';
 import { useRedactOn } from '../redact/reveal.js';
 import { sessionHref } from '../routes.js';
 import { cx } from '../ui/cx.js';

@@ -1,10 +1,10 @@
 import type { BackgroundKind, ClaudeSession } from '@yardmaster/protocol';
+import { redact } from '@yardmaster/protocol';
 import { Bot, ChevronRight, CircleDashed, Radar, SquareTerminal } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useId, useMemo } from 'react';
 import { useNow } from '../anim/clock.js';
 import { dur, ease, spring } from '../motion.js';
-import { redact } from '../redact/redact.js';
 import { useRedactOn } from '../redact/reveal.js';
 import type { Tone } from '../status.js';
 import { cx } from '../ui/cx.js';

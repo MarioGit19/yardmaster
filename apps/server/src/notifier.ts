@@ -9,6 +9,7 @@ import {
   type NotifyEvent,
   type PatchOp,
   type PushPayload,
+  redact,
   type ServerToUi,
   type SessionStatus,
   sessionDisplayName,
@@ -98,6 +99,12 @@ const PRIORITY: Record<NotifyEvent, number> = {
 
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
+
+/**
+ * Pushes show on the lock screen, so secrets are masked before clipping (a clipped secret could
+ * slip past the patterns).
+ */
+const masked = (text: string, max: number) => clip(redact(text), max);
 
 const firstLine = (text: string | null | undefined) =>
   (text ?? '')
@@ -328,7 +335,7 @@ export class Notifier {
   private execEvent(exec: Execution, server: boolean): NotifyEventData | null {
     const { state } = this.options.store;
     const projectId = state.terminals[exec.terminalId]?.projectId ?? null;
-    const command = clip(firstLine(exec.commandLine) || 'A command', 80);
+    const command = clip(redact(firstLine(exec.commandLine)) || 'A command', 80);
     const ran = formatDuration((exec.endedAt ?? this.now()) - exec.startedAt);
     const code = exec.exitCode;
     const url = terminalUrl(projectId, exec.terminalId);
@@ -505,8 +512,8 @@ export class Notifier {
     const payload: PushPayload = {
       type: 'show',
       kind: event.kind,
-      title: clip(title, TITLE_MAX),
-      body: hide ? '' : clip(event.body, BODY_MAX),
+      title: masked(title, TITLE_MAX),
+      body: hide ? '' : masked(event.body, BODY_MAX),
       tag: this.tag(key),
       url: event.url,
       request: event.request,
@@ -560,8 +567,8 @@ export class Notifier {
   private toast(event: NotifyEventData): ServerToUi {
     return makeMessage('toast', {
       level: event.level,
-      title: clip(`${this.projectLabel(event.projectId)} · ${event.headline}`, TITLE_MAX),
-      ...(event.body ? { body: clip(event.body, 400) } : {}),
+      title: masked(`${this.projectLabel(event.projectId)} · ${event.headline}`, TITLE_MAX),
+      ...(event.body ? { body: masked(event.body, BODY_MAX) } : {}),
       ...(event.projectId ? { projectId: event.projectId } : {}),
     });
   }

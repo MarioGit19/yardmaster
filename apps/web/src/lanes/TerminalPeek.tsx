@@ -1,7 +1,7 @@
 import type { StreamId } from '@yardmaster/protocol';
+import { redact } from '@yardmaster/protocol';
 import { useEffect, useRef, useState } from 'react';
 import { useStream } from '../data/index.js';
-import { redact } from '../redact/redact.js';
 import { useRedactOn } from '../redact/reveal.js';
 import { cx } from '../ui/cx.js';
 import { type Line, segmentCss, TerminalTail } from './ansi.js';

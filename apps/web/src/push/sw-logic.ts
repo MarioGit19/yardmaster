@@ -67,7 +67,7 @@ export function showOptions(payload: ShowPayload): ShowOptions {
     requireInteraction: needsYou,
     actions: payload.approvalId
       ? [
-          { action: 'allow', title: 'Allow' },
+          { action: 'allow', title: 'Allow once' },
           { action: 'deny', title: 'Deny' },
         ]
       : [],

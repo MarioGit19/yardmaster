@@ -273,7 +273,7 @@ function HideDetailsRow({ server: { settings, update } }: { server: ServerSettin
   return (
     <SettingRow
       title="Hide details"
-      description="Notifications say only which project needs you, such as “acme-shop needs you”, never the command or what Claude wrote."
+      description="Details show on the lock screen: the command, the tool Claude wants to run and what it wrote, with known secrets masked. Turn this on to say only which project needs you, such as “acme-shop needs you”."
       data="notify-hide-details"
     >
       <Segmented

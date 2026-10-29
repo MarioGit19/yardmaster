@@ -1,5 +1,5 @@
 /**
- * Secret masking for the UI (PRD §8.7). Masks keep a recognizable prefix (`sk-ant-`, `ghp_`,
+ * Secret masking for the UI and push notifications (PRD §8.7). Masks keep a recognizable prefix (`sk-ant-`, `ghp_`,
  * `AKIA`, the variable name) and replace the secret itself with a fixed-length mask, so the
  * length doesn't leak either.
  */

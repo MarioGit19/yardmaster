@@ -178,6 +178,11 @@ describe('push routes', () => {
     expect(res.json()).toEqual({ error: 'unknown_approval' });
     const bad = await call(instance, 'POST', '/api/approvals/nope/decision', { decision: 'maybe' });
     expect(bad.statusCode).toBe(400);
+    // A notification never writes a rule: Allow once and Deny only.
+    const always = await call(instance, 'POST', '/api/approvals/nope/decision', {
+      decision: 'allowAlways',
+    });
+    expect(always.statusCode).toBe(400);
   });
 
   it('drop a paired device’s subscriptions when it is revoked', async () => {

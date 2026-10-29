@@ -143,7 +143,7 @@ describe('payloads', () => {
       ts: 0,
     };
     expect(showOptions({ ...base, approvalId: 'ap-1' }).actions.map((a) => a.title)).toEqual([
-      'Allow',
+      'Allow once',
       'Deny',
     ]);
     const plain = showOptions({ ...base, approvalId: null });

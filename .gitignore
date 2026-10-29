@@ -33,6 +33,11 @@ loop/.state/
 .claude/references/
 .claude/settings.local.json
 
+# Impeccable's local state (the hook cache holds absolute home paths)
+**/.impeccable/hook.cache.json
+**/.impeccable/hook.pending.json
+**/.impeccable/config.local.json
+
 # brand assets rendered from apps/web/src/brand/logo.svg (pnpm brand:build, and the web build)
 apps/web/public/*.png
 apps/web/public/favicon.svg

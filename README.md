@@ -131,10 +131,14 @@ Yardmaster only ever listens on `127.0.0.1`. To use it from your phone, put both
 **Yardmaster runs locally, uses your own Claude Code login, and has no telemetry.**
 
 - The server binds `127.0.0.1` only, checks the `Host` and `Origin` of every request, and requires a per-install token (`~/.yardmaster/token`, mode 0600) or a browser session. Each browser signs in with a one-time link and keeps its own session in the board's own storage, never in a cookie, so dev servers on other ports of the same host never see it. Settings lists every signed-in browser and phone and can sign any of them out.
-- The editor extension and the Claude hooks talk to it only through a socket in `~/.yardmaster` that only you can reach, so another program holding the port can't collect the token or answer in Yardmaster's place.
+- The editor extension and the Claude hooks talk to it only through a socket in `~/.yardmaster` that only you can reach, so another program holding the port can't collect the token or answer in Yardmaster's place. A project's editor settings can't point the extension elsewhere.
+- A paired phone can read and type into your terminals and answer Claude, but can't change project folders, the editor command, allowed hosts or history, install hooks, rotate the token or pair devices. Requests through `tailscale serve` always count as remote, and Tailscale Funnel is refused.
+- Untrusted repositories: before the first board Claude session in a folder whose Claude settings or `.mcp.json` can run commands or widen permissions, a trust card lists what was found and nothing starts until you trust it. Git status is skipped for repos whose own config runs commands, and text printed in a terminal can't plant a fake command for Rerun.
 - It never reads your Claude credentials (`~/.claude/.credentials*`, the Keychain, `~/.claude.json`) and never asks for an API key. If `ANTHROPIC_API_KEY` is set in the server's environment, the Agent SDK bills that key instead; `doctor` warns about it.
-- It makes no network calls of its own. Fonts and assets are bundled.
-- Terminal output and transcripts stay in memory and in a local SQLite file under `~/.yardmaster`. The **Redact secrets** setting masks common secret patterns on screen.
+- It makes no network calls of its own, except the push notifications you turn on, which go through your browser's push service. Fonts and assets are bundled. Notifications show on the lock screen with secrets masked; **Hide details** leaves only the project name.
+- Terminal output and transcripts stay in memory and in a local SQLite file under `~/.yardmaster` (owner only). The **Redact secrets** setting masks common secret patterns on screen.
+
+What Yardmaster does and doesn't protect against, and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Uninstall
 

@@ -133,7 +133,7 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 │         "Refactoring the cart totals to use…"            │  ← last assistant line, 1-line clamp, shimmer while streaming
 │                                                           │
 │  ▸ backend     pnpm dev        ▁▂▅▇▅▂▁   :3000  ● 2m     │  ← terminal lanes: name · cmd · throughput sparkline · port · uptime
-│  ▸ storefront  shopify app dev ▁▁▂▁▁▁▁   :9292  ●        │
+│  ▸ web         pnpm dev        ▁▁▂▁▁▁▁   :5173  ●        │
 │  ▸ zsh         git status      ✓ 0                        │
 └───────────────────────────────────────────────────────────┘
 ```

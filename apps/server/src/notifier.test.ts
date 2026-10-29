@@ -1,4 +1,10 @@
-import type { Approval, NotifyEvent, PushPayload, ServerToUi } from '@yardmaster/protocol';
+import {
+  type Approval,
+  MASK,
+  type NotifyEvent,
+  type PushPayload,
+  type ServerToUi,
+} from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APPROVAL_GRACE_MS, formatDuration, Notifier, type NotifierSettings } from './notifier.js';
 import { type PushSender, PushSubscriptions, type SendResult } from './push.js';
@@ -327,6 +333,38 @@ describe('Notifier events', () => {
     const empty = setup({ subscriptions: 0 });
     runTurn(empty.store, 60_000);
     expect(empty.shows()).toHaveLength(0);
+  });
+
+  it('masks secrets in every push, since pushes show on the lock screen', async () => {
+    // Assembled at runtime so no secret-shaped literal sits in the repo.
+    const token = `${'gh'}p_${'aB3dE6gH9j'.repeat(4)}`;
+    const { store, shows, toasts, settings } = setup();
+    settings.events = new Set<NotifyEvent>([...settings.events, 'background']);
+    store.upsertApproval(
+      approval('ap-1', { input: { command: `curl -H "Authorization: ${token}" api.test` } }),
+    );
+    store.flush();
+    await vi.advanceTimersByTimeAsync(20_000);
+    runCommand(store, 'e-1', {
+      ranMs: 40_000,
+      exitCode: 0,
+      line: `API_TOKEN=s3cr3tvalue ${'x'.repeat(70)}`,
+    });
+    await vi.advanceTimersByTimeAsync(20_000);
+    store.setSessionStatus(SESSION, { kind: 'working' }, Date.now() - 40_000);
+    store.flush();
+    store.updateSession(SESSION, { lastAssistantText: `Set it to ${token} and retry.` });
+    store.setSessionStatus(SESSION, { kind: 'idle' });
+    store.flush();
+    const all = JSON.stringify([shows(), toasts]);
+    expect(shows()).toHaveLength(3);
+    expect(all).not.toContain(token);
+    expect(all).not.toContain('s3cr3tvalue');
+    expect(shows().map((s) => [s.title, s.body])).toEqual([
+      ['acme-shop · Claude wants to run Bash', `curl -H "Authorization: ghp_${MASK}" api.test`],
+      [expect.stringContaining(`✓ API_TOKEN=${MASK} xxx`), 'Ran for 40s'],
+      ['acme-shop · Claude finished', `Set it to ghp_${MASK} and retry.`],
+    ]);
   });
 
   it('toasts the board for everything but approvals, which toast on their own', () => {

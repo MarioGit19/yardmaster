@@ -2,6 +2,7 @@ import {
   type Approval,
   type ApprovalState,
   parseToolCall,
+  redactDeep,
   sessionDisplayName,
   sessionSubtitle,
   toolInputDetail,
@@ -17,7 +18,6 @@ import { selectProject, selectSession, useBoard } from '../data/index.js';
 import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { finishCountdown, orbStateFor } from '../orb/model.js';
-import { redactDeep } from '../redact/redact.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { Button } from '../ui/Button.js';
