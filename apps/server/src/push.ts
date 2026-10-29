@@ -131,12 +131,16 @@ export class PushSubscriptions {
     return this.items.find((s) => s.id === id);
   }
 
+  byEndpoint(endpoint: string): StoredSubscription | undefined {
+    return this.items.find((s) => s.endpoint === endpoint);
+  }
+
   /** Adds a subscription; the same endpoint again keeps its id. Oldest out once full. */
   add(
     input: PushSubscriptionInput,
-    owner: { deviceId: string | null; userAgent: string | undefined },
+    owner: { deviceId: string; userAgent: string | undefined },
   ): string {
-    const existing = this.items.find((s) => s.endpoint === input.endpoint);
+    const existing = this.byEndpoint(input.endpoint);
     const id = existing?.id ?? randomBytes(12).toString('base64url');
     const item: StoredSubscription = {
       id,
@@ -299,8 +303,15 @@ export function registerPushRoutes(app: FastifyInstance, options: PushRoutesOpti
       options.logger.warn('refused a push subscription for an unknown push service');
       return reply.code(422).send({ error: 'unknown_push_service' });
     }
+    // Every subscription belongs to a browser session and ends with it; the token alone owns none.
+    const deviceId = request.browserSession();
+    if (deviceId === null) return reply.code(403).send({ error: 'browser_session_required' });
+    // A phone can't take over an endpoint another device subscribed with.
+    if (!mayManage(request, subscriptions.byEndpoint(body.data.endpoint))) {
+      return reply.code(403).send({ error: 'local_only' });
+    }
     const id = subscriptions.add(body.data, {
-      deviceId: request.browserSession(),
+      deviceId,
       userAgent: request.headers['user-agent'],
     });
     return { id } satisfies PushSubscribeResponse;

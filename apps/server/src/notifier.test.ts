@@ -59,7 +59,7 @@ function setup(
         endpoint: `https://fcm.googleapis.com/fcm/send/device-${i}`,
         keys: { p256dh: `key${i}`, auth: `auth${i}` },
       },
-      { deviceId: null, userAgent: undefined },
+      { deviceId: `session-${i}`, userAgent: undefined },
     );
   }
   const ids = subscriptions.list().map((s) => s.id);

@@ -388,6 +388,15 @@ describe('a paired phone', () => {
     const mine = await subscribe(first, 1);
     const theirs = await subscribe(second, 2);
     const asFirst = { ...remote, ...first };
+    // Re-sending another device's endpoint doesn't take its subscription over.
+    const takeover = await call(instance, 'POST', '/api/push/subscriptions', asFirst, {
+      endpoint: 'https://web.push.apple.com/QHx2',
+      keys: { p256dh: 'BKeyX', auth: 'authX' },
+    });
+    expect(takeover.statusCode).toBe(403);
+    expect(takeover.json()).toEqual({ error: 'local_only' });
+    expect(instance.pushSubscriptions.get(theirs)).toMatchObject({ p256dh: 'BKey2' });
+    expect(await subscribe(first, 1)).toBe(mine);
     for (const [method, url, body] of [
       ['DELETE', `/api/push/subscriptions/${theirs}`, undefined],
       ['POST', '/api/push/test', { id: theirs }],

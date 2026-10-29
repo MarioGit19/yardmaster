@@ -1,13 +1,14 @@
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PushInfoResponse, PushOutboxResponse } from '@yardmaster/protocol';
+import { PushInfoResponse, PushOutboxResponse, SESSION_HEADER } from '@yardmaster/protocol';
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { isPushServiceEndpoint, type PushSender, VAPID_FILE } from './push.js';
 import { TOKEN_HEADER } from './security.js';
+import { sessionHeader } from './sessions.test-helpers.js';
 import { generateToken } from './token.js';
 
 const token = generateToken();
@@ -56,6 +57,17 @@ async function server(
   return app;
 }
 
+/** One signed-in browser on this machine per server, as the board's own tab would be. */
+const macSessions = new WeakMap<FastifyInstance, Record<string, string>>();
+function macSession(instance: FastifyInstance): Record<string, string> {
+  let header = macSessions.get(instance);
+  if (!header) {
+    header = sessionHeader(instance);
+    macSessions.set(instance, header);
+  }
+  return header;
+}
+
 function call(
   instance: FastifyInstance,
   method: 'GET' | 'PUT' | 'POST' | 'DELETE',
@@ -63,7 +75,10 @@ function call(
   body?: unknown,
   headers: InjectOptions['headers'] = local,
 ) {
-  const auth = headers?.host === local.host ? { [TOKEN_HEADER]: token } : {};
+  const auth =
+    headers?.host === local.host
+      ? { [TOKEN_HEADER]: token, ...(headers[SESSION_HEADER] ? {} : macSession(instance)) }
+      : {};
   return instance.inject({
     method,
     url,
@@ -116,6 +131,19 @@ describe('push routes', () => {
     expect((await call(instance, 'DELETE', `/api/push/subscriptions/${id}`)).statusCode).toBe(200);
     expect((await call(instance, 'DELETE', `/api/push/subscriptions/${id}`)).statusCode).toBe(404);
     expect((await call(instance, 'GET', '/api/push')).json().devices).toEqual([]);
+  });
+
+  it('refuse a subscription from the token alone: it would belong to no browser', async () => {
+    const instance = await server();
+    const res = await instance.inject({
+      method: 'POST',
+      url: '/api/push/subscriptions',
+      headers: { ...local, [TOKEN_HEADER]: token },
+      payload: subscription(1),
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'browser_session_required' });
+    expect(instance.pushSubscriptions.list()).toEqual([]);
   });
 
   it('refuse endpoints that are not a browser push service', async () => {
