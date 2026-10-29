@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { chmod, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -82,6 +82,17 @@ describe('Persistence', () => {
     expect(db.path).toBe(join(nested, DB_FILE));
     expect((await stat(db.path)).mode & 0o777).toBe(0o600);
     expect((await stat(nested)).mode & 0o777).toBe(0o700);
+  });
+
+  it('tightens a board.db and its WAL files left readable by others', async () => {
+    const path = join(home, DB_FILE);
+    await writeFile(path, '', { mode: 0o644 });
+    await writeFile(`${path}-wal`, '', { mode: 0o644 });
+    await chmod(path, 0o644);
+    await chmod(`${path}-wal`, 0o644);
+    openDb({ home });
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+    expect((await stat(`${path}-wal`)).mode & 0o777).toBe(0o600);
   });
 
   it('persists projects across a restart, including deletes', () => {

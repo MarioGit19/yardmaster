@@ -1,5 +1,8 @@
 import type { GitFileChange, GitFileStatus, GitInfo } from '@yardmaster/protocol';
 
+/** Shown instead of the status when the repository's own config could run programs. */
+export const GIT_SKIPPED = 'git status skipped: repository config runs commands';
+
 export interface FileGroup {
   status: GitFileStatus;
   label: string;

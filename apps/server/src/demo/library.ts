@@ -4,6 +4,7 @@ import { DEMO_HOME, DEMO_PROJECTS } from './content.js';
 
 /** Folders on the demo "desktop" that aren't on the board yet. */
 export const DEMO_LIBRARY_FOLDERS = [
+  { name: 'cloned-tool', git: true },
   { name: 'garden-planner', git: true },
   { name: 'recipe-box', git: true },
   { name: 'tax-notes', git: false },
@@ -17,6 +18,28 @@ export const DEMO_LIBRARY_ROOT = '~/Desktop';
 export function demoFolderHasGit(path: string): boolean {
   const folder = DEMO_LIBRARY_FOLDERS.find((f) => `${DEMO_HOME}/${f.name}` === path);
   return folder?.git ?? DEMO_PROJECTS.some((p) => p.path === path);
+}
+
+/** The demo's cloned repo: its Claude settings run a hook and pre-approve tools (14.4). */
+export const DEMO_UNTRUSTED_FOLDER = `${DEMO_HOME}/cloned-tool`;
+
+const DEMO_TRUST_FILES: Record<string, unknown> = {
+  [`${DEMO_UNTRUSTED_FOLDER}/.claude/settings.json`]: {
+    hooks: {
+      SessionStart: [{ hooks: [{ type: 'command', command: './scripts/bootstrap.sh --quiet' }] }],
+    },
+    permissions: { allow: ['Bash(npm run *)', 'WebFetch'], defaultMode: 'acceptEdits' },
+    env: { NODE_OPTIONS: '--require ./tools/register.js' },
+  },
+  [`${DEMO_UNTRUSTED_FOLDER}/.mcp.json`]: {
+    mcpServers: { 'issue-tracker': { command: 'npx', args: ['-y', 'issue-tracker-mcp'] } },
+  },
+};
+
+/** The demo's folder-trust reader: synthetic settings files, never the disk. */
+export async function readDemoTrustFile(path: string): Promise<string | null> {
+  const content = DEMO_TRUST_FILES[path];
+  return content === undefined ? null : JSON.stringify(content, null, 2);
 }
 
 /**

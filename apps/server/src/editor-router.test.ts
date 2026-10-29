@@ -99,6 +99,8 @@ function board(): BoardState {
     'e-1': execution('e-1', 't-open'),
     'e-closed': execution('e-closed', 't-closed'),
     'e-blank': execution('e-blank', 't-open', '  '),
+    // A command line with a terminal escape in it, as forged output could leave behind.
+    'e-escape': execution('e-escape', 't-open', 'echo ok\x1b[2K\rrm -rf ~'),
   };
   return state;
 }
@@ -224,6 +226,9 @@ describe('createEditorActions', () => {
       ok: false,
       error: 'nothing_to_rerun',
     });
+    expect(await actions['terminal.rerun']({ kind: 'terminal.rerun', execId: 'e-escape' })).toEqual(
+      { ok: false, error: 'unsafe_command_line' },
+    );
     expect(
       await actions['terminal.create']({ kind: 'terminal.create', projectId: 'shopper' }),
     ).toEqual({ ok: false, error: ROUTE_ERRORS.noEditor });

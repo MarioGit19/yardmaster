@@ -19,6 +19,7 @@ import {
   WindowId,
 } from './domain.js';
 import { PatchOp } from './patch.js';
+import { FolderTrustReview } from './trust.js';
 
 // Wire messages, PRD §7. Every message is an envelope `{ v: 1, type, id?, ts, payload }`.
 
@@ -228,6 +229,8 @@ export const ActionResult = envelope(
     sessionId: SessionId.optional(),
     /** The editor `project.openInEditor` launched. */
     editor: EditorApp.optional(),
+    /** With `folder_untrusted`/`trust_changed`: what the trust card lists. */
+    trust: FolderTrustReview.optional(),
   }),
 );
 
@@ -290,6 +293,8 @@ export const UiAction = z.discriminatedUnion('kind', [
   /** Closes it, then drops it from the board and the picker's recents. */
   action('project.forget', { projectId: ProjectId, closeWindow: z.boolean().optional() }),
   action('project.openInEditor', { projectId: ProjectId }),
+  /** Trusts a folder's Claude settings for board sessions; `hash` is the review the user saw. */
+  action('folder.trust', { path: Path, hash: z.string().regex(/^[0-9a-f]{64}$/) }),
   action('settings.set', { key: z.string().min(1).max(128), value: z.unknown() }),
 ]);
 export type UiAction = z.infer<typeof UiAction>;

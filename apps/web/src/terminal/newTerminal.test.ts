@@ -48,6 +48,13 @@ describe('recentCommands', () => {
     expect(recentCommands(board(), 'p-zen')).toEqual([]);
   });
 
+  it('leaves out command lines with control characters', () => {
+    const b = board();
+    const r = run('n-esc', 't-a', 'ls\x1b[2K\rrm -rf ~', 500);
+    b.executions[r.id] = r;
+    expect(recentCommands(b, 'p-acme')).toEqual(['pnpm dev', 'git status', 'pnpm test']);
+  });
+
   it('keeps at most `max`', () => {
     const b = board();
     for (let i = 0; i < 8; i++) {

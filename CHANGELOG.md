@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Untrusted projects
+
+- Before the first board Claude session in a folder whose `.claude/settings*.json` or `.mcp.json` can run commands or widen permissions (hooks, allow rules, a permission mode that asks less, env, MCP servers, plugins, command settings), a trust card lists exactly what was found, on the Mac and on phones. Nothing starts until you trust it, and changing those settings asks again. Folders without any of these start as before.
+- Board terminals sign their shell-integration markers with a per-terminal secret, so text printed in a terminal (a `cat`-ed README) can't plant a fake past command. Rerun refuses command lines with control characters, and the board shows such characters instead of hiding them.
+- Git status is skipped for repositories whose own config runs commands (filter drivers, `core.fsmonitor`, `core.hooksPath`, `*command` keys), and git runs without the system config.
+- `~/.yardmaster` is tightened to owner only and `board.db` to 0600 at start; `yardmaster doctor` reports both.
+
 ### Phones can do less
 
 - A paired phone keeps terminals, chat, approvals and notifications, but can no longer change project folders, the editor command, allowed hosts or activity history, install hooks, rotate the token, pair devices or sign out other browsers. Do those on the Mac; Settings on the phone hides them.

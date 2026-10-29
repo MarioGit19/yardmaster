@@ -19,6 +19,7 @@ import {
   useLastActivity,
 } from '../data/index.js';
 import { POD_LAYOUT_DEPENDENCY, sharedId } from '../focus/shared.js';
+import { GIT_SKIPPED } from '../git/model.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
 import { type OpeningPhase, slowHint, useOpening } from '../library/opening.js';
 import { spring } from '../motion.js';
@@ -276,6 +277,13 @@ function OpeningLine({ editor, phase }: { editor: EditorApp; phase: OpeningPhase
 
 function GitLine({ git }: { git: Project['git'] }) {
   if (!git) return <span className="text-meta text-text-2">Not a git repository</span>;
+  if (git.statusSkipped) {
+    return (
+      <span className="truncate text-meta text-text-2" title={GIT_SKIPPED}>
+        {GIT_SKIPPED}
+      </span>
+    );
+  }
   const branch = git.branch ?? (git.head ? git.head.slice(0, 7) : 'no branch');
   return (
     <span className="flex min-w-0 items-center gap-2 font-mono text-meta text-text-2 tabular">

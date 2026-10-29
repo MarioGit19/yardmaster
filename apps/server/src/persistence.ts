@@ -1,11 +1,12 @@
-import { chmodSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { type ActivityEvent, ClaudeSession, Project } from '@yardmaster/protocol';
 import { z } from 'zod';
+import { DB_FILE, prepareDbFile } from './data-dir.js';
 import type { BoardStore } from './store.js';
 
-export const DB_FILE = 'board.db';
+export { DB_FILE };
 export const ACTIVITY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 /** Queued writes are flushed this long after the first one, or sooner when the batch is full. */
@@ -123,8 +124,8 @@ export class Persistence {
     if (this.path !== ':memory:' && !options.path) {
       mkdirSync(options.home as string, { recursive: true, mode: 0o700 });
     }
+    if (this.path !== ':memory:') prepareDbFile(this.path);
     this.db = new DatabaseSync(this.path);
-    if (this.path !== ':memory:') chmodSync(this.path, 0o600);
     migrate(this.db);
 
     this.stmt = {

@@ -11,6 +11,7 @@ import {
   GIT_MAX_FILES,
   type GitFileChange,
   type GitInfo,
+  isSafeCommandLine,
   makeMessage,
   type PortBinding,
   type Project,
@@ -21,6 +22,7 @@ import {
   startBackground,
   type ToolActivity,
   toolFamily,
+  UNSAFE_COMMAND_LINE,
 } from '@yardmaster/protocol';
 import type { ActionHandlers, ActionResult } from '../actions.js';
 import { NOTHING_TO_RERUN, type TerminalActionKind } from '../editor-actions.js';
@@ -335,6 +337,9 @@ export class DemoSimulator {
         const terminal = this.openTerminal(execution.terminalId);
         if (!terminal.ok) return terminal;
         if (execution.commandLine.trim() === '') return { ok: false, error: NOTHING_TO_RERUN };
+        if (!isSafeCommandLine(execution.commandLine)) {
+          return { ok: false, error: UNSAFE_COMMAND_LINE };
+        }
         this.rerun(terminal.ctx, execution.commandLine);
         return { ok: true };
       },

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { cx } from '../ui/cx.js';
-import { groupFiles, splitPath, syncState, unlistedCount } from './model.js';
+import { GIT_SKIPPED, groupFiles, splitPath, syncState, unlistedCount } from './model.js';
 
 const FILE_MARK: Record<GitFileStatus, { mark: string; className: string }> = {
   modified: { mark: 'M', className: 'text-st-work-ink' },
@@ -33,6 +33,16 @@ export function GitPanel({ git, now }: GitPanelProps) {
       <section aria-label="Git" data-git-panel>
         <ColumnHeading>Git</ColumnHeading>
         <p className="text-body-sm text-text-2">Not a git repository</p>
+      </section>
+    );
+  }
+  if (git.statusSkipped) {
+    return (
+      <section aria-label="Git" data-git-panel>
+        <ColumnHeading>Git</ColumnHeading>
+        <p className="text-body-sm text-text-2" data-git-skipped>
+          {GIT_SKIPPED}
+        </p>
       </section>
     );
   }

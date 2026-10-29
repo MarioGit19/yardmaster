@@ -22,13 +22,20 @@ import { z } from 'zod';
 import { type ActionHandlers, createActionDispatcher, stubActionHandlers } from './actions.js';
 import { AwayApprovals, registerAwayRoutes } from './claude/away.js';
 import { BackgroundTracker } from './claude/background-tracker.js';
+import { FolderTrust, TRUSTED_FOLDERS_KEY } from './claude/folder-trust.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
+import { secureDataDir } from './data-dir.js';
 import { createDemoQuery } from './demo/demo-query.js';
-import { DEMO_LIBRARY_ROOT, demoFolderHasGit, demoLibrary } from './demo/library.js';
+import {
+  DEMO_LIBRARY_ROOT,
+  demoFolderHasGit,
+  demoLibrary,
+  readDemoTrustFile,
+} from './demo/library.js';
 import { demoPty } from './demo/pty.js';
 import { runPushDrill } from './demo/push-drill.js';
 import { DemoSimulator } from './demo/simulator.js';
@@ -208,6 +215,8 @@ export async function buildServer(
 ): Promise<FastifyInstance> {
   // Mutable: Settings can rotate it while the server runs.
   let token = options.token ?? (await ensureToken(config.home));
+  // Terminal output and transcripts live here: never readable by other users (PRD §8).
+  await secureDataDir(config.home);
   const currentToken = () => token;
   const logger: FastifyBaseLogger = pino({
     name: 'yardmaster',
@@ -345,8 +354,18 @@ export async function buildServer(
   app.decorate('transcripts', transcripts);
   // Demo board sessions run the real runner over a scripted query and the demo transcripts.
   const demoTranscripts = demo?.transcripts;
+  const folderTrust = new FolderTrust({
+    load: () => settings[TRUSTED_FOLDERS_KEY],
+    save: (list) => {
+      settings[TRUSTED_FOLDERS_KEY] = list;
+      persistence.setSetting(TRUSTED_FOLDERS_KEY, list);
+    },
+    // The demo's folders are synthetic: it never reads the disk.
+    ...(options.demo ? { read: readDemoTrustFile } : {}),
+  });
   const runner = new SessionRunner({
     store,
+    trust: folderTrust,
     transcripts: demoTranscripts ?? transcripts,
     logger: logger.child({ component: 'runner' }),
     onActivity: recordActivity,

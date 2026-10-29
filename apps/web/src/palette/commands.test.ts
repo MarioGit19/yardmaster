@@ -257,10 +257,11 @@ describe('buildCommands', () => {
     ]);
   });
 
-  it('skips interactive and empty commands when re-running', () => {
+  it('skips interactive, empty and unsafe commands when re-running', () => {
     const b = board();
     b.executions['e-4'] = { ...execution('e-4', 't-acme', 'htop', T0 + 99), interactive: true };
     b.executions['e-5'] = execution('e-5', 't-acme', '  ', T0 + 100);
+    b.executions['e-6'] = execution('e-6', 't-acme', 'ls\x1b[2K\rrm -rf ~', T0 + 101);
     const rerun = byId(buildCommands(b, context({ projectId: 'p-acme' })), 'rerun-last');
     expect(rerun?.hint).toBe('pnpm lint');
   });

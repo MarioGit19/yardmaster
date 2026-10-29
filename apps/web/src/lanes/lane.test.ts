@@ -59,6 +59,17 @@ describe('laneView', () => {
     expect(laneView(terminal, none)).toMatchObject({ command: null, tone: 'idle', exit: null });
   });
 
+  it('shows control characters in a command, and calls it unsafe to re-run', () => {
+    const view = laneView(terminal, execution({ commandLine: 'echo ok\x1b[8m\rrm -rf ~' }));
+    expect(view).toMatchObject({ command: 'echo ok␛[8m␍rm -rf ~', safe: false });
+    expect(view.label).toBe('backend: echo ok␛[8m␍rm -rf ~, running');
+    expect(laneView(terminal, execution()).safe).toBe(true);
+    expect(laneView(terminal, none).safe).toBe(false);
+    expect(
+      terminalDisplay({ ...terminal, name: 'zsh' }, execution({ commandLine: 'a\nb' })).name,
+    ).toBe('a␊b');
+  });
+
   it('never calls a command running in a closed terminal', () => {
     const view = laneView({ ...terminal, state: 'closed', exitCode: null }, execution());
     expect(view.running).toBe(false);

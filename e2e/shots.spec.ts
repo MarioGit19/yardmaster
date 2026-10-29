@@ -1886,6 +1886,58 @@ test.describe('board terminal', () => {
   }
 });
 
+// 14.4: the trust card before a board session in the demo's cloned folder, whose Claude settings
+// run a hook and pre-approve tools. Its own board: opening the folder adds a project. Cancel leaves
+// it untrusted, so every width shows the card.
+test.describe('folder trust', () => {
+  for (const theme of THEMES) {
+    test(theme, async ({ browser }) => {
+      test.slow();
+      const board = await startBoard({ demo: true });
+      try {
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 390, height: 844 },
+        ]) {
+          const phone = viewport.width < 768;
+          const context = await browser.newContext({
+            viewport,
+            colorScheme: theme,
+            baseURL: board.url,
+            storageState: signedInState(board.url, board.session),
+            ...(phone ? { hasTouch: true, isMobile: true } : {}),
+          });
+          const page = await context.newPage();
+          await page.addInitScript((t) => localStorage.setItem('yardmaster.theme', t), theme);
+          await page.goto(phone ? '/#/projects' : '/#/');
+          await page.locator('[data-hud="open-project"], [data-phone-open-project]').click();
+          const dialog = page.locator('[data-open-project]');
+          await dialog.locator('[data-library-entry="cloned-tool"]').click();
+          const sheet = dialog.locator('[data-launch-sheet="cloned-tool"]');
+          await sheet.locator('[data-launch-option="editor"] label').click();
+          await sheet.locator('[data-launch-option="claude"] label').click();
+          await sheet
+            .getByRole('textbox', { name: 'What should Claude do?' })
+            .fill('Read the README and set up the dev tools');
+          await sheet.getByRole('button', { name: 'Open project' }).click();
+          const card = page.getByRole('dialog', { name: 'Trust cloned-tool?' });
+          await expect(card).toBeVisible();
+          await page.waitForTimeout(700);
+          await page.screenshot({
+            path: new URL(`folder-trust-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+          await card.getByRole('button', { name: 'Cancel' }).click();
+          await expect(card).toHaveCount(0);
+          await context.close();
+        }
+      } finally {
+        await board.stop();
+      }
+    });
+  }
+});
+
 // 12.5: the phone pass on an iPhone profile (touch, 390 px) in Chromium: the overview in every
 // layout, the picker and launch sheet, the focus view's tabs and composer, the Attention Center,
 // and Settings → Phone with a host, a live pairing code and paired devices (faked for this page).

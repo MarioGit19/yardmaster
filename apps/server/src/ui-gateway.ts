@@ -4,6 +4,7 @@ import {
   decodeUiToServer,
   type EditorApp,
   encodeServerToUi,
+  type FolderTrustReview,
   makeMessage,
   type PatchOp,
   type ServerToUi,
@@ -217,6 +218,7 @@ export class UiGateway {
         this.reply(client, message.id, result.ok, result.ok ? undefined : result.error, {
           ...(result.ok && result.sessionId !== undefined ? { sessionId: result.sessionId } : {}),
           ...(result.ok && result.editor !== undefined ? { editor: result.editor } : {}),
+          ...(!result.ok && result.trust !== undefined ? { trust: result.trust } : {}),
         });
         return;
       }
@@ -239,7 +241,13 @@ export class UiGateway {
       case 'session.send': {
         const { sessionId, text } = message.payload;
         const result = await settle(() => this.sendToSession(sessionId, text));
-        this.reply(client, message.id, result.ok, result.ok ? undefined : result.error);
+        this.reply(
+          client,
+          message.id,
+          result.ok,
+          result.ok ? undefined : result.error,
+          !result.ok && result.trust !== undefined ? { trust: result.trust } : {},
+        );
         return;
       }
     }
@@ -323,11 +331,13 @@ export class UiGateway {
     id: string | undefined,
     ok: boolean,
     error?: string,
-    extra: { sessionId?: string; editor?: EditorApp } = {},
+    extra: { sessionId?: string; editor?: EditorApp; trust?: FolderTrustReview } = {},
   ): void {
     if (id === undefined) return;
     const payload =
-      error === undefined ? { id, ok, ...extra } : { id, ok, error: error.slice(0, 1_000) };
+      error === undefined
+        ? { id, ok, ...extra }
+        : { id, ok, error: error.slice(0, 1_000), ...(extra.trust ? { trust: extra.trust } : {}) };
     this.send(client, this.message('action.result', payload));
   }
 

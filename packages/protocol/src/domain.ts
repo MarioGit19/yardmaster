@@ -72,6 +72,8 @@ export const GitInfo = z.object({
   files: z.array(GitFileChange).max(GIT_MAX_FILES).default([]),
   /** Newest first. */
   commits: z.array(GitCommit).max(GIT_MAX_COMMITS).default([]),
+  /** The repository's own config can run programs, so its status isn't read (PRD §8). */
+  statusSkipped: z.boolean().optional(),
   updatedAt: Timestamp,
 });
 export type GitInfo = z.infer<typeof GitInfo>;

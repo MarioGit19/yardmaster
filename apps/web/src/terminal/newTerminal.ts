@@ -1,4 +1,9 @@
-import type { BoardState, ServerStatus, Terminal } from '@yardmaster/protocol';
+import {
+  type BoardState,
+  isSafeCommandLine,
+  type ServerStatus,
+  type Terminal,
+} from '@yardmaster/protocol';
 import { useSyncExternalStore } from 'react';
 
 /** Chips for the project's recent commands in the new-terminal popover. */
@@ -10,7 +15,8 @@ const isClaude = (command: string) => command === CLAUDE_COMMAND || command.star
 
 /**
  * The project's distinct recent command lines, newest first: what someone is likely to start
- * again in a new terminal. Interactive apps, `claude` (it has its own chip) and blanks are left out.
+ * again in a new terminal. Interactive apps, `claude` (it has its own chip), blanks and lines with
+ * control characters (14.4) are left out.
  */
 export function recentCommands(
   board: Pick<BoardState, 'terminals' | 'executions'>,
@@ -22,6 +28,7 @@ export function recentCommands(
     .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id));
   const commands: string[] = [];
   for (const run of runs) {
+    if (!isSafeCommandLine(run.commandLine)) continue;
     const command = run.commandLine.replace(/\s+/g, ' ').trim();
     if (command === '' || isClaude(command) || commands.includes(command)) continue;
     commands.push(command);

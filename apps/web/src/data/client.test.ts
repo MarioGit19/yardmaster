@@ -559,6 +559,69 @@ describe('BoardClient requests', () => {
     expect(heard).toHaveLength(1);
   });
 
+  it('asks the trust gate for an untrusted folder, trusts it and sends the request again', async () => {
+    const { client, connect, last } = setup();
+    client.start();
+    connect();
+    const review = {
+      path: '/home/dev/cloned-tool',
+      hash: 'a'.repeat(64),
+      findings: [
+        {
+          file: '.claude/settings.json' as const,
+          kind: 'hook' as const,
+          label: 'SessionStart hook',
+          detail: './setup.sh',
+        },
+      ],
+      truncated: false,
+    };
+    const asked: unknown[] = [];
+    let answer: (trusted: boolean) => void = () => {};
+    client.setTrustGate((r) => {
+      asked.push(r);
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    });
+    const flush = () => vi.advanceTimersByTimeAsync(0);
+    const reply = (extra: Record<string, unknown>) => {
+      const sent = last().sent.at(-1);
+      last().receive(
+        makeMessage<ServerToUi>('action.result', { id: sent?.id ?? '', ...extra } as never),
+      );
+    };
+
+    const started = client.action({ kind: 'session.create', projectId: 'p1', prompt: 'hi' });
+    reply({ ok: false, error: 'folder_untrusted', trust: review });
+    await flush();
+    expect(asked).toEqual([review]);
+    answer(true);
+    await flush();
+    expect(last().sent.at(-1)?.payload).toEqual({
+      kind: 'folder.trust',
+      path: review.path,
+      hash: review.hash,
+    });
+    reply({ ok: true });
+    await flush();
+    expect(last().sent.at(-1)?.payload).toMatchObject({ kind: 'session.create', prompt: 'hi' });
+    reply({ ok: true, sessionId: '00000000-0000-4000-8000-000000000001' });
+    await expect(started).resolves.toEqual({
+      ok: true,
+      sessionId: '00000000-0000-4000-8000-000000000001',
+    });
+
+    // Cancel: the refusal comes back as it was, and nothing is trusted.
+    const cancelled = client.action({ kind: 'session.create', projectId: 'p1', prompt: 'hi' });
+    reply({ ok: false, error: 'folder_untrusted', trust: review });
+    await flush();
+    const count = last().sent.length;
+    answer(false);
+    await expect(cancelled).resolves.toMatchObject({ ok: false, error: 'folder_untrusted' });
+    expect(last().sent).toHaveLength(count);
+  });
+
   it('fails fast offline, on disconnect, on timeout and for invalid payloads', async () => {
     const { client, connect, last, logger } = setup({ requestTimeoutMs: 1000 });
     client.start();

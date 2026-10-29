@@ -1,4 +1,9 @@
-import { type BoardState, RESUMABLE_SESSION_ID } from '@yardmaster/protocol';
+import {
+  type BoardState,
+  isSafeCommandLine,
+  RESUMABLE_SESSION_ID,
+  UNSAFE_COMMAND_LINE,
+} from '@yardmaster/protocol';
 import type { ActionHandlers, ActionResult } from './actions.js';
 import type { CommandPayloads } from './editor-gateway.js';
 import type { EditorRouter } from './editor-router.js';
@@ -48,6 +53,10 @@ export function createEditorActions(options: {
       const route = router.forExecution(execId);
       if (!route.ok) return route;
       if (route.execution.commandLine.trim() === '') return { ok: false, error: NOTHING_TO_RERUN };
+      // The command line came from the terminal's own output: never type control characters.
+      if (!isSafeCommandLine(route.execution.commandLine)) {
+        return { ok: false, error: UNSAFE_COMMAND_LINE };
+      }
       return send(route.windowId, 'cmd.rerun', { execId });
     },
     'terminal.create': ({ projectId, name, command }) => {

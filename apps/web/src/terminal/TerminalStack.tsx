@@ -978,7 +978,7 @@ function ActiveControls({
     (!claude && paneKind(execution.id === null ? null : execution, terminal) === 'interactive');
 
   const interrupt = () => act({ kind: 'terminal.interrupt', terminalId: terminal.id });
-  const rerunnable = open && !view.running && execution.id !== null && Boolean(view.command);
+  const rerunnable = open && !view.running && execution.id !== null && view.safe;
   const board = isBoardTerminal(terminal);
   const [port, ...morePorts] = useBoardList(selectPortsByTerminal(terminal.id));
   const lift = useComposerLift();

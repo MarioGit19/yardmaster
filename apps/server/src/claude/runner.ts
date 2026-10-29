@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import type {
   CanUseTool,
   Options,
@@ -19,6 +20,7 @@ import {
   backgroundLabel,
   type ClaudeSession,
   exitCodeOf,
+  type FolderTrustReview,
   makeMessage,
   nextSessionOrdinal,
   notificationStatus,
@@ -36,6 +38,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import type { ActionHandlers, ActionResult } from '../actions.js';
 import type { BoardStore } from '../store.js';
+import { type FolderTrust, untrusted } from './folder-trust.js';
 import { toolSummary } from './session-reducer.js';
 
 // Headless Claude sessions run from the board through the Agent SDK (PRD F6, §6.2).
@@ -67,6 +70,8 @@ export interface SessionRunnerOptions {
   onActivity?: (event: ActivityEvent) => void;
   /** Pending approvals expire (deny) after this long. `null`, the default: they wait. */
   approvalTimeoutMs?: number | null;
+  /** Folder trust (14.4): nothing launches in a folder whose settings need the user's yes. */
+  trust?: Pick<FolderTrust, 'review' | 'trust'> | null;
 }
 
 export interface StartSessionInput {
@@ -83,7 +88,9 @@ export interface ResumeSessionInput {
   fork?: boolean;
 }
 
-export type RunnerResult = { ok: true; sessionId: string } | { ok: false; error: string };
+export type RunnerResult =
+  | { ok: true; sessionId: string }
+  | { ok: false; error: string; trust?: FolderTrustReview };
 
 export const UNKNOWN_PROJECT = 'unknown_project';
 export const UNKNOWN_SESSION = 'unknown_session';
@@ -247,6 +254,7 @@ export class SessionRunner {
   private readonly onMessage: (message: ServerToUi) => void;
   private readonly onActivity: ((event: ActivityEvent) => void) | undefined;
   private readonly approvalTimeoutMs: number | null;
+  private readonly trust: SessionRunnerOptions['trust'];
 
   constructor(options: SessionRunnerOptions) {
     this.store = options.store;
@@ -266,6 +274,7 @@ export class SessionRunner {
     this.onMessage = options.onMessage ?? (() => {});
     this.onActivity = options.onActivity;
     this.approvalTimeoutMs = options.approvalTimeoutMs ?? null;
+    this.trust = options.trust ?? null;
   }
 
   isLive(sessionId: string): boolean {
@@ -280,8 +289,13 @@ export class SessionRunner {
   async startSession(input: StartSessionInput): Promise<RunnerResult> {
     // Loaded before any check, so everything after it runs in one synchronous step.
     const queryFn = await this.loadQuery();
+    const reviewed = this.store.state.projects[input.projectId];
+    if (!reviewed) return { ok: false, error: UNKNOWN_PROJECT };
+    const review = await this.trust?.review(reviewed.path);
+    if (review) return untrusted(review);
     const project = this.store.state.projects[input.projectId];
     if (!project) return { ok: false, error: UNKNOWN_PROJECT };
+    if (project.path !== reviewed.path) return this.startSession(input);
     const id = this.newId();
     const ts = this.now();
     this.transcripts?.claim(id);
@@ -311,11 +325,15 @@ export class SessionRunner {
   async resumeSession(sessionId: string, input: ResumeSessionInput = {}): Promise<RunnerResult> {
     const queryFn = await this.loadQuery();
     if (this.runs.has(sessionId) && !input.fork) return { ok: true, sessionId };
-    const session = this.store.state.sessions[sessionId];
-    const projectId = session?.projectId ?? input.projectId ?? null;
-    const project = projectId === null ? undefined : this.store.state.projects[projectId];
-    const cwd = session?.cwd ?? project?.path ?? null;
+    const reviewedCwd = this.resumeTarget(sessionId, input).cwd;
+    if (reviewedCwd !== null) {
+      const review = await this.trust?.review(reviewedCwd);
+      if (review) return untrusted(review);
+      if (this.runs.has(sessionId) && !input.fork) return { ok: true, sessionId };
+    }
+    const { session, project, cwd } = this.resumeTarget(sessionId, input);
     if (cwd === null) return { ok: false, error: session ? UNKNOWN_PROJECT : UNKNOWN_SESSION };
+    if (cwd !== reviewedCwd) return this.resumeSession(sessionId, input);
     // Two processes writing one transcript would corrupt it: a live terminal session forks.
     if (!input.fork && session && session.origin === 'terminal' && isLiveStatus(session.status)) {
       return { ok: false, error: SESSION_LIVE };
@@ -354,6 +372,14 @@ export class SessionRunner {
       ...(session?.permissionMode ? { permissionMode: session.permissionMode } : {}),
     });
     return { ok: true, sessionId: id };
+  }
+
+  private resumeTarget(sessionId: string, input: ResumeSessionInput) {
+    const session = this.store.state.sessions[sessionId];
+    const projectId = session?.projectId ?? input.projectId ?? null;
+    const project = projectId === null ? undefined : this.store.state.projects[projectId];
+    const cwd = session?.cwd ?? project?.path ?? null;
+    return { session, project, cwd };
   }
 
   /** Sends a user turn; a board session that isn't running is resumed first. */
@@ -485,6 +511,7 @@ export class SessionRunner {
     | 'session.close'
     | 'session.setModel'
     | 'session.setPermissionMode'
+    | 'folder.trust'
   > {
     const done = (result: RunnerResult): ActionResult =>
       result.ok ? { ok: true, sessionId: result.sessionId } : result;
@@ -510,7 +537,20 @@ export class SessionRunner {
       'session.setModel': ({ sessionId, model }) => this.setModel(sessionId, model),
       'session.setPermissionMode': ({ sessionId, permissionMode }) =>
         this.setPermissionMode(sessionId, permissionMode),
+      'folder.trust': ({ path, hash }) => this.trustFolder(path, hash),
     };
+  }
+
+  /** Only a folder a board session could start in: a project's, or a known session's. */
+  private async trustFolder(path: string, hash: string): Promise<ActionResult> {
+    if (!this.trust) return { ok: true };
+    const { projects, sessions } = this.store.state;
+    const target = resolve(path);
+    const known =
+      Object.values(projects).some((p) => resolve(p.path) === target) ||
+      Object.values(sessions).some((s) => s.cwd !== null && resolve(s.cwd) === target);
+    if (!known) return { ok: false, error: UNKNOWN_PROJECT };
+    return this.trust.trust(path, hash);
   }
 
   private launch(queryFn: QueryFn, id: string, options: Options): void {

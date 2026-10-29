@@ -1,10 +1,12 @@
 import {
   type BoardState,
   type ClaudeSession,
+  isSafeCommandLine,
   type Project,
   sessionDisplayName,
   sessionSubtitle,
   type UiAction,
+  visibleCommandLine,
 } from '@yardmaster/protocol';
 import { isWaiting } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
@@ -127,10 +129,11 @@ function lastCommand(board: BoardState, projectId: string | null) {
     if (!terminal?.projectId || terminal.state !== 'open') continue;
     if (projectId !== null && terminal.projectId !== projectId) continue;
     if (execution.interactive || execution.commandLine.trim() === '') continue;
+    if (!isSafeCommandLine(execution.commandLine)) continue;
     if (best && best.startedAt >= execution.startedAt) continue;
     best = {
       execId: execution.id,
-      commandLine: execution.commandLine.trim(),
+      commandLine: visibleCommandLine(execution.commandLine.trim()),
       projectId: terminal.projectId,
       startedAt: execution.startedAt,
     };

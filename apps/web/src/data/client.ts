@@ -2,6 +2,7 @@ import {
   decodeServerToUi,
   type EditorApp,
   encodeUiToServer,
+  type FolderTrustReview,
   makeMessage,
   type ServerToUi,
   type StreamId,
@@ -80,10 +81,16 @@ export interface ChunkInfo {
 
 export type ChunkListener = (chunk: string, info: ChunkInfo) => void;
 
-/** `sessionId`: the session the action started, if any. `editor`: the editor a launch opened. */
+/**
+ * `sessionId`: the session the action started, if any. `editor`: the editor a launch opened.
+ * `trust`: the folder a board session needs trusted first (14.4).
+ */
 export type RequestResult =
   | { ok: true; sessionId?: string; editor?: EditorApp }
-  | { ok: false; error: string };
+  | { ok: false; error: string; trust?: FolderTrustReview };
+
+/** Asks the user to trust a folder; resolves `true` to trust it and retry. */
+export type TrustGate = (review: FolderTrustReview) => Promise<boolean>;
 
 export type ActionListener = (action: UiAction, result: RequestResult) => void;
 
@@ -128,6 +135,7 @@ export class BoardClient {
   private readonly log: Logger;
 
   private socket: SocketLike | null = null;
+  private trustGate: TrustGate | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private attempt = 0;
   private running = false;
@@ -260,9 +268,36 @@ export class BoardClient {
     this.send(makeMessage<UiToServer>('terminal.resize', { terminalId, cols, rows }));
   }
 
-  request<T extends RequestMessage['type']>(
+  /**
+   * Who asks the user when a board session's folder needs trusting. With one set, a request the
+   * server refuses with a trust review waits for the answer: trusted, it is sent again.
+   */
+  setTrustGate(gate: TrustGate | null): () => void {
+    this.trustGate = gate;
+    return () => {
+      if (this.trustGate === gate) this.trustGate = null;
+    };
+  }
+
+  async request<T extends RequestMessage['type']>(
     type: T,
     payload: Extract<RequestMessage, { type: T }>['payload'],
+  ): Promise<RequestResult> {
+    let result = await this.requestOnce(type, payload);
+    // A changed folder asks again with what is there now; Cancel keeps the refusal.
+    while (!result.ok && result.trust && this.trustGate) {
+      const { path, hash } = result.trust;
+      if (!(await this.trustGate(result.trust))) return result;
+      const trusted = await this.requestOnce('action', { kind: 'folder.trust', path, hash });
+      if (!trusted.ok && !trusted.trust) return trusted;
+      result = await this.requestOnce(type, payload);
+    }
+    return result;
+  }
+
+  private requestOnce(
+    type: RequestMessage['type'],
+    payload: RequestMessage['payload'],
   ): Promise<RequestResult> {
     if (!this.synced) return Promise.resolve({ ok: false, error: 'offline' });
     const id = `ui-${this.nextRequestId++}`;
@@ -385,7 +420,7 @@ export class BoardClient {
         if (!pending) return;
         this.pending.delete(message.payload.id);
         clearTimeout(pending.timer);
-        const { ok, error, sessionId, editor } = message.payload;
+        const { ok, error, sessionId, editor, trust } = message.payload;
         pending.resolve(
           ok
             ? {
@@ -393,7 +428,7 @@ export class BoardClient {
                 ...(sessionId !== undefined ? { sessionId } : {}),
                 ...(editor !== undefined ? { editor } : {}),
               }
-            : { ok: false, error: error ?? 'action_failed' },
+            : { ok: false, error: error ?? 'action_failed', ...(trust ? { trust } : {}) },
         );
         return;
       }

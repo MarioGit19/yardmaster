@@ -81,7 +81,9 @@ function fakeDeps(world: FakeWorld = {}): DoctorDeps & { requests: [string, unkn
     readText: async (path) => files[path]?.text,
     fileInfo: async (path) => {
       const file = files[path];
-      return file ? { mode: file.mode ?? 0o100600, isFile: true } : undefined;
+      return file
+        ? { mode: file.mode ?? 0o100600, isFile: !(file.mode && file.mode & 0o40000) }
+        : undefined;
     },
     isExecutable: async (path) => (world.executables ?? ['/usr/local/bin/claude']).includes(path),
     run: async (file, args) =>
@@ -122,6 +124,7 @@ describe('runDoctor', () => {
       'node',
       'server',
       'token',
+      'data',
       'channel',
       'hooks',
       'extensions',
@@ -209,6 +212,46 @@ describe('runDoctor', () => {
     it('fails when the port is taken and nothing answers HTTP', async () => {
       const checks = await runDoctor(config, fakeDeps({ portFree: false }), NOW);
       expect(byId(checks, 'server').level).toBe('fail');
+    });
+  });
+
+  describe('data dir', () => {
+    const TOKEN_FILE = { '/home/dev/.yardmaster/token': { text: `${TOKEN}\n`, mode: 0o100600 } };
+    const world = (dir: number, db?: number): FakeWorld => ({
+      files: {
+        ...TOKEN_FILE,
+        '/home/dev/.yardmaster': { text: '', mode: dir },
+        ...(db === undefined ? {} : { '/home/dev/.yardmaster/board.db': { text: '', mode: db } }),
+      },
+    });
+
+    it('is ok for a 0700 dir and a 0600 board.db', async () => {
+      const checks = await runDoctor(config, fakeDeps(world(0o40700, 0o100600)), NOW);
+      expect(byId(checks, 'data')).toMatchObject({
+        level: 'ok',
+        message: '~/.yardmaster (0700), board.db (0600)',
+      });
+    });
+
+    it('says when board.db is not created yet', async () => {
+      const checks = await runDoctor(config, fakeDeps(world(0o40700)), NOW);
+      expect(byId(checks, 'data')).toMatchObject({ level: 'ok' });
+      expect(byId(checks, 'data').message).toContain('no board.db yet');
+    });
+
+    it('warns about a dir or a database other users can read', async () => {
+      const checks = await runDoctor(config, fakeDeps(world(0o40755, 0o100644)), NOW);
+      const data = byId(checks, 'data');
+      expect(data.level).toBe('warn');
+      expect(data.message).toContain('~/.yardmaster (mode 0755)');
+      expect(data.message).toContain('board.db (mode 0644)');
+      expect(data.hint).toContain('chmod 700 ~/.yardmaster');
+    });
+
+    it('warns when the dir is missing', async () => {
+      const checks = await runDoctor(config, fakeDeps(), NOW);
+      expect(byId(checks, 'data')).toMatchObject({ level: 'warn' });
+      expect(byId(checks, 'data').message).toContain('missing');
     });
   });
 

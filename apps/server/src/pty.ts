@@ -21,7 +21,14 @@ export interface PtySpawnOptions {
 
 export type PtySpawn = (file: string, args: string[], options: PtySpawnOptions) => PtyProcess;
 
-export type PtyLoad = { ok: true; spawn: PtySpawn } | { ok: false; reason: string };
+export type PtyLoad =
+  | {
+      ok: true;
+      spawn: PtySpawn;
+      /** The processes sign shell markers themselves (the demo shell), so they get a nonce too. */
+      signsMarkers?: boolean;
+    }
+  | { ok: false; reason: string };
 
 interface NodePtyModule {
   spawn(

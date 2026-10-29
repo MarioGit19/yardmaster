@@ -132,6 +132,7 @@ const uiToServer: UiToServer[] = [
   env('action', { kind: 'project.close', projectId: 'a1b2c3d4e5f6', closeWindow: true }),
   env('action', { kind: 'project.forget', projectId: 'a1b2c3d4e5f6' }),
   env('action', { kind: 'project.openInEditor', projectId: 'a1b2c3d4e5f6' }),
+  env('action', { kind: 'folder.trust', path: '/home/dev/cloned-tool', hash: 'd'.repeat(64) }),
   env('action', { kind: 'settings.set', key: 'motion', value: 'reduced' }),
   env('session.send', { sessionId: 'sess-1', text: 'Now add a test' }),
   env('approval.decide', { approvalId: approval.id, decision: 'allow' }),

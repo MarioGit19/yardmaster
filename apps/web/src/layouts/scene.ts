@@ -19,7 +19,7 @@ import {
 import { activityKey, levelAt, type Pulses, QUIET_LEVEL } from '../data/activity.js';
 import { isCrashExit, terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
-import { laneExecution, terminalDisplay } from '../lanes/lane.js';
+import { laneExecution, shownCommand, terminalDisplay } from '../lanes/lane.js';
 import { isDimmed } from '../pod/activity.js';
 import {
   attentionRank,
@@ -398,7 +398,7 @@ function projectActors(
     });
     const last = laneExecution(board, terminal);
     const label = terminalDisplay(terminal, last).name;
-    const command = last.commandLine?.trim() || null;
+    const command = shownCommand(last.commandLine);
     const caption = terminalCaption(state, command, last.exitCode);
     let running: Execution | null = null;
     for (const execution of executions) {

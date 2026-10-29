@@ -1,5 +1,17 @@
+import { execFile } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GIT_INTERVAL_MS, type GitRunner, GitScanner, NOT_REPO_RECHECK_MS } from './git-scanner.js';
+import {
+  GIT_INTERVAL_MS,
+  type GitRunner,
+  GitScanner,
+  gitEnv,
+  NOT_REPO_RECHECK_MS,
+  runGit,
+} from './git-scanner.js';
 import { BoardStore } from './store.js';
 
 const T0 = 1_760_000_000_000;
@@ -22,6 +34,8 @@ function gitError(stderr: string): Error {
 interface Repo {
   status: string | Error;
   log?: string | Error;
+  /** `git config --list --show-scope --name-only -z` output. */
+  config?: string;
 }
 
 function setup(repos: Record<string, Repo>, active = true) {
@@ -41,8 +55,9 @@ function setup(repos: Record<string, Repo>, active = true) {
   store.flush();
   const calls: string[] = [];
   const run: GitRunner = async (dir, args) => {
-    calls.push(`${dir} ${args[0]}`);
     const repo = repos[dir.slice('/home/dev/'.length)];
+    if (args[0] === 'config') return repo?.config ?? z('global', 'user.name');
+    calls.push(`${dir} ${args[0]}`);
     const out = args[0] === 'status' ? repo?.status : repo?.log;
     if (out === undefined) throw gitError(`fatal: cannot change to '${dir}'`);
     if (out instanceof Error) throw out;
@@ -191,6 +206,7 @@ describe('GitScanner', () => {
       active: () => true,
       now: () => T0,
       run: async (_dir, args) => {
+        if (args[0] === 'config') return '';
         if (args[0] === 'log') return LOG;
         statusCalls += 1;
         if (statusCalls === 1) await new Promise<void>((resolve) => (release = resolve));
@@ -200,6 +216,7 @@ describe('GitScanner', () => {
     const first = scanner.scan('p-shop');
     void scanner.scan('p-shop');
     void scanner.scan('p-shop');
+    await vi.waitFor(() => expect(statusCalls).toBe(1));
     release();
     await first;
     await vi.waitFor(() => expect(statusCalls).toBe(2));
@@ -219,5 +236,92 @@ describe('GitScanner', () => {
     scanner.stop();
     await scan;
     expect(store.state.projects['p-shop']?.git).toBeNull();
+  });
+
+  it.each([
+    ['a filter driver', z('local', 'filter.lfs.clean')],
+    ['an fsmonitor', z('local', 'core.fsmonitor')],
+    ['a hooks path', z('worktree', 'core.hookspath')],
+    ['a *.command key', z('local', 'diff.Tool.command')],
+    ['a *Command key', z('local', 'core.sshcommand')],
+  ])('skips status for a repository whose config defines %s', async (_label, config) => {
+    const { store, scanner, calls } = setup({ shop: { status: STATUS, log: LOG, config } });
+    await scanner.tick();
+    expect(calls).toEqual([]);
+    expect(store.state.projects['p-shop']?.git).toMatchObject({
+      statusSkipped: true,
+      branch: null,
+      dirty: 0,
+    });
+  });
+
+  it('ignores command keys from the user and command-line config', async () => {
+    const config = z(
+      'global',
+      'core.sshcommand',
+      'command',
+      'core.fsmonitor',
+      'local',
+      'user.name',
+    );
+    const { store, scanner, calls } = setup({ shop: { status: STATUS, log: LOG, config } });
+    await scanner.tick();
+    expect(calls).toEqual(['/home/dev/shop status', '/home/dev/shop log']);
+    expect(store.state.projects['p-shop']?.git?.statusSkipped).toBeUndefined();
+  });
+});
+
+const exec = promisify(execFile);
+
+describe('runGit', () => {
+  let dir = '';
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = '';
+  });
+
+  it('skips the system config', () => {
+    expect(gitEnv().GIT_CONFIG_NOSYSTEM).toBe('1');
+  });
+
+  it('never runs a filter driver from a cloned repository', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'ym-git-'));
+    const marker = join(dir, 'ran');
+    const git = (...args: string[]) => exec('git', ['-C', dir, ...args], { env: gitEnv() });
+    await git('init', '-q');
+    await git('config', 'filter.evil.clean', `touch ${marker}; cat`);
+    writeFileSync(join(dir, '.gitattributes'), '* filter=evil\n');
+    writeFileSync(join(dir, 'notes.md'), 'hello\n');
+    const store = new BoardStore({ autoFlush: false, now: () => T0 });
+    store.upsertProject({
+      id: 'p-evil',
+      path: dir,
+      name: 'evil',
+      accent: 0,
+      source: 'manual',
+      git: null,
+      createdAt: T0,
+      lastActivityAt: null,
+    });
+    const calls: string[] = [];
+    const scanner = new GitScanner({
+      store,
+      logger: { warn: vi.fn(), debug: vi.fn() },
+      active: () => true,
+      run: (cwd, args) => {
+        calls.push(args[0] ?? '');
+        return runGit(cwd, args);
+      },
+    });
+    await scanner.tick();
+    expect(calls).toEqual(['config']);
+    expect(existsSync(marker)).toBe(false);
+    expect(store.state.projects['p-evil']?.git?.statusSkipped).toBe(true);
+
+    await git('config', '--unset', 'filter.evil.clean');
+    await scanner.tick();
+    expect(calls).toEqual(['config', 'config', 'status']);
+    expect(store.state.projects['p-evil']?.git).toMatchObject({ dirty: 2 });
+    expect(store.state.projects['p-evil']?.git?.statusSkipped).toBeUndefined();
   });
 });

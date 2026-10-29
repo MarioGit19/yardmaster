@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
-import type { PtyLoad, PtyProcess, PtySpawnOptions } from '../pty.js';
+import type { PtyLoad, PtyProcess } from '../pty.js';
+import { MARKER_NONCE_ENV } from '../shell-markers.js';
 
 const DIM = '\x1b[2m';
 const ACCENT = '\x1b[36m';
@@ -20,6 +21,8 @@ export class DemoShell implements PtyProcess {
   readonly pid: number;
   private readonly folder: string;
   private readonly cwd: string;
+  /** Signs the command line and cwd markers, like the real shells' hooks. */
+  private readonly nonce: string;
   private readonly dataListeners = new Set<DataListener>();
   private readonly exitListeners = new Set<ExitListener>();
   private line = '';
@@ -29,8 +32,9 @@ export class DemoShell implements PtyProcess {
   private escape = false;
   private exited = false;
 
-  constructor(pid: number, options: Pick<PtySpawnOptions, 'cwd'>) {
+  constructor(pid: number, options: { cwd: string; env?: Record<string, string> }) {
     this.pid = pid;
+    this.nonce = options.env?.[MARKER_NONCE_ENV] ?? '';
     this.folder = basename(options.cwd);
     this.cwd = options.cwd;
     this.emit(`${DIM}Yardmaster demo shell: nothing runs on your machine.${RESET}\r\n`);
@@ -106,7 +110,7 @@ export class DemoShell implements PtyProcess {
       this.prompt();
       return;
     }
-    this.emit(mark(`633;E;${escapeValue(line)}`) + mark('133;C'));
+    this.emit(mark(`633;E;${escapeValue(line)};${this.nonce}`) + mark('133;C'));
     if (command === 'exit') {
       const code = Number.parseInt(args[0] ?? '0', 10);
       this.emit('exit\r\n');
@@ -137,7 +141,7 @@ export class DemoShell implements PtyProcess {
   }
 
   private prompt(): void {
-    this.emit(mark(`633;P;Cwd=${escapeValue(this.cwd)}`) + mark('133;A'));
+    this.emit(mark(`633;P;Cwd=${escapeValue(this.cwd)};${this.nonce}`) + mark('133;A'));
     this.emit(`${ACCENT}${this.folder}${RESET} $ `);
   }
 
@@ -161,5 +165,9 @@ export class DemoShell implements PtyProcess {
 /** The demo board's stand-in for node-pty. */
 export function demoPty(): PtyLoad {
   let pid = 61_000;
-  return { ok: true, spawn: (_file, _args, options) => new DemoShell(++pid, options) };
+  return {
+    ok: true,
+    signsMarkers: true,
+    spawn: (_file, _args, options) => new DemoShell(++pid, options),
+  };
 }

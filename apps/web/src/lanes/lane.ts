@@ -1,10 +1,12 @@
 import {
   type BoardState,
   type Execution,
+  isSafeCommandLine,
   type SessionNameFields,
   type Terminal,
   type TerminalDisplayName,
   terminalDisplayName,
+  visibleCommandLine,
 } from '@yardmaster/protocol';
 import type { BoardStoreState } from '../data/store.js';
 import type { Tone } from '../status.js';
@@ -56,7 +58,7 @@ export function terminalDisplay(
   execution: LaneExecution | typeof NO_EXECUTION,
   session?: SessionNameFields | null,
 ): TerminalDisplayName {
-  const command = execution.commandLine?.trim() || null;
+  const command = shownCommand(execution.commandLine);
   const running = execution.id !== null && execution.endedAt === null && terminal.state === 'open';
   return terminalDisplayName(terminal, {
     running: running ? command : null,
@@ -65,9 +67,16 @@ export function terminalDisplay(
   });
 }
 
+/** A command line for the screen, control characters shown (`␛`), never hidden; null if blank. */
+export function shownCommand(commandLine: string | null | undefined): string | null {
+  return visibleCommandLine(commandLine?.trim() ?? '') || null;
+}
+
 export interface LaneView {
-  /** The running or last command; null when the terminal never ran one we know of. */
+  /** The running or last command, every character visible; null when none is known. */
   command: string | null;
+  /** The command may be typed again: it has no control characters (14.4). */
+  safe: boolean;
   running: boolean;
   /** When the running command started. */
   startedAt: number | null;
@@ -90,7 +99,7 @@ export function laneView(
     exit = { key: `${terminal.id}:closed`, code: terminal.exitCode };
   }
   const tone: Tone = exit && exit.code !== 0 ? 'err' : running ? 'ok' : 'idle';
-  const command = execution.commandLine?.trim() || null;
+  const command = shownCommand(execution.commandLine);
   const status = running
     ? 'running'
     : exit
@@ -100,6 +109,7 @@ export function laneView(
       : 'idle';
   return {
     command,
+    safe: command !== null && isSafeCommandLine(execution.commandLine ?? ''),
     running,
     startedAt: running ? execution.startedAt : null,
     exit,

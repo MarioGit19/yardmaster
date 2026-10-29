@@ -1,7 +1,15 @@
 import { execFile } from 'node:child_process';
 import { GitInfo } from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
-import { GIT_LOG_ARGS, GIT_STATUS_ARGS, parseGitLog, parseGitStatus, sameGitInfo } from './git.js';
+import {
+  configRunsCommands,
+  GIT_CONFIG_ARGS,
+  GIT_LOG_ARGS,
+  GIT_STATUS_ARGS,
+  parseGitLog,
+  parseGitStatus,
+  sameGitInfo,
+} from './git.js';
 import type { BoardStore } from './store.js';
 
 export const GIT_INTERVAL_MS = 5_000;
@@ -120,6 +128,15 @@ export class GitScanner {
 
   /** The repository state, null for a folder outside git, undefined if git failed. */
   private async read(path: string): Promise<GitInfo | null | undefined> {
+    // A cloned repository's own config can name programs that `git status` would run.
+    try {
+      if (configRunsCommands(await this.run(path, GIT_CONFIG_ARGS))) return this.skipped();
+    } catch (err) {
+      // Outside a repository `git config` fails; `git status` below says so properly.
+      if (!/not a git repository|cannot change to/i.test(errorStderr(err))) {
+        return this.failed(err, path);
+      }
+    }
     let statusOut: string;
     try {
       statusOut = await this.run(path, GIT_STATUS_ARGS);
@@ -146,6 +163,22 @@ export class GitScanner {
       return undefined;
     }
     return parsed.data;
+  }
+
+  private skipped(): GitInfo {
+    return {
+      branch: null,
+      head: null,
+      detached: false,
+      dirty: 0,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      commits: [],
+      statusSkipped: true,
+      updatedAt: this.now(),
+    };
   }
 
   private failed(err: unknown, path: string): null | undefined {
@@ -182,8 +215,8 @@ function errorStderr(err: unknown): string {
 
 /**
  * `execFile` without a shell. Optional locks are off so polling never blocks the user's
- * own git commands, and `core.fsmonitor` is off so a repository's config can't make
- * us run a program.
+ * own git commands, `core.fsmonitor` is off so a repository's config can't make us run a
+ * program, and the system config is skipped.
  */
 export const runGit: GitRunner = (dir, args) =>
   new Promise((resolve, reject) => {
@@ -203,7 +236,7 @@ export const runGit: GitRunner = (dir, args) =>
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: MAX_OUTPUT,
         encoding: 'utf8',
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+        env: gitEnv(),
       },
       (err, stdout, stderr) => {
         if (err) reject(Object.assign(err, { stderr }));
@@ -211,3 +244,14 @@ export const runGit: GitRunner = (dir, args) =>
       },
     );
   });
+
+/** The environment `runGit` gives git. */
+export function gitEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_OPTIONAL_LOCKS: '0',
+    GIT_TERMINAL_PROMPT: '0',
+    LC_ALL: 'C',
+  };
+}

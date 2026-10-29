@@ -1,10 +1,12 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import {
   type ActivityEvent,
   BOARD_WINDOW_ID,
   isBoardTerminal,
+  isSafeCommandLine,
   MAX_BOARD_TERMINALS,
   type Terminal,
+  UNSAFE_COMMAND_LINE,
 } from '@yardmaster/protocol';
 import type { ActionHandler, ActionHandlers, ActionResult } from './actions.js';
 import { NOTHING_TO_RERUN, type TerminalActionKind } from './editor-actions.js';
@@ -17,7 +19,12 @@ import {
   integrationFor,
   writeShellIntegration,
 } from './shell-integration.js';
-import { createMarkerParser, type MarkerParser, type ShellMarker } from './shell-markers.js';
+import {
+  createMarkerParser,
+  MARKER_NONCE_ENV,
+  type MarkerParser,
+  type ShellMarker,
+} from './shell-markers.js';
 import type { BoardStore } from './store.js';
 
 export const PTY_ERRORS = {
@@ -86,14 +93,14 @@ interface Live {
   dispose: () => void;
   parser: MarkerParser;
   integration: IntegratedShell | null;
-  /** A marker arrived: the shell reports its own commands. */
+  /** A signed marker arrived: the shell reports its own commands. */
   reporting: boolean;
   /** No markers to expect, or they never came: the process table stands in for them. */
   inferring: boolean;
   markerTimer: NodeJS.Timeout | undefined;
   /** The launch command, typed at the first prompt. */
   queued: string | null;
-  /** From the last `633;E`, for the next execution. */
+  /** From the last signed `633;E`, for the next execution: a `133;C` without one is ignored. */
   commandLine: string | null;
   cwd: string;
   running: Running | null;
@@ -193,13 +200,16 @@ export class PtyManager {
       integrated && this.integrationDir !== undefined
         ? integrateShell(this.shell, this.env(), this.integrationDir)
         : { ...this.shell, env: this.env(), integration: null };
+    // Only a shell that signs its markers gets a nonce; any other takes no markers at all.
+    const nonce =
+      launch.integration !== null || loaded.signsMarkers ? randomBytes(16).toString('hex') : null;
     let pty: PtyProcess;
     try {
       pty = loaded.spawn(launch.file, launch.args, {
         cwd: options.cwd,
         cols: DEFAULT_COLS,
         rows: DEFAULT_ROWS,
-        env: launch.env,
+        env: nonce === null ? launch.env : { ...launch.env, [MARKER_NONCE_ENV]: nonce },
       });
     } catch {
       return { ok: false, error: PTY_ERRORS.spawnFailed };
@@ -236,7 +246,7 @@ export class PtyManager {
       pending: '',
       timer: undefined,
       dispose: () => {},
-      parser: createMarkerParser(),
+      parser: createMarkerParser(nonce),
       integration: launch.integration,
       reporting: false,
       inferring: launch.integration === null,
@@ -425,6 +435,7 @@ export class PtyManager {
     const entry = this.live.get(execution.terminalId);
     if (!entry) return this.missing(execution.terminalId);
     if (execution.commandLine.trim() === '') return { ok: false, error: NOTHING_TO_RERUN };
+    if (!isSafeCommandLine(execution.commandLine)) return { ok: false, error: UNSAFE_COMMAND_LINE };
     if (entry.running) return { ok: false, error: PTY_ERRORS.busy };
     return this.sendText(execution.terminalId, execution.commandLine, true);
   }
@@ -497,6 +508,9 @@ export class PtyManager {
   }
 
   private onMarker(id: string, entry: Live, marker: ShellMarker): void {
+    // Unsigned markers (prompt, run, end) count once a signed one proved the integration runs.
+    const signed = marker.kind === 'commandLine' || marker.kind === 'cwd';
+    if (!entry.reporting && !signed) return;
     if (!entry.reporting) {
       entry.reporting = true;
       entry.inferring = false;
@@ -515,10 +529,12 @@ export class PtyManager {
         entry.commandLine = marker.commandLine;
         return;
       case 'executed': {
-        if (entry.running) this.endExecution(id, entry, null);
         const commandLine = entry.commandLine;
+        // Our hooks sign every command line before it runs: a bare `133;C` is printed text.
+        if (commandLine === null) return;
+        if (entry.running) this.endExecution(id, entry, null);
         entry.commandLine = null;
-        this.startExecution(id, entry, commandLine ?? '', null);
+        this.startExecution(id, entry, commandLine, null);
         return;
       }
       case 'finished':

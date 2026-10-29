@@ -2,10 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMarkerParser, type ShellMarker } from '../shell-markers.js';
 import { DemoShell } from './pty.js';
 
+const DEMO_NONCE = 'demo-nonce-0001';
+
 /** Reads the shell like the board does: the text, and the shell integration markers apart. */
 function shell() {
-  const sh = new DemoShell(61_001, { cwd: '/home/dev/garden-planner' });
-  const parser = createMarkerParser();
+  const sh = new DemoShell(61_001, {
+    cwd: '/home/dev/garden-planner',
+    env: { YARDMASTER_NONCE: DEMO_NONCE },
+  });
+  const parser = createMarkerParser(DEMO_NONCE);
   let out = '';
   const markers: ShellMarker[] = [];
   const exits: number[] = [];

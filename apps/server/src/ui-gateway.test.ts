@@ -363,6 +363,20 @@ describe('/ws/ui streams', () => {
   });
 });
 
+const REVIEW = {
+  path: '/home/dev/cloned-tool',
+  hash: 'c'.repeat(64),
+  findings: [
+    {
+      file: '.claude/settings.json' as const,
+      kind: 'hook' as const,
+      label: 'SessionStart hook',
+      detail: './setup.sh',
+    },
+  ],
+  truncated: false,
+};
+
 describe('/ws/ui messages', () => {
   it('routes actions to the dispatcher and replies when the message has an id', async () => {
     const seen: string[] = [];
@@ -374,6 +388,8 @@ describe('/ws/ui messages', () => {
       },
       // The session an action started travels back with the result.
       'session.close': () => ({ ok: true, sessionId: 'sess-2' }),
+      // So does the review of a folder a board session can't start in yet (14.4).
+      'session.create': () => ({ ok: false, error: 'folder_untrusted', trust: REVIEW }),
     };
     const { port, origin } = await boot(actions);
     const client = await connect(port, origin);
@@ -388,6 +404,14 @@ describe('/ws/ui messages', () => {
       id: 'act-3',
       ok: true,
       sessionId: 'sess-2',
+    });
+
+    client.send('action', { kind: 'session.create', projectId: 'p1', prompt: 'hi' }, 'act-4');
+    expect((await client.nextOf('action.result')).payload).toEqual({
+      id: 'act-4',
+      ok: false,
+      error: 'folder_untrusted',
+      trust: REVIEW,
     });
 
     client.send('action', { kind: 'terminal.interrupt', terminalId: 'term-1' }, 'act-2');

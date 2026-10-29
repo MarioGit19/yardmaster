@@ -1,12 +1,12 @@
-import type { EditorApp, UiAction, UiActionKind } from '@yardmaster/protocol';
+import type { EditorApp, FolderTrustReview, UiAction, UiActionKind } from '@yardmaster/protocol';
 
 /**
  * `sessionId`: the session an action started (`session.create`, a forked resume). `editor`: the
- * editor `project.openInEditor` launched.
+ * editor `project.openInEditor` launched. `trust`: what a board session's folder needs trusted for.
  */
 export type ActionResult =
   | { ok: true; sessionId?: string; editor?: EditorApp }
-  | { ok: false; error: string };
+  | { ok: false; error: string; trust?: FolderTrustReview };
 
 export type ActionOf<K extends UiActionKind> = Extract<UiAction, { kind: K }>;
 
@@ -44,6 +44,7 @@ export function stubActionHandlers(): ActionHandlers {
     'project.close': notImplemented,
     'project.forget': notImplemented,
     'project.openInEditor': notImplemented,
+    'folder.trust': notImplemented,
     'settings.set': notImplemented,
   };
 }

@@ -6,6 +6,10 @@ import { basename, join } from 'node:path';
  * as usual, then report each command with OSC 133/633 markers (`shell-markers.ts`). Nothing in
  * the user's dotfiles changes: zsh starts with `ZDOTDIR` pointing at wrapper files that source the
  * real ones, bash with an `--rcfile` that does the same.
+ *
+ * The markers that carry data (633 E and P) end with the terminal's nonce, handed over in
+ * `YARDMASTER_NONCE`. The scripts move it into an unexported variable before any user file runs,
+ * so commands started from the shell never see it and output can't sign a forged marker.
  */
 
 export interface ShellLaunch {
@@ -37,6 +41,13 @@ const ESCAPE = String.raw`__yardmaster_esc() {
 
 const HEADER = '# Yardmaster shell integration. Written by the Yardmaster server on each start.\n';
 
+/** Takes the nonce out of the environment (zsh and bash alike). */
+const TAKE_NONCE = `if [[ -n \${YARDMASTER_NONCE-} ]]; then
+  __yardmaster_nonce=$YARDMASTER_NONCE
+  unset YARDMASTER_NONCE
+fi
+`;
+
 const ZSH_HOOKS = `${HEADER}${ESCAPE}
 __yardmaster_running=0
 __yardmaster_precmd() {
@@ -46,11 +57,11 @@ __yardmaster_precmd() {
     __yardmaster_running=0
   fi
   __yardmaster_esc "$PWD"
-  builtin printf '\\033]633;P;Cwd=%s\\007\\033]133;A\\007' "$REPLY"
+  builtin printf '\\033]633;P;Cwd=%s;%s\\007\\033]133;A\\007' "$REPLY" "$__yardmaster_nonce"
 }
 __yardmaster_preexec() {
   __yardmaster_esc "$1"
-  builtin printf '\\033]633;E;%s\\007\\033]133;C\\007' "$REPLY"
+  builtin printf '\\033]633;E;%s;%s\\007\\033]133;C\\007' "$REPLY" "$__yardmaster_nonce"
   __yardmaster_running=1
 }
 # First, so it still sees the command's exit status.
@@ -75,7 +86,7 @@ unset YARDMASTER_USER_ZDOTDIR
 `;
 
 const ZSH_FILES: Record<string, string> = {
-  '.zshenv': `${HEADER}${zshSource('.zshenv')}`,
+  '.zshenv': `${HEADER}${TAKE_NONCE}${zshSource('.zshenv')}`,
   '.zprofile': `${HEADER}${zshSource('.zprofile')}`,
   '.zshrc': `${HEADER}${zshSource('.zshrc')}builtin source "\${ZDOTDIR}/yardmaster.zsh"
 if [[ ! -o login ]]; then
@@ -85,7 +96,7 @@ ${ZSH_RESTORE}fi
   'yardmaster.zsh': ZSH_HOOKS,
 };
 
-const BASH_RC = `${HEADER}if [[ \${YARDMASTER_BASH_LOGIN-} == 1 ]]; then
+const BASH_RC = `${HEADER}${TAKE_NONCE}if [[ \${YARDMASTER_BASH_LOGIN-} == 1 ]]; then
   unset YARDMASTER_BASH_LOGIN
   [[ -r /etc/profile ]] && builtin source /etc/profile
   for __yardmaster_profile in ~/.bash_profile ~/.bash_login ~/.profile; do
@@ -118,7 +129,7 @@ __yardmaster_preexec() {
     fi
   fi
   __yardmaster_esc "$line"
-  builtin printf '\\033]633;E;%s\\007\\033]133;C\\007' "$REPLY"
+  builtin printf '\\033]633;E;%s;%s\\007\\033]133;C\\007' "$REPLY" "$__yardmaster_nonce"
   return 0
 }
 __yardmaster_prompt() {
@@ -127,7 +138,7 @@ __yardmaster_prompt() {
   fi
   __yardmaster_running=0
   __yardmaster_esc "$PWD"
-  builtin printf '\\033]633;P;Cwd=%s\\007\\033]133;A\\007' "$REPLY"
+  builtin printf '\\033]633;P;Cwd=%s;%s\\007\\033]133;A\\007' "$REPLY" "$__yardmaster_nonce"
   __yardmaster_in_prompt=0
   __yardmaster_ready=1
 }

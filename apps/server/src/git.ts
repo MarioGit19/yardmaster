@@ -10,6 +10,46 @@ import {
 /** Arguments for `git status`; `-z` keeps paths unquoted and NUL-separated. */
 export const GIT_STATUS_ARGS = ['status', '--porcelain=v2', '--branch', '-z'] as const;
 
+/**
+ * Arguments that list the repository's own config keys (local and worktree scope, includes
+ * followed) without running anything: `scope NUL name NUL` pairs.
+ */
+export const GIT_CONFIG_ARGS = [
+  'config',
+  '--list',
+  '--show-scope',
+  '--includes',
+  '--name-only',
+  '-z',
+] as const;
+
+const REPO_SCOPES = new Set(['local', 'worktree']);
+
+/**
+ * Whether the repository's own config (from `GIT_CONFIG_ARGS`) defines something that can make
+ * `git status` run a program: filter drivers, `core.fsmonitor`, `core.hooksPath`, or any
+ * `*.command` / `*Command` key. Names come lowercased from git, except subsections.
+ */
+export function configRunsCommands(stdout: string): boolean {
+  const fields = stdout.split('\0');
+  for (let i = 0; i + 1 < fields.length; i += 2) {
+    if (!REPO_SCOPES.has(fields[i] ?? '')) continue;
+    const name = fields[i + 1] ?? '';
+    const lower = name.toLowerCase();
+    const section = lower.slice(0, lower.indexOf('.'));
+    const key = lower.slice(lower.lastIndexOf('.') + 1);
+    if (
+      section === 'filter' ||
+      lower === 'core.fsmonitor' ||
+      lower === 'core.hookspath' ||
+      key.endsWith('command')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const FIELD = '\x1f';
 
 /** Arguments for `git log`: one NUL-terminated record per commit, fields split by US. */
@@ -179,6 +219,7 @@ export function sameGitInfo(a: GitInfo | null, b: GitInfo | null): boolean {
     a.upstream === b.upstream &&
     a.ahead === b.ahead &&
     a.behind === b.behind &&
+    (a.statusSkipped ?? false) === (b.statusSkipped ?? false) &&
     a.files.length === b.files.length &&
     a.files.every((file, i) => sameFile(file, b.files[i])) &&
     a.commits.length === b.commits.length &&

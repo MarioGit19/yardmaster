@@ -9,6 +9,7 @@ import { AttentionCenter, AttentionPage } from './attention/AttentionCenter.js';
 import { SignInScreen } from './auth/SignInScreen.js';
 import { useSignedOut } from './auth/session.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
+import { TrustFolderDialog } from './claude/TrustFolderDialog.js';
 import { FocusBackdrop, FocusStage, useFocusRoute } from './focus/FocusStage.js';
 import { useLayoutShortcuts } from './layouts/LayoutStage.js';
 import { CloseProjectDialog } from './library/CloseProject.js';
@@ -165,6 +166,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <CommandPalette />
           <OpenProjectDialog />
           <CloseProjectDialog />
+          <TrustFolderDialog />
           <PortShareDialog />
           <EditorLaunchWatcher />
         </Router>

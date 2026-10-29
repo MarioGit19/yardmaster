@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { claudeSettingsPath, isHookCommand } from '@yardmaster/hook';
 import { HealthResponse, LOCAL_SOCKET_FILE, ServerStatus } from '@yardmaster/protocol';
 import type { ServerConfig } from './config.js';
+import { DB_FILE } from './data-dir.js';
 import { findEditorCli, findOnPath } from './editor-cli.js';
 import { loadNodePty } from './pty.js';
 import { TOKEN_HEADER } from './security.js';
@@ -19,6 +20,7 @@ export interface DoctorCheck {
     | 'node'
     | 'server'
     | 'token'
+    | 'data'
     | 'channel'
     | 'hooks'
     | 'extensions'
@@ -233,6 +235,38 @@ async function checkToken(config: ServerConfig, deps: DoctorDeps) {
     token,
     check: { id: 'token', label, level: 'ok', message: `${shown} (0600)` } satisfies DoctorCheck,
   };
+}
+
+const modeOf = (info: FileInfo) => (info.mode & 0o777).toString(8).padStart(4, '0');
+
+/** The data dir is 0700 and `board.db` 0600: they hold terminal output and transcripts. */
+async function checkDataDir(config: ServerConfig, deps: DoctorDeps): Promise<DoctorCheck> {
+  const base = { id: 'data', label: 'Data dir' } as const;
+  const dirShown = tildify(config.home, deps.home);
+  const dbPath = join(config.home, DB_FILE);
+  const [dir, db] = await Promise.all([deps.fileInfo(config.home), deps.fileInfo(dbPath)]);
+  if (!dir) {
+    return {
+      ...base,
+      level: 'warn',
+      message: `${dirShown} is missing`,
+      hint: 'It is created on the next `yardmaster start`.',
+    };
+  }
+  const posix = deps.platform !== 'win32';
+  const loose: string[] = [];
+  if (posix && (dir.mode & 0o077) !== 0) loose.push(`${dirShown} (mode ${modeOf(dir)})`);
+  if (posix && db && (db.mode & 0o077) !== 0) loose.push(`${DB_FILE} (mode ${modeOf(db)})`);
+  if (loose.length > 0) {
+    return {
+      ...base,
+      level: 'warn',
+      message: `readable by other users: ${loose.join(', ')}`,
+      hint: `Restart Yardmaster to fix it, or run \`chmod 700 ${dirShown}\` and \`chmod 600 ${tildify(dbPath, deps.home)}\`.`,
+    };
+  }
+  const dbPart = db ? `${DB_FILE} (${modeOf(db)})` : `no ${DB_FILE} yet`;
+  return { ...base, level: 'ok', message: `${dirShown} (${modeOf(dir)}), ${dbPart}` };
 }
 
 type ServerProbe = { state: 'free' } | { state: 'board'; version: string } | { state: 'foreign' };
@@ -565,9 +599,10 @@ export async function runDoctor(
   deps: DoctorDeps,
   now: number = Date.now(),
 ): Promise<DoctorCheck[]> {
-  const [probe, tokenResult] = await Promise.all([
+  const [probe, tokenResult, data] = await Promise.all([
     probeServer(config, deps),
     checkToken(config, deps),
+    checkDataDir(config, deps),
   ]);
   const status =
     probe.state === 'board' ? await fetchStatus(config, deps, tokenResult.token) : undefined;
@@ -583,6 +618,7 @@ export async function runDoctor(
     checkNode(deps),
     checkServer(config, probe, liveStatus),
     tokenResult.check,
+    data,
     channel,
     hooks,
     checkExtensions(probe, status),

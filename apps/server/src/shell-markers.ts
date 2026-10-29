@@ -1,7 +1,12 @@
 /**
  * Shell integration markers in a board terminal's pty stream (12.6a): FinalTerm's OSC 133
  * (`A` prompt, `B` input, `C` command runs, `D;<code>` it ended), VS Code's OSC 633 (the same
- * letters, plus `E;<command line>` and `P;Cwd=<dir>`) and OSC 7 (`file://host/dir`).
+ * letters, plus `E;<command line>;<nonce>` and `P;Cwd=<dir>;<nonce>`) and OSC 7
+ * (`file://host/dir;<nonce>`).
+ *
+ * Anything a terminal prints can contain these sequences (`cat` a hostile README), so the ones
+ * that carry data need the terminal's nonce, which only our shell integration knows (14.4).
+ * Without it they are dropped, and a terminal without a nonce takes none of them.
  */
 export type ShellMarker =
   | { kind: 'prompt' }
@@ -19,6 +24,9 @@ export interface MarkerParser {
   /** Releases text held back as a possible marker start (end of stream). */
   flush(): string;
 }
+
+/** How a board terminal's shell gets its nonce. The shell integration unsets it at once. */
+export const MARKER_NONCE_ENV = 'YARDMASTER_NONCE';
 
 const OURS = new Set(['7', '133', '633']);
 /** An unterminated sequence longer than this isn't a marker; it goes out as text. */
@@ -41,13 +49,19 @@ function fileUrlPath(value: string): string | null {
   }
 }
 
-/** The marker an OSC payload (`133;D;0`, without `ESC ]` and the terminator) carries, if any. */
-export function parseMarker(payload: string): ShellMarker | null {
+/**
+ * The marker an OSC payload (`133;D;0`, without `ESC ]` and the terminator) carries, if any.
+ * `nonce` is the terminal's: a command line or cwd without it is no marker.
+ */
+export function parseMarker(payload: string, nonce: string | null): ShellMarker | null {
   const semi = payload.indexOf(';');
   const code = semi === -1 ? payload : payload.slice(0, semi);
   const rest = semi === -1 ? '' : payload.slice(semi + 1);
+  const signed = (value: string | undefined) => Boolean(nonce) && value === nonce;
   if (code === '7') {
-    const cwd = fileUrlPath(rest);
+    const end = rest.lastIndexOf(';');
+    if (end === -1 || !signed(rest.slice(end + 1))) return null;
+    const cwd = fileUrlPath(rest.slice(0, end));
     return cwd ? { kind: 'cwd', cwd } : null;
   }
   if (code !== '133' && code !== '633') return null;
@@ -64,12 +78,14 @@ export function parseMarker(payload: string): ShellMarker | null {
       return { kind: 'finished', exitCode };
     }
     case 'E':
-      return code === '633'
+      // The command line is escaped, so its own `;` never splits it.
+      return code === '633' && args.length === 2 && signed(args[1])
         ? { kind: 'commandLine', commandLine: unescapeMarkerValue(args[0] ?? '') }
         : null;
     case 'P': {
-      const property = args.join(';');
+      const property = args[0] ?? '';
       if (code !== '633' || !property.startsWith('Cwd=')) return null;
+      if (args.length !== 2 || !signed(args[1])) return null;
       const cwd = unescapeMarkerValue(property.slice(4));
       return cwd ? { kind: 'cwd', cwd } : null;
     }
@@ -81,9 +97,9 @@ export function parseMarker(payload: string): ShellMarker | null {
 /**
  * A stateful splitter for a pty stream. Sequences may be split anywhere across chunks, so a
  * partial one is carried over to the next push. Every OSC 7/133/633 sequence is removed from the
- * text (unknown letters too); other escape sequences pass through untouched.
+ * text (unknown letters and unsigned ones too); other escape sequences pass through untouched.
  */
-export function createMarkerParser(): MarkerParser {
+export function createMarkerParser(nonce: string | null): MarkerParser {
   let carry = '';
 
   return {
@@ -147,7 +163,7 @@ export function createMarkerParser(): MarkerParser {
           carry = text.slice(esc);
           break;
         }
-        const marker = parseMarker(text.slice(esc + 2, end));
+        const marker = parseMarker(text.slice(esc + 2, end), nonce);
         if (marker) {
           emitText();
           tokens.push({ marker });

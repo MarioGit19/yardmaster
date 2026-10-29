@@ -21,15 +21,27 @@ export interface ProjectActionsOptions {
 
 /**
  * The library path check every launch goes through (PRD §8 item 10): the project's folder must
- * still resolve inside a configured root. Null when it does.
+ * still resolve inside a configured root. Its realpath when it does, so a launch uses the path
+ * that passed the check, never the stored one (a symlink swapped in between would escape).
  */
-export function libraryGuard(options: Pick<ProjectActionsOptions, 'store' | 'library' | 'roots'>) {
+export function libraryResolver(
+  options: Pick<ProjectActionsOptions, 'store' | 'library' | 'roots'>,
+) {
   const { store, library, roots } = options;
-  return async (projectId: string): Promise<ActionResult | null> => {
+  return async (projectId: string): Promise<{ ok: true; real: string } | ActionResult> => {
     const project = store.state.projects[projectId];
     if (!project) return { ok: false, error: ROUTE_ERRORS.unknownProject };
     const real = await library.resolve(roots(), project.path);
-    return real === null ? { ok: false, error: OUTSIDE_LIBRARY } : null;
+    return real === null ? { ok: false, error: OUTSIDE_LIBRARY } : { ok: true, real };
+  };
+}
+
+/** `libraryResolver` as a guard: null when the project's folder is inside a root. */
+export function libraryGuard(options: Pick<ProjectActionsOptions, 'store' | 'library' | 'roots'>) {
+  const resolve = libraryResolver(options);
+  return async (projectId: string): Promise<ActionResult | null> => {
+    const resolved = await resolve(projectId);
+    return 'real' in resolved ? null : resolved;
   };
 }
 
@@ -42,7 +54,7 @@ export function createProjectActions(
   options: ProjectActionsOptions,
 ): Pick<ActionHandlers, 'project.add' | 'project.openInEditor'> {
   const { store, library, roots, launcher } = options;
-  const guard = libraryGuard(options);
+  const resolve = libraryResolver(options);
   const now = options.now ?? Date.now;
   const add = options.add ?? ((project: Project) => store.upsertProject(project));
   return {
@@ -69,11 +81,9 @@ export function createProjectActions(
       return { ok: true };
     },
     'project.openInEditor': async ({ projectId }) => {
-      const refused = await guard(projectId);
-      if (refused) return refused;
-      const project = store.state.projects[projectId];
-      if (!project) return { ok: false, error: ROUTE_ERRORS.unknownProject };
-      const opened = await launcher.open(project.path);
+      const resolved = await resolve(projectId);
+      if (!('real' in resolved)) return resolved;
+      const opened = await launcher.open(resolved.real);
       if (!opened.ok) return opened;
       store.reopenProject(projectId);
       store.touchProject(projectId);

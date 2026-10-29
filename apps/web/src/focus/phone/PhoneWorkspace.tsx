@@ -619,9 +619,11 @@ function PageRows({ project }: { project: Project }) {
     {
       page: 'git' as const,
       icon: <GitBranch />,
-      detail: git
-        ? `${git.branch ?? 'detached'} · ${git.dirty > 0 ? `${git.dirty} changed` : 'clean'}`
-        : 'Not a git repository',
+      detail: git?.statusSkipped
+        ? 'git status skipped'
+        : git
+          ? `${git.branch ?? 'detached'} · ${git.dirty > 0 ? `${git.dirty} changed` : 'clean'}`
+          : 'Not a git repository',
     },
     {
       page: 'history' as const,

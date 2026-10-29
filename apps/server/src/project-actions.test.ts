@@ -154,6 +154,29 @@ describe('project.openInEditor', () => {
     expect(store.state.projects[recipes.id]?.lastActivityAt).toBeGreaterThan(T0 - 1_000);
   });
 
+  it('opens the realpath that passed the library check, not the stored path', async () => {
+    const store = new BoardStore({ autoFlush: false });
+    const { launcher, spawned } = fakeLauncher();
+    const actions = createProjectActions({
+      store,
+      library: {
+        ...library,
+        resolve: async (_roots, path) =>
+          path === '/home/dev/link' ? '/home/dev/recipe-box' : null,
+      },
+      roots: () => ['~/Desktop'],
+      launcher,
+    });
+    const linked = project('/home/dev/link');
+    store.upsertProject(linked);
+    const result = await actions['project.openInEditor']({
+      kind: 'project.openInEditor',
+      projectId: linked.id,
+    });
+    expect(result).toEqual({ ok: true, editor: 'Cursor' });
+    expect(spawned).toEqual([['/usr/local/bin/cursor', ['/home/dev/recipe-box']]]);
+  });
+
   it('falls back to code when cursor is not installed', async () => {
     const { store, spawned, open } = setup(['~/Desktop'], ['/usr/local/bin/code']);
     const recipes = project('/home/dev/recipe-box');
