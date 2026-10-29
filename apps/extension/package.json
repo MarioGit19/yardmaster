@@ -63,7 +63,7 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
-    "@types/node": "^22",
+    "@types/node": "^26",
     "@types/vscode": "1.93.0",
     "@types/ws": "^8.18.2",
     "@vscode/vsce": "^4.0.0",
