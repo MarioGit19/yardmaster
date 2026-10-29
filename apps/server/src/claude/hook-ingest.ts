@@ -2,6 +2,7 @@ import {
   type ActivityEvent,
   HookCommon,
   KnownHookEvent,
+  LOCAL_ROUTES,
   normalizeHookEvent,
   Pid,
 } from '@yardmaster/protocol';
@@ -11,7 +12,7 @@ import type { BoardStore } from '../store.js';
 import { type PathResolver, projectForCwd, resolveDir } from './project-lookup.js';
 import { sessionReducer } from './session-reducer.js';
 
-export const HOOK_ROUTE = '/api/hooks/claude';
+export const HOOK_ROUTE = LOCAL_ROUTES.hooks;
 export const CLAUDE_PID_HEADER = 'x-yardmaster-claude-pid';
 
 /** The hook's Claude pid header, also under its old name for one version. */
@@ -129,7 +130,7 @@ export function parseClaudePid(header: string | string[] | undefined): number | 
 }
 
 /**
- * `POST /api/hooks/claude`, behind the token guard. Replies 204 at once; the event is
+ * `POST /api/hooks/claude`, on the local socket with the token. Replies 204 at once; the event is
  * applied after the response so the hook script never waits on the board.
  */
 export function registerHookRoute(app: FastifyInstance, ingest: HookIngest): void {

@@ -4,10 +4,10 @@ import {
   type Approval,
   type ApprovalDecision,
   type AwayStatusResponse,
+  LOCAL_ROUTES,
   makeMessage,
-  type PermissionRequestDecision,
+  type PermissionHookAnswer,
   PermissionRequestHook,
-  type PermissionRequestOutput,
   PermissionSuggestion,
   type ServerToUi,
 } from '@yardmaster/protocol';
@@ -22,10 +22,9 @@ import {
 } from './hook-ingest.js';
 import { RESOLVED_APPROVAL_TTL_MS, UNKNOWN_APPROVAL } from './runner.js';
 
-export const AWAY_ROUTE = '/api/away';
-export const PERMISSION_ROUTE = '/api/hooks/permission';
+export const AWAY_ROUTE = LOCAL_ROUTES.away;
+export const PERMISSION_ROUTE = LOCAL_ROUTES.permission;
 
-const DENY_MESSAGE = 'Denied from Yardmaster.';
 const REASON_MAX = 500;
 
 export interface AwayApprovalsOptions {
@@ -47,7 +46,7 @@ interface Pending {
   approval: Approval;
   suggestions: PermissionSuggestion[];
   timer: NodeJS.Timeout;
-  resolve: (decision: PermissionRequestDecision | null) => void;
+  resolve: (answer: PermissionHookAnswer | null) => void;
   dispose: () => void;
 }
 
@@ -74,12 +73,15 @@ export class AwayApprovals {
     return this.options.status();
   }
 
-  /** Waits for the board's decision; null means "no decision", and the terminal prompt shows. */
+  /**
+   * Waits for the board's decision; null means "no decision", and the terminal prompt shows.
+   * The hook turns the answer into Claude Code's output itself.
+   */
   async request(
     raw: unknown,
     claudePid: number | null,
     signal: AbortSignal,
-  ): Promise<PermissionRequestOutput | null> {
+  ): Promise<PermissionHookAnswer | null> {
     const hook = PermissionRequestHook.safeParse(raw);
     if (!hook.success) {
       this.options.logger.warn(
@@ -115,7 +117,7 @@ export class AwayApprovals {
       reason: null,
     };
 
-    const decision = await new Promise<PermissionRequestDecision | null>((resolve) => {
+    return new Promise<PermissionHookAnswer | null>((resolve) => {
       const onAbort = () => this.settle(approval.id, 'expired', 'Answered in the terminal', null);
       const pending: Pending = {
         approval,
@@ -142,9 +144,6 @@ export class AwayApprovals {
       }
       this.options.onMessage?.(makeMessage('approval.new', { approval }, { ts }));
     });
-    return decision === null
-      ? null
-      : { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } };
   }
 
   /** Handles a UI `approval.decide` for an away-mode approval. */
@@ -153,15 +152,11 @@ export class AwayApprovals {
     if (!pending) return { ok: false, error: UNKNOWN_APPROVAL };
     if (decision.decision === 'deny') {
       const reason = clip(decision.reason);
-      this.settle(decision.approvalId, 'denied', reason, {
-        behavior: 'deny',
-        message: reason ?? DENY_MESSAGE,
-      });
+      this.settle(decision.approvalId, 'denied', reason, { decision: 'deny', reason });
     } else {
       const always = decision.decision === 'allowAlways' && pending.suggestions.length > 0;
       this.settle(decision.approvalId, 'allowed', null, {
-        behavior: 'allow',
-        ...(always ? { updatedPermissions: pending.suggestions } : {}),
+        decision: always ? 'allow_always' : 'allow',
       });
     }
     return { ok: true };
@@ -176,7 +171,7 @@ export class AwayApprovals {
     id: string,
     state: 'allowed' | 'denied' | 'expired',
     reason: string | null,
-    decision: PermissionRequestDecision | null,
+    answer: PermissionHookAnswer | null,
   ): void {
     const pending = this.pending.get(id);
     if (!pending) return;
@@ -214,7 +209,7 @@ export class AwayApprovals {
       summary: `${approval.tool} ${state}`,
       data: { approval_id: id, decision: state },
     });
-    pending.resolve(decision);
+    pending.resolve(answer);
   }
 }
 
@@ -225,8 +220,8 @@ function clip(text: string | undefined): string | null {
 }
 
 /**
- * `GET /api/away` and the long-polling `POST /api/hooks/permission`, both behind the token
- * guard. The POST answers 200 with the hook output on a decision and 204 otherwise.
+ * `GET /api/away` and the long-polling `POST /api/hooks/permission`, both on the local socket
+ * with the token. The POST answers 200 with a `PermissionHookAnswer` on a decision, else 204.
  */
 export function registerAwayRoutes(app: FastifyInstance, away: AwayApprovals): void {
   app.get(AWAY_ROUTE, async (_request, reply) => {
@@ -241,10 +236,10 @@ export function registerAwayRoutes(app: FastifyInstance, away: AwayApprovals): v
       if (!reply.raw.writableFinished) controller.abort();
     });
     const pid = parseClaudePid(claudePidHeader(request.headers));
-    const output = await away.request(request.body, pid, controller.signal);
+    const answer = await away.request(request.body, pid, controller.signal);
     reply.header('cache-control', 'no-store');
-    if (output === null) return reply.code(204).send();
-    return reply.code(200).send(output);
+    if (answer === null) return reply.code(204).send();
+    return reply.code(200).send(answer);
   });
 
   // Answer the waiting hooks before the server waits for their connections to close.

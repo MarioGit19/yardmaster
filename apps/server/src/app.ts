@@ -3,9 +3,11 @@ import websocket from '@fastify/websocket';
 import {
   type ActivityEvent,
   type ApprovalDecision,
+  type DashboardLinkResponse,
   type HealthResponse,
   HISTORY_WINDOW_MS,
   type LibraryResponse,
+  LOCAL_ROUTES,
   type Project,
   ProjectId,
   type ServerStatus,
@@ -39,6 +41,7 @@ import {
 import { EditorRouter } from './editor-router.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
+import { LocalChannel } from './local-channel.js';
 import { Notifier, type NotifierOptions } from './notifier.js';
 import { Persistence, type SessionRecord } from './persistence.js';
 import {
@@ -181,6 +184,8 @@ declare module 'fastify' {
     ptyManager: PtyManager;
     notifier: Notifier;
     pushSubscriptions: PushSubscriptions;
+    /** The socket editors and hooks use; `startServer` makes it listen. */
+    localChannel: LocalChannel;
   }
 }
 
@@ -523,6 +528,7 @@ export async function buildServer(
     },
   });
   app.decorate('hookIngest', hookIngest);
+  app.decorate('localChannel', new LocalChannel(app, logger.child({ component: 'socket' })));
   registerHookRoute(app, hookIngest);
   const awayApprovals: AwayApprovals = new AwayApprovals({
     store,
@@ -540,6 +546,14 @@ export async function buildServer(
   registerAwayRoutes(app, awayApprovals);
 
   app.get('/api/health', async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }));
+  // The extension's Open Dashboard asks here (on the socket) rather than building the link
+  // itself, so it never opens a token link on a port the board doesn't hold.
+  app.post(LOCAL_ROUTES.dashboardLink, async (_request, reply): Promise<DashboardLinkResponse> => {
+    reply.header('cache-control', 'no-store');
+    const address = app.server.address();
+    const port = address !== null && typeof address === 'object' ? address.port : config.port;
+    return { url: `http://127.0.0.1:${port}/auth?t=${encodeURIComponent(token)}` };
+  });
   app.get('/api/status', async (): Promise<ServerStatus> => {
     const editors = Object.keys(store.state.windows).length;
     if (editors > 0) markSeen(EDITOR_SEEN_KEY);
@@ -707,11 +721,16 @@ export function restoreBoardSessions(store: BoardStore, records: readonly Sessio
   }
 }
 
+/**
+ * Listens on TCP (browsers) and then on the local socket in `config.home` (editors and hooks).
+ * `localChannel.state` reports whether the socket came up.
+ */
 export async function startServer(
   config: ServerConfig,
   options: BuildOptions = {},
 ): Promise<FastifyInstance> {
   const app = await buildServer(config, options);
   await app.listen({ port: config.port, host: config.host });
+  await app.localChannel.listen(config.home);
   return app;
 }

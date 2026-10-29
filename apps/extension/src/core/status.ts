@@ -8,7 +8,7 @@ function seconds(ms: number): string {
 }
 
 /** Status bar tooltip for the link state; clicking the item opens the dashboard. */
-export function statusTooltip(status: LinkStatus | { kind: 'legacy' }, port: number): string {
+export function statusTooltip(status: LinkStatus | { kind: 'legacy' }): string {
   const action = 'Click to open the dashboard.';
   switch (status.kind) {
     case 'legacy':
@@ -16,9 +16,9 @@ export function statusTooltip(status: LinkStatus | { kind: 'legacy' }, port: num
     case 'stopped':
       return `Yardmaster: off (yardmaster.enabled is false). ${action}`;
     case 'connecting':
-      return `Yardmaster: connecting to 127.0.0.1:${port}…`;
+      return 'Yardmaster: connecting to the local server…';
     case 'connected':
-      return `Yardmaster: connected to 127.0.0.1:${port}. ${action}`;
+      return `Yardmaster: connected to the local server. ${action}`;
     case 'disconnected':
       return `Yardmaster: disconnected, ${status.reason}. Retrying in ${seconds(status.retryInMs)}. ${action}`;
     case 'replaced':

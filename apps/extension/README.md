@@ -3,15 +3,15 @@
 Mirrors this window's integrated terminals (commands, exit codes and colored output) to the local
 Yardmaster dashboard, and lets the dashboard run commands in them.
 
-The extension only talks to the Yardmaster server on `127.0.0.1` and authenticates with the token in
-`~/.yardmaster/token`. It needs no account and no API key.
+The extension only talks to the Yardmaster server through its socket, `~/.yardmaster/board.sock`, after
+checking it is a socket you own, and authenticates with the token in `~/.yardmaster/token`. It never
+connects to the TCP port, which another program could hold. It needs no account and no API key.
 
 ## Settings
 
 | Setting | Default | |
 |---|---|---|
-| `yardmaster.enabled` | `true` | Stream this window's terminals to Yardmaster. |
-| `yardmaster.port` | `4317` | Port of the local Yardmaster server. |
+| `yardmaster.enabled` | `true` | Stream this window's terminals to Yardmaster. Read from your user settings only: a workspace's `.vscode/settings.json` can't change it. |
 
 ## Commands
 

@@ -52,8 +52,8 @@ pnpm workspaces, TypeScript (strict, ESM), Node ≥ 22.
 ## Ports, files and data
 
 - Port `4317` by default (`YARDMASTER_PORT`), bound to `127.0.0.1` only.
-- Data directory `~/.yardmaster/` (`YARDMASTER_HOME`): `token` (0600, 32 random bytes, base64url), `board.db` (SQLite), `logs/` and `settings.json`.
-- The extension and the hook script find the server and the token through `~/.yardmaster/`.
+- Data directory `~/.yardmaster/` (`YARDMASTER_HOME`, 0700): `token` (0600, 32 random bytes, base64url), `board.sock` (0600), `board.db` (SQLite), `logs/` and `settings.json`.
+- The extension and the hook scripts talk to the server only through `~/.yardmaster/board.sock`, a Unix socket only the user can create, never the TCP port that any program could bind first.
 
 ## Integrations
 
@@ -63,11 +63,11 @@ The installer (`yardmaster hooks install|uninstall|status`) registers command ho
 
 Subscribed events: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, and in away mode `PermissionRequest`.
 
-**Observer hook** (`packages/hook/bin/yardmaster-hook`): POSIX `sh` and `curl`, no Node startup. It reads the event from stdin and POSTs it to `/api/hooks/claude` with the token (read from `~/.yardmaster/token`, never embedded in settings) and Claude's PID (`$PPID`), with a 1 s timeout. It runs `async`, so Claude never waits for it. It always exits 0 and never prints, because hook output can be read as a decision.
+**Observer hook** (`packages/hook/bin/yardmaster-hook`): POSIX `sh` and `curl`, no Node startup. It reads the event from stdin and POSTs it to `/api/hooks/claude` over the board's socket, with the token (read from `~/.yardmaster/token`, never embedded in settings) and Claude's PID (`$PPID`), with a 1 s timeout. It runs `async`, so Claude never waits for it. It always exits 0 and never prints, because hook output can be read as a decision.
 
 We use `command` hooks rather than `http` ones so the hook can attach `$PPID` for terminal linking, read the token from a file, and fail silently when the board is off.
 
-**Away-mode permission hook** (`yardmaster-hook --permission`, synchronous): exits at once with no output unless the board reports away mode. When it is on, the hook posts the request, long-polls for the decision from the board (120 s by default) and prints the `PermissionRequest` decision. On a timeout or an error it exits quietly, and the normal terminal prompt appears.
+**Away-mode permission hook** (`packages/hook/bin/yardmaster-hook-permission.mjs`, synchronous, run by the absolute Node path the installer writes): exits at once with no output unless the board reports away mode. When it is on, the hook posts the request over the socket and long-polls for the board's decision (120 s by default): allow, always allow, or deny with a reason. It writes the `PermissionRequest` output itself, taking "always allow" rules only from Claude Code's own `permission_suggestions` and never emitting `updatedInput`. On a timeout or an error it exits quietly, and the normal terminal prompt appears.
 
 ### Claude session status
 
@@ -116,7 +116,7 @@ Output is only captured for commands that start after the extension activates; a
 
 Full schemas live in `packages/protocol`. Every message is a JSON envelope `{ v: 1, type, id?, ts, payload }`.
 
-**Editor → server** (`/ws/editor`, token required):
+**Editor → server** (`/ws/editor`, on the local socket only, token required):
 
 - `editor.hello {windowId, appName, appVersion, workspaceFolders[], extensionVersion, capabilities {shellExecution}}`
 - `terminal.upsert`, `terminal.sync {terminals[]}` (the full list after every connect), `terminal.closed`
@@ -139,6 +139,7 @@ Full schemas live in `packages/protocol`. Every message is a JSON envelope `{ v:
 The full list is in [PRD §8](PRD.md#8-security-and-privacy-requirements). In short:
 
 - The server binds `127.0.0.1` and rejects requests whose `Host` is not the board's own (DNS-rebinding defence). `/ws/ui` accepts only the board's origin.
+- Editors and hooks connect only through the local socket `~/.yardmaster/board.sock`, and check it is a socket the user owns before they send anything; their routes are refused over TCP.
 - A per-install token guards everything. Browsers sign in once through a one-time link and get an `HttpOnly`, `SameSite=Strict` session cookie; phones pair with a single-use QR code and can be revoked.
 - Processes are spawned with `execFile` and argument arrays, never shell strings. Markdown renders without raw HTML, and terminal output only ever goes to xterm.
 - Remote access is off by default: only allowed Tailscale `*.ts.net` hosts, over HTTPS, while the server still binds `127.0.0.1`.

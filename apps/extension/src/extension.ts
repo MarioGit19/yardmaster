@@ -3,34 +3,29 @@ import { homedir } from 'node:os';
 import * as vscode from 'vscode';
 import { CommandHandler } from './core/command-handler.js';
 import {
-  authUrl,
   COMMANDS,
   CONFIG_SECTION,
   type ExtensionConfig,
-  editorSocketUrl,
   LEGACY_CONFIG_SECTION,
   LEGACY_EXTENSION_ID,
   linkSettingsChanged,
   type RawConfig,
   resolveConfig,
+  userValue,
 } from './core/config.js';
 import { EditorLink, type HelloPayload, type LinkStatus } from './core/editor-link.js';
 import { ExecStreamer } from './core/exec-streamer.js';
+import { locateBoard, requestDashboardLink } from './core/local-board.js';
 import { STATUS_TEXT, statusTooltip } from './core/status.js';
 import { NAME_POLL_MS, TerminalTracker } from './core/terminal-tracker.js';
-import { readToken, tokenDirs } from './core/token.js';
+import { tokenDirs } from './core/token.js';
 
 const WINDOW_ID_KEY = 'yardmaster.windowId';
 const CLOSE_WINDOW_DELAY_MS = 200;
 
 /** Only the values the user set, so an unset new key can fall back to its old one. */
 function explicitSettings(name: string): RawConfig {
-  const section = vscode.workspace.getConfiguration(name);
-  const value = (key: string) => {
-    const found = section.inspect(key);
-    return found?.workspaceFolderValue ?? found?.workspaceValue ?? found?.globalValue;
-  };
-  return { enabled: value('enabled'), port: value('port') };
+  return { enabled: userValue(vscode.workspace.getConfiguration(name).inspect('enabled')) };
 }
 
 function readConfig(): ExtensionConfig {
@@ -60,7 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const extensionVersion = String(context.extension.packageJSON.version ?? '0.0.0');
   let config = readConfig();
   let link: EditorLink | null = null;
-  log.info(`activated (enabled: ${config.enabled}, port: ${config.port})`);
+  log.info(`activated (enabled: ${config.enabled})`);
 
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   statusItem.name = 'Yardmaster';
@@ -106,7 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Renaming a terminal tab fires no event, so names are polled.
   const namePoll = setInterval(() => terminals.refreshNames(), NAME_POLL_MS);
   const showStatus = (status: LinkStatus | { kind: 'legacy' }) => {
-    statusItem.tooltip = statusTooltip(status, config.port);
+    statusItem.tooltip = statusTooltip(status);
     // Every (re)connect gets the full list, so the server drops anything stale.
     if (status.kind === 'connected') terminals.sync(vscode.window.terminals);
   };
@@ -137,8 +132,7 @@ export function activate(context: vscode.ExtensionContext): void {
       return;
     }
     link = new EditorLink({
-      url: editorSocketUrl(config.port),
-      readToken: () => readToken(home),
+      locate: () => locateBoard(home),
       hello,
       onStatus: showStatus,
       onCommand: (command) => {
@@ -179,7 +173,18 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     },
     vscode.commands.registerCommand(COMMANDS.openDashboard, async () => {
-      const url = authUrl(config.port, await readToken(home));
+      // The board hands out its own sign-in link, so nothing is opened on a port it doesn't hold.
+      const located = await locateBoard(home);
+      const url = located.ok ? await requestDashboardLink(located.board) : null;
+      if (url === null) {
+        log.warn(
+          `no dashboard to open: ${located.ok ? 'the server gave no link' : located.reason}`,
+        );
+        void vscode.window.showInformationMessage(
+          'Yardmaster is not running. Start it with `yardmaster start`, then try again.',
+        );
+        return;
+      }
       const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
       if (!opened) log.warn('the editor declined to open the dashboard');
     }),
@@ -227,7 +232,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const changed = linkSettingsChanged(config, next);
       config = next;
       if (!changed) return;
-      log.info(`settings changed (enabled: ${next.enabled}, port: ${next.port})`);
+      log.info(`settings changed (enabled: ${next.enabled})`);
       startLink();
     }),
   );

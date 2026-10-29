@@ -12,6 +12,7 @@ import {
   hookStatus,
   InvalidSettingsError,
   OBSERVER_EVENTS,
+  permissionHookCommand,
   planInstall,
   planUninstall,
   readSettings,
@@ -19,6 +20,8 @@ import {
 } from './installer.js';
 
 const COMMAND = '/home/dev/tools/yardmaster/packages/hook/bin/yardmaster-hook';
+const PERMISSION =
+  '/home/dev/.local/bin/node /home/dev/tools/yardmaster/packages/hook/bin/yardmaster-hook-permission.mjs';
 const NOW = new Date('2026-03-04T05:06:07.890Z');
 
 const THIRD_PARTY = {
@@ -182,18 +185,18 @@ describe('hook installer', () => {
     await mkdir(join(dir, '.claude'), { recursive: true });
     await writeFile(path, raw);
     expect(hookStatus(raw, COMMAND).outdated).toEqual([...OBSERVER_EVENTS]);
-    expect(awayHookStatus(raw, COMMAND)).toBe('outdated');
+    expect(awayHookStatus(raw, PERMISSION)).toBe('outdated');
 
     const backup = await applyPlan(
       path,
-      planInstall(await readSettings(path), COMMAND, { away: true }),
+      planInstall(await readSettings(path), COMMAND, { away: true, permissionCommand: PERMISSION }),
       NOW,
     );
     expect(await readFile(backup as string, 'utf8')).toBe(raw);
     const after = await readSettings(path);
     expect(after).not.toContain('c-board-hook');
     expect(hookStatus(after, COMMAND).installed).toEqual([...OBSERVER_EVENTS]);
-    expect(awayHookStatus(after, COMMAND)).toBe('installed');
+    expect(awayHookStatus(after, PERMISSION)).toBe('installed');
     // Other tools' hooks stay, and nothing is doubled.
     expect(JSON.parse(after as string).hooks.PreToolUse).toEqual([
       THIRD_PARTY.hooks.PreToolUse[0],
@@ -250,44 +253,72 @@ describe('hook installer', () => {
 
 describe('away-mode installer', () => {
   const away = {
-    hooks: [{ type: 'command', command: `${COMMAND} --permission`, timeout: AWAY_HOOK_TIMEOUT_S }],
+    hooks: [{ type: 'command', command: PERMISSION, timeout: AWAY_HOOK_TIMEOUT_S }],
   };
 
   it('adds a synchronous PermissionRequest handler only with away', async () => {
     const plain = planInstall(undefined, COMMAND);
     expect(JSON.parse(plain.after).hooks.PermissionRequest).toBeUndefined();
-    expect(awayHookStatus(plain.after, COMMAND)).toBe('missing');
+    expect(awayHookStatus(plain.after, PERMISSION)).toBe('missing');
 
-    const withAway = planInstall(plain.after, COMMAND, { away: true });
+    const withAway = planInstall(plain.after, COMMAND, {
+      away: true,
+      permissionCommand: PERMISSION,
+    });
     expect(withAway.changed).toBe(true);
     const hooks = JSON.parse(withAway.after).hooks;
     expect(hooks.PermissionRequest).toEqual([away]);
     // Observer events are untouched; the away handler has no `async`.
     expect(hooks.Stop).toEqual([ours]);
-    expect(awayHookStatus(withAway.after, COMMAND)).toBe('installed');
-    expect(planInstall(withAway.after, COMMAND, { away: true }).changed).toBe(false);
+    expect(awayHookStatus(withAway.after, PERMISSION)).toBe('installed');
+    expect(
+      planInstall(withAway.after, COMMAND, { away: true, permissionCommand: PERMISSION }).changed,
+    ).toBe(false);
     // A plain install neither adds nor removes it.
-    expect(planInstall(withAway.after, COMMAND).changed).toBe(false);
+    expect(planInstall(withAway.after, COMMAND, { permissionCommand: PERMISSION }).changed).toBe(
+      false,
+    );
   });
 
   it('keeps third-party PermissionRequest hooks and uninstall removes only ours', () => {
     const raw = JSON.stringify(THIRD_PARTY);
-    const installed = planInstall(raw, COMMAND, { away: true }).after;
+    const installed = planInstall(raw, COMMAND, {
+      away: true,
+      permissionCommand: PERMISSION,
+    }).after;
     const hooks = JSON.parse(installed).hooks;
     expect(hooks.PermissionRequest).toEqual([...THIRD_PARTY.hooks.PermissionRequest, away]);
     const removed = JSON.parse(planUninstall(installed).after).hooks;
     expect(removed.PermissionRequest).toEqual(THIRD_PARTY.hooks.PermissionRequest);
   });
 
-  it('reports an older away handler as outdated and replaces it', () => {
+  it('reports the sh away handler as outdated, and any install moves it to Node', () => {
+    // Before the permission hook built its own output, it was the observer script with a flag.
     const old = JSON.stringify({
       hooks: {
-        PermissionRequest: [{ hooks: [{ type: 'command', command: `${COMMAND} --permission` }] }],
+        PermissionRequest: [
+          { hooks: [{ type: 'command', command: `${COMMAND} --permission`, timeout: 330 }] },
+        ],
       },
     });
-    expect(awayHookStatus(old, COMMAND)).toBe('outdated');
-    const next = planInstall(old, COMMAND, { away: true }).after;
+    expect(awayHookStatus(old, PERMISSION)).toBe('outdated');
+    const next = planInstall(old, COMMAND, { away: true, permissionCommand: PERMISSION }).after;
     expect(JSON.parse(next).hooks.PermissionRequest).toEqual([away]);
+    // `yardmaster hooks install` without --away refreshes it too, instead of leaving a dead one.
+    const plain = planInstall(old, COMMAND, { permissionCommand: PERMISSION }).after;
+    expect(JSON.parse(plain).hooks.PermissionRequest).toEqual([away]);
+  });
+
+  it('runs the permission hook on an absolute Node path, quoted for the shell', () => {
+    expect(
+      permissionHookCommand('/opt/node/bin/node', '/opt/ym/yardmaster-hook-permission.mjs'),
+    ).toBe('/opt/node/bin/node /opt/ym/yardmaster-hook-permission.mjs');
+    expect(permissionHookCommand('/home/dev/My Tools/node', "/home/dev/it's/hook.mjs")).toBe(
+      `'/home/dev/My Tools/node' '/home/dev/it'\\''s/hook.mjs'`,
+    );
+    // By default, the Node running Yardmaster and the script next to the observer.
+    expect(permissionHookCommand()).toContain(process.execPath);
+    expect(permissionHookCommand()).toMatch(/yardmaster-hook-permission\.mjs'?$/);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   hookStatus,
   InvalidSettingsError,
   type Plan,
+  permissionHookCommand,
   planInstall,
   readSettings,
   unifiedDiff,
@@ -61,6 +62,8 @@ export interface HookSettingsFile {
   displayPath: string;
   /** The handler command an install writes. */
   command: string;
+  /** The away-mode handler's command, for refreshing an installed one. */
+  permissionCommand: string;
   read(): Promise<string | undefined>;
   /** Writes a plan; returns the displayed backup path, if one was made. */
   apply(plan: Plan): Promise<string | undefined>;
@@ -74,6 +77,7 @@ export function diskHookSettings(
   return {
     displayPath: tildify(path, home),
     command: hookCommand(),
+    permissionCommand: permissionHookCommand(),
     read: () => readSettings(path),
     apply: async (plan) => {
       const backup = await applyPlan(path, plan);
@@ -88,6 +92,8 @@ export function memoryHookSettings(initial?: string): HookSettingsFile {
   return {
     displayPath: '~/.claude/settings.json',
     command: '/opt/yardmaster/bin/yardmaster-hook',
+    permissionCommand:
+      '/opt/yardmaster/bin/node /opt/yardmaster/bin/yardmaster-hook-permission.mjs',
     read: async () => text,
     apply: async (plan) => {
       if (!plan.changed) return undefined;
@@ -288,7 +294,9 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
   app.post('/api/hooks/plan', async (_request, reply) => {
     try {
       const raw = await hookSettings.read();
-      const plan = planInstall(raw, hookSettings.command);
+      const plan = planInstall(raw, hookSettings.command, {
+        permissionCommand: hookSettings.permissionCommand,
+      });
       const path = hookSettings.displayPath;
       return {
         path,
@@ -310,7 +318,9 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
       if (fingerprint(raw) !== body.data.fingerprint) {
         return reply.code(409).send({ error: 'changed' });
       }
-      const plan = planInstall(raw, hookSettings.command);
+      const plan = planInstall(raw, hookSettings.command, {
+        permissionCommand: hookSettings.permissionCommand,
+      });
       const backup = await hookSettings.apply(plan);
       app.log.info({ changed: plan.changed }, 'installed hooks from the board');
       return {

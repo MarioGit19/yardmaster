@@ -131,6 +131,7 @@ Yardmaster only ever listens on `127.0.0.1`. To use it from your phone, put both
 **Yardmaster runs locally, uses your own Claude Code login, and has no telemetry.**
 
 - The server binds `127.0.0.1` only, checks the `Host` and `Origin` of every request, and requires a per-install token (`~/.yardmaster/token`, mode 0600) or a session cookie.
+- The editor extension and the Claude hooks talk to it only through a socket in `~/.yardmaster` that only you can reach, so another program holding the port can't collect the token or answer in Yardmaster's place.
 - It never reads your Claude credentials (`~/.claude/.credentials*`, the Keychain, `~/.claude.json`) and never asks for an API key. If `ANTHROPIC_API_KEY` is set in the server's environment, the Agent SDK bills that key instead; `doctor` warns about it.
 - It makes no network calls of its own. Fonts and assets are bundled.
 - Terminal output and transcripts stay in memory and in a local SQLite file under `~/.yardmaster`. The **Redact secrets** setting masks common secret patterns on screen.

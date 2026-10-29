@@ -4,13 +4,15 @@ import { join } from 'node:path';
 import {
   type Approval,
   AwayStatusResponse,
-  PermissionRequestOutput,
+  LOCAL_ONLY_ROUTES,
+  PermissionHookAnswer,
   type ServerToUi,
 } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
 import type { ServerConfig } from '../config.js';
+import { localInject } from '../local-channel.test-helpers.js';
 import { memoryHookSettings } from '../settings-routes.js';
 import { BoardStore } from '../store.js';
 import { generateToken } from '../token.js';
@@ -53,17 +55,30 @@ async function boot(options: { demo?: boolean } = {}) {
   return { app, token };
 }
 
-function call(method: 'GET' | 'PUT' | 'POST', url: string, token: string | null, body?: unknown) {
-  return (app as FastifyInstance).inject({
+/** The hook's routes go over the socket, like the hook; settings over TCP, like the board UI. */
+async function call(
+  method: 'GET' | 'PUT' | 'POST',
+  url: string,
+  token: string | null,
+  body?: unknown,
+): Promise<{
+  statusCode: number;
+  headers: Record<string, string | string[] | number | undefined>;
+  body: string;
+  json(): unknown;
+}> {
+  const request = {
     method,
     url,
     headers: {
-      host,
       ...(token ? { 'x-yardmaster-token': token } : {}),
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(body === undefined ? {} : { payload: JSON.stringify(body) }),
-  });
+  };
+  const server = app as FastifyInstance;
+  if (LOCAL_ONLY_ROUTES.includes(url)) return localInject(server, request);
+  return server.inject({ ...request, headers: { host, ...request.headers } });
 }
 
 async function pendingApproval(server: FastifyInstance): Promise<Approval> {
@@ -76,6 +91,26 @@ async function pendingApproval(server: FastifyInstance): Promise<Approval> {
 }
 
 describe('away-mode routes', () => {
+  it('are refused over TCP, even with the token', async () => {
+    const { app: server, token } = await boot();
+    for (const [method, url] of [
+      ['GET', AWAY_ROUTE],
+      ['POST', PERMISSION_ROUTE],
+    ] as const) {
+      const res = await server.inject({
+        method,
+        url,
+        headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json' },
+        ...(method === 'POST'
+          ? { payload: JSON.stringify(hookFixture('permission-request')) }
+          : {}),
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'local_channel_required' });
+    }
+    expect(server.awayApprovals.size).toBe(0);
+  });
+
   it('need the token', async () => {
     await boot();
     expect((await call('GET', AWAY_ROUTE, null)).statusCode).toBe(401);
@@ -128,9 +163,7 @@ describe('away-mode routes', () => {
     });
     const res = await response;
     expect(res.statusCode).toBe(200);
-    expect(PermissionRequestOutput.parse(res.json())).toEqual({
-      hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } },
-    });
+    expect(PermissionHookAnswer.parse(res.json())).toEqual({ decision: 'allow' });
     expect(server.store.state.approvals[approval.id]?.state).toBe('allowed');
     expect(server.store.state.sessions[FIXTURE_SESSION_ID]?.status).toMatchObject({
       kind: 'tool',
@@ -138,24 +171,15 @@ describe('away-mode routes', () => {
     });
   });
 
-  it('returns the suggestions for "Always allow" and the reason for a denial', async () => {
+  it('answers only the decision: "always" without rules, and the reason for a denial', async () => {
     const { app: server, token } = await boot();
     await call('PUT', '/api/settings', token, { awayMode: true });
 
+    // The hook takes the rules from Claude Code's own input; the board never sends any.
     const always = call('POST', PERMISSION_ROUTE, token, hookFixture('permission-request'));
     const first = await pendingApproval(server);
     server.awayApprovals.decide({ approvalId: first.id, decision: 'allowAlways' });
-    expect((await always).json().hookSpecificOutput.decision).toEqual({
-      behavior: 'allow',
-      updatedPermissions: [
-        {
-          type: 'addRules',
-          rules: [{ toolName: 'Bash', ruleContent: 'rm -rf dist' }],
-          behavior: 'allow',
-          destination: 'localSettings',
-        },
-      ],
-    });
+    expect((await always).json()).toEqual({ decision: 'allow_always' });
 
     const deny = call('POST', PERMISSION_ROUTE, token, hookFixture('permission-request'));
     const second = await pendingApproval(server);
@@ -164,10 +188,7 @@ describe('away-mode routes', () => {
       decision: 'deny',
       reason: 'Not on main',
     });
-    expect((await deny).json().hookSpecificOutput.decision).toEqual({
-      behavior: 'deny',
-      message: 'Not on main',
-    });
+    expect((await deny).json()).toEqual({ decision: 'deny', reason: 'Not on main' });
     expect(server.store.state.sessions[FIXTURE_SESSION_ID]?.status).toEqual({ kind: 'working' });
     expect(server.awayApprovals.decide({ approvalId: second.id, decision: 'allow' })).toEqual({
       ok: false,

@@ -8,6 +8,7 @@ import type { ServerConfig } from './config.js';
 import { INVALID_SESSION_ID } from './editor-actions.js';
 import { COMMAND_ERRORS, EDITOR_WS_PATH } from './editor-gateway.js';
 import { ROUTE_ERRORS } from './editor-router.js';
+import { localSocket, localWebSocket } from './local-channel.test-helpers.js';
 import { OUTSIDE_LIBRARY } from './project-actions.js';
 import { createSessionValue, TOKEN_HEADER } from './security.js';
 import { TERMINAL_REPLY_DISABLED } from './terminal-reply.js';
@@ -28,6 +29,8 @@ const shopPath = '/home/dev/acme-shop';
 
 let app: FastifyInstance | undefined;
 const sockets: WebSocket[] = [];
+/** Each app's socket, by its TCP port. */
+const socketPaths = new Map<number, string>();
 
 afterEach(async () => {
   for (const socket of sockets.splice(0)) socket.terminate();
@@ -42,7 +45,9 @@ async function boot(): Promise<{ app: FastifyInstance; port: number }> {
     processes: false,
     editor: { resolvePath: async (path) => path, commandTimeoutMs: TIMEOUT_MS },
   });
-  return { app, port: (app.server.address() as AddressInfo).port };
+  const port = (app.server.address() as AddressInfo).port;
+  socketPaths.set(port, await localSocket(app));
+  return { app, port };
 }
 
 /** A socket that queues every message it receives. */
@@ -92,8 +97,8 @@ class Peer<M> {
 }
 
 async function editor(port: number, id = windowId): Promise<Peer<ServerToEditor>> {
-  const socket = new WebSocket(`ws://127.0.0.1:${port}${EDITOR_WS_PATH}`, {
-    headers: { [TOKEN_HEADER]: token },
+  const socket = localWebSocket(socketPaths.get(port) ?? '', EDITOR_WS_PATH, {
+    [TOKEN_HEADER]: token,
   });
   const peer = new Peer<ServerToEditor>(socket, (data) => {
     const decoded = decodeServerToEditor(data);
@@ -377,6 +382,7 @@ describe('editor commands', () => {
     });
     app.settings['library.roots'] = ['/home/dev'];
     const port = (app.server.address() as AddressInfo).port;
+    socketPaths.set(port, await localSocket(app));
     const client = await ui(port);
 
     client.send('action', { kind: 'project.add', path: '/home/dev/recipe-box' }, 'o-1');

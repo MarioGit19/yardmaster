@@ -45,14 +45,8 @@
         "yardmaster.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Stream this window's terminals to the local Yardmaster server."
-        },
-        "yardmaster.port": {
-          "type": "integer",
-          "default": 4317,
-          "minimum": 1,
-          "maximum": 65535,
-          "description": "Port of the local Yardmaster server (it always listens on 127.0.0.1)."
+          "description": "Stream this window's terminals to the local Yardmaster server. Read from your user settings only, never a workspace's.",
+          "scope": "machine"
         }
       }
     }

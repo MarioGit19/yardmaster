@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServer } from '../app.js';
 import type { ServerConfig } from '../config.js';
+import { localInject } from '../local-channel.test-helpers.js';
 import { BoardStore } from '../store.js';
 import { generateToken } from '../token.js';
 import { FIXTURE_CWD, FIXTURE_SESSION_ID, hookFixture } from './fixtures.test-helpers.js';
@@ -31,11 +32,12 @@ afterEach(async () => {
   tmp = undefined;
 });
 
+/** Posts like the hook script: over the board's socket. */
 function post(body: unknown, headers: Record<string, string> = {}) {
-  return (app as FastifyInstance).inject({
+  return localInject(app as FastifyInstance, {
     method: 'POST',
     url: HOOK_ROUTE,
-    headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json', ...headers },
+    headers: { 'x-yardmaster-token': token, 'content-type': 'application/json', ...headers },
     payload: JSON.stringify(body),
   });
 }
@@ -49,30 +51,46 @@ async function settled(): Promise<void> {
 describe(`POST ${HOOK_ROUTE}`, () => {
   it('requires the token', async () => {
     app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
-    const res = await app.inject({
+    const res = await localInject(app, {
       method: 'POST',
       url: HOOK_ROUTE,
-      headers: { host, 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
       payload: JSON.stringify(hookFixture('session-start')),
     });
     expect(res.statusCode).toBe(401);
+    // A token sent over TCP is refused: whatever holds the port may not be the board.
+    const tcp = await app.inject({
+      method: 'POST',
+      url: HOOK_ROUTE,
+      headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json' },
+      payload: JSON.stringify(hookFixture('session-start')),
+    });
+    expect(tcp.statusCode).toBe(403);
     await settled();
     expect(app.store.state.sessions).toEqual({});
     expect(app.hookStats.received).toBe(0);
   });
 
-  it('accepts a hook script from before the rename, with the old headers', async () => {
+  it('accepts the old header names on the socket, never over TCP', async () => {
     app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
-    const res = await app.inject({
+    const legacy = {
+      'x-cboard-token': token,
+      'x-cboard-claude-pid': '4321',
+      'content-type': 'application/json',
+    };
+    const payload = JSON.stringify(hookFixture('session-start'));
+    const tcp = await app.inject({
       method: 'POST',
       url: HOOK_ROUTE,
-      headers: {
-        host,
-        'x-cboard-token': token,
-        'x-cboard-claude-pid': '4321',
-        'content-type': 'application/json',
-      },
-      payload: JSON.stringify(hookFixture('session-start')),
+      headers: { host, ...legacy },
+      payload,
+    });
+    expect(tcp.statusCode).toBe(403);
+    const res = await localInject(app, {
+      method: 'POST',
+      url: HOOK_ROUTE,
+      headers: legacy,
+      payload,
     });
     expect(res.statusCode).toBe(204);
     await settled();
@@ -193,10 +211,10 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     for (const body of [[1, 2], 'text', { hook_event_name: 'Stop' }, { session_id: '' }]) {
       expect((await post(body)).statusCode).toBe(204);
     }
-    const bad = await app.inject({
+    const bad = await localInject(app, {
       method: 'POST',
       url: HOOK_ROUTE,
-      headers: { host, 'x-yardmaster-token': token, 'content-type': 'application/json' },
+      headers: { 'x-yardmaster-token': token, 'content-type': 'application/json' },
       payload: '{not json',
     });
     expect(bad.statusCode).toBe(400);

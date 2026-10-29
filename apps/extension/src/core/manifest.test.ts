@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMMANDS, CONFIG_SECTION, DEFAULT_PORT } from './config.js';
+import { COMMANDS, CONFIG_SECTION } from './config.js';
 
 const manifest = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
@@ -13,7 +13,14 @@ describe('extension manifest', () => {
   it('declares settings that match the code defaults', () => {
     const props = manifest.contributes.configuration.properties;
     expect(props[`${CONFIG_SECTION}.enabled`].default).toBe(true);
-    expect(props[`${CONFIG_SECTION}.port`].default).toBe(DEFAULT_PORT);
+  });
+
+  it('lets no workspace steer the link', () => {
+    const props = manifest.contributes.configuration.properties;
+    // Machine scope: settable in user settings only, not in a repo's .vscode/settings.json.
+    expect(props[`${CONFIG_SECTION}.enabled`].scope).toBe('machine');
+    // The link goes through the board's socket, so there is no port to point elsewhere.
+    expect(Object.keys(props)).toEqual([`${CONFIG_SECTION}.enabled`]);
   });
 
   it('activates on startup so executions are captured from the start', () => {

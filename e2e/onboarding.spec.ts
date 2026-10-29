@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { type DemoBoard, startBoard } from './board.js';
+import { startBoard } from './board.js';
 import { expect, signedInState, test } from './fixtures.js';
+import { connectEditor, OBSERVER_HOOK, runHook } from './local.js';
 
 // Synthetic hook payload and editor window (privacy: no real paths or ids).
 const SESSION_ID = '0b5e7c2a-4d1f-4e8a-9c3b-7a6f5e4d3c2b';
@@ -14,39 +15,6 @@ const HOOK_EVENT = {
   source: 'startup',
 };
 
-/** Connects a fake editor window the way the extension does, and says hello. */
-async function connectEditor(board: DemoBoard, token: string): Promise<WebSocket> {
-  const url = `${board.url.replace(/^http/, 'ws')}/ws/editor`;
-  // Node's WebSocket (undici) takes headers in its init; the DOM typings don't know that.
-  const Ctor = WebSocket as unknown as new (
-    url: string,
-    init: { headers: Record<string, string> },
-  ) => WebSocket;
-  const socket = new Ctor(url, { headers: { 'x-yardmaster-token': token } });
-  await new Promise<void>((resolve, reject) => {
-    socket.addEventListener('open', () => resolve(), { once: true });
-    socket.addEventListener('error', () => reject(new Error('editor socket failed')), {
-      once: true,
-    });
-  });
-  socket.send(
-    JSON.stringify({
-      v: 1,
-      type: 'editor.hello',
-      ts: Date.now(),
-      payload: {
-        windowId: 'e2e-window-1',
-        appName: 'Cursor',
-        appVersion: '1.105.0',
-        workspaceFolders: ['/home/dev/acme-shop'],
-        extensionVersion: '0.1.0',
-        capabilities: { shellExecution: true },
-      },
-    }),
-  );
-  return socket;
-}
-
 test('the onboarding steps tick themselves from simulated events', async ({ browser }) => {
   test.slow();
   const board = await startBoard({ demo: false });
@@ -54,7 +22,7 @@ test('the onboarding steps tick themselves from simulated events', async ({ brow
     baseURL: board.url,
     storageState: signedInState(board.url, board.cookie),
   });
-  let editor: WebSocket | undefined;
+  let editor: Awaited<ReturnType<typeof connectEditor>> | undefined;
   try {
     const token = (await readFile(join(board.home, 'token'), 'utf8')).trim();
     const page = await context.newPage();
@@ -80,20 +48,15 @@ test('the onboarding steps tick themselves from simulated events', async ({ brow
     const settings = JSON.parse(await readFile(join(board.claudeDir, 'settings.json'), 'utf8'));
     expect(settings.hooks.SessionStart).toHaveLength(1);
 
-    // The first hook event ticks the hooks step.
-    const res = await fetch(`${board.url}/api/hooks/claude`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-yardmaster-token': token },
-      body: JSON.stringify(HOOK_EVENT),
-    });
-    expect(res.status).toBe(204);
+    // The first hook event (the real hook script, over the board's socket) ticks the hooks step.
+    expect(await runHook(board, OBSERVER_HOOK, HOOK_EVENT)).toEqual({ code: 0, stdout: '' });
     await expect(step('hooks')).toHaveAttribute('data-done', 'true');
     await expect(wizard.locator('[data-progress]')).toHaveText('2 of 3 done');
     // The guide stays up although the event created the first project.
     await expect(wizard).toBeVisible();
 
     // An editor connection ticks the last one.
-    editor = await connectEditor(board, token);
+    editor = await connectEditor(board, token, ['/home/dev/acme-shop']);
     await expect(step('extension')).toHaveAttribute('data-done', 'true');
     await expect(wizard).toHaveAttribute('data-complete', 'true');
     await expect(wizard.getByRole('heading', { level: 1 })).toHaveText('You’re all set');

@@ -42,7 +42,10 @@ interface FakeWorld {
   env?: NodeJS.ProcessEnv;
   portFree?: boolean;
   files?: Record<string, { text: string; mode?: number }>;
+  /** TCP URLs, and `local:<path>` for requests over the board's socket. */
   http?: Record<string, JsonResponse>;
+  /** The socket at `~/.yardmaster/board.sock`; there by default when `http` has local routes. */
+  socket?: { isSocket: boolean; ours: boolean } | null;
   executables?: string[];
   commands?: Record<string, string | undefined>;
   pty?: { ok: true } | { ok: false; reason: string };
@@ -64,6 +67,17 @@ function fakeDeps(world: FakeWorld = {}): DoctorDeps & { requests: [string, unkn
       requests.push([url, headers]);
       return world.http?.[url];
     },
+    getLocalJson: async (socketPath, path, headers) => {
+      expect(socketPath).toBe('/home/dev/.yardmaster/board.sock');
+      requests.push([`local:${path}`, headers]);
+      return world.http?.[`local:${path}`];
+    },
+    socketInfo: async (path) => {
+      if (path !== '/home/dev/.yardmaster/board.sock') return undefined;
+      if (world.socket !== undefined) return world.socket ?? undefined;
+      const local = Object.keys(world.http ?? {}).some((url) => url.startsWith('local:'));
+      return local ? { isSocket: true, ours: true } : undefined;
+    },
     readText: async (path) => files[path]?.text,
     fileInfo: async (path) => {
       const file = files[path];
@@ -82,9 +96,11 @@ const byId = (checks: DoctorCheck[], id: DoctorCheck['id']) => {
   return check;
 };
 
+const health = { status: 200, body: { ok: true, version: '1.2.3' } };
 const runningBoard = (status: object = {}): FakeWorld['http'] => ({
-  'http://127.0.0.1:4317/api/health': { status: 200, body: { ok: true, version: '1.2.3' } },
-  'http://127.0.0.1:4317/api/status': {
+  'http://127.0.0.1:4317/api/health': health,
+  'local:/api/health': health,
+  'local:/api/status': {
     status: 200,
     body: {
       ok: true,
@@ -106,6 +122,7 @@ describe('runDoctor', () => {
       'node',
       'server',
       'token',
+      'channel',
       'hooks',
       'extensions',
       'editor-cli',
@@ -286,18 +303,83 @@ describe('runDoctor', () => {
     });
   });
 
+  describe('local socket', () => {
+    const tokenFile = { '/home/dev/.yardmaster/token': { text: TOKEN, mode: 0o100600 } };
+    it('is ok when the board answers on its private socket', async () => {
+      const files = {
+        ...tokenFile,
+        '/home/dev/.yardmaster': { text: '', mode: 0o40700 },
+      };
+      const checks = await runDoctor(
+        config,
+        fakeDeps({ files, portFree: false, http: runningBoard() }),
+        NOW,
+      );
+      expect(byId(checks, 'channel')).toMatchObject({
+        level: 'ok',
+        message: '~/.yardmaster/board.sock (owner only)',
+      });
+    });
+
+    it('is skipped when the board is not running', async () => {
+      expect(byId(await runDoctor(config, fakeDeps(), NOW), 'channel').level).toBe('skip');
+      const leftover = fakeDeps({ socket: { isSocket: true, ours: true } });
+      expect(byId(await runDoctor(config, leftover, NOW), 'channel')).toMatchObject({
+        level: 'skip',
+        message: 'server not running (~/.yardmaster/board.sock is left over)',
+      });
+    });
+
+    it('fails when the running board has no socket, or nothing answers on it', async () => {
+      const http = { 'http://127.0.0.1:4317/api/health': health };
+      const missing = await runDoctor(config, fakeDeps({ portFree: false, http }), NOW);
+      expect(byId(missing, 'channel')).toMatchObject({
+        level: 'fail',
+        message: 'the running server does not listen on ~/.yardmaster/board.sock',
+      });
+      const silent = fakeDeps({ portFree: false, http, socket: { isSocket: true, ours: true } });
+      expect(byId(await runDoctor(config, silent, NOW), 'channel')).toMatchObject({
+        level: 'fail',
+        message: 'nothing answers on ~/.yardmaster/board.sock',
+      });
+    });
+
+    it('fails on a file that is not our socket', async () => {
+      for (const socket of [
+        { isSocket: false, ours: true },
+        { isSocket: true, ours: false },
+      ]) {
+        const deps = fakeDeps({ portFree: false, http: runningBoard(), socket });
+        expect(byId(await runDoctor(config, deps, NOW), 'channel')).toMatchObject({
+          level: 'fail',
+          message: '~/.yardmaster/board.sock is not a socket of yours',
+        });
+      }
+    });
+
+    it('warns when the data dir is open to other users', async () => {
+      const files = { ...tokenFile, '/home/dev/.yardmaster': { text: '', mode: 0o40755 } };
+      const deps = fakeDeps({ files, portFree: false, http: runningBoard() });
+      expect(byId(await runDoctor(config, deps, NOW), 'channel')).toMatchObject({
+        level: 'warn',
+        message: '~/.yardmaster is open to other users (mode 755)',
+      });
+    });
+  });
+
   describe('extensions', () => {
-    it('reports connected windows and sends the token header', async () => {
+    it('reports connected windows, asking over the socket with the token', async () => {
       const deps = fakeDeps({ portFree: false, http: runningBoard() });
       const checks = await runDoctor(config, deps, NOW);
       expect(byId(checks, 'extensions')).toMatchObject({
         level: 'ok',
         message: '2 windows connected',
       });
-      expect(deps.requests).toContainEqual([
-        'http://127.0.0.1:4317/api/status',
-        { 'x-yardmaster-token': TOKEN },
-      ]);
+      expect(deps.requests).toContainEqual(['local:/api/status', { 'x-yardmaster-token': TOKEN }]);
+      // Whatever holds the TCP port never sees the token.
+      for (const [url, headers] of deps.requests) {
+        if (url.startsWith('http:')) expect(headers).toBeUndefined();
+      }
     });
 
     it('warns when no window is connected', async () => {
@@ -313,7 +395,7 @@ describe('runDoctor', () => {
     it('warns when the server rejects the token', async () => {
       const http = {
         ...runningBoard(),
-        'http://127.0.0.1:4317/api/status': { status: 401, body: { error: 'unauthorized' } },
+        'local:/api/status': { status: 401, body: { error: 'unauthorized' } },
       };
       const checks = await runDoctor(config, fakeDeps({ portFree: false, http }), NOW);
       expect(byId(checks, 'extensions')).toMatchObject({ level: 'warn' });
@@ -324,13 +406,13 @@ describe('runDoctor', () => {
       const deps = fakeDeps({ portFree: false, http: runningBoard(), files: {} });
       const checks = await runDoctor(config, deps, NOW);
       expect(byId(checks, 'extensions').level).toBe('warn');
-      expect(deps.requests.map(([url]) => url)).toEqual(['http://127.0.0.1:4317/api/health']);
+      expect(deps.requests.map(([url]) => url)).not.toContain('local:/api/status');
     });
 
     it('ignores a malformed status body', async () => {
       const http = {
         ...runningBoard(),
-        'http://127.0.0.1:4317/api/status': { status: 200, body: { editors: 'many' } },
+        'local:/api/status': { status: 200, body: { editors: 'many' } },
       };
       const checks = await runDoctor(config, fakeDeps({ portFree: false, http }), NOW);
       expect(byId(checks, 'extensions').message).toContain('could not read');

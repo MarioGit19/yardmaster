@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, readFile, stat } from 'node:fs/promises';
+import { access, lstat, readFile, stat } from 'node:fs/promises';
+import { request } from 'node:http';
 import { createServer } from 'node:net';
+import { join } from 'node:path';
 import { claudeSettingsPath, isHookCommand } from '@yardmaster/hook';
-import { HealthResponse, ServerStatus } from '@yardmaster/protocol';
+import { HealthResponse, LOCAL_SOCKET_FILE, ServerStatus } from '@yardmaster/protocol';
 import type { ServerConfig } from './config.js';
 import { findEditorCli, findOnPath } from './editor-cli.js';
 import { loadNodePty } from './pty.js';
@@ -17,6 +19,7 @@ export interface DoctorCheck {
     | 'node'
     | 'server'
     | 'token'
+    | 'channel'
     | 'hooks'
     | 'extensions'
     | 'editor-cli'
@@ -41,6 +44,12 @@ export interface FileInfo {
   isFile: boolean;
 }
 
+export interface SocketInfo {
+  isSocket: boolean;
+  /** Owned by the user running doctor. */
+  ours: boolean;
+}
+
 /** Everything the doctor touches outside its own logic, so tests can swap it. */
 export interface DoctorDeps {
   env: NodeJS.ProcessEnv;
@@ -51,6 +60,14 @@ export interface DoctorDeps {
   isPortFree(host: string, port: number): Promise<boolean>;
   /** GET a JSON body, or undefined when nothing answers. */
   getJson(url: string, headers?: Record<string, string>): Promise<JsonResponse | undefined>;
+  /** GET a JSON body over a Unix socket, or undefined when nothing answers. */
+  getLocalJson(
+    socketPath: string,
+    path: string,
+    headers?: Record<string, string>,
+  ): Promise<JsonResponse | undefined>;
+  /** `lstat` of a path that should be the board's socket. */
+  socketInfo(path: string): Promise<SocketInfo | undefined>;
   readText(path: string): Promise<string | undefined>;
   fileInfo(path: string): Promise<FileInfo | undefined>;
   isExecutable(path: string): Promise<boolean>;
@@ -79,6 +96,38 @@ export function defaultDoctorDeps(home: string, env: NodeJS.ProcessEnv = process
       try {
         const res = await fetch(url, { headers, signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
         return { status: res.status, body: await res.json().catch(() => undefined) };
+      } catch {
+        return undefined;
+      }
+    },
+    getLocalJson: (socketPath, path, headers) =>
+      new Promise((done) => {
+        const req = request({ socketPath, path, headers, timeout: HTTP_TIMEOUT_MS }, (res) => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk) => {
+            text += chunk;
+          });
+          res.on('end', () => {
+            let body: unknown;
+            try {
+              body = JSON.parse(text);
+            } catch {
+              body = undefined;
+            }
+            done({ status: res.statusCode ?? 0, body });
+          });
+          res.on('error', () => done(undefined));
+        });
+        req.on('timeout', () => req.destroy());
+        req.on('error', () => done(undefined));
+        req.end();
+      }),
+    socketInfo: async (path) => {
+      try {
+        const info = await lstat(path);
+        const uid = process.getuid?.();
+        return { isSocket: info.isSocket(), ours: uid === undefined || info.uid === uid };
       } catch {
         return undefined;
       }
@@ -241,19 +290,77 @@ function checkServer(
   }
 }
 
+/** Asks over the socket, so the token never goes to whatever holds the TCP port. */
 async function fetchStatus(
   config: ServerConfig,
   deps: DoctorDeps,
   token: string | undefined,
 ): Promise<ServerStatus | 'unauthorized' | undefined> {
   if (token === undefined) return 'unauthorized';
-  const res = await deps.getJson(`${baseUrl(config)}/api/status`, { [TOKEN_HEADER]: token });
+  const res = await deps.getLocalJson(localSocket(config), '/api/status', {
+    [TOKEN_HEADER]: token,
+  });
   if (res?.status === 401) return 'unauthorized';
   const status = ServerStatus.safeParse(res?.body);
   return status.success ? status.data : undefined;
 }
 
 export { claudeSettingsPath };
+
+function localSocket(config: ServerConfig): string {
+  return join(config.home, LOCAL_SOCKET_FILE);
+}
+
+/** The socket editors and hooks use (PRD §8 item 13): there, private, and answering. */
+async function checkChannel(
+  config: ServerConfig,
+  deps: DoctorDeps,
+  probe: ServerProbe,
+): Promise<DoctorCheck> {
+  const base = { id: 'channel', label: 'Local socket' } as const;
+  const path = localSocket(config);
+  const shown = tildify(path, deps.home);
+  const info = await deps.socketInfo(path);
+  if (!info) {
+    return probe.state === 'board'
+      ? {
+          ...base,
+          level: 'fail',
+          message: `the running server does not listen on ${shown}`,
+          hint: 'Editors and Claude hooks connect only there. Restart Yardmaster and check its log, or update it if it is older.',
+        }
+      : { ...base, level: 'skip', message: 'server not running' };
+  }
+  if (!info.isSocket || !info.ours) {
+    return {
+      ...base,
+      level: 'fail',
+      message: `${shown} is not a socket of yours`,
+      hint: `Yardmaster won't replace it. Stop Yardmaster, remove ${shown} and start it again.`,
+    };
+  }
+  const dir = await deps.fileInfo(config.home);
+  if (deps.platform !== 'win32' && dir && (dir.mode & 0o077) !== 0) {
+    return {
+      ...base,
+      level: 'warn',
+      message: `${tildify(config.home, deps.home)} is open to other users (mode ${(dir.mode & 0o777).toString(8)})`,
+      hint: 'Restart Yardmaster to make it private (0700).',
+    };
+  }
+  const health = HealthResponse.safeParse((await deps.getLocalJson(path, '/api/health'))?.body);
+  if (!health.success) {
+    return probe.state === 'board'
+      ? {
+          ...base,
+          level: 'fail',
+          message: `nothing answers on ${shown}`,
+          hint: 'Restart Yardmaster.',
+        }
+      : { ...base, level: 'skip', message: `server not running (${shown} is left over)` };
+  }
+  return { ...base, level: 'ok', message: `${shown} (owner only)` };
+}
 
 /** Hook events whose handlers run the Yardmaster hook script. */
 export function installedHookEvents(settings: unknown): string[] {
@@ -465,7 +572,8 @@ export async function runDoctor(
   const status =
     probe.state === 'board' ? await fetchStatus(config, deps, tokenResult.token) : undefined;
   const liveStatus = typeof status === 'object' ? status : undefined;
-  const [hooks, editorCli, pty, claude] = await Promise.all([
+  const [channel, hooks, editorCli, pty, claude] = await Promise.all([
+    checkChannel(config, deps, probe),
     checkHooks(deps, liveStatus, now),
     checkEditorCli(deps, liveStatus),
     checkPty(deps, liveStatus),
@@ -475,6 +583,7 @@ export async function runDoctor(
     checkNode(deps),
     checkServer(config, probe, liveStatus),
     tokenResult.check,
+    channel,
     hooks,
     checkExtensions(probe, status),
     editorCli,

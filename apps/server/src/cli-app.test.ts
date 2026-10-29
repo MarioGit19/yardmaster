@@ -389,7 +389,12 @@ describe('yardmaster hooks', () => {
     expect(await runCli(['hooks', 'install', '--away', ...args], away.io)).toBe(0);
     expect(away.out()).toContain('and the away-mode permission hook');
     const handler = JSON.parse(await readFile(path, 'utf8')).hooks.PermissionRequest[0].hooks[0];
-    expect(handler.command).toMatch(/yardmaster-hook --permission$/);
+    // The Node that runs Yardmaster, then the permission hook script.
+    expect(
+      handler.command.startsWith(process.execPath) ||
+        handler.command.startsWith(`'${process.execPath}`),
+    ).toBe(true);
+    expect(handler.command).toMatch(/yardmaster-hook-permission\.mjs'?$/);
     expect(handler.async).toBeUndefined();
     const status = testIo();
     expect(await runCli(['hooks', 'status', '--settings-path', path], status.io)).toBe(0);

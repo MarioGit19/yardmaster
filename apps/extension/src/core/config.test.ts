@@ -1,38 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_PORT,
-  dashboardUrl,
-  linkSettingsChanged,
-  parsePort,
-  resolveConfig,
-} from './config.js';
-
-describe('parsePort', () => {
-  it('accepts integers in range', () => {
-    expect(parsePort(4317)).toBe(4317);
-    expect(parsePort(1)).toBe(1);
-    expect(parsePort(65535)).toBe(65535);
-  });
-
-  it('accepts numeric strings from hand-edited settings', () => {
-    expect(parsePort(' 5000 ')).toBe(5000);
-  });
-
-  it.each([0, -1, 65536, 4317.5, Number.NaN, '43a', '', null, undefined, true, {}])(
-    'falls back to the default for %s',
-    (value) => {
-      expect(parsePort(value)).toBe(DEFAULT_PORT);
-    },
-  );
-});
+import { linkSettingsChanged, resolveConfig, userValue } from './config.js';
 
 describe('resolveConfig', () => {
-  it('defaults to enabled on the default port', () => {
-    expect(resolveConfig({})).toEqual({ enabled: true, port: DEFAULT_PORT });
+  it('defaults to enabled', () => {
+    expect(resolveConfig({})).toEqual({ enabled: true });
   });
 
-  it('keeps valid values', () => {
-    expect(resolveConfig({ enabled: false, port: 5123 })).toEqual({ enabled: false, port: 5123 });
+  it('keeps a valid value', () => {
+    expect(resolveConfig({ enabled: false })).toEqual({ enabled: false });
   });
 
   it('ignores a non-boolean enabled flag', () => {
@@ -40,34 +15,32 @@ describe('resolveConfig', () => {
   });
 });
 
-describe('linkSettingsChanged', () => {
-  const base = { enabled: true, port: 4317 };
-
-  it('is false when nothing relevant changed', () => {
-    expect(linkSettingsChanged(base, { ...base })).toBe(false);
+describe('userValue', () => {
+  it('reads only the user value, never a workspace or folder one', () => {
+    // A cloned repo's .vscode/settings.json can set these, even in Restricted Mode.
+    expect(userValue({ workspaceValue: false, workspaceFolderValue: false })).toBeUndefined();
+    expect(
+      userValue({ globalValue: true, workspaceValue: false, workspaceFolderValue: false }),
+    ).toBe(true);
+    expect(userValue(undefined)).toBeUndefined();
   });
 
-  it('is true when the port or enabled flag changes', () => {
-    expect(linkSettingsChanged(base, { ...base, port: 4318 })).toBe(true);
-    expect(linkSettingsChanged(base, { ...base, enabled: false })).toBe(true);
+  it('leaves a workspace that turns the link off without effect', () => {
+    const found = { workspaceValue: false };
+    expect(resolveConfig({ enabled: userValue(found) })).toEqual({ enabled: true });
   });
 });
 
-describe('dashboardUrl', () => {
-  it('always points at loopback', () => {
-    expect(dashboardUrl(4317)).toBe('http://127.0.0.1:4317/');
+describe('linkSettingsChanged', () => {
+  it('is true only when the enabled flag changes', () => {
+    expect(linkSettingsChanged({ enabled: true }, { enabled: true })).toBe(false);
+    expect(linkSettingsChanged({ enabled: true }, { enabled: false })).toBe(true);
   });
 });
 
 describe('settings from before the rename', () => {
-  it('fall back to the old cboard.* keys when the new ones are unset', () => {
-    expect(resolveConfig({}, { enabled: false, port: 5123 })).toEqual({
-      enabled: false,
-      port: 5123,
-    });
-    expect(resolveConfig({ enabled: true, port: 6000 }, { enabled: false, port: 5123 })).toEqual({
-      enabled: true,
-      port: 6000,
-    });
+  it('fall back to the old cboard.* key when the new one is unset', () => {
+    expect(resolveConfig({}, { enabled: false })).toEqual({ enabled: false });
+    expect(resolveConfig({ enabled: true }, { enabled: false })).toEqual({ enabled: true });
   });
 });

@@ -137,6 +137,12 @@ async function start(args: string[], config: ServerConfig, io: CliIo): Promise<n
       'Watching for changes: an edit restarts the server and interrupts board sessions. Use `pnpm board` for a board that stays up.\n',
     );
   }
+  const channel = app.localChannel?.state;
+  if (channel?.kind === 'unavailable') {
+    io.stderr.write(
+      `yardmaster: can't listen on ${tildify(channel.path, io.home)} (${channel.reason}), so editors and Claude hooks can't connect. See \`yardmaster doctor\`.\n`,
+    );
+  }
   if (!hasWebBuild(webRoot)) {
     io.stdout.write('The web app is not built yet; run `pnpm --filter @yardmaster/web build`.\n');
   }

@@ -28,10 +28,12 @@ export const LEGACY_HOOK_MARKER = 'c-board-hook';
 export const HOOK_TIMEOUT_S = 5;
 /** Away mode's `PermissionRequest` handler. */
 export const AWAY_EVENT = 'PermissionRequest';
-export const AWAY_FLAG = '--permission';
 /** Above the longest wait the board allows (300 s) plus the script's slack. */
 export const AWAY_HOOK_TIMEOUT_S = 330;
 export const DEFAULT_HOOK_PATH = fileURLToPath(new URL('../bin/yardmaster-hook', import.meta.url));
+export const DEFAULT_PERMISSION_HOOK_PATH = fileURLToPath(
+  new URL('../bin/yardmaster-hook-permission.mjs', import.meta.url),
+);
 
 export class InvalidSettingsError extends Error {}
 
@@ -41,11 +43,24 @@ export function claudeSettingsPath(env: NodeJS.ProcessEnv, home: string): string
   return join(dir ? dir : join(home, '.claude'), 'settings.json');
 }
 
+function shellQuote(word: string): string {
+  return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
+}
+
 /** The handler command for a script path, quoted for the shell Claude Code runs it in. */
 export function hookCommand(scriptPath: string = DEFAULT_HOOK_PATH): string {
-  return /^[\w@%+=:,./-]+$/.test(scriptPath)
-    ? scriptPath
-    : `'${scriptPath.replaceAll("'", `'\\''`)}'`;
+  return shellQuote(scriptPath);
+}
+
+/**
+ * The away handler's command: the absolute Node binary (the one running Yardmaster, since hooks
+ * may run without the user's shell PATH, e.g. under nvm) and the permission hook script.
+ */
+export function permissionHookCommand(
+  nodePath: string = process.execPath,
+  scriptPath: string = DEFAULT_PERMISSION_HOOK_PATH,
+): string {
+  return `${shellQuote(nodePath)} ${shellQuote(scriptPath)}`;
 }
 
 const Handler = z.looseObject({ command: z.unknown().optional() });
@@ -94,14 +109,11 @@ export function parseSettings(raw: string | undefined): Json {
   return value as Json;
 }
 
+/** `command` is the observer command, or the away handler's for `PermissionRequest`. */
 function desiredGroup(event: string, command: string): Json {
   // The permission hook is synchronous: Claude Code waits for its decision.
   return event === AWAY_EVENT
-    ? {
-        hooks: [
-          { type: 'command', command: `${command} ${AWAY_FLAG}`, timeout: AWAY_HOOK_TIMEOUT_S },
-        ],
-      }
+    ? { hooks: [{ type: 'command', command, timeout: AWAY_HOOK_TIMEOUT_S }] }
     : { hooks: [{ type: 'command', command, async: true, timeout: HOOK_TIMEOUT_S }] };
 }
 
@@ -147,8 +159,13 @@ function plan(raw: string | undefined, settings: Json, changed: boolean): Plan {
 }
 
 export interface InstallOptions {
-  /** Also add the away-mode `PermissionRequest` handler. Without it, that event is left alone. */
+  /**
+   * Also add the away-mode `PermissionRequest` handler. Without it, that event is only touched
+   * to bring an installed handler of ours up to date.
+   */
   away?: boolean;
+  /** The away handler's command. Defaults to `permissionHookCommand()`. */
+  permissionCommand?: string;
 }
 
 export function planInstall(
@@ -159,14 +176,15 @@ export function planInstall(
   const settings = parseSettings(raw);
   const hooks: HookMap = { ...((settings.hooks as HookMap | undefined) ?? {}) };
   let changed = false;
-  const events: readonly string[] = options.away
-    ? [...OBSERVER_EVENTS, AWAY_EVENT]
-    : OBSERVER_EVENTS;
+  const away = options.away || countOurs(hooks[AWAY_EVENT] ?? []) > 0;
+  const events: readonly string[] = away ? [...OBSERVER_EVENTS, AWAY_EVENT] : OBSERVER_EVENTS;
+  const permission = options.permissionCommand ?? permissionHookCommand();
   for (const event of events) {
     const groups = hooks[event] ?? [];
+    const wanted = event === AWAY_EVENT ? permission : command;
     // Already exactly one handler of ours, in the shape we'd write: leave the event alone.
-    if (isInstalled(groups, event, command)) continue;
-    hooks[event] = [...stripOurs(groups), desiredGroup(event, command)];
+    if (isInstalled(groups, event, wanted)) continue;
+    hooks[event] = [...stripOurs(groups), desiredGroup(event, wanted)];
     changed = true;
   }
   return plan(raw, changed ? { ...settings, hooks } : settings, changed);
@@ -216,7 +234,7 @@ export function hookStatus(raw: string | undefined, command = hookCommand()): Ho
 /** The away-mode handler: absent, installed as an install would write it, or outdated. */
 export function awayHookStatus(
   raw: string | undefined,
-  command = hookCommand(),
+  command = permissionHookCommand(),
 ): 'missing' | 'installed' | 'outdated' {
   const groups = (parseSettings(raw).hooks as HookMap | undefined)?.[AWAY_EVENT] ?? [];
   if (countOurs(groups) === 0) return 'missing';

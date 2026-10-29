@@ -1,7 +1,10 @@
-import type { AddressInfo } from 'node:net';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { EDITOR_CLOSE_REPLACED } from '@yardmaster/protocol';
-import { afterEach, describe, expect, it } from 'vitest';
-import { type WebSocket, WebSocketServer } from 'ws';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { type ServerOptions, type WebSocket, WebSocketServer } from 'ws';
 import { backoffDelay, EditorLink, type HelloPayload, type LinkStatus } from './editor-link.js';
 
 const token = `${'tok'.repeat(14)}x`;
@@ -19,7 +22,22 @@ interface Received {
   payload: Record<string, unknown>;
 }
 
-/** A stand-in for the Yardmaster server's `/ws/editor`. */
+const dir = mkdtempSync(join(tmpdir(), 'ym-link-'));
+let socketCount = 0;
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+/** A socket path nothing listens on yet. */
+function freeSocket(): string {
+  socketCount += 1;
+  return join(dir, `s${socketCount}.sock`);
+}
+
+function listen(server: Server, path: string): Promise<void> {
+  rmSync(path, { force: true });
+  return new Promise((resolve) => server.listen(path, () => resolve()));
+}
+
+/** A stand-in for the Yardmaster server's `/ws/editor`, on a socket like the real one. */
 class FakeServer {
   readonly wss: WebSocketServer;
   readonly received: Received[] = [];
@@ -27,7 +45,11 @@ class FakeServer {
   readonly sockets: WebSocket[] = [];
   connections = 0;
 
-  private constructor(wss: WebSocketServer) {
+  private constructor(
+    private readonly http: Server,
+    wss: WebSocketServer,
+    readonly socketPath: string,
+  ) {
     this.wss = wss;
     wss.on('connection', (socket, request) => {
       this.connections += 1;
@@ -37,18 +59,14 @@ class FakeServer {
     });
   }
 
-  static async start(port = 0): Promise<FakeServer> {
-    const wss = new WebSocketServer({ host: '127.0.0.1', port });
-    await new Promise<void>((resolve) => wss.once('listening', () => resolve()));
-    return new FakeServer(wss);
-  }
-
-  get port(): number {
-    return (this.wss.address() as AddressInfo).port;
-  }
-
-  get url(): string {
-    return `ws://127.0.0.1:${this.port}/ws/editor`;
+  static async start(
+    socketPath = freeSocket(),
+    verifyClient?: ServerOptions['verifyClient'],
+  ): Promise<FakeServer> {
+    const http = createServer();
+    const wss = new WebSocketServer({ server: http, path: '/ws/editor', verifyClient });
+    await listen(http, socketPath);
+    return new FakeServer(http, wss, socketPath);
   }
 
   types(): string[] {
@@ -58,6 +76,8 @@ class FakeServer {
   async stop(): Promise<void> {
     for (const socket of this.wss.clients) socket.terminate();
     await new Promise<void>((resolve) => this.wss.close(() => resolve()));
+    this.http.closeAllConnections();
+    await new Promise<void>((resolve) => this.http.close(() => resolve()));
   }
 }
 
@@ -69,20 +89,19 @@ afterEach(async () => {
   for (const server of servers.splice(0)) await server.stop();
 });
 
-async function server(port?: number): Promise<FakeServer> {
-  const s = await FakeServer.start(port);
+async function server(socketPath?: string): Promise<FakeServer> {
+  const s = await FakeServer.start(socketPath);
   servers.push(s);
   return s;
 }
 
 function link(
-  url: string,
+  socketPath: string,
   overrides: Partial<ConstructorParameters<typeof EditorLink>[0]> = {},
 ): { link: EditorLink; statuses: LinkStatus[] } {
   const statuses: LinkStatus[] = [];
   const l = new EditorLink({
-    url,
-    readToken: async () => token,
+    locate: async () => ({ ok: true, board: { socketPath, token } }),
     hello: () => hello,
     onStatus: (status) => statuses.push(status),
     minBackoffMs: 20,
@@ -102,14 +121,6 @@ async function waitFor(check: () => boolean, timeoutMs = 3_000): Promise<void> {
   }
 }
 
-/** A port nothing listens on: bind one, then release it. */
-async function freePort(): Promise<number> {
-  const s = await FakeServer.start();
-  const port = s.port;
-  await s.stop();
-  return port;
-}
-
 describe('backoffDelay', () => {
   it('doubles from the minimum up to the cap', () => {
     const mid = () => 0.5;
@@ -127,7 +138,7 @@ describe('backoffDelay', () => {
 describe('EditorLink', () => {
   it('connects with the token header and sends hello first', async () => {
     const s = await server();
-    const { link: l, statuses } = link(s.url);
+    const { link: l, statuses } = link(s.socketPath);
     l.start();
     await waitFor(() => s.received.length > 0);
 
@@ -139,7 +150,7 @@ describe('EditorLink', () => {
 
   it('sends heartbeats while connected', async () => {
     const s = await server();
-    const { link: l } = link(s.url, { heartbeatMs: 20 });
+    const { link: l } = link(s.socketPath, { heartbeatMs: 20 });
     l.start();
     await waitFor(() => s.types().filter((type) => type === 'editor.heartbeat').length >= 2);
     expect(l.status.kind).toBe('connected');
@@ -147,7 +158,7 @@ describe('EditorLink', () => {
 
   it('re-sends hello on demand', async () => {
     const s = await server();
-    const { link: l } = link(s.url);
+    const { link: l } = link(s.socketPath);
     l.start();
     await waitFor(() => l.status.kind === 'connected');
     l.sendHello();
@@ -155,13 +166,22 @@ describe('EditorLink', () => {
     expect(s.types()).toEqual(['editor.hello', 'editor.hello']);
   });
 
-  it('retries without a token, and connects once one appears', async () => {
+  it('retries until the board is found, and connects once it is', async () => {
     const s = await server();
     let current: string | null = null;
-    const { link: l, statuses } = link(s.url, { readToken: async () => current });
+    const { link: l, statuses } = link(s.socketPath, {
+      locate: async () =>
+        current === null
+          ? { ok: false, reason: 'no token yet (is the Yardmaster server installed?)' }
+          : { ok: true, board: { socketPath: s.socketPath, token: current } },
+    });
     l.start();
     await waitFor(() => l.status.kind === 'disconnected');
-    expect(statuses[1]).toMatchObject({ kind: 'disconnected', retryInMs: 20 });
+    expect(statuses[1]).toMatchObject({
+      kind: 'disconnected',
+      reason: 'no token yet (is the Yardmaster server installed?)',
+      retryInMs: 20,
+    });
     expect(s.connections).toBe(0);
 
     current = token;
@@ -171,8 +191,7 @@ describe('EditorLink', () => {
 
   it('reconnects with backoff after the server goes away', async () => {
     const s = await server();
-    const port = s.port;
-    const { link: l, statuses } = link(s.url);
+    const { link: l, statuses } = link(s.socketPath);
     l.start();
     await waitFor(() => l.status.kind === 'connected');
 
@@ -191,39 +210,33 @@ describe('EditorLink', () => {
       'the server is not running',
     ]);
 
-    const restarted = await server(port);
+    const restarted = await server(s.socketPath);
     await waitFor(() => l.status.kind === 'connected');
     await waitFor(() => restarted.received.length > 0);
     expect(restarted.received[0]?.type).toBe('editor.hello');
   });
 
   it('reports a rejected token and keeps retrying', async () => {
-    const wss = new WebSocketServer({
-      host: '127.0.0.1',
-      port: 0,
-      verifyClient: (_info, done) => done(false, 401),
-    });
-    await new Promise<void>((resolve) => wss.once('listening', () => resolve()));
-    const port = (wss.address() as AddressInfo).port;
-    const { link: l, statuses } = link(`ws://127.0.0.1:${port}/ws/editor`);
+    const s = await FakeServer.start(freeSocket(), (_info, done) => done(false, 401));
+    servers.push(s);
+    const { link: l, statuses } = link(s.socketPath);
     l.start();
     await waitFor(() => statuses.filter((status) => status.kind === 'disconnected').length >= 2);
     expect(statuses.find((status) => status.kind === 'disconnected')).toMatchObject({
       reason: 'the server rejected the token',
     });
     l.stop();
-    await new Promise<void>((resolve) => wss.close(() => resolve()));
   });
 
   it('queues messages while offline and flushes them after hello', async () => {
-    const port = await freePort();
-    const { link: l } = link(`ws://127.0.0.1:${port}/ws/editor`);
+    const path = freeSocket();
+    const { link: l } = link(path);
     l.start();
     l.send('terminal.closed', { terminalId: 'term-1', exitCode: 0 });
     l.send('terminal.closed', { terminalId: 'term-2', exitCode: null });
     expect(l.queued).toBe(2);
 
-    const s = await server(port);
+    const s = await server(path);
     await waitFor(() => s.received.length === 3);
     expect(s.types()).toEqual(['editor.hello', 'terminal.closed', 'terminal.closed']);
     expect(s.received.slice(1).map((message) => message.payload.terminalId)).toEqual([
@@ -234,8 +247,8 @@ describe('EditorLink', () => {
   });
 
   it('caps the offline queue by count, dropping the oldest', async () => {
-    const port = await freePort();
-    const { link: l } = link(`ws://127.0.0.1:${port}/ws/editor`, { maxQueuedMessages: 3 });
+    const path = freeSocket();
+    const { link: l } = link(path, { maxQueuedMessages: 3 });
     l.start();
     for (let i = 0; i < 10; i += 1) {
       l.send('terminal.closed', { terminalId: `term-${i}`, exitCode: 0 });
@@ -243,7 +256,7 @@ describe('EditorLink', () => {
     expect(l.queued).toBe(3);
     expect(l.dropped).toBe(7);
 
-    const s = await server(port);
+    const s = await server(path);
     await waitFor(() => s.received.length === 4);
     expect(s.received.slice(1).map((message) => message.payload.terminalId)).toEqual([
       'term-7',
@@ -253,8 +266,7 @@ describe('EditorLink', () => {
   });
 
   it('caps the offline queue by size', async () => {
-    const port = await freePort();
-    const { link: l } = link(`ws://127.0.0.1:${port}/ws/editor`, { maxQueuedBytes: 2_000 });
+    const { link: l } = link(freeSocket(), { maxQueuedBytes: 2_000 });
     l.start();
     const chunk = 'x'.repeat(800);
     for (let seq = 0; seq < 5; seq += 1) l.send('exec.data', { execId: 'exec-1', seq, chunk });
@@ -264,7 +276,7 @@ describe('EditorLink', () => {
 
   it('drops invalid outgoing messages instead of sending them', async () => {
     const s = await server();
-    const { link: l } = link(s.url);
+    const { link: l } = link(s.socketPath);
     l.start();
     await waitFor(() => l.status.kind === 'connected');
     l.send('terminal.closed', { terminalId: '', exitCode: 0 });
@@ -275,7 +287,7 @@ describe('EditorLink', () => {
 
   it('stops retrying when another connection replaces it', async () => {
     const s = await server();
-    const { link: l } = link(s.url);
+    const { link: l } = link(s.socketPath);
     l.start();
     await waitFor(() => s.sockets.length === 1);
     s.sockets[0]?.close(EDITOR_CLOSE_REPLACED, 'replaced');
@@ -291,7 +303,7 @@ describe('EditorLink', () => {
   it('passes valid server commands on and ignores invalid ones', async () => {
     const s = await server();
     const commands: string[] = [];
-    const { link: l } = link(s.url, { onCommand: (command) => commands.push(command.type) });
+    const { link: l } = link(s.socketPath, { onCommand: (command) => commands.push(command.type) });
     l.start();
     await waitFor(() => s.sockets.length === 1);
     const socket = s.sockets[0];
@@ -312,7 +324,7 @@ describe('EditorLink', () => {
 
   it('closes the socket and clears the queue on stop', async () => {
     const s = await server();
-    const { link: l } = link(s.url);
+    const { link: l } = link(s.socketPath);
     l.start();
     await waitFor(() => s.sockets.length === 1);
     const closed = new Promise<number>((resolve) => s.sockets[0]?.once('close', resolve));

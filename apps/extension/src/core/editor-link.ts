@@ -1,12 +1,15 @@
+import { connect } from 'node:net';
 import {
   decodeServerToEditor,
   EDITOR_CLOSE_REPLACED,
   type EditorToServer,
   encodeEditorToServer,
+  LOCAL_ROUTES,
   makeMessage,
   type ServerToEditor,
 } from '@yardmaster/protocol';
 import WebSocket from 'ws';
+import { type Located, TOKEN_HEADER } from './local-board.js';
 
 export const HEARTBEAT_MS = 10_000;
 export const MIN_BACKOFF_MS = 500;
@@ -16,7 +19,6 @@ export const MAX_QUEUED_MESSAGES = 1_000;
 export const MAX_QUEUED_BYTES = 4 * 1024 * 1024;
 /** Largest server → editor message (characters). */
 export const MAX_SERVER_MESSAGE = 1024 * 1024;
-const TOKEN_HEADER = 'x-yardmaster-token';
 
 export type HelloPayload = Extract<EditorToServer, { type: 'editor.hello' }>['payload'];
 type OutgoingType = Exclude<EditorToServer['type'], 'editor.hello' | 'editor.heartbeat'>;
@@ -37,8 +39,8 @@ export interface LinkLogger {
 }
 
 export interface EditorLinkOptions {
-  url: string;
-  readToken: () => Promise<string | null>;
+  /** Finds and checks the board's socket before every connect (see `locateBoard`). */
+  locate: () => Promise<Located>;
   /** Built fresh for every connection, so folder changes are picked up. */
   hello: () => HelloPayload;
   onStatus?: (status: LinkStatus) => void;
@@ -66,7 +68,7 @@ export function backoffDelay(
 const silentLogger: LinkLogger = { info() {}, warn() {}, debug() {} };
 
 /**
- * The extension's connection to `/ws/editor`: sends `editor.hello` on every connect,
+ * The extension's connection to `/ws/editor`, over the board's local socket only: sends `editor.hello` on every connect,
  * heartbeats while connected, reconnects with backoff, and queues messages while offline.
  */
 export class EditorLink {
@@ -147,18 +149,23 @@ export class EditorLink {
     this.retryTimer = undefined;
     this.setStatus({ kind: 'connecting' });
 
-    const token = await this.options.readToken().catch(() => null);
+    const located = await this.options
+      .locate()
+      .catch((err: unknown): Located => ({ ok: false, reason: String(err) }));
     if (generation !== this.generation) return;
-    if (token === null) {
-      this.retry(generation, 'no token yet (is the Yardmaster server installed?)');
+    if (!located.ok) {
+      this.retry(generation, located.reason);
       return;
     }
+    const { socketPath, token } = located.board;
 
     let reason: string | null = null;
-    const socket = new WebSocket(this.options.url, {
+    // The URL only names the path: the connection always goes to the socket.
+    const socket = new WebSocket(`ws://localhost${LOCAL_ROUTES.editor}`, {
       headers: { [TOKEN_HEADER]: token },
       maxPayload: MAX_SERVER_MESSAGE * 4,
       handshakeTimeout: 5_000,
+      createConnection: () => connect(socketPath),
     });
     this.socket = socket;
 
@@ -193,7 +200,8 @@ export class EditorLink {
     });
     socket.on('error', (error) => {
       const code = (error as NodeJS.ErrnoException).code;
-      reason ??= code === 'ECONNREFUSED' ? 'the server is not running' : error.message;
+      reason ??=
+        code === 'ECONNREFUSED' || code === 'ENOENT' ? 'the server is not running' : error.message;
     });
     socket.on('close', (code) => {
       if (generation !== this.generation) return;

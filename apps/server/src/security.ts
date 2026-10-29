@@ -1,5 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
+import { LOCAL_ONLY_ROUTES } from '@yardmaster/protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { ServerConfig } from './config.js';
@@ -9,6 +10,7 @@ import {
   LEGACY_SESSION_COOKIE,
   LEGACY_TOKEN_HEADER,
 } from './legacy.js';
+import { isLocalChannel } from './local-channel.js';
 import { DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE_SEC, type RemoteDevices } from './remote.js';
 import { tokensEqual } from './token.js';
 
@@ -56,6 +58,15 @@ export function readCookie(header: string | undefined, name: string): string | u
 function isProtectedPath(path: string | undefined): boolean {
   if (path === undefined || PUBLIC_API_ROUTES.has(path)) return false;
   return path === '/api' || path.startsWith('/api/');
+}
+
+const LOCAL_ONLY = new Set(LOCAL_ONLY_ROUTES);
+
+/** Paths the local socket serves: the API and the editor link, never the web app or `/ws/ui`. */
+function isSocketPath(path: string | undefined): boolean {
+  return (
+    path !== undefined && (LOCAL_ONLY.has(path) || path === '/api' || path.startsWith('/api/'))
+  );
 }
 
 function hostWithPort(host: string, port: number): string {
@@ -114,7 +125,8 @@ function pairPage(reply: FastifyReply, status: number, message: string) {
 
 /**
  * PRD §8: Host allowlist (DNS-rebinding defence), Origin check, `/auth?t=` cookie bootstrap
- * and the token guard for `/api/*`. Register before any route.
+ * and the token guard for `/api/*`, plus the split between the local socket (editors and
+ * hooks, token only) and TCP (browsers). Register before any route.
  */
 export function registerSecurity(app: FastifyInstance, options: SecurityOptions): void {
   const { config } = options;
@@ -152,23 +164,32 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   const remoteDevice = (request: FastifyRequest): string | null =>
     remote && remoteHosts.has(request) ? remote.devices.verify(deviceCookieOf(request)) : null;
 
+  const hasToken = (request: FastifyRequest): boolean => {
+    const header = tokenHeader(request.headers);
+    return header !== undefined && tokensEqual(header, currentToken());
+  };
+
   const isAuthorized = (request: FastifyRequest): boolean => {
+    // The socket takes the token header only: no browser can reach it.
+    if (isLocalChannel(request.raw)) return hasToken(request);
     // Over Tailscale only a paired device's own cookie counts, never the token (PRD §8 item 12).
     if (remoteHosts.has(request)) return remoteDevice(request) !== null;
-    const header = tokenHeader(request.headers);
+    if (hasToken(request)) return true;
     const token = currentToken();
-    if (header !== undefined && tokensEqual(header, token)) return true;
     return [SESSION_COOKIE, LEGACY_SESSION_COOKIE].some((name) => {
       const cookie = readCookie(request.headers.cookie, name);
       return cookie !== undefined && verifySessionValue(token, cookie);
     });
   };
 
-  const deny = (reply: FastifyReply, status: 401 | 403, error: string) =>
+  const deny = (reply: FastifyReply, status: 401 | 403 | 404, error: string) =>
     reply.code(status).header('cache-control', 'no-store').send({ error });
 
   app.decorateRequest('isAuthorized', function (this: FastifyRequest) {
     return isAuthorized(this);
+  });
+  app.decorateRequest('isLocalChannel', function (this: FastifyRequest) {
+    return isLocalChannel(this.raw);
   });
   app.decorateRequest('isRemote', function (this: FastifyRequest) {
     return remoteHosts.has(this);
@@ -182,6 +203,20 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     reply
       .header('x-frame-options', 'DENY')
       .header('content-security-policy', "frame-ancestors 'none'");
+    // Check the matched route as well as the raw path, so percent-encoded variants of a
+    // route can't slip past the guard.
+    const paths = [request.routeOptions.url, request.url.split('?', 1)[0]];
+
+    if (isLocalChannel(request.raw)) {
+      // Only this user can open the socket, so Host means nothing here; browsers never get here.
+      if (request.headers.origin !== undefined) return deny(reply, 403, 'forbidden_origin');
+      if (!paths.every(isSocketPath)) return deny(reply, 404, 'not_found');
+      if (paths.some(isProtectedPath) && !isAuthorized(request)) {
+        return deny(reply, 401, 'unauthorized');
+      }
+      return;
+    }
+
     const host = request.headers.host?.toLowerCase();
     const remoteHost = host === undefined ? null : remoteHostOf(host);
     if (!host || (remoteHost === null && !allowedHosts().has(host))) {
@@ -220,9 +255,11 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
       return deny(reply, 403, 'forbidden_origin');
     }
 
-    // Check the matched route as well as the raw path, so percent-encoded variants of an
-    // /api route can't slip past the guard.
-    const paths = [request.routeOptions.url, request.url.split('?', 1)[0]];
+    // The editor and hook channels never run over TCP: whatever answers on the port may not
+    // be the board, so the clients never send the token there (PRD §8 item 13).
+    if (paths.some((path) => path !== undefined && LOCAL_ONLY.has(path))) {
+      return deny(reply, 403, 'local_channel_required');
+    }
     if (paths.some(isProtectedPath) && !isAuthorized(request)) {
       return deny(reply, 401, 'unauthorized');
     }
@@ -267,6 +304,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     /** True when the request carries a valid `X-Yardmaster-Token` header or session cookie. */
     isAuthorized(): boolean;
+    /** True when the request came in on the local socket (editors and hooks). */
+    isLocalChannel(): boolean;
     /** True when the request came in on an allowed remote (Tailscale) host. */
     isRemote(): boolean;
     /** The paired device behind a remote request, or null. */

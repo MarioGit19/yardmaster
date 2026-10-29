@@ -3,9 +3,10 @@ import { EDITOR_CLOSE_REPLACED, projectIdFromPath } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
-import { startServer } from './app.js';
+import { buildServer } from './app.js';
 import type { ServerConfig } from './config.js';
 import { EDITOR_WS_PATH } from './editor-gateway.js';
+import { localSocket, localWebSocket } from './local-channel.test-helpers.js';
 import { TOKEN_HEADER } from './security.js';
 import { commandHeader } from './store.js';
 import { generateToken } from './token.js';
@@ -25,6 +26,7 @@ const shopPath = '/home/dev/acme-shop';
 const apiPath = '/home/dev/acme-api';
 
 let app: FastifyInstance | undefined;
+let socketPath = '';
 const sockets: WebSocket[] = [];
 
 afterEach(async () => {
@@ -36,16 +38,26 @@ afterEach(async () => {
 });
 
 async function boot(idleMs?: number): Promise<{ app: FastifyInstance; port: number }> {
-  app = await startServer(config, {
+  app = await buildServer(config, {
     token,
     dbPath: ':memory:',
     processes: false,
     editor: { graceMs: GRACE_MS, resolvePath: async (path) => path, idleMs },
   });
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  socketPath = await localSocket(app);
   return { app, port: (app.server.address() as AddressInfo).port };
 }
 
-function connect(port: number, headers: Record<string, string> = { [TOKEN_HEADER]: token }) {
+/** Connects like the extension: over the board's socket. */
+function connect(_port: number, headers: Record<string, string> = { [TOKEN_HEADER]: token }) {
+  const socket = localWebSocket(socketPath, EDITOR_WS_PATH, headers);
+  sockets.push(socket);
+  return socket;
+}
+
+/** Connects the way the extension used to: to the TCP port. */
+function connectTcp(port: number, headers: Record<string, string> = { [TOKEN_HEADER]: token }) {
   const socket = new WebSocket(`ws://127.0.0.1:${port}${EDITOR_WS_PATH}`, { headers });
   sockets.push(socket);
   return socket;
@@ -104,6 +116,12 @@ describe('/ws/editor', () => {
     const { port } = await boot();
     expect(await rejectedStatus(connect(port, {}))).toBe(401);
     expect(await rejectedStatus(connect(port, { [TOKEN_HEADER]: generateToken() }))).toBe(401);
+  });
+
+  it('refuses the TCP port, even with the token', async () => {
+    const { app, port } = await boot();
+    expect(await rejectedStatus(connectTcp(port))).toBe(403);
+    expect(Object.keys(app.store.state.windows)).toEqual([]);
   });
 
   it('registers the window and its workspace folders as projects on hello', async () => {

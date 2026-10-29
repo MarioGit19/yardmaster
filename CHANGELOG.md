@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Editors and hooks connect through a private socket
+
+- The server also listens on `~/.yardmaster/board.sock` (owner only). The extension, the Claude hooks and `yardmaster doctor` talk to it there and never send the token to the TCP port, so a program that grabs port 4317 while Yardmaster is off gets nothing and can't answer for it. The editor and hook routes are refused over TCP.
+- The away-mode permission hook is now `yardmaster-hook-permission.mjs`, run by Node. The board only says allow, always allow or deny, and the hook writes Claude Code's answer itself. Run `yardmaster hooks install` once to switch to it: the old handler gives no decision, so the terminal prompt shows.
+- The extension has no `yardmaster.port` setting any more, and reads `yardmaster.enabled` from your user settings only. Update the extension: older versions can't connect.
+- `yardmaster doctor` reports the socket.
+
 ### Release packaging
 
 - `pnpm build` bundles the server with esbuild into one file, `apps/server/dist/cli.js`, and builds the web app it serves. The workspace packages are inlined, so `node apps/server/dist/cli.js` runs without extra flags. node-pty and the Claude Agent SDK stay outside the bundle.

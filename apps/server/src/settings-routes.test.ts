@@ -16,6 +16,7 @@ import { buildServer } from './app.js';
 import { hookFixture } from './claude/fixtures.test-helpers.js';
 import { HOOK_ROUTE } from './claude/hook-ingest.js';
 import type { ServerConfig } from './config.js';
+import { localInject } from './local-channel.test-helpers.js';
 import { SESSION_COOKIE } from './security.js';
 import {
   diskHookSettings,
@@ -385,7 +386,12 @@ describe('settings routes', () => {
       ServerStatus.parse((await call('GET', '/api/status', token)).json()).setup;
     expect(await status()).toEqual({ hookSeen: false, editorSeen: false });
 
-    const posted = await call('POST', HOOK_ROUTE, token, hookFixture('session-start'));
+    const posted = await localInject(app as FastifyInstance, {
+      method: 'POST',
+      url: HOOK_ROUTE,
+      headers: { 'x-yardmaster-token': token, 'content-type': 'application/json' },
+      payload: JSON.stringify(hookFixture('session-start')),
+    });
     expect(posted.statusCode).toBe(204);
     // The route records events after replying.
     await new Promise((resolve) => setImmediate(resolve));

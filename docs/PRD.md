@@ -160,8 +160,8 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 ### 5.3 Ports, files, data
 
 - Default port `4317` (`YARDMASTER_PORT`). Bind `127.0.0.1` only.
-- Data dir: `~/.yardmaster/` (`YARDMASTER_HOME`): `token` (0600, random 32 bytes, base64url), `board.db` (sqlite), `logs/`, `settings.json`.
-- The extension and the hook script locate the server and token through `~/.yardmaster/`.
+- Data dir: `~/.yardmaster/` (`YARDMASTER_HOME`, 0700): `token` (0600, random 32 bytes, base64url), `board.sock` (the local socket, 0600), `board.db` (sqlite), `logs/`, `settings.json`.
+- The extension and the hook scripts reach the server only through `~/.yardmaster/board.sock`, never the TCP port (§8 item 13).
 
 ## 6. Integrations — verified facts and how we use them
 
@@ -176,13 +176,15 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 **Observer hook contract** (`packages/hook/bin/yardmaster-hook`):
 - POSIX `sh` plus `curl`, no Node startup cost.
-- Reads stdin, then POSTs to `http://127.0.0.1:${YARDMASTER_PORT:-4317}/api/hooks/claude` with headers `X-Yardmaster-Token` (from `~/.yardmaster/token`) and `X-Yardmaster-Claude-Pid: $PPID`. The timeout is `-m 1`.
-- If the token file is missing, the server is down, or anything else fails, it exits 0 silently.
+- Reads stdin, then POSTs to `/api/hooks/claude` over the board's socket (`curl --unix-socket ~/.yardmaster/board.sock`) with headers `X-Yardmaster-Token` (from `~/.yardmaster/token`) and `X-Yardmaster-Claude-Pid: $PPID`. The timeout is `-m 1`. It posts only if the socket is a socket owned by the user (not a link), and never uses TCP.
+- If the token file or the socket is missing, the server is down, or anything else fails, it exits 0 silently.
 - It must never print to stdout. Output could be interpreted as a hook decision.
 
-**Away-mode permission hook** (`yardmaster-hook --permission`, sync, not async):
-- Exits 0 immediately with no output unless the board reports away mode is ON (fast GET, 300 ms timeout).
-- When away mode is on: POST the request, long-poll for a decision (≤ configurable, default 120 s), then print the `PermissionRequest` decision JSON. The exact output schema **must be re-verified against the hooks reference at implementation time**. On timeout or error it exits 0 with no output, and the normal terminal prompt appears.
+**Away-mode permission hook** (`packages/hook/bin/yardmaster-hook-permission.mjs`, sync, not async):
+- Runs on Node. The installer writes the absolute path of the Node binary that runs Yardmaster into the hook command, because hooks may run without the user's shell `PATH` (nvm).
+- Exits 0 immediately with no output unless the board reports away mode is ON (`GET /api/away` over the socket, 300 ms timeout).
+- When away mode is on: POST the request, long-poll for a decision (≤ configurable, default 120 s). The board answers only `allow`, `allow_always` or `deny` with a reason. The hook builds the `PermissionRequest` output itself: "always allow" applies the `permission_suggestions` from Claude Code's own hook input, never rules from the server, and it never emits `updatedInput`. Anything else from the server is ignored. On timeout or error it exits 0 with no output, and the normal terminal prompt appears.
+- A handler installed before this (the observer script with `--permission`) gives no decision; any `yardmaster hooks install` replaces it.
 
 **Installer** (`yardmaster hooks install|uninstall|status`): merges idempotently into `~/.claude/settings.json`, identifies its own entries by the `yardmaster-hook` command path, writes a timestamped backup first, supports `--dry-run` (prints a diff), and never touches other hooks. It always asks for confirmation unless `--yes` is passed.
 
@@ -236,7 +238,7 @@ All messages are JSON envelopes `{ v: 1, type, id?, ts, payload }`.
 Treat these as non-negotiable. They are acceptance criteria for every phase.
 
 1. **Network:** listen on `127.0.0.1` only. Reject requests whose `Host` is not `127.0.0.1:<port>` or `localhost:<port>` (DNS-rebinding defence).
-2. **WebSocket origin check:** `/ws/ui` accepts only `Origin` equal to the board's own origin (plus the Vite dev origin in dev). `/ws/editor` requires the token header.
+2. **WebSocket origin check:** `/ws/ui` accepts only `Origin` equal to the board's own origin (plus the Vite dev origin in dev). `/ws/editor` is served only on the local socket and requires the token header (item 13).
 3. **Auth:** a per-install random token in `~/.yardmaster/token` (0600). The browser gets a session cookie (`HttpOnly`, `SameSite=Strict`) by visiting a one-time link `http://127.0.0.1:4317/auth?t=<token>` that the CLI opens. Every state-changing HTTP route requires the cookie or the token header.
 4. **No credentials:** Yardmaster never reads `~/.claude/.credentials*`, the Keychain or `~/.claude.json`, and it never asks for an API key. Each user runs with their own Claude Code login.
 5. **No telemetry,** no external network calls at runtime. Fonts and assets are bundled.
@@ -247,6 +249,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 10. **Project library:** the server lists only the top-level directory names of the configured roots and checks `.git` existence. It reads nothing else under a root until a project is opened, and every path from the UI is `realpath`-checked to be inside a root (no `..`, no symlink escape). Editor launches go through `execFile` with the folder as a single argument.
 11. **Remote hosts:** off by default. Allowed hosts are an explicit list (Tailscale `*.ts.net` names), HTTPS only, and the server still binds `127.0.0.1`. Public tunnels (ngrok, Cloudflare and the like) are unsupported, and the docs say why: the board can type into terminals.
 12. **Pairing:** a phone signs in with a one-time code (5 min, single use) shown as a QR code, never the raw token. Paired devices are listed and can be revoked.
+13. **Local channel for editors and hooks:** anything can bind `127.0.0.1:<port>` while Yardmaster isn't running (another user, a container with host networking), so the extension and the hooks never send the token to the TCP port or act on what it says. The server also listens on a Unix domain socket, `~/.yardmaster/board.sock` (data dir 0700, socket 0600; on start it removes a stale socket only if it is a socket owned by the user, and leaves anything else alone). Only the user can create a socket there, so a client that checks it is a socket owned by the user, not a link, knows it talks to this install's board. `/ws/editor`, `/api/hooks/claude`, `/api/hooks/permission`, `/api/away` and `/api/local/dashboard-link` are served only there (over TCP they answer 403 `local_channel_required`), and still require the token header. The socket serves `/api/*` and `/ws/editor` only, never the web app or `/ws/ui`, and refuses any request with an `Origin`. The extension's Open Dashboard opens the sign-in link the server returns over the socket, on loopback only. Extension settings come from user settings only (`yardmaster.enabled` is machine-scoped; there is no port setting), so a cloned repo's `.vscode/settings.json` can't redirect or switch off the link. The away-mode hook builds its own decision (§6.1), so the server can't inject `updatedInput` or permission rules. Supported platforms are macOS and Linux, which both have Unix sockets.
 
 ## 9. Non-functional requirements
 
