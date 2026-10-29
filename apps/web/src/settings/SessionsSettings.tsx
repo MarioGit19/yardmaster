@@ -6,6 +6,7 @@ import { markSignedOut, sessionSecret } from '../auth/session.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { Button } from '../ui/Button.js';
 import { api } from './api.js';
+import { onRemoteHost } from './remoteHost.js';
 
 const NOW_TICK_MS = 30_000;
 
@@ -37,6 +38,7 @@ export function SessionsRow() {
   const { sessions, failed, reload } = useSessions();
   const [now, setNow] = useState(() => Date.now());
   const [revoking, setRevoking] = useState<string | null>(null);
+  const remote = onRemoteHost();
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), NOW_TICK_MS);
     return () => clearInterval(timer);
@@ -113,14 +115,17 @@ export function SessionsRow() {
                     </span>
                   </span>
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={revoking === session.id}
-                  onClick={() => void revoke(session)}
-                >
-                  {revoking === session.id ? 'Signing out…' : 'Sign out'}
-                </Button>
+                {/* A phone may sign out only itself; the Mac signs out the others. */}
+                {(!remote || session.current) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={revoking === session.id}
+                    onClick={() => void revoke(session)}
+                  >
+                    {revoking === session.id ? 'Signing out…' : 'Sign out'}
+                  </Button>
+                )}
               </li>
             );
           })}

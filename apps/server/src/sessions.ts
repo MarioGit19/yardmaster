@@ -244,6 +244,10 @@ export function registerSessionRoutes(app: FastifyInstance, sessions: BrowserSes
   app.delete('/api/sessions/:id', async (request, reply) => {
     const params = SessionParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: 'bad_request' });
+    // A phone may sign itself out, never another browser.
+    if (request.isRemote() && params.data.id !== request.browserSession()) {
+      return reply.code(403).send({ error: 'local_only' });
+    }
     if (!sessions.revoke(params.data.id)) return reply.code(404).send({ error: 'unknown_session' });
     app.log.info('signed out a browser session');
     return { ok: true };

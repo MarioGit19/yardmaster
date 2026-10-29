@@ -7,6 +7,7 @@ import {
 } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { localOnly } from './security.js';
 import type { BrowserSessions } from './sessions.js';
 
 export const REMOTE_HOSTS_KEY = 'remote.allowedHosts';
@@ -66,9 +67,8 @@ export function registerRemoteRoutes(
 ): void {
   const { sessions } = options;
 
-  app.post('/api/remote/pair', async (request, reply) => {
+  app.post('/api/remote/pair', { preHandler: localOnly }, async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    if (request.isRemote()) return reply.code(403).send({ error: 'local_only' });
     const body = PairingRequest.safeParse(request.body ?? {});
     if (!body.success) return reply.code(400).send({ error: 'bad_request' });
     const hosts = options.hosts();
@@ -104,6 +104,10 @@ export function registerRemoteRoutes(
   app.delete('/api/remote/devices/:id', async (request, reply) => {
     const params = DeviceParams.safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: 'bad_request' });
+    // A phone may unpair itself, never another device.
+    if (request.isRemote() && params.data.id !== request.browserSession()) {
+      return reply.code(403).send({ error: 'local_only' });
+    }
     const remote = sessions.list(null, 'remote').some((s) => s.id === params.data.id);
     if (!remote || !sessions.revoke(params.data.id)) {
       return reply.code(404).send({ error: 'unknown_device' });

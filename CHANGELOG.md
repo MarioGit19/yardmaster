@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Phones can do less
+
+- A paired phone keeps terminals, chat, approvals and notifications, but can no longer change project folders, the editor command, allowed hosts or activity history, install hooks, rotate the token, pair devices or sign out other browsers. Do those on the Mac; Settings on the phone hides them.
+- A request that comes through `tailscale serve` counts as remote even if it claims to be for `127.0.0.1`, and Tailscale Funnel requests are refused.
+
 ### Browsers sign in with one-time links and their own sessions
 
 - **Sign in once more:** browsers and phones signed in before this version see a "Sign in again" screen. On this computer, run `yardmaster open` (or Yardmaster: Open Dashboard in your editor); pair phones again from Settings → Phone.

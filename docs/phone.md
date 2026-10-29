@@ -50,7 +50,9 @@ Common snags:
 
 ## Why not ngrok or Cloudflare Tunnel?
 
-Public tunnels put the board on the internet. The board can type into your terminals and start Claude sessions, so a leaked link or a weak spot in a tunnel would be a remote shell on your Mac. Yardmaster refuses any host that isn't on your allowed list, and the docs only support Tailscale, where the only devices that can reach the board are the ones you signed in to your tailnet.
+Public tunnels put the board on the internet. The board can type into your terminals and start Claude sessions, so a leaked link or a weak spot in a tunnel would be a remote shell on your Mac. Yardmaster refuses any host that isn't on your allowed list, and the docs only support Tailscale, where the only devices that can reach the board are the ones you signed in to your tailnet. Tailscale Funnel is refused too.
+
+A paired phone does what you need away from the desk: terminals, chat, approvals and notifications. Settings that reach your Mac's disk, editor or sign-ins (project folders, the editor command, allowed hosts, activity history, the hooks, the access token, pairing and signing out other devices) only change on the Mac.
 
 ## Troubleshooting
 

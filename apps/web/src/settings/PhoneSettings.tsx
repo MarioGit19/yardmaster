@@ -58,7 +58,7 @@ export function PhoneSettings({ server }: { server: ServerSettings }) {
   const { devices, failed, reload } = useDevices();
   return (
     <>
-      <RemoteHostsRow server={server} />
+      {!onRemoteHost() && <RemoteHostsRow server={server} />}
       <PairRow server={server} devices={devices} reload={reload} />
       <DevicesRow devices={devices} failed={failed} reload={reload} />
       <DevServersRow />
@@ -375,6 +375,7 @@ function DevicesRow({
 }) {
   const now = useNow(30_000);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const remote = onRemoteHost();
 
   const revoke = async (device: PairedDevice) => {
     setRevoking(device.id);
@@ -434,14 +435,17 @@ function DevicesRow({
                   </span>
                 </span>
               </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={revoking === device.id}
-                onClick={() => void revoke(device)}
-              >
-                {revoking === device.id ? 'Revoking…' : 'Revoke'}
-              </Button>
+              {/* A phone may unpair only itself; the Mac revokes the others. */}
+              {(!remote || device.current) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={revoking === device.id}
+                  onClick={() => void revoke(device)}
+                >
+                  {revoking === device.id ? 'Revoking…' : 'Revoke'}
+                </Button>
+              )}
             </li>
           ))}
         </ul>

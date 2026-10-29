@@ -32,6 +32,25 @@ const authQuery = z.object({
 });
 const pairQuery = z.object({ c: z.string().min(1).max(256) });
 
+/**
+ * Headers `tailscale serve` adds to what it forwards. Any of them marks a request as remote,
+ * whatever its Host says: a tailnet peer can't pass as this machine by sending `Host: 127.0.0.1`.
+ */
+export const FORWARDED_HEADERS = [
+  'tailscale-user-login',
+  'tailscale-user-name',
+  'tailscale-user-profile-pic',
+  'tailscale-headers-info',
+  'tailscale-funnel-request',
+  'x-forwarded-for',
+  'x-forwarded-proto',
+  'x-forwarded-host',
+  'forwarded',
+] as const;
+
+const isForwarded = (headers: FastifyRequest['headers']): boolean =>
+  FORWARDED_HEADERS.some((name) => headers[name] !== undefined);
+
 /** The install token header, also under its old name for one version (hooks and extensions). */
 export function tokenHeader(headers: FastifyRequest['headers']): string | undefined {
   return headerValue(headers, TOKEN_HEADER, LEGACY_TOKEN_HEADER);
@@ -184,7 +203,8 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     const name = host.endsWith(':443') ? host.slice(0, -4) : host;
     return remote.hosts().includes(name) ? name : null;
   };
-  const remoteHosts = new WeakMap<FastifyRequest, string>();
+  /** Requests that came in through Tailscale (or any proxy): only a phone's session counts. */
+  const remoteRequests = new WeakSet<FastifyRequest>();
   const verified = new WeakMap<FastifyRequest, string | null>();
   /** The browser session behind a TCP request (a phone's over Tailscale), or null. */
   const browserSession = (request: FastifyRequest): string | null => {
@@ -193,7 +213,7 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     if (known !== undefined) return known;
     const id = sessions.verify(
       sessionSecretOf(request),
-      remoteHosts.has(request) ? 'remote' : 'local',
+      remoteRequests.has(request) ? 'remote' : 'local',
     );
     verified.set(request, id);
     return id;
@@ -208,7 +228,7 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     // The socket takes the token header only: no browser can reach it.
     if (isLocalChannel(request.raw)) return hasToken(request);
     // Over Tailscale only a paired phone's own session counts, never the token (PRD §8 item 12).
-    if (remoteHosts.has(request)) return browserSession(request) !== null;
+    if (remoteRequests.has(request)) return browserSession(request) !== null;
     return hasToken(request) || browserSession(request) !== null;
   };
 
@@ -222,7 +242,7 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     return isLocalChannel(this.raw);
   });
   app.decorateRequest('isRemote', function (this: FastifyRequest) {
-    return remoteHosts.has(this);
+    return remoteRequests.has(this);
   });
   app.decorateRequest('browserSession', function (this: FastifyRequest) {
     return browserSession(this);
@@ -247,6 +267,12 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
       return;
     }
 
+    // Funnel puts the board on the public internet: unsupported (PRD §8.11).
+    if (request.headers['tailscale-funnel-request'] !== undefined) {
+      request.log.warn('rejected a Tailscale Funnel request');
+      return deny(reply, 403, 'funnel_unsupported');
+    }
+
     const host = request.headers.host?.toLowerCase();
     const remoteHost = host === undefined ? null : remoteHostOf(host);
     if (!host || (remoteHost === null && !allowedHosts().has(host))) {
@@ -257,17 +283,19 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
     // Browsers send Origin on cross-origin and state-changing requests; tools like curl,
     // the hook script and the extension send none and authenticate with the token instead.
     const origin = request.headers.origin;
-    if (remoteHost !== null) {
+    if (remoteHost !== null || isForwarded(request.headers)) {
       // `tailscale serve` terminates TLS and forwards to 127.0.0.1, saying so in this header.
       if (request.headers['x-forwarded-proto'] !== 'https') {
         request.log.warn({ host }, 'rejected a remote request without HTTPS');
         return deny(reply, 403, 'https_required');
       }
-      if (origin !== undefined && origin !== `https://${remoteHost}`) {
+      const remoteOrigins = (remote?.hosts() ?? []).map((name) => `https://${name}`);
+      const allowed = remoteHost === null ? remoteOrigins : [`https://${remoteHost}`];
+      if (origin !== undefined && !allowed.includes(origin)) {
         request.log.warn({ origin }, 'rejected cross-origin request');
         return deny(reply, 403, 'forbidden_origin');
       }
-      remoteHosts.set(request, remoteHost);
+      remoteRequests.add(request);
     } else if (origin !== undefined && !allowedOrigins().has(origin)) {
       request.log.warn({ origin }, 'rejected cross-origin request');
       return deny(reply, 403, 'forbidden_origin');
@@ -330,13 +358,23 @@ export function registerSecurity(app: FastifyInstance, options: SecurityOptions)
   });
 }
 
+/**
+ * A `preHandler` for routes only this machine may use (PRD §8): settings that reach the disk or
+ * the editor, the hooks installer, token rotation. A paired phone gets 403 `local_only`.
+ */
+export async function localOnly(request: FastifyRequest, reply: FastifyReply) {
+  if (request.isRemote()) {
+    return reply.code(403).header('cache-control', 'no-store').send({ error: 'local_only' });
+  }
+}
+
 declare module 'fastify' {
   interface FastifyRequest {
     /** True when the request carries a valid `X-Yardmaster-Token` header or browser session. */
     isAuthorized(): boolean;
     /** True when the request came in on the local socket (editors and hooks). */
     isLocalChannel(): boolean;
-    /** True when the request came in on an allowed remote (Tailscale) host. */
+    /** True when the request came in over Tailscale: an allowed remote host or forwarded headers. */
     isRemote(): boolean;
     /** The browser session behind the request (local or a paired phone's), or null. */
     browserSession(): string | null;

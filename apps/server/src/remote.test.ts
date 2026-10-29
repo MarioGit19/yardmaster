@@ -204,6 +204,180 @@ describe('remote hosts', () => {
   });
 });
 
+describe('forwarded requests', () => {
+  /** What `tailscale serve` adds, sent with this machine's own Host. */
+  const forwarded = {
+    host: local.host,
+    'x-forwarded-proto': 'https',
+    'x-forwarded-for': '100.101.102.103',
+  };
+
+  it('count as remote whatever their Host: the token never signs them in', async () => {
+    const instance = await server();
+    for (const extra of [
+      {},
+      { 'tailscale-user-login': 'dev@example.test' },
+      { 'x-forwarded-host': local.host },
+    ]) {
+      const res = await call(instance, 'GET', '/api/settings', { ...forwarded, ...extra });
+      expect(res.statusCode).toBe(401);
+    }
+    const tailscaleOnly = await call(instance, 'GET', '/api/settings', {
+      host: local.host,
+      'x-forwarded-proto': 'https',
+      'tailscale-user-login': 'dev@example.test',
+    });
+    expect(tailscaleOnly.statusCode).toBe(401);
+    // A browser session on this machine doesn't count through the proxy either.
+    const mac = instance.browserSessions.create('local', undefined);
+    const session = await call(instance, 'GET', '/api/settings', {
+      ...forwarded,
+      [SESSION_HEADER]: mac.secret,
+    });
+    expect(session.statusCode).toBe(401);
+    const auth = await call(instance, 'GET', '/auth?c=x', forwarded);
+    expect(auth.json()).toEqual({ error: 'pair_required' });
+  });
+
+  it('need HTTPS and the phone’s origin, like a listed host', async () => {
+    const instance = await server();
+    const plain = await call(instance, 'GET', '/api/health', {
+      host: local.host,
+      'x-forwarded-for': '100.101.102.103',
+    });
+    expect(plain.json()).toEqual({ error: 'https_required' });
+    const origin = await call(instance, 'GET', '/api/health', {
+      ...forwarded,
+      origin: 'http://127.0.0.1:4317',
+    });
+    expect(origin.json()).toEqual({ error: 'forbidden_origin' });
+  });
+
+  it('let a paired phone in, as a phone', async () => {
+    const instance = await server();
+    const phone = await pair(instance);
+    const res = await call(instance, 'GET', '/api/settings', { ...forwarded, ...phone });
+    expect(res.statusCode).toBe(200);
+    const rotate = await call(
+      instance,
+      'POST',
+      '/api/token/rotate',
+      { ...forwarded, ...phone },
+      {},
+    );
+    expect(rotate.statusCode).toBe(403);
+    expect(rotate.json()).toEqual({ error: 'local_only' });
+  });
+
+  it('refuse Funnel, on any host', async () => {
+    const instance = await server();
+    const phone = await pair(instance);
+    for (const headers of [{ ...remote, ...phone }, forwarded, { host: local.host }]) {
+      const res = await call(instance, 'GET', '/api/health', {
+        ...headers,
+        'tailscale-funnel-request': '?1',
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'funnel_unsupported' });
+    }
+  });
+
+  it('leave this machine’s own requests local', async () => {
+    const instance = await server();
+    const res = await call(instance, 'POST', '/api/remote/pair', local, {});
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('a paired phone', () => {
+  const LOCAL_ONLY: [method: 'PUT' | 'POST', url: string, body: unknown][] = [
+    ['PUT', '/api/settings', { editorCli: '/usr/local/bin/cursor' }],
+    ['PUT', '/api/settings', { editorCli: null }],
+    ['PUT', '/api/settings', { libraryRoots: ['/home/dev/code'] }],
+    ['PUT', '/api/settings', { remoteAllowedHosts: [] }],
+    ['PUT', '/api/settings', { retentionDays: 1 }],
+    ['PUT', '/api/settings', { awayMode: true, libraryRoots: [] }],
+    ['POST', '/api/token/rotate', {}],
+    ['POST', '/api/hooks/plan', {}],
+    ['POST', '/api/hooks/install', { fingerprint: 'x' }],
+    ['POST', '/api/remote/pair', {}],
+  ];
+
+  it.each(LOCAL_ONLY)('may not %s %s %j', async (method, url, body) => {
+    const instance = await server();
+    const phone = await pair(instance);
+    const before = (await call(instance, 'GET', '/api/settings', local)).json();
+    const res = await call(instance, method, url, { ...remote, ...phone }, body);
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'local_only' });
+    // Nothing changed, not even the allowed part of a mixed patch.
+    expect((await call(instance, 'GET', '/api/settings', local)).json()).toEqual(before);
+    expect(instance.browserSessions.list()).toHaveLength(1);
+  });
+
+  it('keeps its day-to-day settings: notifications, away mode, pins', async () => {
+    const instance = await server();
+    const phone = await pair(instance);
+    const res = await call(
+      instance,
+      'PUT',
+      '/api/settings',
+      { ...remote, ...phone },
+      {
+        notifyEvents: ['needs_you'],
+        notifyHideDetails: true,
+        awayMode: true,
+        awayTimeoutSec: 120,
+        terminalReply: false,
+        libraryIdleHideMin: 60,
+      },
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ notifyHideDetails: true, awayMode: true });
+    const hooks = await call(instance, 'GET', '/api/hooks', { ...remote, ...phone });
+    expect(hooks.statusCode).toBe(200);
+  });
+
+  it('may sign out only itself, as a session or a paired device', async () => {
+    const instance = await server();
+    const first = await pair(instance);
+    const second = await pair(instance);
+    const mac = instance.browserSessions.create('local', undefined);
+    for (const url of [
+      `/api/sessions/${mac.session.id}`,
+      `/api/sessions/${idOf(second)}`,
+      `/api/remote/devices/${idOf(second)}`,
+    ]) {
+      const res = await call(instance, 'DELETE', url, { ...remote, ...first });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'local_only' });
+    }
+    expect(instance.browserSessions.list()).toHaveLength(3);
+
+    const self = await call(instance, 'DELETE', `/api/remote/devices/${idOf(first)}`, {
+      ...remote,
+      ...first,
+    });
+    expect(self.statusCode).toBe(200);
+    const other = await call(instance, 'DELETE', `/api/sessions/${idOf(second)}`, {
+      ...remote,
+      ...second,
+    });
+    expect(other.statusCode).toBe(200);
+    expect(instance.browserSessions.list().map((s) => s.id)).toEqual([mac.session.id]);
+  });
+
+  it('never posts hook events or permission requests', async () => {
+    const instance = await server();
+    const phone = await pair(instance);
+    for (const url of ['/api/hooks/claude', '/api/hooks/permission']) {
+      const res = await call(instance, 'POST', url, { ...remote, ...phone }, {});
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toEqual({ error: 'local_channel_required' });
+    }
+  });
+});
+
 describe('pairing', () => {
   it('signs a phone in with a one-time code, handing its secret to the phone’s origin', async () => {
     const instance = await server();

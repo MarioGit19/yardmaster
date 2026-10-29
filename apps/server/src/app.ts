@@ -622,10 +622,7 @@ export async function buildServer(
           token = await rotateTokenFile(config.home);
           sealSessions();
           // The caller's browser stays signed in under a new session, with its notifications.
-          const fresh =
-            caller.session === null
-              ? null
-              : sessions.create(caller.remote ? 'remote' : 'local', caller.userAgent);
+          const fresh = caller.session === null ? null : sessions.create('local', caller.userAgent);
           if (caller.session !== null && fresh) {
             pushSubscriptions.moveDevice(caller.session, fresh.session.id);
           }

@@ -313,6 +313,23 @@ test('a phone pairs, opens the hub, and answers a request from a notification', 
       mac.page.locator(`[data-setting="sessions"] [data-session="${phoneId}"]`),
     ).toContainText('Phone');
 
+    // A phone can't reach what only the Mac may change (14.3), but it keeps its own settings.
+    const fromPhone = (method: string, path: string, body: unknown) =>
+      phone.evaluate(
+        async ({ method, path, body, secret }) =>
+          (
+            await fetch(path, {
+              method,
+              headers: { 'x-yardmaster-session': secret, 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+            })
+          ).status,
+        { method, path, body, secret: phoneSecret ?? '' },
+      );
+    expect(await fromPhone('POST', '/api/token/rotate', {})).toBe(403);
+    expect(await fromPhone('PUT', '/api/settings', { libraryRoots: [] })).toBe(403);
+    expect(await fromPhone('PUT', '/api/settings', { notifyHideDetails: false })).toBe(200);
+
     // The hub: a project's page on the phone.
     await phone.goto(`${serve}/#/projects`);
     const project = phone.locator('a[href^="#/p/"]').first();

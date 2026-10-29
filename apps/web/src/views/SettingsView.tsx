@@ -33,6 +33,7 @@ import { InstallHooksButton } from '../settings/HooksInstall.js';
 import { NotificationSettings } from '../settings/NotificationSettings.js';
 import { PhoneSettings } from '../settings/PhoneSettings.js';
 import { redactPreference } from '../settings/prefs.js';
+import { onRemoteHost } from '../settings/remoteHost.js';
 import { SessionsRow } from '../settings/SessionsSettings.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
@@ -69,6 +70,8 @@ export function SettingsView() {
   const status = useServerStatus(null);
   const demo = status !== null && status !== 'error' && status.demo;
   const server = useBoardSettings();
+  // A phone can't change what reaches this Mac's disk, editor or sign-ins (PRD §8).
+  const remote = onRemoteHost();
   return (
     <Page width="narrow">
       <PageHeader title="Settings" />
@@ -156,9 +159,9 @@ export function SettingsView() {
         </SettingsSection>
 
         <SettingsSection title="Projects">
-          <LibraryRootsRow server={server} />
+          {!remote && <LibraryRootsRow server={server} />}
           <IdleHideRow server={server} />
-          <EditorCliRow server={server} />
+          {!remote && <EditorCliRow server={server} />}
         </SettingsSection>
 
         <SettingsSection title="Claude">
@@ -166,7 +169,7 @@ export function SettingsView() {
         </SettingsSection>
 
         <SettingsSection title="Connections">
-          <HooksRow />
+          <HooksRow remote={remote} />
           <EditorsRow />
           <SettingRow
             title="Setup guide"
@@ -183,9 +186,17 @@ export function SettingsView() {
         </SettingsSection>
 
         <SettingsSection title="Data and security">
-          <RetentionRow server={server} />
+          {remote ? (
+            <SettingRow
+              title="Managed on your Mac"
+              description="Project folders, the editor command, allowed hosts, the hooks, activity history and the access token can only be changed on the Mac."
+              data="mac-only"
+            />
+          ) : (
+            <RetentionRow server={server} />
+          )}
           <SessionsRow />
-          <TokenRow demo={demo} />
+          {!remote && <TokenRow demo={demo} />}
         </SettingsSection>
 
         <SettingsSection title="About">
@@ -222,7 +233,7 @@ export function SettingsSection({ title, children }: { title: string; children: 
 }
 
 /** Claude Code hooks: how many events are installed, plus the confirm-first installer. */
-function HooksRow() {
+function HooksRow({ remote }: { remote: boolean }) {
   const { state, reload } = useHooksStatus();
   const hooks = state.status === 'ready' ? state.hooks : null;
   const installed = hooksInstalled(hooks?.status ?? null);
@@ -259,7 +270,7 @@ function HooksRow() {
       }
       data="hooks"
     >
-      {state.status === 'error' || hooks?.error ? (
+      {remote ? null : state.status === 'error' || hooks?.error ? (
         <Button size="sm" onClick={reload}>
           Check again
         </Button>
@@ -750,7 +761,7 @@ export function SettingRow({
   description: React.ReactNode;
   /** `data-setting`, for tests. */
   data?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
     <div

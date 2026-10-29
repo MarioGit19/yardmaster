@@ -38,6 +38,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
 import type { Persistence } from './persistence.js';
 import { REMOTE_HOSTS_KEY, remoteHosts } from './remote.js';
+import { localOnly } from './security.js';
 import { LEGACY_TERMINAL_REPLY_KEY, TERMINAL_REPLY_KEY } from './terminal-reply.js';
 import { generateToken, writeToken } from './token.js';
 
@@ -54,6 +55,17 @@ export const EDITOR_CLI_KEY = 'editor.cli';
 export const NOTIFY_EVENTS_KEY = 'notify.events';
 export const NOTIFY_HIDE_DETAILS_KEY = 'notify.hideDetails';
 export const NOTIFY_MUTED_KEY = 'notify.mutedProjects';
+
+/**
+ * Settings only this machine may change: they reach the disk, the editor or who may connect, or
+ * delete history. A phone keeps notifications, away mode, pins and the rest.
+ */
+export const LOCAL_ONLY_SETTINGS = [
+  'editorCli',
+  'libraryRoots',
+  'remoteAllowedHosts',
+  'retentionDays',
+] as const satisfies readonly (keyof BoardSettings)[];
 
 /** Claude's settings.json as the hooks routes see it. Demo mode swaps in an in-memory one. */
 export interface HookSettingsFile {
@@ -213,10 +225,9 @@ export interface SettingsRoutesOptions {
   rotateToken: ((caller: RotateCaller) => Promise<{ session?: string }>) | null;
 }
 
-/** Who asked for a rotation: their browser session (if any) is replaced, not ended. */
+/** Who asked for a rotation (on this machine): their browser session is replaced, not ended. */
 export interface RotateCaller {
   session: string | null;
-  remote: boolean;
   userAgent: string | undefined;
 }
 
@@ -252,6 +263,9 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
   app.put('/api/settings', async (request, reply) => {
     const patch = BoardSettingsPatch.safeParse(request.body);
     if (!patch.success) return reply.code(400).send({ error: 'bad_request' });
+    if (request.isRemote() && LOCAL_ONLY_SETTINGS.some((key) => patch.data[key] !== undefined)) {
+      return reply.code(403).send({ error: 'local_only' });
+    }
     if (patch.data.retentionDays !== undefined) {
       save(RETENTION_KEY, patch.data.retentionDays);
       persistence.setRetention(retentionMs(patch.data.retentionDays));
@@ -300,7 +314,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
   });
 
-  app.post('/api/hooks/plan', async (_request, reply) => {
+  app.post('/api/hooks/plan', { preHandler: localOnly }, async (_request, reply) => {
     try {
       const raw = await hookSettings.read();
       const plan = planInstall(raw, hookSettings.command, {
@@ -318,7 +332,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
   });
 
-  app.post('/api/hooks/install', async (request, reply) => {
+  app.post('/api/hooks/install', { preHandler: localOnly }, async (request, reply) => {
     const body = HooksInstallRequest.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: 'bad_request' });
     try {
@@ -343,11 +357,10 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
   });
 
-  app.post('/api/token/rotate', async (request, reply) => {
+  app.post('/api/token/rotate', { preHandler: localOnly }, async (request, reply) => {
     if (!options.rotateToken) return reply.code(409).send({ error: 'demo' });
     const { session } = await options.rotateToken({
       session: request.browserSession(),
-      remote: request.isRemote(),
       userAgent: request.headers['user-agent'],
     });
     app.log.info('rotated the install token from the board');
