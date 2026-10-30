@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { NeedsYouStrip } from '../attention/NeedsYouStrip.js';
 import { selectHydrated, selectProjectCount, useBoard } from '../data/index.js';
 import { LayoutStage } from '../layouts/LayoutStage.js';
 import { useActiveProjects, useClosedProjects } from '../library/useActive.js';
@@ -19,6 +21,7 @@ export function Overview() {
     ...(closed > 0 ? [`${closed} closed`] : []),
   ].join(' · ');
   const onboarding = useOnboarding();
+  const stage = useRef<HTMLDivElement>(null);
 
   if (onboarding.show) {
     return (
@@ -31,6 +34,7 @@ export function Overview() {
   return (
     <Page>
       <PageHeader title="Overview" meta={hydrated ? meta : 'Loading…'} />
+      {hydrated && <NeedsYouStrip below={stage} />}
       {!hydrated || onboarding.show === null ? (
         <PodGridSkeleton />
       ) : total === 0 ? (
@@ -49,7 +53,9 @@ export function Overview() {
           project from its menu to keep it here.
         </EmptyState>
       ) : (
-        <LayoutStage />
+        <div ref={stage}>
+          <LayoutStage />
+        </div>
       )}
     </Page>
   );

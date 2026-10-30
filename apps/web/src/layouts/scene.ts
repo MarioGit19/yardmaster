@@ -23,15 +23,7 @@ import { isCrashExit, terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
 import { laneExecution, laneView, shownCommand, terminalDisplay } from '../lanes/lane.js';
 import { isDimmed } from '../pod/activity.js';
-import {
-  attentionRank,
-  type Caption,
-  lastLine,
-  orderPods,
-  podSessions,
-  sessionCaption,
-  staleCaption,
-} from '../pod/model.js';
+import { type Caption, lastLine, podSessions, sessionCaption, staleCaption } from '../pod/model.js';
 import { sessionHref, terminalHref } from '../routes.js';
 import type { Tone } from '../status.js';
 import {
@@ -45,8 +37,8 @@ import {
   tokenTone,
 } from '../statusTokens.js';
 
-// The scene-neutral model every layout draws (DESIGN.md §10.1): projects in attention-first
-// order, each with its actors. No layout reads the store any other way, so a state can't mean
+// The scene-neutral model every layout draws (DESIGN.md §10.1): projects, each with its actors.
+// The overview puts them in the board's stable order (`useOverviewScene`). No layout reads the store any other way, so a state can't mean
 // one thing in Office and another in Grid.
 
 export type ActorKind = 'claude' | 'subagent' | 'background' | 'terminal';
@@ -584,10 +576,9 @@ export function buildSceneModel(
       sceneProject(board, pulses, project, groups.get(project.id) ?? EMPTY, now, status),
     );
   }
-  const order = orderPods(
-    [...projects.values()].map((p) => ({ id: p.id, name: p.name, rank: attentionRank(p.tone) })),
+  const ordered = [...projects.values()].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
   );
-  const ordered = order.flatMap((id) => projects.get(id) ?? []);
   const actors = new Map<string, SceneActor>();
   for (const project of ordered) for (const actor of project.actors) actors.set(actor.id, actor);
   return { projects: ordered, actors };

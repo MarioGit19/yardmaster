@@ -34,6 +34,7 @@ import { StatusDot } from '../ui/StatusDot.js';
 import { isDimmed } from './activity.js';
 import { MAX_SESSION_ROWS, podSessions } from './model.js';
 import { ActivityBorder, DoneSweep, EventSparks } from './PodActivity.js';
+import { PodGrip } from './PodGrip.js';
 import { PodMenu } from './PodMenu.js';
 import { SessionRow } from './SessionRow.js';
 import { useMascotState } from './useMascotState.js';
@@ -195,6 +196,7 @@ export function ProjectPod({ project }: { project: Project }) {
           }}
         />
 
+        <PodGrip name={project.name} />
         <motion.header
           layoutId={sharedId.header(project.id)}
           layoutDependency={POD_LAYOUT_DEPENDENCY}

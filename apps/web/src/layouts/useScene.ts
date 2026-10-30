@@ -3,6 +3,8 @@ import { useNow } from '../anim/clock.js';
 import { useBoard } from '../data/index.js';
 import { useActiveProjects } from '../library/useActive.js';
 import { dur } from '../motion.js';
+import { keepOrder } from '../order.js';
+import { useProjectOrder } from '../pod/projectOrder.js';
 import { useSeenItems } from '../seen.js';
 import { hearsServer } from '../statusTokens.js';
 import {
@@ -42,16 +44,20 @@ export function useSceneModel(): SceneModel {
   }, [board, pulses, now, device]);
 }
 
+const sameAs = (scene: SceneModel) => (project: SceneProject, index: number) =>
+  project === scene.projects[index];
+
 /** How long a project that went inactive stays drawn for its exit: `dur.fast`, plus a frame. */
 export const LEAVE_MS = dur.fast * 1000 + 40;
 
 /**
- * The overview's scene: only active projects (F26). One that goes inactive stays a moment,
+ * The overview's scene: only active projects (F26), in the board's stable order. One that goes inactive stays a moment,
  * marked `leaving`, so the layout can fade it out (`data-scene-leaving`) instead of dropping it.
  */
 export function useOverviewScene(): SceneModel {
   const scene = useSceneModel();
   const active = useActiveProjects();
+  const order = useProjectOrder();
   const [tick, wake] = useReducer((n: number) => n + 1, 0);
   const last = useRef<{ shown: SceneModel | null; leaving: Map<string, LeavingProject> }>({
     shown: null,
@@ -59,7 +65,11 @@ export function useOverviewScene(): SceneModel {
   });
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` drops expired exits
   const shown = useMemo(() => {
-    const visible = scene.projects.filter((p) => active.has(p.id));
+    const visible = keepOrder(
+      scene.projects.filter((p) => active.has(p.id)),
+      order,
+      (p) => p.id,
+    );
     const prev = last.current.shown?.projects ?? [];
     const { projects, leaving } = lingerProjects(
       prev,
@@ -69,7 +79,7 @@ export function useOverviewScene(): SceneModel {
       LEAVE_MS,
     );
     let model: SceneModel;
-    if (leaving.size === 0 && projects.length === scene.projects.length) model = scene;
+    if (projects.length === scene.projects.length && projects.every(sameAs(scene))) model = scene;
     else {
       const actors = new Map<string, SceneActor>();
       for (const project of projects) {
@@ -79,7 +89,7 @@ export function useOverviewScene(): SceneModel {
     }
     last.current = { shown: model, leaving };
     return model;
-  }, [scene, active, tick]);
+  }, [scene, active, order, tick]);
   const leaving = last.current.leaving;
   useEffect(() => {
     if (leaving.size === 0) return;

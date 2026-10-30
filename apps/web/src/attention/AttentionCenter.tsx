@@ -7,7 +7,6 @@ import {
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { Link, useLocation } from 'wouter';
 import {
   selectPendingApprovals,
@@ -23,7 +22,6 @@ import { usePreference } from '../prefs.js';
 import { routes, sessionHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { isTypingTarget } from '../shell/railNav.js';
-import { actionErrorText } from '../terminal/stack.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
@@ -34,6 +32,7 @@ import {
   attentionKey,
   attentionOpen,
   canAlwaysAllow,
+  decideApproval,
   lingerFor,
   selectWaitingWithoutApproval,
 } from './attention.js';
@@ -121,19 +120,13 @@ function SheetBody({ onClose, inline = false }: { onClose: () => void; inline?: 
     if (busy.has(approval.id)) return;
     if (decision === 'allowAlways' && !canAlwaysAllow(approval)) return;
     setBusy((prev) => new Set(prev).add(approval.id));
-    const result = await client.request(
-      'approval.decide',
-      decision === 'deny'
-        ? { approvalId: approval.id, decision, ...(reason ? { reason } : {}) }
-        : { approvalId: approval.id, decision },
-    );
+    const ok = await decideApproval(client, approval.id, decision, reason);
     setBusy((prev) => {
       const next = new Set(prev);
       next.delete(approval.id);
       return next;
     });
-    if (!result.ok) toast.error(actionErrorText(result.error, 'The decision did not go through'));
-    else setDenyingId((id) => (id === approval.id ? null : id));
+    if (ok) setDenyingId((id) => (id === approval.id ? null : id));
   };
 
   // The newest handlers for the window listener, which subscribes once.

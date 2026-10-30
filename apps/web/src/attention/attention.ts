@@ -1,7 +1,10 @@
 import type { Approval, ApprovalState, ClaudeSession, Project } from '@yardmaster/protocol';
+import { toast } from 'sonner';
+import type { BoardClient } from '../data/client.js';
 import type { BoardStoreState } from '../data/store.js';
 import type { MotionLevel } from '../motion.js';
 import { createPreference, type KeyValueStorage } from '../prefs.js';
+import { actionErrorText } from '../terminal/stack.js';
 
 // Whether the sheet is open lives only in memory: a reload starts with it closed.
 const memory: KeyValueStorage = { getItem: () => null, setItem: () => {} };
@@ -74,6 +77,23 @@ export function attentionKey(event: {
     default:
       return null;
   }
+}
+
+/** Sends a decision; says so if it fails. */
+export async function decideApproval(
+  client: Pick<BoardClient, 'request'>,
+  approvalId: string,
+  decision: AttentionDecision,
+  reason?: string,
+): Promise<boolean> {
+  const result = await client.request(
+    'approval.decide',
+    decision === 'deny'
+      ? { approvalId, decision, ...(reason ? { reason } : {}) }
+      : { approvalId, decision },
+  );
+  if (!result.ok) toast.error(actionErrorText(result.error, 'The decision did not go through'));
+  return result.ok;
 }
 
 /** Whether "Always allow" would save a rule; without suggestions it only allows once. */

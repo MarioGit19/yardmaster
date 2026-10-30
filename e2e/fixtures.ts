@@ -67,7 +67,9 @@ export async function openRoute(page: Page, route: string): Promise<void> {
  * or the Grid trunk's nodes and the Office's rooms, which aren't links).
  */
 export async function firstProjectRoute(page: Page): Promise<string> {
-  const first = page.locator('a[href^="#/p/"], [data-grid-node], [data-room]').first();
+  const first = page
+    .locator('a[href^="#/p/"]:not([data-needs-you] a), [data-grid-node], [data-room]')
+    .first();
   await first.waitFor({ state: 'attached' });
   const href = await first.getAttribute('href');
   if (href) return href.slice(1);

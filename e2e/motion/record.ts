@@ -152,7 +152,7 @@ const SCENARIOS = {
       await page.mouse.move(4, DESKTOP.height - 4);
       await page.waitForTimeout(600);
     });
-    const lane = page.locator('[data-lane][data-streaming], [data-lane]').first();
+    const lane = page.locator('[data-lane]:has([aria-expanded]:not([data-inspect]))').first();
     await lane.waitFor();
     await r.moment(
       'lane-peek',

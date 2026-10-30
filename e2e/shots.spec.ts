@@ -274,7 +274,7 @@ test.describe('terminal lanes', () => {
         await page.waitForTimeout(4000);
         await page.screenshot({ path: new URL(`lanes-${theme}.png`, OUT_DIR).pathname });
         const lane = page.locator('[data-lane][data-streaming]').first();
-        await lane.locator('[aria-expanded]:not([data-inspect])').hover();
+        await lane.locator('[aria-expanded]:not([data-inspect])').first().hover();
         await expect(page.locator('[data-peek]')).toBeVisible();
         await page.waitForTimeout(600);
         const pod = page.locator('[data-pod]:has([data-open])');
@@ -289,7 +289,7 @@ test.describe('terminal lanes', () => {
   }
 });
 
-// A pod waiting for approval: attention-first order and the amber glow.
+// A pod waiting for approval: the amber glow, with the strip above the grid.
 test.describe('waiting pod', () => {
   for (const theme of THEMES) {
     test.describe(theme, () => {
@@ -302,6 +302,37 @@ test.describe('waiting pod', () => {
         });
         await page.waitForTimeout(1200);
         await page.screenshot({ path: new URL(`overview-waiting-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+});
+
+// The Needs you strip above every layout, and at the top of the phone's overview.
+test.describe('needs you strip', () => {
+  for (const theme of THEMES) {
+    for (const layout of ['minimal', 'office', 'grid', 'transit', 'retro']) {
+      test.describe(`${theme} ${layout}`, () => {
+        test.use({ theme, viewport: { width: 1440, height: 900 } });
+        test('overview', async ({ page }) => {
+          test.slow();
+          await page.addInitScript((id) => localStorage.setItem('yardmaster.layout', id), layout);
+          await openRoute(page, '/');
+          await expect(page.locator('[data-strip-item]').first()).toBeVisible({ timeout: 30_000 });
+          await page.waitForTimeout(800);
+          await page.screenshot({
+            path: new URL(`strip-${layout}-${theme}.png`, OUT_DIR).pathname,
+          });
+        });
+      });
+    }
+    test.describe(`${theme} phone`, () => {
+      test.use({ theme, viewport: { width: 390, height: 844 }, hasTouch: true });
+      test('overview', async ({ page }) => {
+        test.slow();
+        await openRoute(page, '/');
+        await expect(page.locator('[data-strip-item]').first()).toBeVisible({ timeout: 30_000 });
+        await page.waitForTimeout(800);
+        await page.screenshot({ path: new URL(`strip-phone-${theme}.png`, OUT_DIR).pathname });
       });
     });
   }
@@ -954,7 +985,7 @@ test.describe('composer', () => {
         test('interrupted session', async ({ page }) => {
           await openRoute(page, '/');
           const href = await page
-            .locator('a[href^="#/p/"]', { hasText: 'docs-site' })
+            .locator('a[href^="#/p/"]:not([data-needs-you] a)', { hasText: 'docs-site' })
             .first()
             .getAttribute('href');
           await openRoute(page, (href ?? '#/').slice(1));

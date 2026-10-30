@@ -96,12 +96,12 @@ describe('opsStateFor', () => {
 });
 
 describe('buildSceneModel', () => {
-  it('orders projects attention first: waiting, then errors, then by name', () => {
+  it('lists projects by name, whatever their status', () => {
     const board = sampleBoard();
     board.projects['p-alpha'] = makeProject('p-alpha', 'alpha-site');
     const scene = buildSceneModel(board, {}, NOW);
-    expect(scene.projects.map((p) => p.id)).toEqual(['p-acme', 'p-zen', 'p-alpha', 'p-orbit']);
-    expect(scene.projects.map((p) => p.tone)).toEqual(['wait', 'err', 'idle', 'work']);
+    expect(scene.projects.map((p) => p.id)).toEqual(['p-acme', 'p-alpha', 'p-orbit', 'p-zen']);
+    expect(scene.projects.map((p) => p.tone)).toEqual(['wait', 'idle', 'work', 'err']);
   });
 
   it('turns sessions into Claude actors with state, caption, name and links', () => {

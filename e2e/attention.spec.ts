@@ -102,3 +102,35 @@ test('a new request shows a toast that opens the Attention Center', async ({ bro
     await stop();
   }
 });
+
+test('the Needs you strip decides an approval without opening the sheet', async ({ browser }) => {
+  test.slow();
+  const { page, stop } = await openBoard(browser);
+  try {
+    const strip = page.locator('[data-needs-you]');
+    const row = strip.locator('[data-strip-item]:has([data-strip-approve])').first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    const key = await row.getAttribute('data-strip-item');
+    const decided = strip.locator(`[data-strip-item="${key}"]`);
+    await expect(decided.locator('[data-strip-open]')).toHaveText(/(<1m|\d+m)$/);
+    await decided.locator('[data-strip-approve]').click();
+    await expect(decided).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.locator('[data-attention-scrim]')).toHaveCount(0);
+  } finally {
+    await stop();
+  }
+});
+
+test('the strip folds past three rows and expands in place', async ({ page }) => {
+  await openRoute(page, '/');
+  const strip = page.locator('[data-needs-you]');
+  await expect(strip.locator('[data-strip-item]').first()).toBeVisible({ timeout: 30_000 });
+  // The demo keeps adding to the list, so each check reads the total it's held to.
+  const rows = strip.locator('[data-strip-item]');
+  const total = () => strip.getAttribute('data-needs-you').then(Number);
+  await expect.poll(async () => (await rows.count()) === Math.min(await total(), 3)).toBe(true);
+  const more = strip.locator('[data-strip-more]');
+  if ((await more.count()) === 0) return;
+  await more.click();
+  await expect.poll(async () => (await rows.count()) === (await total())).toBe(true);
+});

@@ -86,7 +86,8 @@ function DesktopShell({ children, sheet, stage, pulse }: AppShellProps) {
             id="main"
             tabIndex={-1}
             className={cx(
-              'relative min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-base',
+              // Behind the focus view the board is inert, so it has nothing to scroll to.
+              'relative min-w-0 flex-1 overflow-y-auto outline-none transition-opacity duration-base has-[[data-offstage]]:overflow-hidden',
               reconnecting && 'opacity-60',
             )}
           >

@@ -88,14 +88,11 @@ const podIds = () =>
 const pod = (id: string) => container.querySelector<HTMLElement>(`[data-pod="${id}"]`);
 
 describe('PodGrid', () => {
-  it('lists projects attention first', () => {
-    render(sampleStore());
-    expect(podIds()).toEqual(['p-acme', 'p-zen', 'p-orbit']);
-  });
-
-  it('reorders when a project stops waiting', () => {
+  it('holds its order through a status change', () => {
     const store = sampleStore();
     render(store);
+    const before = podIds();
+    expect(before).toHaveLength(3);
     act(() => {
       const board = store.getState().board;
       const s1 = board.sessions['s-1'];
@@ -105,7 +102,12 @@ describe('PodGrid', () => {
         sessions: { ...board.sessions, 's-1': { ...s1, status: { kind: 'idle' } } },
       });
     });
-    expect(podIds()).toEqual(['p-zen', 'p-acme', 'p-orbit']);
+    expect(podIds()).toEqual(before);
+  });
+
+  it('gives every pod in the grid a grip', () => {
+    render(sampleStore());
+    expect(container.querySelectorAll('[data-pod-grip]')).toHaveLength(3);
   });
 
   it('leaves out quiet projects unless they are pinned (F26)', async () => {
@@ -114,12 +116,12 @@ describe('PodGrid', () => {
     const quiet = { ...makeProject('p-quiet', 'quiet-lab'), lastActivityAt: Date.now() - HOUR };
     store.getState().replaceBoard({ ...board, projects: { ...board.projects, 'p-quiet': quiet } });
     render(store);
-    expect(podIds()).toEqual(['p-acme', 'p-zen', 'p-orbit']);
+    expect(podIds()).not.toContain('p-quiet');
 
     await act(() => boardSettings.load()); // the request the grid made on mount
     serverSettings = { ...serverSettings, pinnedProjects: ['p-quiet'] };
     await act(() => boardSettings.load());
-    expect(podIds()).toContain('p-quiet');
+    expect(podIds()[0]).toBe('p-quiet');
   });
 });
 

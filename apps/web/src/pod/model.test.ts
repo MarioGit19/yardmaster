@@ -1,15 +1,11 @@
 import type { Approval, ClaudeSession } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
-import { createBoardStore } from '../data/index.js';
-import { makeSession, sampleBoard } from '../test/board.js';
+import { makeSession } from '../test/board.js';
 import {
-  attentionRank,
   isStreaming,
   lastLine,
-  orderPods,
   podSessions,
   risingPods,
-  selectPodOrder,
   sessionCaption,
   sessionWhen,
 } from './model.js';
@@ -28,32 +24,6 @@ const tool = (name: string, summary: string | null): ClaudeSession['currentTool'
   startedAt: 0,
   endedAt: null,
   status: 'running',
-});
-
-describe('attention order', () => {
-  it('ranks waiting above errors above everything else', () => {
-    expect(attentionRank('wait')).toBeGreaterThan(attentionRank('err'));
-    expect(attentionRank('err')).toBeGreaterThan(attentionRank('work'));
-    expect(attentionRank('work')).toBe(attentionRank('idle'));
-  });
-
-  it('puts urgent pods first and keeps the rest by name', () => {
-    expect(
-      orderPods([
-        { id: 'c', name: 'charlie', rank: 0 },
-        { id: 'a', name: 'alpha', rank: 0 },
-        { id: 'e', name: 'echo', rank: 1 },
-        { id: 'w', name: 'whiskey', rank: 2 },
-      ]),
-    ).toEqual(['w', 'e', 'a', 'c']);
-  });
-
-  it('orders the board: waiting, then the crashed terminal, then by name', () => {
-    const store = createBoardStore();
-    store.getState().replaceBoard(sampleBoard());
-    // acme-shop waits, zen-notes has a crashed terminal, orbit-api is only working.
-    expect(selectPodOrder(store.getState())).toEqual(['p-acme', 'p-zen', 'p-orbit']);
-  });
 });
 
 describe('podSessions', () => {

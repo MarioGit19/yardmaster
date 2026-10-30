@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../data/index.js';
 import { useWebglClaimed } from '../fx/webglSlot.js';
 import { useMotionLevel } from '../motion.js';
-import { selectPodOrder } from '../pod/model.js';
+import { projectOrder } from '../pod/projectOrder.js';
 import { usePreference } from '../prefs.js';
 import { projectHref } from '../routes.js';
 import { useTheme } from '../theme/theme.js';
@@ -96,7 +96,7 @@ export function AmbientField() {
         energyFrom(activeSessionCount(board), boardActivity(board, pulses, Date.now()), rate);
       const projectId = attentionProjectId(board);
       const element = projectId === null ? null : attentionElement(projectId);
-      const order = projectId === null ? '' : selectPodOrder(store.getState()).join(' ');
+      const order = projectId === null ? '' : projectOrder.get().join(' ');
       const point = attentionPoint.read(element, order, performance.now(), (target) =>
         viewportPoint(target.getBoundingClientRect(), {
           width: window.innerWidth,

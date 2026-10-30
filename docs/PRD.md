@@ -79,7 +79,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 ### 4.3 Features (MoSCoW)
 
 **Must**
-- F1 Overview ("Mission Control"): all projects as animated **pods**, sorted attention-first (waiting > error > working > idle).
+- F1 Overview ("Mission Control"): all projects as animated **pods** in a stable order: pinned first, then an order the user sets by dragging (saved per device), by default most recently active as of page load. Status never reorders them; a pinned **Needs you** strip above every layout lists approvals, questions and failures, oldest first, with their action.
 - F2 Live terminal mirroring from Cursor/VS Code through the extension: list, status, command, exit codes, full colored output (xterm.js), history since the extension started.
 - F3 Terminal actions: send input, Ctrl+C, re-run last command, create a terminal with a command, focus the terminal in Cursor, close it.
 - F4 Claude session observation through hooks: real-time status, current tool, last message, tokens and context, linked terminal.

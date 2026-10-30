@@ -2,37 +2,14 @@ import {
   type Approval,
   type ClaudeSession,
   isAutomaticSessionName,
-  type Terminal,
   toolFamily,
 } from '@yardmaster/protocol';
-import type { BoardStoreState } from '../data/index.js';
-import { projectTone, type Tone } from '../status.js';
 import { formatWaited, formatWhen } from '../time.js';
 
 /** Session rows per pod before the rest collapse into a count. */
 export const MAX_SESSION_ROWS = 3;
 /** Longest one-line summary; the box truncates it further to fit. */
 const CAPTION_MAX = 240;
-
-/**
- * Pod order on the overview: projects that need you first (waiting, then errors), the rest by
- * name. Working and idle don't reorder, so pods don't shuffle on every turn.
- */
-export function attentionRank(tone: Tone): number {
-  return tone === 'wait' ? 2 : tone === 'err' ? 1 : 0;
-}
-
-export interface PodEntry {
-  id: string;
-  name: string;
-  rank: number;
-}
-
-export function orderPods(entries: readonly PodEntry[]): string[] {
-  return [...entries]
-    .sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    .map((e) => e.id);
-}
 
 /**
  * Pods that moved ahead of a pod they used to follow between two orders: during the reorder they
@@ -48,28 +25,6 @@ export function risingPods(prev: readonly string[], next: readonly string[]): Se
     if (i < (before.get(id) ?? i)) rising.add(id);
   });
   return rising;
-}
-
-/** Project ids in overview order, from one pass over the board. */
-export function selectPodOrder(s: BoardStoreState): string[] {
-  const sessions = new Map<string, ClaudeSession[]>();
-  const terminals = new Map<string, Terminal[]>();
-  const push = <T>(map: Map<string, T[]>, key: string | null, value: T) => {
-    if (key === null) return;
-    const list = map.get(key);
-    if (list) list.push(value);
-    else map.set(key, [value]);
-  };
-  for (const session of Object.values(s.board.sessions)) push(sessions, session.projectId, session);
-  for (const terminal of Object.values(s.board.terminals))
-    push(terminals, terminal.projectId, terminal);
-  return orderPods(
-    Object.values(s.board.projects).map((p) => ({
-      id: p.id,
-      name: p.name,
-      rank: attentionRank(projectTone(sessions.get(p.id) ?? [], terminals.get(p.id) ?? [])),
-    })),
-  );
 }
 
 const SESSION_RANK: Record<ClaudeSession['status']['kind'], number> = {
