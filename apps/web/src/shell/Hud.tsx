@@ -12,16 +12,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
 import { Wordmark } from '../brand/Logo.js';
-import {
-  type ConnectionState,
-  selectConnection,
-  selectHydrated,
-  useBoard,
-  useBoardShallow,
-} from '../data/index.js';
+import { type ConnectionState, selectConnection, selectHydrated, useBoard } from '../data/index.js';
 import { pickerOpen } from '../library/OpenProject.js';
 import { type MotionSetting, motionPreference, nextMotion, useMotionLevel } from '../motion.js';
 import { paletteOpen } from '../palette/palette.js';
+import { plural } from '../plural.js';
 import { usePreference } from '../prefs.js';
 import { routes } from '../routes.js';
 import { formatCount, type Tone } from '../status.js';
@@ -33,7 +28,14 @@ import { Kbd } from '../ui/Kbd.js';
 import { NumberTicker } from '../ui/NumberTicker.js';
 import { TONE_MARK } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
-import { selectHudCounts } from './counts.js';
+import { hudSeverity } from './counts.js';
+import {
+  COUNTER_BUTTON,
+  COUNTER_HINT,
+  JumpCounter,
+  SEVERITY_RING,
+  useHudCounts,
+} from './HudCounters.js';
 
 const THEME_ICON = { dark: Moon, light: Sun, system: Monitor } as const;
 const THEME_NAME: Record<ThemeSetting, string> = {
@@ -73,11 +75,10 @@ export function connectionView(connection: ConnectionState): { tone: Tone; label
   }
 }
 
-const selectCounts = selectHudCounts();
-
 /** Top bar, DESIGN.md §4.4: live counters, connection, ⌘K hint, motion and theme. */
 export function Hud() {
-  const counts = useBoardShallow(selectCounts);
+  const counts = useHudCounts();
+  const severity = hudSeverity(counts);
   const sheetOpen = usePreference(attentionOpen) === 'open';
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
@@ -97,50 +98,65 @@ export function Hud() {
         {/* The smallest phones need the room for the counters; the link keeps its label. */}
         <Wordmark className="text-title-sm" nameClassName="max-[23rem]:sr-only" />
       </Link>
-      <ul
-        aria-label="Activity"
+      <div
         className={cx(
           'flex min-w-0 items-center gap-0.5 transition-opacity duration-base md:ml-3',
           stale && 'opacity-60',
         )}
       >
-        <li>
-          <Counter tone="work" label="Working" value={counts.working} />
-        </li>
-        <li>
-          <Tooltip content="Open the Attention Center">
-            <button
-              type="button"
-              data-hud="waiting"
-              aria-expanded={sheetOpen}
-              onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
-              className={cx(
-                'rounded-control transition-[background-color,box-shadow,scale] duration-fast ease-out hover:bg-bg-2 moving:active:scale-[0.97]',
-                counts.waiting > 0 &&
-                  'shadow-[inset_0_0_0_1px_var(--st-wait-glow)] focus-visible:shadow-[var(--focus-ring)]',
-              )}
-            >
+        <ul
+          aria-label="Activity"
+          data-severity={severity ?? undefined}
+          className={cx(
+            'flex min-w-0 items-center gap-0.5 rounded-control',
+            severity && SEVERITY_RING[severity],
+          )}
+        >
+          <li>
+            <Tooltip content={COUNTER_HINT.needsYou}>
+              <button
+                type="button"
+                data-hud="needs-you"
+                aria-expanded={sheetOpen}
+                onClick={() => attentionOpen.set(sheetOpen ? 'closed' : 'open')}
+                className={COUNTER_BUTTON}
+              >
+                <Counter
+                  tone="wait"
+                  label="Needs you"
+                  value={counts.needsYou}
+                  flare="ripple"
+                  armed={armed}
+                />
+              </button>
+            </Tooltip>
+          </li>
+          <li>
+            <JumpCounter bucket="failed" label="Failed" value={counts.failed}>
               <Counter
-                tone="wait"
-                label="Waiting"
-                value={counts.waiting}
-                flare="ripple"
+                tone="err"
+                label="Failed"
+                value={counts.failed}
+                flare="flash"
                 armed={armed}
               />
-            </button>
-          </Tooltip>
-        </li>
-        <li className="max-sm:hidden">
-          <Counter tone="ok" label="Running" value={counts.running} />
-        </li>
-        <li>
-          <Counter tone="err" label="Errors" value={counts.errors} flare="flash" armed={armed} />
-        </li>
-        <li aria-hidden className="mx-1.5 h-4 w-px bg-line max-md:hidden" />
-        <li className="max-md:hidden">
-          <Counter label="tokens today" value={counts.tokensToday} format={formatCount} />
-        </li>
-      </ul>
+            </JumpCounter>
+          </li>
+          <li>
+            <JumpCounter bucket="active" label="Active" value={counts.active}>
+              <Counter tone="work" label="Active" value={counts.active} />
+            </JumpCounter>
+          </li>
+        </ul>
+        <span aria-hidden className="mx-1.5 h-4 w-px bg-line max-md:hidden" />
+        <span className="max-md:hidden">
+          <Counter
+            label={`${plural(counts.tokensToday, 'token')} today`}
+            value={counts.tokensToday}
+            format={formatCount}
+          />
+        </span>
+      </div>
       <div className="flex-1" />
       <Tooltip content="Open project" shortcut={IS_MAC ? '⌘O' : 'Ctrl+O'}>
         <button
@@ -216,7 +232,8 @@ export function Counter({ tone, label, value, format, flare, armed = false }: Co
     <span
       data-counter={label}
       className="flex h-7 items-center gap-1.5 px-2 text-body-sm touch:h-11 touch:min-w-11"
-      title={`${format ? format(value) : value} ${label}`}
+      // The status counters explain themselves in a tooltip.
+      title={tone ? undefined : `${format ? format(value) : value} ${label}`}
     >
       {tone && (
         // Shaped like the board's status marks, so the counters read without color or labels

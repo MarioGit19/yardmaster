@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { countOf } from '../plural.js';
 import { cx } from '../ui/cx.js';
 import { CORE_R } from './map.js';
 
@@ -28,7 +29,7 @@ export function Core({ energy, count, style, className }: CoreProps) {
   return (
     <div
       role="img"
-      aria-label={`You, ${count} ${count === 1 ? 'project' : 'projects'}`}
+      aria-label={`You, ${countOf(count, 'project')}`}
       data-grid-core
       className={cx('grid-core pointer-events-none absolute', className)}
       style={{ width: size, height: size, ...style }}

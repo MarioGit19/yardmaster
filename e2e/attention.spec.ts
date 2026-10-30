@@ -25,7 +25,7 @@ async function openBoard(browser: Browser): Promise<{ page: Page; stop(): Promis
 
 /** Waits for the demo's first permission request (8–14 s in) and opens the sheet on it. */
 async function openFirstRequest(page: Page) {
-  const waiting = page.locator('[data-hud="waiting"]');
+  const waiting = page.locator('[data-hud="needs-you"]');
   await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
     timeout: 30_000,
   });

@@ -158,8 +158,8 @@ test.describe('keyboard @a11y', () => {
     await expect(page).toHaveURL(/#\/$/);
 
     // The Attention Center from the HUD: focus moves in, Esc gives it back to the trigger.
-    const waiting = page.locator('[data-hud="waiting"]');
-    hidden.push(...(await tabTo(page, '[data-hud="waiting"]')));
+    const waiting = page.locator('[data-hud="needs-you"]');
+    hidden.push(...(await tabTo(page, '[data-hud="needs-you"]')));
     await page.keyboard.press('Enter');
     await expect(page.locator('#attention-title')).toBeVisible();
     expect(await activeInside(page, 'aside[aria-labelledby="attention-title"]')).toBe(true);

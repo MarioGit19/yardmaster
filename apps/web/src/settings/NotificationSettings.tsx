@@ -8,6 +8,7 @@ import { BellRing } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { notificationsPreference } from '../attention/attention.js';
+import { countOf } from '../plural.js';
 import { usePreference } from '../prefs.js';
 import {
   browserPushEnvironment,
@@ -321,7 +322,7 @@ function PushDevicesRow({
   else if (devices === null) summary = 'Loading…';
   else if (devices.length === 0) summary = 'No device gets notifications yet.';
   else
-    summary = `${devices.length} ${devices.length === 1 ? 'device gets' : 'devices get'} notifications. Mute a project from its menu.`;
+    summary = `${countOf(devices.length, 'device gets', 'devices get')} notifications. Mute a project from its menu.`;
 
   return (
     <div className="flex flex-col gap-3 p-5" data-setting="push-devices">

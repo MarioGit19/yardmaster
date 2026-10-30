@@ -60,6 +60,7 @@ import { sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { isTypingTarget } from '../shell/railNav.js';
+import { seenFailures } from '../shell/seenFailures.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
@@ -664,6 +665,12 @@ function Pane({
   onController: (controller: XtermController | null) => void;
 }) {
   const { execution, view, session, display } = useTerminalView(terminal);
+  // Whatever is on screen has been seen; a failure that lands while it's open included.
+  const failure = view.tone === 'err' ? view.exit?.key : undefined;
+  const onScreen = active || inGrid;
+  useEffect(() => {
+    if (failure && onScreen) seenFailures.mark(failure);
+  }, [failure, onScreen]);
   const kind = paneKind(execution.id === null ? null : execution, terminal);
   const masked = useMasked(`term:${terminal.id}`);
   const name = display.name;

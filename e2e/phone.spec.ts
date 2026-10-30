@@ -180,7 +180,7 @@ for (const profile of PROFILES) {
       page,
     }) => {
       await openRoute(page, '/');
-      await page.locator('[data-phone-topbar] [data-hud="waiting"]').tap();
+      await page.locator('[data-phone-topbar] [data-hud="needs-you"]').tap();
       await expect.poll(() => hash(page)).toBe('#/attention');
       await expect(page.locator('[data-attention-page] #attention-title')).toBeVisible();
       // No desktop sheet on a phone.

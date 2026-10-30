@@ -19,6 +19,7 @@ import { DOT_PULSE } from '../../anim/dotPulse.js';
 import { useInView } from '../../anim/useFrame.js';
 import { useRateLoop } from '../../anim/useRateLoop.js';
 import { dur, ease, move, spring, useMotionLevel } from '../../motion.js';
+import { countOf, plural } from '../../plural.js';
 import { usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
 import { DrawnCheck } from '../../ui/DrawnCheck.js';
@@ -332,7 +333,7 @@ function CodeLines({
       </div>
       {more > 0 && (
         <p className="px-3 pt-1 font-sans text-meta text-text-2">
-          {more} more {more === 1 ? 'line' : 'lines'}
+          {more} more {plural(more, 'line')}
         </p>
       )}
     </div>
@@ -564,7 +565,7 @@ function ChipCard({
     case 'search': {
       target = <span className="min-w-0 truncate text-text-1">“{call.query}”</span>;
       const links = result && !failed ? urlsIn(result.text).length : 0;
-      if (links > 0) count = `${links} ${links === 1 ? 'link' : 'links'}`;
+      if (links > 0) count = countOf(links, 'link');
       break;
     }
   }

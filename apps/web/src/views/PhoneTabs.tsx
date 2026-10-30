@@ -25,6 +25,7 @@ import {
   spring,
   useMotionLevel,
 } from '../motion.js';
+import { countOf } from '../plural.js';
 import { usePreference } from '../prefs.js';
 import {
   eventDetail,
@@ -371,7 +372,7 @@ function EditorStatus() {
   const editors =
     windows.length === 0
       ? 'No editor connected'
-      : `${windows.length} editor ${windows.length === 1 ? 'window' : 'windows'} connected`;
+      : `${countOf(windows.length, 'editor window')} connected`;
   return (
     <div className="flex flex-col gap-2 p-5" data-more="status">
       <StatusDot

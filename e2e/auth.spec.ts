@@ -339,7 +339,7 @@ test('a phone pairs, opens the hub, and answers a request from a notification', 
 
     // A demo request arrives (8–14 s in) and the Mac's sheet shows it.
     await mac.page.goto('/#/');
-    const waiting = mac.page.locator('[data-hud="waiting"]');
+    const waiting = mac.page.locator('[data-hud="needs-you"]');
     await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
       timeout: 30_000,
     });

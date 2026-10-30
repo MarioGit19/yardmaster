@@ -102,7 +102,7 @@ test('hooks, terminals and away-mode approvals reach the board through its socke
     };
     let exited = false;
     let decided = ask();
-    const waiting = page.locator('[data-hud="waiting"] [data-value]');
+    const waiting = page.locator('[data-hud="needs-you"] [data-value]');
     // The hook gives up on the away check after 300 ms, so Claude never waits on a busy board;
     // under a loaded test run that can happen, and the hook rightly exits with no decision.
     await expect
@@ -117,7 +117,7 @@ test('hooks, terminals and away-mode approvals reach the board through its socke
         { timeout: 20_000 },
       )
       .toBe('1');
-    const hud = page.locator('[data-hud="waiting"]');
+    const hud = page.locator('[data-hud="needs-you"]');
     await hud.click();
     const sheet = page.getByRole('complementary', { name: /Needs you/ });
     const card = sheet.locator('article[data-approval]').first();

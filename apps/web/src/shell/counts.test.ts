@@ -2,7 +2,7 @@ import type { Execution } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { createBoardStore } from '../data/store.js';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
-import { selectHudCounts, startOfLocalDay } from './counts.js';
+import { hudSeverity, selectHudCounts, selectHudItems, startOfLocalDay } from './counts.js';
 
 const NOW = new Date(2026, 3, 14, 15, 30).getTime();
 
@@ -23,13 +23,16 @@ function execution(id: string, terminalId: string, over: Partial<Execution> = {}
   };
 }
 
-function countsOf(edit: (board: ReturnType<typeof sampleBoard>) => void = () => {}) {
+function stateOf(edit: (board: ReturnType<typeof sampleBoard>) => void = () => {}) {
   const board = sampleBoard();
   edit(board);
   const store = createBoardStore();
   store.getState().replaceBoard(board);
-  return selectHudCounts(() => NOW)(store.getState());
+  return store.getState();
 }
+
+const countsOf = (edit?: (board: ReturnType<typeof sampleBoard>) => void) =>
+  selectHudCounts(() => NOW)(stateOf(edit));
 
 describe('startOfLocalDay', () => {
   it('is local midnight of the same day', () => {
@@ -38,11 +41,11 @@ describe('startOfLocalDay', () => {
 });
 
 describe('selectHudCounts', () => {
-  it('counts the sample board: one working, one waiting, one crashed terminal', () => {
-    expect(countsOf()).toEqual({ working: 1, waiting: 1, running: 0, errors: 1, tokensToday: 0 });
+  it('counts the sample board: one busy, one waiting, one crashed terminal', () => {
+    expect(countsOf()).toEqual({ needsYou: 1, failed: 1, active: 1, tokensToday: 0 });
   });
 
-  it('counts tool and compacting sessions as working, waiting input as waiting', () => {
+  it('counts tool and compacting sessions as active, waiting input as needing you', () => {
     const counts = countsOf((board) => {
       for (const [id, status] of [
         ['a', { kind: 'tool', tool: 'Bash', toolUseId: null }],
@@ -55,10 +58,10 @@ describe('selectHudCounts', () => {
         board.sessions[id] = makeSession(id, 'p-acme', status);
       }
     });
-    expect(counts).toMatchObject({ working: 3, waiting: 2, errors: 2 });
+    expect(counts).toMatchObject({ active: 3, needsYou: 2, failed: 2 });
   });
 
-  it('counts an idle session with background work running as working, once', () => {
+  it('counts an idle session with background work running as active, once', () => {
     const shell = {
       id: 'b1',
       kind: 'shell' as const,
@@ -84,7 +87,7 @@ describe('selectHudCounts', () => {
         background: [{ ...shell, status: 'done', endedAt: NOW }],
       };
     });
-    expect(counts.working).toBe(3);
+    expect(counts.active).toBe(3);
   });
 
   it('counts running commands and failed last commands like the lanes do', () => {
@@ -101,7 +104,53 @@ describe('selectHudCounts', () => {
       board.executions['e-ok'] = execution('e-ok', 't-ok', { endedAt: NOW, exitCode: 0 });
       for (const t of [running, failed, ok]) board.terminals[t.id] = t;
     });
-    expect(counts).toMatchObject({ running: 1, errors: 2 });
+    expect(counts).toMatchObject({ active: 2, failed: 2 });
+  });
+
+  it('counts claude running in a terminal once', () => {
+    const counts = countsOf((board) => {
+      const terminal = makeTerminal('t-claude', 'p-acme');
+      terminal.executionIds = ['e-claude'];
+      board.executions['e-claude'] = execution('e-claude', 't-claude');
+      board.terminals[terminal.id] = terminal;
+      board.sessions['s-t'] = {
+        ...makeSession('s-t', 'p-acme', { kind: 'idle' }),
+        terminalId: 't-claude',
+        origin: 'terminal',
+      };
+    });
+    expect(counts.active).toBe(1);
+  });
+
+  it('drops a failed terminal once seen, until it fails again', () => {
+    const fail = (id: string) => (board: ReturnType<typeof sampleBoard>) => {
+      const failed = makeTerminal('t-fail', 'p-orbit');
+      failed.executionIds = [id];
+      board.executions[id] = execution(id, 't-fail', { endedAt: NOW, exitCode: 2 });
+      board.terminals[failed.id] = failed;
+    };
+    const seen = new Set(['e-1']);
+    const counted = (id: string) => selectHudCounts(() => NOW, seen)(stateOf(fail(id))).failed;
+    expect(countsOf(fail('e-1')).failed).toBe(2);
+    expect(counted('e-1')).toBe(1);
+    expect(counted('e-2')).toBe(2);
+  });
+
+  it('lists the items behind a count', () => {
+    const state = stateOf();
+    const failed = selectHudItems('failed')(state);
+    expect(failed.map((i) => i.kind)).toEqual(['terminal']);
+    const active = selectHudItems('active')(state);
+    expect(active.map((i) => (i.kind === 'session' ? i.session.id : i.terminal.id))).toEqual([
+      's-2',
+    ]);
+  });
+
+  it('colours the group by its most severe non-zero counter', () => {
+    expect(hudSeverity({ needsYou: 1, failed: 1, active: 1 })).toBe('wait');
+    expect(hudSeverity({ needsYou: 0, failed: 1, active: 1 })).toBe('err');
+    expect(hudSeverity({ needsYou: 0, failed: 0, active: 1 })).toBe('work');
+    expect(hudSeverity({ needsYou: 0, failed: 0, active: 0 })).toBeNull();
   });
 
   it('sums tokens of sessions active since local midnight', () => {

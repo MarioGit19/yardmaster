@@ -35,6 +35,7 @@ import { layoutPreference } from '../layouts/registry.js';
 import { requestClose } from '../library/closing.js';
 import { pickerOpen } from '../library/OpenProject.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
+import { countOf } from '../plural.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
@@ -326,8 +327,7 @@ function PaletteBody({
     );
     const approved = results.filter((r) => r.ok).length;
     const failed = results.find((r) => !r.ok);
-    if (approved > 0)
-      toast.success(approved === 1 ? 'Approved 1 request' : `Approved ${approved} requests`);
+    if (approved > 0) toast.success(`Approved ${countOf(approved, 'request')}`);
     if (failed && !failed.ok)
       toast.error(actionErrorText(failed.error, 'Some requests were not approved'));
   };

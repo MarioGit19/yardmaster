@@ -1,5 +1,6 @@
 import type { SessionStatus, ToolFamily } from '@yardmaster/protocol';
 import { dur, loop, moment } from '../motion.js';
+import { countOf } from '../plural.js';
 
 /** The orb's visual states, DESIGN.md §4.2. */
 export const ORB_STATES = [
@@ -130,5 +131,5 @@ const STATE_LABEL: Record<OrbState, string> = {
 export function orbLabel(state: OrbState, tool: string | null, satellites: number): string {
   const base = state === 'tool' && tool ? `Using ${tool}` : STATE_LABEL[state];
   if (satellites <= 0) return base;
-  return `${base}, ${satellites} subagent${satellites === 1 ? '' : 's'}`;
+  return `${base}, ${countOf(satellites, 'subagent')}`;
 }

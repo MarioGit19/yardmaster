@@ -14,6 +14,7 @@ import type { Phosphor } from '../fx/FaultyTerminal.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';
 import { LAYOUT_NAME, LAYOUTS, type LayoutId } from '../layouts/registry.js';
 import type { MotionSetting } from '../motion.js';
+import { countOf } from '../plural.js';
 import { PHOSPHOR_LABEL, PHOSPHORS } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
@@ -301,7 +302,7 @@ function projectActions(
       id: `approve-all:${project.id}`,
       group: 'Actions',
       label: `Approve all waiting in ${project.name}`,
-      hint: approvalIds.length === 1 ? '1 request' : `${approvalIds.length} requests`,
+      hint: countOf(approvalIds.length, 'request'),
       icon: 'approve',
       tone: 'wait',
       run: { kind: 'approveAll', approvalIds },

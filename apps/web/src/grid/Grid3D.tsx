@@ -2,6 +2,7 @@ import { type RefObject, useContext, useEffect, useLayoutEffect, useRef, useStat
 import { OffstageContext } from '../anim/useFrame.js';
 import { useBoardStore } from '../data/index.js';
 import type { SceneProject } from '../layouts/scene.js';
+import { countOf } from '../plural.js';
 import { useTheme } from '../theme/theme.js';
 import { FlatCockpit } from './FlatCockpit.js';
 import { GridNode } from './GridNode.js';
@@ -104,7 +105,7 @@ export default function Grid3D({ projects, entered, now, onEnter, onBack, onLost
       <div aria-hidden className="grid-floor-scan pointer-events-none absolute inset-0" />
       <span
         role="img"
-        aria-label={`You, ${projects.length} ${projects.length === 1 ? 'project' : 'projects'}`}
+        aria-label={`You, ${countOf(projects.length, 'project')}`}
         data-grid-core
         className="sr-only"
       />

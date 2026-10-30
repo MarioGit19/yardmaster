@@ -319,7 +319,7 @@ test.describe('hud', () => {
         test('attention', async ({ page }) => {
           test.slow();
           await openRoute(page, '/');
-          const waiting = page.locator('[data-hud="waiting"]');
+          const waiting = page.locator('[data-hud="needs-you"]');
           await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
             timeout: 30_000,
           });
@@ -851,7 +851,7 @@ test.describe('worst case', () => {
           }
           await page.keyboard.press('Escape');
 
-          await page.locator('[data-hud="waiting"]').click();
+          await page.locator('[data-hud="needs-you"]').click();
           await page.waitForTimeout(800);
           await shot('attention', false);
           await page.keyboard.press('Escape');
@@ -1996,7 +1996,7 @@ for (const theme of THEMES) {
     test('attention center', async ({ page }) => {
       test.slow();
       await openRoute(page, '/');
-      const waiting = page.locator('[data-hud="waiting"]');
+      const waiting = page.locator('[data-hud="needs-you"]');
       await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
         timeout: 30_000,
       });

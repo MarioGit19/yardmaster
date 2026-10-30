@@ -4,13 +4,22 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { attentionOpen } from '../attention/attention.js';
 import { Logomark } from '../brand/Logo.js';
-import { selectConnection, selectHydrated, useBoard, useBoardShallow } from '../data/index.js';
+import { selectConnection, selectHydrated, useBoard } from '../data/index.js';
 import { dur, ease, spring, tabGlide } from '../motion.js';
 import { paletteOpen } from '../palette/palette.js';
+import { countOf, plural } from '../plural.js';
 import { routes } from '../routes.js';
 import { cx } from '../ui/cx.js';
-import { selectHudCounts } from './counts.js';
+import { Tooltip } from '../ui/Tooltip.js';
+import { hudSeverity } from './counts.js';
 import { Counter } from './Hud.js';
+import {
+  COUNTER_BUTTON,
+  COUNTER_HINT,
+  JumpCounter,
+  SEVERITY_RING,
+  useHudCounts,
+} from './HudCounters.js';
 import { isWorkspace, PHONE_TAB_HREF, PHONE_TABS, type PhoneTab, phoneTabFor } from './phoneNav.js';
 
 const TAB_ICON = {
@@ -28,8 +37,6 @@ const TAB_LABEL: Record<PhoneTab, string> = {
   pulse: 'Pulse',
   more: 'More',
 };
-
-const selectCounts = selectHudCounts();
 
 /**
  * The phone shell, DESIGN.md §11: a 48 px top bar, the main area, and the bottom tab bar in place
@@ -104,9 +111,10 @@ export function PhoneShell({ children, stage }: { children: ReactNode; stage?: R
   );
 }
 
-/** Logomark, the three counts (waiting opens the Attention tab) and search (⌘K). */
+/** Logomark, the three counts (Needs you opens the Attention tab) and search (⌘K). */
 function PhoneTopBar() {
-  const counts = useBoardShallow(selectCounts);
+  const counts = useHudCounts();
+  const severity = hudSeverity(counts);
   const stale = useBoard(selectConnection).status === 'reconnecting';
   const armed = useBoard(selectHydrated);
   return (
@@ -124,36 +132,40 @@ function PhoneTopBar() {
       </Link>
       <ul
         aria-label="Activity"
+        data-severity={severity ?? undefined}
         className={cx(
-          'flex min-w-0 flex-1 items-center justify-center gap-2 transition-opacity duration-base',
+          'mx-auto flex min-w-0 items-center gap-2 rounded-control transition-opacity duration-base',
+          severity && SEVERITY_RING[severity],
           stale && 'opacity-60',
         )}
       >
         <li>
-          <Counter tone="work" label="Working" value={counts.working} />
+          <Tooltip content={COUNTER_HINT.needsYou}>
+            <Link
+              href={routes.attention}
+              data-hud="needs-you"
+              aria-label={`${countOf(counts.needsYou, 'needs', 'need')} you, open the Attention Center`}
+              className={cx(COUNTER_BUTTON, 'h-11')}
+            >
+              <Counter
+                tone="wait"
+                label="Needs you"
+                value={counts.needsYou}
+                flare="ripple"
+                armed={armed}
+              />
+            </Link>
+          </Tooltip>
         </li>
         <li>
-          <Link
-            href={routes.attention}
-            data-hud="waiting"
-            aria-label={`${counts.waiting} waiting, open the Attention Center`}
-            className={cx(
-              'flex h-11 items-center rounded-control transition-[background-color,box-shadow,scale] duration-fast ease-out moving:active:scale-[0.97]',
-              counts.waiting > 0 &&
-                'shadow-[inset_0_0_0_1px_var(--st-wait-glow)] focus-visible:shadow-[var(--focus-ring)]',
-            )}
-          >
-            <Counter
-              tone="wait"
-              label="Waiting"
-              value={counts.waiting}
-              flare="ripple"
-              armed={armed}
-            />
-          </Link>
+          <JumpCounter bucket="failed" label="Failed" value={counts.failed}>
+            <Counter tone="err" label="Failed" value={counts.failed} flare="flash" armed={armed} />
+          </JumpCounter>
         </li>
         <li>
-          <Counter tone="err" label="Errors" value={counts.errors} flare="flash" armed={armed} />
+          <JumpCounter bucket="active" label="Active" value={counts.active}>
+            <Counter tone="work" label="Active" value={counts.active} />
+          </JumpCounter>
         </li>
       </ul>
       <button
@@ -176,7 +188,7 @@ function PhoneTopBar() {
  */
 function TabBar({ location }: { location: string }) {
   const active = phoneTabFor(location);
-  const waiting = useBoardShallow(selectCounts).waiting;
+  const waiting = useHudCounts().needsYou;
   const [byKeyboard, setByKeyboard] = useState(false);
   return (
     <motion.nav
@@ -220,7 +232,7 @@ function TabBar({ location }: { location: string }) {
                       className="tabular absolute top-0 right-2 grid h-4 min-w-4 place-items-center rounded-full bg-st-wait px-1 font-medium text-label text-bg-0 leading-none"
                     >
                       {waiting > 99 ? '99+' : waiting}
-                      <span className="sr-only"> waiting</span>
+                      <span className="sr-only"> {plural(waiting, 'needs', 'need')} you</span>
                     </span>
                   )}
                 </span>

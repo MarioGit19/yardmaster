@@ -3,10 +3,9 @@ import { LayoutStage } from '../layouts/LayoutStage.js';
 import { useActiveProjects, useClosedProjects } from '../library/useActive.js';
 import { OnboardingWizard } from '../onboarding/OnboardingWizard.js';
 import { useOnboarding } from '../onboarding/useOnboarding.js';
+import { countOf } from '../plural.js';
 import { PodGridSkeleton } from '../pod/PodGrid.js';
 import { EmptyState, Page, PageHeader } from './Page.js';
-
-const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
 
 export function Overview() {
   const hydrated = useBoard(selectHydrated);
@@ -15,7 +14,7 @@ export function Overview() {
   const closed = useClosedProjects().size;
   const hidden = Math.max(0, total - count - closed);
   const meta = [
-    plural(count, 'project'),
+    countOf(count, 'project'),
     ...(hidden > 0 ? [`${hidden} quiet, hidden`] : []),
     ...(closed > 0 ? [`${closed} closed`] : []),
   ].join(' · ');
@@ -45,7 +44,7 @@ export function Overview() {
         </EmptyState>
       ) : count === 0 ? (
         <EmptyState title="All quiet" mark>
-          {plural(hidden, 'project')} had no activity for a while, so the overview hides{' '}
+          {countOf(hidden, 'project')} had no activity for a while, so the overview hides{' '}
           {hidden === 1 ? 'it' : 'them'}. Find {hidden === 1 ? 'it' : 'one'} with ⌘K, or pin a
           project from its menu to keep it here.
         </EmptyState>

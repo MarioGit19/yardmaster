@@ -9,6 +9,7 @@ import { Smartphone, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { encode } from 'uqr';
+import { countOf } from '../plural.js';
 import { stopSharing, usePortShares } from '../ports/shares.js';
 import { formatDateTime, formatWhen } from '../time.js';
 import { Button } from '../ui/Button.js';
@@ -397,7 +398,7 @@ function DevicesRow({
   else if (devices === null) summary = 'Loading…';
   else if (devices.length === 0) summary = 'No phone is paired.';
   else
-    summary = `${devices.length} ${devices.length === 1 ? 'device stays' : 'devices stay'} signed in until revoked, or for 30 days unused.`;
+    summary = `${countOf(devices.length, 'device stays', 'devices stay')} signed in until revoked, or for 30 days unused.`;
 
   return (
     <div className="flex flex-col gap-3 p-5" data-setting="devices">

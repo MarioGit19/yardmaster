@@ -23,6 +23,7 @@ import { GIT_SKIPPED } from '../git/model.js';
 import { TerminalLane } from '../lanes/TerminalLane.js';
 import { type OpeningPhase, slowHint, useOpening } from '../library/opening.js';
 import { spring } from '../motion.js';
+import { plural } from '../plural.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { formatCount, projectTone, toneLabel } from '../status.js';
@@ -232,7 +233,7 @@ export function ProjectPod({ project }: { project: Project }) {
             ))}
             {hiddenSessions > 0 && (
               <li className="pl-10 text-meta text-text-2 tabular">
-                {hiddenSessions} more {hiddenSessions === 1 ? 'session' : 'sessions'}
+                {hiddenSessions} more {plural(hiddenSessions, 'session')}
               </li>
             )}
           </ul>
@@ -249,7 +250,7 @@ export function ProjectPod({ project }: { project: Project }) {
             </ul>
             {hiddenLanes > 0 && (
               <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
-                {hiddenLanes} more {hiddenLanes === 1 ? 'terminal' : 'terminals'}
+                {hiddenLanes} more {plural(hiddenLanes, 'terminal')}
               </p>
             )}
           </div>
@@ -294,7 +295,7 @@ function GitLine({ git }: { git: Project['git'] }) {
       {git.dirty > 0 && (
         <span
           className="pod-git-dirty flex shrink-0 items-center gap-1"
-          title={`${git.dirty} changed ${git.dirty === 1 ? 'file' : 'files'}`}
+          title={`${git.dirty} changed ${plural(git.dirty, 'file')}`}
         >
           <span aria-hidden className="size-1.5 rounded-full bg-text-3" />
           {formatCount(git.dirty)}

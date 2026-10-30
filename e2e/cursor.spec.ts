@@ -95,7 +95,7 @@ test('the approvals sheet shows the pointer on everything clickable', async ({ b
   try {
     const page = await context.newPage();
     await openRoute(page, '/');
-    const waiting = page.locator('[data-hud="waiting"]');
+    const waiting = page.locator('[data-hud="needs-you"]');
     await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
       timeout: 30_000,
     });

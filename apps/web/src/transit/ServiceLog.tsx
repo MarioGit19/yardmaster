@@ -1,4 +1,5 @@
 import { type CSSProperties, useMemo } from 'react';
+import { countOf } from '../plural.js';
 import { formatAgo } from '../pulse/model.js';
 import { cx } from '../ui/cx.js';
 import {
@@ -24,7 +25,7 @@ function binLabel(bin: LogBin, now: number): string {
   const newest = binTarget(bin);
   const what = `${newest.label}${newest.detail ? `: ${newest.detail}` : ''}, ${formatAgo(now - newest.ts)}`;
   if (bin.events.length === 1) return what;
-  return `${bin.events.length} events, the worst a ${KIND_WORD[bin.kind]}. Newest: ${what}`;
+  return `${countOf(bin.events.length, 'event')}, the worst a ${KIND_WORD[bin.kind]}. Newest: ${what}`;
 }
 
 /**

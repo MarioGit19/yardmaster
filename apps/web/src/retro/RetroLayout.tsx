@@ -16,6 +16,7 @@ import { throughputSampler } from '../lanes/useThroughput.js';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { useOverviewScene } from '../layouts/useScene.js';
+import { countOf } from '../plural.js';
 import type { CaptionTone } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { projectHref } from '../routes.js';
@@ -285,7 +286,7 @@ function RetroFrame({ project, number, width, body, stacked, fresh }: FrameProps
     items[(current + step + items.length) % items.length]?.focus();
   };
 
-  const count = `${actors.length} ${actors.length === 1 ? 'actor' : 'actors'}`;
+  const count = countOf(actors.length, 'actor');
 
   return (
     <li

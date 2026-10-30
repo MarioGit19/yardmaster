@@ -5,7 +5,7 @@ test('the HUD counters roll when the demo changes', async ({ page }) => {
   test.slow();
   await openRoute(page, '/');
   const hud = page.locator('header').first();
-  await expect(hud.locator('[data-counter="Working"]')).toBeVisible();
+  await expect(hud.locator('[data-counter="Active"]')).toBeVisible();
   // Collects every transform each digit strip passes through until one strip has rolled
   // through intermediate positions, i.e. animated rather than jumped.
   const frames = await hud.evaluate(
@@ -35,10 +35,10 @@ test('the HUD counters roll when the demo changes', async ({ page }) => {
   expect(frames).toBeGreaterThanOrEqual(4);
 });
 
-test('the Waiting count opens the Attention Center', async ({ page }) => {
+test('the Needs you count opens the Attention Center', async ({ page }) => {
   test.slow();
   await openRoute(page, '/');
-  const waiting = page.locator('[data-hud="waiting"]');
+  const waiting = page.locator('[data-hud="needs-you"]');
   // The demo's first permission request arrives 8–14 s in.
   await expect(waiting.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
     timeout: 30_000,
@@ -65,7 +65,7 @@ for (const level of ['full', 'reduced', 'off'] as const) {
   test(`the Attention Center at ${level} motion`, async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem('yardmaster.motion', value), level);
     await openRoute(page, '/');
-    const button = page.locator('[data-hud="waiting"]');
+    const button = page.locator('[data-hud="needs-you"]');
     await expect(button).toBeVisible();
     // Samples the sheet's computed transform and opacity every frame once it appears.
     const sampling = page.evaluate(
@@ -97,6 +97,22 @@ for (const level of ['full', 'reduced', 'off'] as const) {
     await expect(page.getByRole('complementary', { name: /Needs you/ })).toBeVisible();
   });
 }
+
+test('Failed and Active jump to what they count', async ({ page }) => {
+  test.slow();
+  await openRoute(page, '/');
+  for (const name of ['failed', 'active']) {
+    const counter = page.locator(`[data-hud="${name}"]`);
+    await expect(counter.locator('[data-value]')).not.toHaveAttribute('data-value', '0', {
+      timeout: 45_000,
+    });
+    await counter.click();
+    const item = page.locator(`[data-hud-list="${name}"] a[data-hud-item]`).first();
+    if (await item.isVisible()) await item.click();
+    await expect(page.locator('[data-focus]')).toBeVisible();
+    await page.goBack();
+  }
+});
 
 test('killing the server shows the disconnected state', async ({ browser }) => {
   test.slow();

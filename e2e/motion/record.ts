@@ -855,7 +855,7 @@ const SCENARIOS = {
     await r.moment('attention-open', 'transition', 'the Attention Center slides in', async () => {
       const review = toast.getByRole('button', { name: 'Review' });
       if (arrived && (await review.isVisible())) await review.click();
-      else await page.locator('[data-hud="waiting"]').click();
+      else await page.locator('[data-hud="needs-you"]').click();
       await sheet.waitFor();
       await page.waitForTimeout(900);
     });

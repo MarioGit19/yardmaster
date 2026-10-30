@@ -26,6 +26,7 @@ import { dur, ease, loop, moment, move, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { resolveColor } from '../orb/colors.js';
 import { orbStateFor } from '../orb/model.js';
+import { plural } from '../plural.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import type { Tone } from '../status.js';
 import { terminalTarget } from '../terminal/target.js';
@@ -210,7 +211,7 @@ export function PulseRail() {
           )}
           <span className="font-medium text-text-1">Pulse</span>
           <span className="tabular hidden text-text-2 sm:inline">
-            <NumberTicker value={count} /> {count === 1 ? 'event' : 'events'} · 15 min
+            <NumberTicker value={count} /> {plural(count, 'event')} · 15 min
           </span>
         </button>
         {!collapsed && <FilterToggle />}

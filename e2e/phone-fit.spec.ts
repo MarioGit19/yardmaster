@@ -316,7 +316,7 @@ async function walk(page: Page, query: string, phone: boolean) {
 
   // The Attention Center.
   if (phone) await go('/attention');
-  else await page.locator('[data-hud="waiting"]').click();
+  else await page.locator('[data-hud="needs-you"]').click();
   await expect(page.locator('#attention-title')).toBeVisible();
   await check('attention');
   if (!phone) await dismiss('#attention-title');

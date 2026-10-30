@@ -4,6 +4,7 @@ import { Link } from 'wouter';
 import { ActorInspector } from '../layouts/ActorInspector.js';
 import { actorKindName, type SceneActor, type SceneProject } from '../layouts/scene.js';
 import { spring } from '../motion.js';
+import { countOf } from '../plural.js';
 import { PodMenu } from '../pod/PodMenu.js';
 import { projectHref } from '../routes.js';
 import { toneLabel } from '../status.js';
@@ -100,7 +101,7 @@ export function LineSign({
 
 export const trainCount = (actors: readonly SceneActor[]) => {
   const n = actors.filter((a) => a.kind === 'claude' || a.kind === 'terminal').length;
-  return `${n} ${n === 1 ? 'train' : 'trains'}`;
+  return countOf(n, 'train');
 };
 
 /**

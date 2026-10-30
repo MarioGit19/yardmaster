@@ -1,3 +1,5 @@
+import { countOf } from '../../plural.js';
+
 // Reading tool results: Claude Code returns plain text, so these pull out the few facts the
 // cards show (exit codes, line numbers, file counts, links). Each returns null when unsure.
 
@@ -73,7 +75,7 @@ export function grepCount(text: string): string | null {
   if (found) return `${found[1]} ${found[2]}`;
   if (/^No (?:files|matches) found/m.test(text)) return 'no matches';
   const lines = nonEmpty(text).length;
-  return lines > 0 ? `${lines} ${lines === 1 ? 'line' : 'lines'}` : null;
+  return lines > 0 ? countOf(lines, 'line') : null;
 }
 
 /** File paths of a Glob or Grep (files) result. */
@@ -87,7 +89,7 @@ export function listedPaths(text: string): string[] {
 /** "3 files", "no files" for a Glob result. */
 export function globCount(text: string): string {
   const n = listedPaths(text).length;
-  return n === 0 ? 'no files' : `${n} ${n === 1 ? 'file' : 'files'}`;
+  return n === 0 ? 'no files' : countOf(n, 'file');
 }
 
 /** "220 lines" or "lines 40–120" for a Read result. */
@@ -96,9 +98,7 @@ export function readExtent(text: string): string | null {
   if (!lines) return null;
   const first = (lines[0] as NumberedLine).no;
   const last = (lines[lines.length - 1] as NumberedLine).no;
-  return first > 1
-    ? `lines ${first}–${last}`
-    : `${lines.length} ${lines.length === 1 ? 'line' : 'lines'}`;
+  return first > 1 ? `lines ${first}–${last}` : countOf(lines.length, 'line');
 }
 
 /** Distinct http(s) URLs in a result, in order. */

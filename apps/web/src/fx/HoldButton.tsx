@@ -12,6 +12,7 @@
  */
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { dur, ease, useMotionLevel } from '../motion.js';
+import { countOf } from '../plural.js';
 import { cx } from '../ui/cx.js';
 
 /** How far the pointer may drift off the button before the hold cancels, px. */
@@ -242,7 +243,7 @@ export function HoldButton({
         {doneLabel}
       </span>
       <span id={hintId} className="sr-only">
-        Press and hold for {seconds} seconds to confirm
+        Press and hold for {countOf(seconds, 'second')} to confirm
       </span>
     </button>
   );

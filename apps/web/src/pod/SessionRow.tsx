@@ -11,6 +11,7 @@ import { ActorInspector } from '../layouts/ActorInspector.js';
 import { actorId } from '../layouts/scene.js';
 import { spring } from '../motion.js';
 import { ToolChip } from '../orb/ToolChip.js';
+import { plural } from '../plural.js';
 import { formatCount, totalTokens } from '../status.js';
 import { formatStarted } from '../time.js';
 import { LiveCaption } from './LiveCaption.js';
@@ -89,7 +90,7 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
           <ToolChip tool={tool} className="hidden self-center @min-[360px]:inline-block" />
           {tokens > 0 && (
             <span
-              title={`${tokens.toLocaleString('en-US')} tokens`}
+              title={`${tokens.toLocaleString('en-US')} ${plural(tokens, 'token')}`}
               className="tabular shrink-0 font-mono text-meta text-text-2"
             >
               {formatCount(tokens)} tok

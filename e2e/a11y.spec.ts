@@ -156,7 +156,7 @@ for (const theme of ['dark', 'light'] as const) {
 
         // The Attention Center.
         if (phone) await go(page, '/attention');
-        else await page.locator('[data-hud="waiting"]').click();
+        else await page.locator('[data-hud="needs-you"]').click();
         await expect(page.locator('#attention-title')).toBeVisible();
         await scan('attention');
         if (!phone) await dismiss(page, '#attention-title');

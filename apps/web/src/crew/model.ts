@@ -1,6 +1,7 @@
 import { type ClaudeSession, type Terminal, toolFamily } from '@yardmaster/protocol';
 import { runningBackground } from '../background/model.js';
 import type { OrbState } from '../orb/model.js';
+import { countOf } from '../plural.js';
 
 /** The crew member's states, DESIGN.md §4.11. */
 export const MASCOT_STATES = [
@@ -192,7 +193,7 @@ export function mascotLabel(
     tool && (state === 'typing' || state === 'reading' || state === 'running')
       ? `${STATE_LABEL[state]} (${tool})`
       : STATE_LABEL[state];
-  if (minis > 0) label += `, ${minis} subagent${minis === 1 ? '' : 's'}`;
+  if (minis > 0) label += `, ${countOf(minis, 'subagent')}`;
   if (helpers > 0) label += `, ${helpers} in background`;
   return label;
 }

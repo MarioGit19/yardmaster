@@ -30,6 +30,7 @@ import {
   type SceneProject,
 } from '../layouts/scene.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
+import { plural } from '../plural.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import { PortButton } from '../ports/PortButton.js';
 import { projectHref } from '../routes.js';
@@ -726,7 +727,7 @@ function GitScreen({ project }: { project: SceneProject }) {
       <p className="text-meta text-text-3 tabular">
         {project.dirty === 0
           ? 'Clean'
-          : `${project.dirty} uncommitted ${project.dirty === 1 ? 'file' : 'files'}`}
+          : `${project.dirty} uncommitted ${plural(project.dirty, 'file')}`}
       </p>
     </Screen>
   );

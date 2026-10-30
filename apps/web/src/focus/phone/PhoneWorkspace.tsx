@@ -55,6 +55,7 @@ import { dur, ease, move, spring, useMotionLevel } from '../../motion.js';
 import { ClaudeOrb } from '../../orb/ClaudeOrb.js';
 import { orbStateFor } from '../../orb/model.js';
 import { useHeldOrder } from '../../order.js';
+import { countOf } from '../../plural.js';
 import { LiveCaption } from '../../pod/LiveCaption.js';
 import { type Caption, sessionCaption } from '../../pod/model.js';
 import { createPreference, usePreference } from '../../prefs.js';
@@ -628,8 +629,7 @@ function PageRows({ project }: { project: Project }) {
     {
       page: 'history' as const,
       icon: <History />,
-      detail:
-        past === null ? 'Past sessions' : past === 1 ? '1 past session' : `${past} past sessions`,
+      detail: past === null ? 'Past sessions' : countOf(past, 'past session'),
     },
     {
       page: 'ports' as const,

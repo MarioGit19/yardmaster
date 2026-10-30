@@ -1,4 +1,5 @@
 import { memo, type ReactNode } from 'react';
+import { countOf, plural } from '../../plural.js';
 import { createPreference, usePreference } from '../../prefs.js';
 import { cx } from '../../ui/cx.js';
 import { useScrollFocus } from '../../ui/useScrollFocus.js';
@@ -240,8 +241,8 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
           className="diff-more flex h-7 w-full items-center justify-center font-sans text-label text-text-3 transition-colors duration-fast hover:text-text-1"
         >
           {all
-            ? `Show less${hidden > 0 ? ` · ${hidden} lines too many to show` : ''}`
-            : `Show ${hidden} more ${hidden === 1 ? 'line' : 'lines'}`}
+            ? `Show less${hidden > 0 ? ` · ${countOf(hidden, 'line')} too many to show` : ''}`
+            : `Show ${hidden} more ${plural(hidden, 'line')}`}
         </button>
       )}
     </div>

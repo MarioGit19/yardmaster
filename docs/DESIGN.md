@@ -146,7 +146,7 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 
 ### 4.4 HUD (top bar)
 
-Rolling-digit counters: **Working · Waiting · Running terminals · Errors · Tokens today**. A clickable "Waiting" count opens the Attention Center. On the right are the connection status dot (with a reconnect spinner), ⌘K hint, motion toggle and theme.
+Rolling-digit counters, named for what they ask of you: **Needs you** (approvals, questions, input needed), **Failed** (failed sessions, and terminals that exited non-zero since this browser last opened them) and **Active** (busy sessions and terminals running a command; `claude` in a terminal counts once), then **Tokens today**. Each is a button with a tooltip saying what it counts. Needs you opens the Attention Center; Failed and Active jump to a lone item, or list several in a popover, and do nothing at zero. A 1 px ring around the three takes the colour of the most severe non-zero one (amber, then rose, then the working blue). Which failures count as seen is kept per browser. On the right are the connection status dot (with a reconnect spinner), ⌘K hint, motion toggle and theme.
 
 ### 4.5 Attention Center
 
@@ -423,7 +423,7 @@ The focus view (§4.6) keeps one implementation: the same columns, session list,
 The board must be fully usable one-handed on a phone (360–430 px wide, portrait, and landscape at 844 × 390), not a desktop squeezed down. Below 768 px the app switches to the **phone shell**; 768–1023 px keeps the desktop shell with the project rail collapsed to icons.
 
 **Phone shell.**
-- **Top bar** (48 px, plus `env(safe-area-inset-top)`): the logomark (no wordmark), the three status counts (working, waiting, errors; waiting opens the Attention Center), and a search button for ⌘K on the right. Theme, editor status and *Open project* leave the top bar.
+- **Top bar** (48 px, plus `env(safe-area-inset-top)`): the logomark (no wordmark), the three status counts (Needs you, Failed, Active, as in §4.4), and a search button for ⌘K on the right. Theme, editor status and *Open project* leave the top bar.
 - **Bottom tab bar** (56 px plus `env(safe-area-inset-bottom)`, glass, thumb reach): **Overview**, **Projects** (the project rail as a list, with *Open project* at the top), **Attention** (with its count badge; the Attention Center full-screen), **Pulse** (the timeline as a vertical list, newest first), and **More** (layout, theme, motion, editor status, settings). The active tab's indicator glides (`layoutId`, `tabGlide`). The tab bar replaces the left rail and the Pulse rail, which don't render on phones.
 - **Workspace (focus view)** is full-bleed: no card inset, no outer margin, the bottom tab bar hidden while it's open (back brings it back). It is organised around **what the user wants to do**, not the desktop's three columns:
   - **Project hub** (the workspace's first screen): an app bar (back, project avatar and name, branch, overflow menu), a one-line summary ("2 working · 1 needs you · :3000 serving"), then **one list of everything in the project**, grouped **Needs you**, **Running**, **Idle**. Each Claude session and each terminal is one card. A Claude session that runs in a terminal is a single card, never two. A card shows a kind icon (orb or terminal), its name, its status in words plus color, the live caption, and ports. Below the list are rows that open their own pages: **Git** (branch, changed count), **History** (past sessions, count) and **Ports**. A large **+ New** button opens a sheet with *Claude session*, *Terminal* and the recent-command chips.

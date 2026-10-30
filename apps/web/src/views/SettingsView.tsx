@@ -20,6 +20,7 @@ import { selectWindows, useBoardList } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { hooksInstalled } from '../onboarding/model.js';
+import { countOf } from '../plural.js';
 import { usePreference } from '../prefs.js';
 import { PHOSPHOR_LABEL, PHOSPHORS, phosphorPreference } from '../retro/phosphor.js';
 import { routes } from '../routes.js';
@@ -350,7 +351,7 @@ function EditorsRow() {
 }
 
 const RETENTION_LABEL = Object.fromEntries(
-  RETENTION_DAYS.map((days) => [String(days), days === 1 ? '1 day' : `${days} days`]),
+  RETENTION_DAYS.map((days) => [String(days), countOf(days, 'day')]),
 ) as Record<`${RetentionDays}`, string>;
 const RETENTION_OPTIONS = RETENTION_DAYS.map((days) => `${days}` as const);
 
@@ -484,9 +485,7 @@ function LibraryRootsRow({ server: { settings, update } }: { server: ServerSetti
                       className={cx('text-meta', status.error ? 'text-st-err-ink' : 'text-text-3')}
                       data-library-status={status.error ?? 'ok'}
                     >
-                      {status.error
-                        ? status.message
-                        : `${status.count} ${status.count === 1 ? 'folder' : 'folders'}`}
+                      {status.error ? status.message : countOf(status.count, 'folder')}
                     </span>
                   )}
                 </span>

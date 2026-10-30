@@ -3,6 +3,7 @@ import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { loop } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
 import { keepOrder as keepInOrder } from '../order.js';
+import { countOf } from '../plural.js';
 import type { Caption } from '../pod/model.js';
 
 // The Grid's 2D map (DESIGN.md §10.4 "2D map"): the core in the middle, a node per project on a
@@ -183,7 +184,7 @@ export function nodeCounts(actors: readonly Pick<SceneActor, 'kind'>[]): string 
   }
   const parts: string[] = [];
   if (claude) parts.push(`${claude} Claude`);
-  if (terminals) parts.push(`${terminals} ${terminals === 1 ? 'terminal' : 'terminals'}`);
+  if (terminals) parts.push(countOf(terminals, 'terminal'));
   if (background) parts.push(`${background} in background`);
   return parts.join(' · ') || 'Nothing running';
 }
