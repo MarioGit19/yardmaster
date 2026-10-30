@@ -16,6 +16,7 @@ import {
   MessageSquarePlus,
   PanelLeft,
   RotateCcw,
+  Rows3,
   Search,
   Settings,
   Sparkles,
@@ -36,6 +37,7 @@ import { requestClose } from '../library/closing.js';
 import { pickerOpen } from '../library/OpenProject.js';
 import { dur, ease, motionPreference, nextMotion } from '../motion.js';
 import { countOf } from '../plural.js';
+import { densityPreference } from '../pod/density.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
@@ -71,6 +73,7 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   motion: Sparkles,
   theme: SunMoon,
   layout: LayoutDashboard,
+  density: Rows3,
   phosphor: SwatchBook,
   settings: Settings,
   attention: BellDot,
@@ -205,6 +208,7 @@ function PaletteBody({
   const motion = usePreference(motionPreference);
   const theme = usePreference(themePreference);
   const layout = usePreference(layoutPreference);
+  const density = usePreference(densityPreference);
   const phosphor = usePreference(phosphorPreference);
   const narrow = useMediaQuery(NARROW_QUERY);
   const [page, setPage] = useState<Page>({ kind: 'root' });
@@ -221,11 +225,12 @@ function PaletteBody({
         theme,
         nextTheme: NEXT_THEME[theme],
         layout,
+        density,
         phosphor,
         railToggle: !narrow,
         mac: IS_MAC,
       }),
-    [board, focus?.projectId, motion, theme, layout, phosphor, narrow],
+    [board, focus?.projectId, motion, theme, layout, density, phosphor, narrow],
   );
   const sections = useMemo(
     () => (page.kind === 'root' ? searchCommands(commands, query) : []),
@@ -287,6 +292,10 @@ function PaletteBody({
         return;
       case 'layout':
         layoutPreference.set(action.next);
+        close();
+        return;
+      case 'density':
+        densityPreference.set(action.next);
         close();
         return;
       case 'phosphor':

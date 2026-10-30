@@ -4,14 +4,23 @@ import { selectProject, useBoard } from '../data/index.js';
 import { useActiveProjects } from '../library/useActive.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { keepOrder } from '../order.js';
+import { usePreference } from '../prefs.js';
+import { type Density, densityPreference, useQuietProjects } from './density.js';
 import { risingPods } from './model.js';
 import { type PodMove, PodMoveContext } from './PodGrip.js';
-import { ProjectPod, ProjectPodSkeleton } from './ProjectPod.js';
+import { PodLineSkeleton, ProjectPod, ProjectPodSkeleton } from './ProjectPod.js';
 import { nudgeProject, projectOrder, usePinnedProjects, useProjectOrder } from './projectOrder.js';
 
 /** Columns follow the space the grid gets (the rail takes some), not the viewport. */
-const POD_GRID =
-  'relative grid grid-cols-1 gap-4 @min-[40rem]:grid-cols-2 @min-[66rem]:grid-cols-3 @min-[96rem]:grid-cols-4';
+const POD_GRID: Record<Density, string> = {
+  comfortable: 'gap-4 @min-[40rem]:grid-cols-2 @min-[66rem]:grid-cols-3 @min-[96rem]:grid-cols-4',
+  compact: 'gap-3 @min-[36rem]:grid-cols-2 @min-[56rem]:grid-cols-3 @min-[80rem]:grid-cols-4',
+  list: 'gap-1.5',
+};
+
+/** Fixed cells, each pod as tall as its content: no masonry, which would reorder them. */
+const gridClass = (density: Density) =>
+  `relative grid grid-cols-1 items-start ${POD_GRID[density]}`;
 
 /** DESIGN.md §3 rule 1: 30–40 ms apart, at most eight pods staggered. */
 const STAGGER_S = 0.035;
@@ -49,7 +58,8 @@ function moveTo(order: readonly string[], id: string, target: string): string[] 
 
 /**
  * The overview's pods in the board's stable order: a status never moves one. The user can, with a
- * pod's grip; its neighbours glide with `layout`, and peeks raise a pod above them.
+ * pod's grip; its neighbours glide with `layout`, and peeks raise a pod above them. They glide
+ * the same way when a pod folds or unfolds; a density the user picks applies at once.
  */
 export function PodGrid() {
   const all = useProjectOrder();
@@ -79,7 +89,10 @@ export function PodGrid() {
     setMoved(`${name} moved to place ${next.indexOf(id) + 1} of ${next.length}`);
   };
   // Only a reorder measures the slots; any other re-render would measure every pod on the page.
+  const density = usePreference(densityPreference);
+  const quiet = useQuietProjects(live);
   const orderKey = order.join('|');
+  const shapeKey = `${orderKey}#${[...quiet].join('|')}`;
   const level = useMotionLevel();
   const [stagger] = useState(() => !entered && level === 'full');
   const [initial] = useState(() => new Set(order));
@@ -96,7 +109,7 @@ export function PodGrid() {
 
   return (
     <div className="@container">
-      <div className={POD_GRID}>
+      <div className={gridClass(density)} data-density={density}>
         <AnimatePresence mode="popLayout" initial>
           {order.map((id, index) => {
             const first = stagger && initial.has(id);
@@ -111,12 +124,12 @@ export function PodGrid() {
                   setDragged(null);
                 }}
                 onNudge={nudge}
-                orderKey={orderKey}
+                shapeKey={shapeKey}
                 index={index}
                 first={first}
                 rising={rising.has(id)}
               >
-                <PodById id={id} />
+                <PodById id={id} density={density} quiet={quiet.has(id)} />
               </PodSlot>
             );
           })}
@@ -139,7 +152,7 @@ function PodSlot({
   onDragOver,
   onDrop,
   onNudge,
-  orderKey,
+  shapeKey,
   index,
   first,
   rising,
@@ -150,7 +163,7 @@ function PodSlot({
   onDragOver(id: string, point: { x: number; y: number }): void;
   onDrop(): void;
   onNudge(id: string, name: string, by: 1 | -1): void;
-  orderKey: string;
+  shapeKey: string;
   index: number;
   first: boolean;
   rising: boolean;
@@ -184,7 +197,7 @@ function PodSlot({
     <motion.div
       ref={ref}
       layout="position"
-      layoutDependency={orderKey}
+      layoutDependency={shapeKey}
       drag
       dragControls={controls}
       dragListener={false}
@@ -206,7 +219,7 @@ function PodSlot({
       onLayoutAnimationStart={() => lift(true)}
       onLayoutAnimationComplete={() => lift(false)}
       data-pod-slot={id}
-      className="pod-slot relative h-full min-w-0 has-[[data-open]]:z-10"
+      className="pod-slot relative min-w-0 has-[[data-open]]:z-10"
     >
       <span aria-hidden className="pod-lift" />
       <PodMoveContext.Provider value={move}>{children}</PodMoveContext.Provider>
@@ -214,17 +227,19 @@ function PodSlot({
   );
 }
 
-function PodById({ id }: { id: string }) {
+function PodById({ id, density, quiet }: { id: string; density: Density; quiet: boolean }) {
   const project = useBoard(selectProject(id));
-  return project ? <ProjectPod project={project} /> : null;
+  return project ? <ProjectPod project={project} density={density} quiet={quiet} /> : null;
 }
 
 export function PodGridSkeleton() {
+  const density = usePreference(densityPreference);
+  const Placeholder = density === 'list' ? PodLineSkeleton : ProjectPodSkeleton;
   return (
     <div className="@container" aria-busy>
-      <div className={POD_GRID}>
+      <div className={gridClass(density)}>
         {[0, 1, 2].map((i) => (
-          <ProjectPodSkeleton key={i} />
+          <Placeholder key={i} />
         ))}
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
 import { boardSettings } from '../settings/boardSettings.js';
 import { makeProject, makeSession, sampleBoard } from '../test/board.js';
 import { TooltipProvider } from '../ui/Tooltip.js';
+import { densityPreference } from './density.js';
 import { PodGrid } from './PodGrid.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -77,6 +78,8 @@ function sampleStore() {
   const store = createBoardStore();
   const board = sampleBoard();
   for (const session of Object.values(board.sessions)) session.updatedAt = Date.now();
+  // A project with recent activity stays a full card.
+  for (const project of Object.values(board.projects)) project.lastActivityAt = Date.now();
   store.getState().replaceBoard(board);
   return store;
 }
@@ -103,6 +106,57 @@ describe('PodGrid', () => {
       });
     });
     expect(podIds()).toEqual(before);
+  });
+
+  describe('density', () => {
+    afterEach(() => act(() => densityPreference.set('comfortable')));
+
+    const form = (id: string) => pod(id)?.dataset.podForm;
+    const pinnedQuiet = () => {
+      const store = sampleStore();
+      const board = store.getState().board;
+      const quiet = { ...makeProject('p-quiet', 'quiet-lab'), lastActivityAt: Date.now() - HOUR };
+      store
+        .getState()
+        .replaceBoard({ ...board, projects: { ...board.projects, 'p-quiet': quiet } });
+      serverSettings.pinnedProjects = ['p-quiet'];
+      return store;
+    };
+
+    it('folds a quiet project to one line and keeps it in its place', async () => {
+      render(pinnedQuiet());
+      await act(() => boardSettings.load());
+      expect(form('p-quiet')).toBe('row');
+      const row = pod('p-quiet');
+      expect(row?.textContent).toContain('quiet-lab');
+      expect(row?.textContent).toContain('main');
+      expect(row?.textContent).toContain('1h ago');
+      expect(row?.querySelector('[data-crew]')).toBeNull();
+      expect(row?.querySelector('[data-pod-grip]')).not.toBeNull();
+      expect(form('p-orbit')).toBe('card');
+    });
+
+    it('takes the crew, the tokens and the last line off a Compact card', () => {
+      render(sampleStore());
+      const full = pod('p-orbit');
+      expect(full?.querySelector('header [data-crew]')).not.toBeNull();
+      expect(full?.querySelector('[data-session-meta]')).not.toBeNull();
+      act(() => densityPreference.set('compact'));
+      const compact = pod('p-orbit');
+      expect(compact?.dataset.podForm).toBe('card');
+      expect(compact?.querySelector('header [data-crew]')).toBeNull();
+      expect(compact?.querySelector('[data-session-meta]')).toBeNull();
+      expect(compact?.textContent).not.toContain(' tok');
+    });
+
+    it('gives every project one line in List, with what its session is doing', () => {
+      render(sampleStore());
+      act(() => densityPreference.set('list'));
+      expect(container.querySelectorAll('[data-pod-form="row"]')).toHaveLength(3);
+      expect(container.querySelector('[data-pod-form="card"]')).toBeNull();
+      expect(container.querySelector('[data-session]')).toBeNull();
+      expect(pod('p-orbit')?.querySelector('.pod-line-lead')?.textContent).not.toBe('');
+    });
   });
 
   it('gives every pod in the grid a grip', () => {
@@ -154,7 +208,7 @@ describe('ProjectPod', () => {
 
   it('shows git state: branch, changed files, ahead and behind', () => {
     const store = createBoardStore();
-    const project = makeProject('p1', 'acme-shop');
+    const project = { ...makeProject('p1', 'acme-shop'), lastActivityAt: Date.now() };
     if (project.git)
       Object.assign(project.git, { branch: 'feat/cart', dirty: 3, ahead: 1, behind: 2 });
     store.getState().replaceBoard({
@@ -205,7 +259,7 @@ describe('ProjectPod', () => {
     const store = createBoardStore();
     store.getState().replaceBoard({
       ...store.getState().board,
-      projects: { p1: makeProject('p1', 'acme-shop') },
+      projects: { p1: { ...makeProject('p1', 'acme-shop'), lastActivityAt: Date.now() } },
       sessions: { s1: { ...makeSession('s1', 'p1', { kind: 'working' }), updatedAt: Date.now() } },
     });
     render(store);

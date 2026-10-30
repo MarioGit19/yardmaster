@@ -15,6 +15,7 @@ import { laneExecution, terminalDisplay } from '../lanes/lane.js';
 import { LAYOUT_NAME, LAYOUTS, type LayoutId } from '../layouts/registry.js';
 import type { MotionSetting } from '../motion.js';
 import { countOf } from '../plural.js';
+import { DENSITIES, DENSITY_NAME, type Density } from '../pod/density.js';
 import { PHOSPHOR_LABEL, PHOSPHORS } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
@@ -35,6 +36,7 @@ export type PaletteRun =
   | { kind: 'motion'; next: MotionSetting }
   | { kind: 'theme'; next: ThemeSetting }
   | { kind: 'layout'; next: LayoutId }
+  | { kind: 'density'; next: Density }
   | { kind: 'phosphor'; next: Phosphor }
   | { kind: 'attention' }
   | { kind: 'openProject' }
@@ -54,6 +56,7 @@ export type PaletteIcon =
   | 'motion'
   | 'theme'
   | 'layout'
+  | 'density'
   | 'phosphor'
   | 'settings'
   | 'attention'
@@ -92,6 +95,7 @@ export interface PaletteContext {
   theme: ThemeSetting;
   nextTheme: ThemeSetting;
   layout: LayoutId;
+  density: Density;
   /** Retro's phosphor color (DESIGN.md §10.6). */
   phosphor: Phosphor;
   /** The rail can be toggled (it is pinned to icons on narrow screens). */
@@ -447,6 +451,17 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       run: { kind: 'layout', next: layout },
     });
   });
+  for (const density of DENSITIES) {
+    commands.push({
+      id: `density:${density}`,
+      group: 'Actions',
+      label: `Density: ${DENSITY_NAME[density]}`,
+      ...(density === context.density ? { hint: 'Current' } : {}),
+      icon: 'density',
+      searchOnly: true,
+      run: { kind: 'density', next: density },
+    });
+  }
   // Retro's colors open the list only in Retro; elsewhere a search finds them.
   for (const phosphor of PHOSPHORS) {
     const current = phosphor === context.phosphor;

@@ -1,5 +1,6 @@
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, GripVertical } from 'lucide-react';
 import { createContext, type KeyboardEvent, type PointerEvent, useContext } from 'react';
+import { cx } from '../ui/cx.js';
 
 export interface PodMove {
   /** Starts dragging the pod from a pointer press. */
@@ -18,8 +19,12 @@ const NUDGE: Record<string, 1 | -1> = {
   ArrowDown: 1,
 };
 
-/** The handle that moves a pod: drag it, or focus it and use the arrow keys. */
-export function PodGrip({ name }: { name: string }) {
+/**
+ * The handle that moves a pod: drag it, or focus it and use the arrow keys. On a one-line pod it
+ * sits in the left gutter (`side`), where it can't cover the name.
+ */
+export function PodGrip({ name, side = false }: { name: string; side?: boolean }) {
+  const Icon = side ? GripVertical : GripHorizontal;
   const move = useContext(PodMoveContext);
   if (!move) return null;
   const onKeyDown = (event: KeyboardEvent) => {
@@ -37,9 +42,14 @@ export function PodGrip({ name }: { name: string }) {
       title="Drag to reorder"
       onPointerDown={move.drag}
       onKeyDown={onKeyDown}
-      className="absolute top-1 left-1/2 z-10 grid h-4 w-8 -translate-x-1/2 cursor-grab touch-none select-none place-items-center rounded-control text-text-3 opacity-0 transition-opacity duration-fast ease-out hover:text-text-2 focus-visible:opacity-100 active:cursor-grabbing group-hover:opacity-100 touch:top-0 touch:size-11 touch:opacity-100"
+      className={cx(
+        'absolute z-10 grid cursor-grab touch-none select-none place-items-center rounded-control text-text-3 opacity-0 transition-opacity duration-fast ease-out hover:text-text-2 focus-visible:opacity-100 active:cursor-grabbing group-hover:opacity-100 touch:opacity-100',
+        side
+          ? 'inset-y-0 left-0 w-3 touch:w-11'
+          : 'top-1 left-1/2 h-4 w-8 -translate-x-1/2 touch:top-0 touch:size-11',
+      )}
     >
-      <GripHorizontal aria-hidden className="size-4" strokeWidth={1.5} />
+      <Icon aria-hidden className={side ? 'size-3' : 'size-4'} strokeWidth={1.5} />
     </button>
   );
 }

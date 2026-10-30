@@ -562,6 +562,29 @@ const SCENARIOS = {
     );
   },
 
+  /** Density through the palette: it applies at once, so no pod crosses the grid. */
+  async density(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(1500);
+    const pick = async (name: string) => {
+      await page.keyboard.press('ControlOrMeta+k');
+      await page.keyboard.type(`density ${name}`);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(900);
+    };
+    await r.moment(
+      'switch',
+      'transition',
+      'Comfortable → Compact → List → Comfortable',
+      async () => {
+        await pick('compact');
+        await pick('list');
+        await pick('comfortable');
+      },
+    );
+  },
+
   /** The stress board: compare with `overview-activity` for how much louder a busy board reads. */
   async busy(r: Recorder) {
     const { page } = r;

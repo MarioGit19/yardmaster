@@ -32,15 +32,19 @@ import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { isDimmed } from './activity.js';
+import { type Density, podForm } from './density.js';
 import { MAX_SESSION_ROWS, podSessions } from './model.js';
 import { ActivityBorder, DoneSweep, EventSparks } from './PodActivity.js';
 import { PodGrip } from './PodGrip.js';
+import { PodLine } from './PodLine.js';
 import { PodMenu } from './PodMenu.js';
 import { SessionRow } from './SessionRow.js';
 import { useMascotState } from './useMascotState.js';
 
 /** Lanes shown per pod before the rest collapse into a count. */
 const MAX_LANES = 4;
+/** Compact keeps the top of each list; the rest are counted the same way. */
+const COMPACT_ROWS = 2;
 /** Header crew members; the rest of the sessions still have their rows. */
 const MAX_CREW = 3;
 /** Sleeping crews and dimmed pods only need to notice five quiet minutes. */
@@ -64,8 +68,18 @@ const BORDER = {
 /**
  * A project on the overview, DESIGN.md §4.3: accent hairline, a header with the crew,
  * session rows and terminal lanes. The border takes the most urgent status (wait > err > work).
+ * A quiet project, and every project in List, folds to one line; Compact drops the crew, the
+ * tokens, the last assistant line and the lanes' graphs from the card.
  */
-export function ProjectPod({ project }: { project: Project }) {
+export function ProjectPod({
+  project,
+  density = 'comfortable',
+  quiet = false,
+}: {
+  project: Project;
+  density?: Density;
+  quiet?: boolean;
+}) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const openTerminals = terminals
@@ -74,8 +88,12 @@ export function ProjectPod({ project }: { project: Project }) {
   const tone = useProjectTone(sessions, terminals);
   const live = podSessions(sessions);
   const accent = `var(--accent-${project.accent})`;
-  const hiddenSessions = live.length - MAX_SESSION_ROWS;
-  const hiddenLanes = openTerminals.length - MAX_LANES;
+  const form = podForm(density, quiet);
+  const compact = density === 'compact';
+  const sessionRows = compact ? COMPACT_ROWS : MAX_SESSION_ROWS;
+  const laneRows = compact ? COMPACT_ROWS : MAX_LANES;
+  const hiddenSessions = live.length - sessionRows;
+  const hiddenLanes = openTerminals.length - laneRows;
   const opening = useOpening(project.id);
 
   // Activity, DESIGN.md §4.10.
@@ -161,6 +179,7 @@ export function ProjectPod({ project }: { project: Project }) {
         }}
         ref={podRef}
         data-pod={project.id}
+        data-pod-form={form}
         data-tone={tone}
         data-crashed={crashed || undefined}
         data-dim={dim || undefined}
@@ -170,7 +189,12 @@ export function ProjectPod({ project }: { project: Project }) {
         onPointerMove={onPointerMove}
         style={{ '--accent': accent, borderRadius: 16 } as React.CSSProperties}
         className={cx(
-          'pod group relative flex h-full min-w-0 flex-col gap-4 rounded-panel border border-line bg-bg-1 p-4 shadow-raised',
+          'pod group relative flex min-w-0 flex-col rounded-panel border border-line bg-bg-1 shadow-raised',
+          form === 'row'
+            ? 'px-3 py-2 touch:min-h-12 touch:justify-center touch:pl-10'
+            : compact
+              ? 'gap-2.5 p-3'
+              : 'gap-4 p-4',
           'transition-[border-color] duration-fast ease-out hover:border-line-strong',
           crashed && tone !== 'wait' ? BORDER.err : BORDER[tone],
         )}
@@ -196,82 +220,100 @@ export function ProjectPod({ project }: { project: Project }) {
           }}
         />
 
-        <PodGrip name={project.name} />
-        <motion.header
-          layoutId={sharedId.header(project.id)}
-          layoutDependency={POD_LAYOUT_DEPENDENCY}
-          transition={spring.smooth}
-          className="flex min-w-0 items-center gap-3"
-        >
-          <span className="pod-dim flex shrink-0">
-            <ProjectAvatar project={project} />
-          </span>
-          <div className="pod-title flex min-w-0 flex-1 flex-col">
-            <span className="flex min-w-0 items-center gap-2">
-              <Link
-                href={projectHref(project.id)}
-                title={project.name}
-                className="min-w-0 truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
-              >
-                {project.name}
-              </Link>
-              {tone !== 'idle' && (
-                <StatusDot
-                  tone={tone}
-                  label={toneLabel(tone)}
-                  showLabel
-                  className="pod-status shrink-0 text-meta text-text-2"
+        <PodGrip name={project.name} side={form === 'row'} />
+        {form === 'row' ? (
+          <PodLine
+            project={project}
+            tone={tone}
+            lead={density === 'list' ? (live[0] ?? null) : null}
+            sessions={live.length}
+            terminals={openTerminals.length}
+            lastActivity={lastActivity}
+            now={now}
+            opening={opening ? <OpeningLine {...opening} /> : null}
+          />
+        ) : (
+          <>
+            <motion.header
+              layoutId={sharedId.header(project.id)}
+              layoutDependency={POD_LAYOUT_DEPENDENCY}
+              transition={spring.smooth}
+              className="flex min-w-0 items-center gap-3"
+            >
+              <span className="pod-dim flex shrink-0">
+                <ProjectAvatar project={project} />
+              </span>
+              <div className="pod-title flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Link
+                    href={projectHref(project.id)}
+                    title={project.name}
+                    className="min-w-0 truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
+                  >
+                    {project.name}
+                  </Link>
+                  {tone !== 'idle' && (
+                    <StatusDot
+                      tone={tone}
+                      label={toneLabel(tone)}
+                      showLabel
+                      className="pod-status shrink-0 text-meta text-text-2"
+                    />
+                  )}
+                </span>
+                {opening ? <OpeningLine {...opening} /> : <GitLine git={project.git} />}
+              </div>
+              {!compact && (
+                <PodCrew
+                  sessions={live.slice(0, MAX_CREW)}
+                  terminals={crew.terminals}
+                  activity={crew.activity}
+                  accent={accent}
+                  now={now}
                 />
               )}
-            </span>
-            {opening ? <OpeningLine {...opening} /> : <GitLine git={project.git} />}
-          </div>
-          <PodCrew
-            sessions={live.slice(0, MAX_CREW)}
-            terminals={crew.terminals}
-            activity={crew.activity}
-            accent={accent}
-            now={now}
-          />
-        </motion.header>
+            </motion.header>
 
-        {live.length > 0 ? (
-          <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
-            {live.slice(0, MAX_SESSION_ROWS).map((session) => (
-              <SessionRow
-                key={session.id}
-                session={session}
-                accent={accent}
-                crew={crew}
-                now={now}
-                projectBranch={project.git?.branch ?? null}
-              />
-            ))}
-            {hiddenSessions > 0 && (
-              <li className="pl-10 text-meta text-text-2 tabular">
-                {hiddenSessions} more {plural(hiddenSessions, 'session')}
-              </li>
+            {live.length > 0 ? (
+              <ul aria-label="Claude sessions" className="relative z-[1] flex flex-col gap-3">
+                {live.slice(0, sessionRows).map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    accent={accent}
+                    crew={crew}
+                    now={now}
+                    projectBranch={project.git?.branch ?? null}
+                    compact={compact}
+                  />
+                ))}
+                {hiddenSessions > 0 && (
+                  <li className="pl-10 text-meta text-text-2 tabular">
+                    {hiddenSessions} more {plural(hiddenSessions, 'session')}
+                  </li>
+                )}
+              </ul>
+            ) : (
+              !compact && <p className="text-body-sm text-text-2">No Claude sessions</p>
             )}
-          </ul>
-        ) : (
-          <p className="text-body-sm text-text-2">No Claude sessions</p>
-        )}
 
-        {openTerminals.length > 0 ? (
-          <div className="lanes relative z-[1]">
-            <ul aria-label="Terminals" className="flex flex-col">
-              {openTerminals.slice(0, MAX_LANES).map((terminal) => (
-                <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
-              ))}
-            </ul>
-            {hiddenLanes > 0 && (
-              <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
-                {hiddenLanes} more {plural(hiddenLanes, 'terminal')}
-              </p>
+            {openTerminals.length > 0 ? (
+              <div className="lanes relative z-[1]">
+                <ul aria-label="Terminals" className="flex flex-col">
+                  {openTerminals.slice(0, laneRows).map((terminal) => (
+                    <TerminalLane key={terminal.id} terminal={terminal} accent={accent} />
+                  ))}
+                </ul>
+                {hiddenLanes > 0 && (
+                  <p className="mt-1 pl-[18px] text-meta text-text-2 tabular">
+                    {hiddenLanes} more {plural(hiddenLanes, 'terminal')}
+                  </p>
+                )}
+              </div>
+            ) : (
+              !compact && <p className="text-meta text-text-2">No open terminals</p>
             )}
-          </div>
-        ) : (
-          <p className="text-meta text-text-2">No open terminals</p>
+          </>
         )}
       </motion.article>
     </PodMenu>
@@ -410,6 +452,21 @@ function CrewMember({
 }
 
 const isLive = (s: ClaudeSession) => s.status.kind !== 'ended' && s.status.kind !== 'interrupted';
+
+/** The one-line form's placeholder, for a board set to List. */
+export function PodLineSkeleton() {
+  return (
+    <div
+      aria-hidden
+      data-pod-skeleton
+      className="flex items-center gap-2.5 rounded-panel border border-line bg-bg-1 px-3 py-2 shadow-raised"
+    >
+      <Skeleton className="size-5 shrink-0 rounded-full" />
+      <Skeleton className="h-3.5 w-40 max-w-full" />
+      <Skeleton className="ml-auto h-3 w-16" />
+    </div>
+  );
+}
 
 /** Pod-shaped loading placeholder: the real pod's header, crew, session rows and lane tracks. */
 export function ProjectPodSkeleton() {

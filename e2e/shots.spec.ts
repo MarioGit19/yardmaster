@@ -307,6 +307,37 @@ test.describe('lane activity', () => {
   }
 });
 
+// Each density on the overview and the phone's Projects list.
+test.describe('density', () => {
+  for (const theme of THEMES) {
+    for (const density of ['comfortable', 'compact', 'list']) {
+      for (const viewport of [
+        { width: 1440, height: 900 },
+        { width: 390, height: 844 },
+      ]) {
+        test.describe(`${density} ${viewport.width} ${theme}`, () => {
+          test.use({ theme, viewport });
+          test('overview', async ({ page }) => {
+            await page.addInitScript(
+              (value) => localStorage.setItem('yardmaster.density', value),
+              density,
+            );
+            await openRoute(page, '/');
+            await expect(page.locator('[data-pod]').first()).toBeVisible();
+            await page.waitForTimeout(800);
+            const name = `density-${density}-${viewport.width}-${theme}`;
+            await page.screenshot({ path: new URL(`${name}.png`, OUT_DIR).pathname });
+            if (viewport.width > 500) return;
+            await openRoute(page, '/projects');
+            await expect(page.locator('[data-phone-project]').first()).toBeVisible();
+            await page.screenshot({ path: new URL(`${name}-list.png`, OUT_DIR).pathname });
+          });
+        });
+      }
+    }
+  }
+});
+
 // A pod waiting for approval: the amber glow, with the strip above the grid.
 test.describe('waiting pod', () => {
   for (const theme of THEMES) {

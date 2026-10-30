@@ -109,7 +109,8 @@ test('quiet pods dim after five minutes', async ({ page }) => {
       .locator(selector)
       .first()
       .evaluate((el) => getComputedStyle(el).opacity);
-  await expect.poll(() => opacity('.pod-crew')).toBe('0.7');
+  await expect(pod(page, id)).toHaveAttribute('data-pod-form', 'row');
+  await expect.poll(() => opacity('.pod-dim')).toBe('0.7');
   await expect.poll(() => pod(page, id).evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
   expect(await opacity('header a')).toBe('1');
 

@@ -21,6 +21,7 @@ import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { hooksInstalled } from '../onboarding/model.js';
 import { countOf } from '../plural.js';
+import { DENSITIES, DENSITY_NAME, densityPreference } from '../pod/density.js';
 import { usePreference } from '../prefs.js';
 import { PHOSPHOR_LABEL, PHOSPHORS, phosphorPreference } from '../retro/phosphor.js';
 import { routes } from '../routes.js';
@@ -65,6 +66,7 @@ export function SettingsView() {
   const { setting: theme, setTheme } = useTheme();
   const motion = usePreference(motionPreference);
   const layout = usePreference(layoutPreference);
+  const density = usePreference(densityPreference);
   const ambient = usePreference(ambientStylePreference);
   const phosphor = usePreference(phosphorPreference);
   const redact = usePreference(redactPreference);
@@ -89,6 +91,19 @@ export function SettingsView() {
               labels={LAYOUT_NAME}
               value={layout}
               onChange={layoutPreference.set}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Density"
+            data="density"
+            description="How much Minimal and the phone's Projects list show. Comfortable folds quiet projects to a line, Compact trims the cards, List gives every project one line. Saved on this device."
+          >
+            <Segmented
+              label="Density"
+              options={DENSITIES}
+              labels={DENSITY_NAME}
+              value={density}
+              onChange={densityPreference.set}
             />
           </SettingRow>
           <SettingRow title="Theme" description="Dark, light, or follow your OS.">

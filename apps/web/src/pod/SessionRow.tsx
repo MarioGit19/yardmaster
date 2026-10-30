@@ -33,6 +33,8 @@ export interface SessionRowProps {
   now: number;
   /** The branch on the pod's header: a row only repeats it when it says something else. */
   projectBranch: string | null;
+  /** Compact density: one line, with the time at its end and no tokens. */
+  compact?: boolean;
 }
 
 /**
@@ -40,7 +42,14 @@ export interface SessionRowProps {
  * needs or produced (slides in on change) · tool chip (rows ≥ 360 px) · tokens, over the last
  * assistant line while that is still news, then the session's name, time and branch.
  */
-export function SessionRow({ session, accent, crew, now, projectBranch }: SessionRowProps) {
+export function SessionRow({
+  session,
+  accent,
+  crew,
+  now,
+  projectBranch,
+  compact = false,
+}: SessionRowProps) {
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
@@ -48,7 +57,8 @@ export function SessionRow({ session, accent, crew, now, projectBranch }: Sessio
   const stale = useSessionStale(session);
   const caption = stale ? staleCaption(stale) : sessionCaption(session, approval);
   // An idle row's caption already is this line.
-  const line = session.status.kind === 'idle' ? null : lastLine(session.lastAssistantText);
+  const line =
+    compact || session.status.kind === 'idle' ? null : lastLine(session.lastAssistantText);
   const rowRef = useRef<HTMLLIElement>(null);
   const onScreen = useInView(rowRef);
   const when = sessionWhen(session, approval, now);
@@ -104,7 +114,16 @@ export function SessionRow({ session, accent, crew, now, projectBranch }: Sessio
           <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
           <DraftMarker draft={draftKey.session(session.id)} className="self-center" />
           <ToolChip tool={tool} className="hidden self-center @min-[360px]:inline-block" />
-          {tokens > 0 && (
+          {compact && when && (
+            <time
+              dateTime={new Date(when.at).toISOString()}
+              title={formatDateTime(when.at)}
+              className="tabular shrink-0 text-meta text-text-2"
+            >
+              {when.text}
+            </time>
+          )}
+          {!compact && tokens > 0 && (
             <span
               title={`${tokens.toLocaleString('en-US')} ${plural(tokens, 'token')}`}
               className="tabular shrink-0 font-mono text-meta text-text-2"
@@ -124,42 +143,44 @@ export function SessionRow({ session, accent, crew, now, projectBranch }: Sessio
             {line}
           </p>
         )}
-        <p
-          data-session-meta
-          className="flex min-w-0 items-center gap-2 text-meta text-text-2 tabular"
-        >
-          <span className="min-w-0 truncate" title={sessionSubtitle(session) ?? undefined}>
-            {sessionDisplayName(session)}
-          </span>
-          {when && (
-            <time
-              dateTime={new Date(when.at).toISOString()}
-              title={formatDateTime(when.at)}
-              className="shrink-0"
-            >
-              {when.text}
-            </time>
-          )}
-          {branch && (
-            <span
-              title={session.branch ?? undefined}
-              className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
-            >
-              <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="truncate">{session.branch}</span>
+        {!compact && (
+          <p
+            data-session-meta
+            className="flex min-w-0 items-center gap-2 text-meta text-text-2 tabular"
+          >
+            <span className="min-w-0 truncate" title={sessionSubtitle(session) ?? undefined}>
+              {sessionDisplayName(session)}
             </span>
-          )}
-          {worktree && (
-            <span
-              title={`Worktree ${worktree}`}
-              className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
-            >
-              <FolderGit2 aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="truncate">{worktree}</span>
-              <span className="sr-only"> worktree</span>
-            </span>
-          )}
-        </p>
+            {when && (
+              <time
+                dateTime={new Date(when.at).toISOString()}
+                title={formatDateTime(when.at)}
+                className="shrink-0"
+              >
+                {when.text}
+              </time>
+            )}
+            {branch && (
+              <span
+                title={session.branch ?? undefined}
+                className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
+              >
+                <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+                <span className="truncate">{session.branch}</span>
+              </span>
+            )}
+            {worktree && (
+              <span
+                title={`Worktree ${worktree}`}
+                className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
+              >
+                <FolderGit2 aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+                <span className="truncate">{worktree}</span>
+                <span className="sr-only"> worktree</span>
+              </span>
+            )}
+          </p>
+        )}
         <BackgroundLine session={session} className="mt-0.5" />
       </div>
     </li>

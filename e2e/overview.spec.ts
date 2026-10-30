@@ -19,9 +19,9 @@ for (const { columns, ...viewport } of COLUMNS) {
   });
 }
 
-test('every pod has a header crew, session rows or a placeholder, and lanes', async ({ page }) => {
+test('every card has a header crew, session rows or a placeholder, and lanes', async ({ page }) => {
   await openRoute(page, '/');
-  const pods = page.locator('[data-pod]');
+  const pods = page.locator('[data-pod][data-pod-form="card"]');
   await expect(pods.first()).toBeVisible();
   for (const pod of await pods.all()) {
     await expect(pod.locator('header [data-crew]').first()).toBeVisible();

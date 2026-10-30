@@ -901,6 +901,22 @@
   display: none;
 }
 
+/* Compact density keeps the reading and drops the picture of it. */
+[data-density="compact"] :is(.lane-signal-graph, .lane-signal-window) {
+  display: none;
+}
+[data-density="compact"] .lane-signal[data-sparkline="line"] .lane-signal-value {
+  display: inline;
+}
+/* The tracks of a narrow pod, as the graph's room goes to the command. */
+[data-density="compact"] .lane-row {
+  grid-template-columns: 4.75rem minmax(0, 1fr) 2.5rem 3.75rem 2.5rem;
+  column-gap: 6px;
+}
+[data-density="compact"] .lane-crash-dot {
+  display: none;
+}
+
 /* Flow light: a comet along the bottom edge while the lane streams (transform only). The loop is
    a WAAPI animation (`TerminalLane`'s `COMET`) whose playback rate eases with the lane's level. */
 .lane-row::after {
@@ -966,6 +982,59 @@
 .pod {
   container-type: inline-size;
 }
+/* A one-line pod, DESIGN.md §4.3. Comfortable and Compact rows push the time and counts to the
+   right; a List line lines its columns up, and a narrow line gives up the caption, then the
+   branch, then the time. */
+/* The name is the row's point: the branch gives way first. */
+.pod-line-branch {
+  flex: 0 1000 auto;
+}
+.pod-line-mark:empty {
+  display: none;
+}
+[data-density="list"] .pod-line-mark:empty {
+  display: block;
+  width: 8px;
+}
+[data-density="list"] .pod-line-name {
+  flex: 0 0 11rem;
+}
+[data-density="list"] .pod-line-branch {
+  flex: 0 0 8rem;
+}
+[data-density="list"] .pod-line-when {
+  width: 4.5rem;
+  text-align: right;
+}
+@container (width < 40rem) {
+  [data-density="list"] .pod-line-name {
+    flex: 0 1 auto;
+  }
+  [data-density="list"] .pod-line-branch {
+    flex: 0 1000 auto;
+  }
+  [data-density="list"] .pod-line-mark:empty {
+    display: none;
+  }
+  [data-density="list"] .pod-line-lead:not(:empty) {
+    display: none;
+  }
+  [data-density="list"] .pod-line-when {
+    margin-left: auto;
+    width: auto;
+  }
+}
+@container (width < 18rem) {
+  .pod-line-branch {
+    display: none;
+  }
+}
+@container (width < 13rem) {
+  .pod-line-when {
+    display: none;
+  }
+}
+
 /* Narrow pods keep the project name readable: the header crew thins out to two, then one. */
 @container (width < 22rem) {
   .pod-crew > :nth-child(n + 3) {

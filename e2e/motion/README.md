@@ -16,6 +16,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `transit`  | `activity` (8 s of the concourse), `glide` (2 s at 12 fps: speed lines, amber doors, due rows), `log` (a new service-log bin grows in), `station` (a new station scales in, when the demo gets there), `inspector` (a board row lights its station, click a station, Esc) |
 | `retro`    | `activity` (8 s of the console), `typing` (2 s at 12 fps, cropped to two frames: captions typing, the cursor's 1 Hz blink), `line-in` (a new actor's line scrolls up, when the demo gets there), `numbers` (2, 1, Enter, Esc) |
 | `reorder`  | `pods`: the first attention reorder of a fresh board (the riser flies over the others) |
+| `density`  | `switch`: Comfortable → Compact → List → Comfortable through the palette (applies at once: nothing should fly across the grid) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |

@@ -193,12 +193,12 @@ test.describe('keyboard @a11y', () => {
     await expect(page).toHaveURL(/#\/settings$/);
     const motion = page.getByRole('group', { name: 'Motion' });
     await expect(motion).toBeVisible();
-    // Theme's buttons come first; Tab on through Motion's to Reduced and press it.
+    // Density's and Theme's buttons come first; Tab on through Motion's to Reduced and press it.
     hidden.push(...(await tabTo(page, 'fieldset button[aria-pressed]')));
     const reduced = motion.getByRole('button', { name: 'Reduced' });
     for (
       let i = 0;
-      i < 12 && !(await reduced.evaluate((el) => el === document.activeElement));
+      i < 16 && !(await reduced.evaluate((el) => el === document.activeElement));
       i++
     ) {
       await page.keyboard.press('Tab');

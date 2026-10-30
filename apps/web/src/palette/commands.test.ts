@@ -18,6 +18,7 @@ const context = (over: Partial<PaletteContext> = {}): PaletteContext => ({
   theme: 'dark',
   nextTheme: 'light',
   layout: 'minimal',
+  density: 'comfortable',
   phosphor: 'green',
   railToggle: true,
   ...over,
@@ -230,6 +231,18 @@ describe('buildCommands', () => {
     expect(byId(commands, 'layout:office')).toMatchObject({ hint: 'Current', searchOnly: true });
     const found = searchCommands(commands, 'layout retro').flatMap((s) => s.results);
     expect(found[0]?.command.id).toBe('layout:retro');
+  });
+
+  it('offers the densities to a search, marking the current one', () => {
+    const commands = buildCommands(board(), context({ density: 'compact' }));
+    expect(byId(commands, 'density:list')).toMatchObject({
+      label: 'Density: List',
+      searchOnly: true,
+      run: { kind: 'density', next: 'list' },
+    });
+    expect(byId(commands, 'density:compact')).toMatchObject({ hint: 'Current' });
+    const found = searchCommands(commands, 'density list').flatMap((s) => s.results);
+    expect(found[0]?.command.id).toBe('density:list');
   });
 
   it('offers every Retro color, listed up front only in Retro', () => {

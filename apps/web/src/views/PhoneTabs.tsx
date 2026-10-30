@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import {
+  activityKey,
   selectApproval,
   selectConnection,
   selectProjects,
@@ -14,6 +15,7 @@ import {
   useBoard,
   useBoardList,
   useBoardStore,
+  useLastActivity,
 } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { requestClose } from '../library/closing.js';
@@ -27,8 +29,10 @@ import {
   useMotionLevel,
 } from '../motion.js';
 import { countOf } from '../plural.js';
+import { type Density, densityPreference, podForm, useQuietProjects } from '../pod/density.js';
 import { CAPTION_COLOR } from '../pod/LiveCaption.js';
 import { podSessions, sessionCaption } from '../pod/model.js';
+import { PodCounts, PodWhen } from '../pod/PodLine.js';
 import { usePreference } from '../prefs.js';
 import {
   eventDetail,
@@ -61,6 +65,9 @@ export function ProjectsPage() {
   const all = useBoardList(selectProjects);
   const closed = useClosedProjects();
   const projects = useMemo(() => all.filter((p) => !closed.has(p.id)), [all, closed]);
+  const ids = useMemo(() => projects.map((p) => p.id), [projects]);
+  const quiet = useQuietProjects(ids);
+  const density = usePreference(densityPreference);
   const hydrated = useBoard((s) => s.hydrated);
   return (
     <Page>
@@ -88,7 +95,7 @@ export function ProjectsPage() {
         </li>
         {projects.map((project) => (
           <li key={project.id}>
-            <ProjectRow project={project} />
+            <ProjectRow project={project} density={density} quiet={quiet.has(project.id)} />
           </li>
         ))}
       </ul>
@@ -107,7 +114,15 @@ const REVEAL_PX = 88;
 const FLICK_VELOCITY = 400;
 
 /** A project in the list: tap to open it, swipe left for Close. */
-function ProjectRow({ project }: { project: Project }) {
+function ProjectRow({
+  project,
+  density,
+  quiet,
+}: {
+  project: Project;
+  density: Density;
+  quiet: boolean;
+}) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const tone = useProjectTone(sessions, terminals);
@@ -116,6 +131,10 @@ function ProjectRow({ project }: { project: Project }) {
     selectApproval(top?.status.kind === 'waiting_permission' ? (top.status.approvalId ?? '') : ''),
   );
   const lead = top ? sessionCaption(top, approval) : null;
+  const line = podForm(density, quiet) === 'row';
+  const now = useNow(AGO_CLOCK_MS);
+  const lastPulse = useLastActivity(activityKey.project(project.id));
+  const lastActivity = Math.max(lastPulse ?? 0, project.lastActivityAt ?? 0) || null;
   const branch = project.git?.branch;
   const level = useMotionLevel();
   const x = useMotionValue(0);
@@ -162,6 +181,7 @@ function ProjectRow({ project }: { project: Project }) {
         <Link
           href={projectHref(project.id)}
           data-phone-project={project.id}
+          data-pod-form={line ? 'row' : 'card'}
           className={ROW}
           draggable={false}
           onClick={(event) => {
@@ -171,33 +191,66 @@ function ProjectRow({ project }: { project: Project }) {
             dragged.current = false;
           }}
         >
-          <ProjectAvatar project={project} size="lg" />
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate font-medium text-body text-text-1" title={project.name}>
-              {project.name}
-            </span>
-            <span className="flex min-w-0 items-center gap-2 text-label text-text-2">
-              {tone !== 'idle' && (
-                <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
-              )}
-              {branch && (
-                <span className="min-w-0 truncate font-mono" title={branch}>
-                  {tone !== 'idle' && '· '}
-                  {branch}
+          <ProjectAvatar project={project} size={line ? 'md' : 'lg'} />
+          {line ? (
+            <>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span
+                  className="min-w-0 truncate font-medium text-body text-text-1"
+                  title={project.name}
+                >
+                  {project.name}
+                </span>
+                {tone !== 'idle' && (
+                  <StatusDot tone={tone} label={toneLabel(tone)} className="shrink-0" />
+                )}
+                {branch && (
+                  <span
+                    className="min-w-0 truncate font-mono text-label text-text-2 [flex-shrink:1000]"
+                    title={branch}
+                  >
+                    {branch}
+                  </span>
+                )}
+              </span>
+              <PodWhen
+                at={lastActivity}
+                now={now}
+                className="shrink-0 text-label text-text-2 tabular"
+              />
+              <PodCounts
+                sessions={podSessions(sessions).length}
+                terminals={terminals.filter((t) => t.state === 'open').length}
+              />
+            </>
+          ) : (
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate font-medium text-body text-text-1" title={project.name}>
+                {project.name}
+              </span>
+              <span className="flex min-w-0 items-center gap-2 text-label text-text-2">
+                {tone !== 'idle' && (
+                  <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
+                )}
+                {branch && density !== 'compact' && (
+                  <span className="min-w-0 truncate font-mono" title={branch}>
+                    {tone !== 'idle' && '· '}
+                    {branch}
+                  </span>
+                )}
+              </span>
+              {lead && (
+                <span
+                  dir="auto"
+                  data-phone-lead
+                  className={cx('truncate text-label', CAPTION_COLOR[lead.tone])}
+                  title={lead.text}
+                >
+                  {lead.text}
                 </span>
               )}
             </span>
-            {lead && (
-              <span
-                dir="auto"
-                data-phone-lead
-                className={cx('truncate text-label', CAPTION_COLOR[lead.tone])}
-                title={lead.text}
-              >
-                {lead.text}
-              </span>
-            )}
-          </span>
+          )}
           <ChevronRight aria-hidden className="size-4 shrink-0 text-text-3" strokeWidth={1.5} />
         </Link>
       </motion.div>

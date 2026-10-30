@@ -157,6 +157,13 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 ```
 
 - **Lead with what needs you:** the header carries the project's status token next to its name, and each row leads with the session's own token (§2.1). Quiet shows no mark and no word. The caption says what the session is doing (tool and target), what it needs (the waiting reason), or what it produced: the last line of `last_assistant_message`, then the session title, then "Ready". Stale replaces it with the reason.
+- **Two sizes:** a project with something going on gets the full card. A quiet one (nothing needs you or runs, nothing crashed, no activity for five minutes: the test that dims a pod, §4.10) folds to a **one-line row**: mark, name, branch, last activity, and a count of live sessions and open terminals. A row keeps the pod's menu, link, grip (in its left gutter) and morph. Cells are a stable grid and each pod is as tall as its content, top-aligned; no masonry, because that reorders cards. A pod folding or unfolding never moves in the order: its neighbours glide (`layout`, `smooth`) into the new heights, and the pod itself swaps at once.
+- **Density** (Comfortable, Compact, List; Settings and ⌘K, kept per device) changes which fields render, for Minimal and the phone's Projects list. Picking one applies at once, with no glide:
+  - **Comfortable:** everything above.
+  - **Compact:** more columns and no header crew, tokens, last assistant line, session meta line, empty placeholders or lane graphs. A session is one line with its time at the end; each card keeps two sessions and two lanes and counts the rest. A phone row loses its branch.
+  - **List:** every project is a row, in one column, with its columns lined up and the top session's caption after the branch. Under 40rem the caption goes; narrower still the branch, then the time. The strip (§4.5) still says what needs you.
+
+  Office, Grid, Transit and Retro keep their geometry and show the same split with `data-dim` (a darker room, a faded node, track or frame).
 - **Times are relative**, with the absolute time in a tooltip: `4m ago`, and `waiting 3m` on a blocked row. A running row shows no time. Session hashes, the word "Idle" and clock times stay off cards.
 - Hover: a cursor-following spotlight (radial gradient at the pointer position, 6% white) plus border brightening. No lift or scale: hover feedback stays quiet so status motion stands out.
 - **Activity track:** it draws only what says something, and the first match wins:
@@ -165,7 +172,7 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
   3. **CPU as text** (`12%`), when a command is running and using at least 2 %.
   4. **Nothing**, when the terminal is idle.
 
-  New samples slide in from the right. The color is the project accent, and it turns rose on error output. The full reading is in the tooltip. In a pod narrower than 22rem the graphs and labels go first and only the number stays.
+  New samples slide in from the right. The color is the project accent, and it turns rose on error output. The full reading is in the tooltip. In a pod narrower than 22rem, and in Compact, the graphs and labels go first and only the number stays.
 - **Flow light:** when a lane is streaming, a thin gradient "comet" travels along its bottom border (CSS keyframe on a pseudo-element, transform only).
 - The pod border takes the highest-priority status color of its children (wait > err > work).
 - **Terminal peek:** hovering (or focusing) a lane expands a live 6-line preview of that terminal's latest output beneath it (DOM text, Geist Mono 11px, ANSI colors, updated at most 10×/s), so you can read logs without opening anything.
