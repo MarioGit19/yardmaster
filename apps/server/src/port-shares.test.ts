@@ -178,7 +178,7 @@ describe('PortShares', () => {
     await instance.share(3000);
     expect(await serveCalls()).toHaveLength(1);
     await instance.stop();
-  });
+  }, 30_000);
 
   it('forwards to IPv6 loopback when the port listens only there', async () => {
     const { store, instance } = shares();

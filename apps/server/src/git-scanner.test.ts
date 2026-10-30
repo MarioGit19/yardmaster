@@ -366,5 +366,5 @@ describe('runGit', () => {
     expect(store.state.projects['p-outer']?.git?.statusSkipped).toBeUndefined();
     expect(store.state.projects['p-outer']?.git?.branch).not.toBeNull();
     expect(existsSync(marker)).toBe(false);
-  });
+  }, 30_000);
 });

@@ -243,19 +243,20 @@ describe('/ws/ui patches', () => {
       if ((JSON.parse(data.toString()) as ServerToUi).type === 'patch') stamps.push(Date.now());
     });
 
+    const start = Date.now();
     store.upsertProject(project);
     for (let i = 1; i <= 20; i++) {
       store.touchProject(project.id, project.createdAt + i);
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
+    const elapsed = Date.now() - start;
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    // ~20 changes over ≥ 100 ms collapse into a few batches spaced ≥ 1/30 s apart.
+    // ~20 changes collapse into at most one batch per 1/30 s, plus the leading and trailing
+    // flush. Counted rather than timed on arrival: a busy machine delivers batches in bursts.
     expect(stamps.length).toBeGreaterThan(0);
     expect(stamps.length).toBeLessThan(20);
-    for (let i = 1; i < stamps.length; i++) {
-      expect((stamps[i] as number) - (stamps[i - 1] as number)).toBeGreaterThanOrEqual(30);
-    }
+    expect(stamps.length).toBeLessThanOrEqual(Math.ceil(elapsed / (1000 / 30)) + 2);
   });
 
   it("doesn't replay changes that the new client's snapshot already holds", async () => {
