@@ -806,7 +806,8 @@ test.describe(`the Grid 3D network ${WEBGL}`, () => {
       await expect(page.locator('[data-ambient]')).toHaveCount(0);
       await expect(page.locator('[data-grid-floor]')).toHaveAttribute('data-grid-floor', '3d');
       // Every project has its label floating on screen, as crisp DOM text.
-      const projects = await page.locator('a[href^="#/p/"]').count();
+      const projects = await page.locator('nav[aria-label="Projects"] a[href^="#/p/"]').count();
+      expect(projects).toBeGreaterThan(0);
       await expect(page.locator('[data-grid-label] [data-grid-node]')).toHaveCount(projects);
       const stage = await page.locator('[data-grid-3d]').boundingBox();
       for (const label of await page.locator('[data-grid-label] [data-grid-node]').all()) {
