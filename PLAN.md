@@ -1153,7 +1153,7 @@ A security review before the repo goes public (three independent reviews of the 
   - Note: `.gitignore` still ignores `loop/logs/`, `loop/.state/`, `.claude/skills/` and `.claude/references/` (comments made neutral): the loop writes full transcripts there, so the ignores stay until those folders are gone. CI no longer skips `loop/**`. PRD §13 is now "Decisions" (distribution, MIT). The doctor's API-key hint no longer says "subscription". UI copy that says "your Claude Code login" was left as is.
   - Note: the e2e suite passed, but split into chunks: on this busy machine (load avg ~11) a few timing tests (crew fps, the grid workspace, phone-fit diffs) flaked in the full run and passed when rerun alone.
 
-- [ ] **[HUMAN] 14.8 Check the hardened build**
+- [x] **[HUMAN] 14.8 Check the hardened build**
   - The extension and the hook changed in 14.1:
     1. Uninstall nothing. Run `pnpm --filter yardmaster-extension package && cursor --install-extension apps/extension/dist/yardmaster.vsix --force`, then reload every Cursor window.
     2. Run `yardmaster install-hooks` again, and restart your Claude sessions.
