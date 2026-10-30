@@ -1393,6 +1393,33 @@
   overscroll-behavior: contain;
   padding: 20px;
 }
+/* A column folded to a rail of buttons, in every skin. */
+.focus[data-layout] .focus-col.focus-col-rail {
+  padding: 0;
+  overflow: hidden;
+}
+.focus-rail {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+/* The side panel's frame; closed, it stays mounted behind the rail. */
+.focus-side {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.focus-side[hidden] {
+  display: none;
+}
 /* The maximized terminal stack covers the other columns. The column itself jumps (it changes
    layout); the cover under it fades the other columns out and, on the way back, in again. */
 .focus-col-max {
@@ -1499,6 +1526,35 @@
 .focus-col:has(> .claude-panel) {
   padding: 0;
   overflow: hidden;
+}
+.claude-panel {
+  container: chat-panel / inline-size;
+}
+/* The header's model and token count give way before the name and the detail toggle. */
+@container chat-panel (width < 672px) {
+  .claude-head [data-head-model] {
+    display: none;
+  }
+}
+@container chat-panel (width < 480px) {
+  .claude-head [data-head-tokens] {
+    display: none;
+  }
+  /* The origin keeps its icon, and its word for screen readers. */
+  .claude-head [data-origin] {
+    width: 20px;
+    height: 20px;
+    justify-content: center;
+    padding: 0;
+  }
+  .claude-head [data-origin] > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 .message-scroll:focus-visible {
   box-shadow: inset 0 0 0 2px var(--line-strong);

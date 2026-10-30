@@ -830,6 +830,41 @@ const SCENARIOS = {
     await page.evaluate(() => localStorage.removeItem('yardmaster.layout'));
   },
 
+  async panels(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.waitForTimeout(800);
+    await page.locator('[data-pod] header a').first().click();
+    const card = page.locator('[data-focus]');
+    await card.locator('[data-session-panel]').waitFor();
+    await page.waitForTimeout(1200);
+    await r.moment('rail', 'transition', 'the session list folds and unfolds', async () => {
+      await card.locator('[data-rail-toggle]').click();
+      await page.waitForTimeout(800);
+      await card.locator('[data-rail-toggle]').click();
+      await page.waitForTimeout(800);
+    });
+    await r.moment('side', 'transition', 'the side panel folds and unfolds', async () => {
+      await card.locator('[data-side-panel] [data-panel-toggle]').click();
+      await page.waitForTimeout(800);
+      await card.locator('[data-side-open="terminals"]').click();
+      await page.waitForTimeout(800);
+    });
+    await r.moment('tabs', 'transition', 'Terminals to Changes and back', async () => {
+      await card.locator('[data-side-tab="changes"]').click();
+      await page.waitForTimeout(500);
+      await card.locator('[data-side-tab="terminals"]').click();
+      await page.waitForTimeout(500);
+    });
+    await r.moment('verbosity', 'transition', 'Summary, Verbose, then Normal', async () => {
+      const toggle = card.getByRole('radiogroup', { name: 'Transcript detail' });
+      for (const name of ['summary', 'verbose', 'normal']) {
+        await toggle.getByRole('radio', { name }).click();
+        await page.waitForTimeout(600);
+      }
+    });
+  },
+
   async chrome(r: Recorder) {
     const { page } = r;
     await openOverview(page);

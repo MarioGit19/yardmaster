@@ -595,11 +595,11 @@ test.describe('terminal stack', () => {
         await shot('terminals-claude');
 
         await stack.getByRole('tab', { name: /^next dev\b/ }).click();
-        await stack.getByRole('button', { name: 'Show up to four terminals' }).click();
+        await page.getByRole('button', { name: 'Show up to four terminals' }).click();
         await page.waitForTimeout(900);
         await shot('terminals-grid');
 
-        await stack.getByRole('button', { name: 'Maximize terminals' }).click();
+        await page.getByRole('button', { name: 'Maximize terminals' }).click();
         await page.waitForTimeout(900);
         await shot('terminals-maximized');
       });
@@ -802,12 +802,18 @@ test.describe('git and history', () => {
         await openRoute(page, await firstProjectRoute(page));
         const history = page.locator('[data-history-list]');
         await expect(history.locator('[data-history]').first()).toBeVisible();
-        await expect(page.locator('[data-git-panel]')).toBeVisible();
         await history.locator('[data-history]').nth(1).hover();
         await page.waitForTimeout(400);
         const column = page.locator('.focus-col').filter({ has: history });
         await column.screenshot({
           path: new URL(`git-history-${theme}.png`, OUT_DIR).pathname,
+          animations: 'disabled',
+        });
+        await page.locator('[data-side-tab="changes"]').click();
+        await expect(page.locator('[data-git-panel]')).toBeVisible();
+        await page.waitForTimeout(400);
+        await page.locator('section[aria-label="Terminals and changes"]').screenshot({
+          path: new URL(`side-changes-${theme}.png`, OUT_DIR).pathname,
           animations: 'disabled',
         });
       });
@@ -2343,7 +2349,7 @@ for (const size of FIT_SIZES) {
           await shot(page, 'workspace');
           return;
         }
-        for (const tab of ['Sessions', 'Claude', 'Terminals'] as const) {
+        for (const tab of ['Sessions', 'Claude', 'Terminals', 'Changes'] as const) {
           await tabs.getByRole('tab', { name: tab, exact: true }).click();
           await page.waitForTimeout(700);
           await shot(page, `workspace-${tab.toLowerCase()}`);
@@ -2643,6 +2649,73 @@ test.describe('brand', () => {
         await page.screenshot({
           path: new URL(`brand-homescreen-${theme}.png`, OUT_DIR).pathname,
         });
+      });
+    });
+  }
+});
+
+test.describe('focus view around the chat', () => {
+  for (const theme of ['dark', 'light'] as const) {
+    for (const [width, height] of [
+      [1280, 800],
+      [1440, 900],
+    ] as const) {
+      test.describe(`${theme} ${width}`, () => {
+        test.use({ theme, viewport: { width, height } });
+        test('panels', async ({ page }) => {
+          await openRoute(page, '/');
+          await openRoute(page, await firstProjectRoute(page));
+          const card = page.locator('[data-focus]');
+          await expect(card.locator('[data-session-panel]')).toBeVisible();
+          const shot = (name: string) =>
+            page.screenshot({
+              path: new URL(`chat-${name}-${width}-${theme}.png`, OUT_DIR).pathname,
+              animations: 'disabled',
+            });
+          await page.waitForTimeout(900);
+          await shot('open');
+          const toggle = card.getByRole('radiogroup', { name: 'Transcript detail' });
+          await toggle.getByRole('radio', { name: 'summary' }).click();
+          await page.waitForTimeout(500);
+          await shot('summary');
+          await toggle.getByRole('radio', { name: 'verbose' }).click();
+          await page.waitForTimeout(500);
+          await shot('verbose');
+          await toggle.getByRole('radio', { name: 'normal' }).click();
+          await card.locator('[data-rail-toggle]').click();
+          await card.locator('[data-side-tab="changes"]').click();
+          await page.waitForTimeout(700);
+          await shot('rail-changes');
+          await card.locator('[data-side-panel] [data-panel-toggle]').click();
+          await page.waitForTimeout(700);
+          await shot('folded');
+        });
+      });
+    }
+  }
+
+  for (const layout of ['office', 'grid', 'transit', 'retro'] as const) {
+    test.describe(layout, () => {
+      test.use({ layout, viewport: { width: 1280, height: 800 } });
+      test('panels', async ({ page }) => {
+        await openRoute(page, '/');
+        await openRoute(page, await firstProjectRoute(page));
+        const card = page.locator('[data-focus]');
+        await expect(card.locator('[data-session-panel]')).toBeVisible();
+        const shot = (name: string) =>
+          page.screenshot({
+            path: new URL(`chat-${layout}-${name}-1280.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        await page.waitForTimeout(900);
+        await shot('open');
+        await card.locator('[data-side-tab="changes"]').click();
+        await page.waitForTimeout(400);
+        await shot('changes');
+        await card.locator('[data-rail-toggle]').click();
+        await card.locator('[data-side-panel] [data-panel-toggle]').click();
+        await page.waitForTimeout(800);
+        await shot('folded');
       });
     });
   }

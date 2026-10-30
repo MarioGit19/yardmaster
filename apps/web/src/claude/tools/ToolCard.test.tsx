@@ -203,3 +203,39 @@ describe('ToolCard', () => {
     expect($('[data-tool-kind]')?.getAttribute('data-tool-kind')).toBe('other');
   });
 });
+
+describe('with every card opened', () => {
+  const opened = (row: ToolRow) =>
+    act(() =>
+      root.render(
+        <ToolViewState opened>
+          <ToolCard row={row} cwd={SAMPLE_CWD} />
+        </ToolViewState>,
+      ),
+    );
+
+  it('opens cards that start closed, past their preview, with their input', () => {
+    const lines = Array.from({ length: 60 }, (_, i) => `${i + 1}\u2192line ${i + 1}`).join('\n');
+    opened({
+      kind: 'tool',
+      id: 'read-long',
+      ts: 1,
+      toolUseId: 'read-long',
+      name: 'Read',
+      input: { file_path: `${SAMPLE_CWD}/src/a.ts`, limit: 60 },
+      result: { text: lines, isError: false },
+    });
+    const card = container.querySelector('[data-tool="Read"]');
+    expect(card?.hasAttribute('data-open')).toBe(true);
+    expect(card?.querySelector('[data-tool-input]')?.textContent).toContain('"limit": 60');
+    expect(card?.textContent).toContain('line 60');
+    expect(card?.textContent).not.toContain('more line');
+  });
+
+  it('keeps a toggled card closed', () => {
+    opened(sample(TOOL_SAMPLES[0]?.label ?? ''));
+    const head = container.querySelector<HTMLButtonElement>('.tool-head');
+    act(() => head?.click());
+    expect(head?.getAttribute('aria-expanded')).toBe('false');
+  });
+});

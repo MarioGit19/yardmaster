@@ -9,6 +9,7 @@ import {
   HANDLE_PX,
   loadSizes,
   maxWidth,
+  RAIL_PX,
   saveSizes,
   snapWidth,
 } from './layout.js';
@@ -61,6 +62,21 @@ describe('fitSizes', () => {
     expect(fitSizes(DEFAULT_SIZES, 300)).toEqual({
       left: COLUMN_LIMITS.left.min,
       right: COLUMN_LIMITS.right.min,
+    });
+  });
+
+  it('folds a railed column and lets the other use the room', () => {
+    expect(fitSizes({ left: 280, right: 600 }, 1000, { left: true })).toEqual({
+      left: RAIL_PX,
+      right: 564,
+    });
+    expect(fitSizes({ left: 400, right: 420 }, 700, { right: true })).toEqual({
+      left: 700 - RAIL_PX - 2 * HANDLE_PX - CENTER_MIN,
+      right: RAIL_PX,
+    });
+    expect(fitSizes(DEFAULT_SIZES, 1000, { left: true, right: true })).toEqual({
+      left: RAIL_PX,
+      right: RAIL_PX,
     });
   });
 

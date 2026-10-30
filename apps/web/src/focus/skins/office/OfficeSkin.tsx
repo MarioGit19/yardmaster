@@ -17,7 +17,7 @@ import { terminalTarget } from '../../../terminal/target.js';
 import { buttonClass } from '../../../ui/Button.js';
 import { cx } from '../../../ui/cx.js';
 import { Tooltip } from '../../../ui/Tooltip.js';
-import { FocusCaption } from '../../FocusCaption.js';
+import { FocusCaption, FocusStatus } from '../../FocusCaption.js';
 import type {
   EntryTransitionProps,
   HeaderBandProps,
@@ -123,8 +123,11 @@ function OfficeHeaderBand({ project, session, headingRef }: HeaderBandProps) {
         )}
       </div>
       {session && session.status.kind !== 'ended' && (
-        <div className="hidden min-w-0 max-w-[26rem] flex-1 basis-0 xl:block">
-          <FocusCaption session={session} />
+        <div className="hidden min-w-0 max-w-[26rem] flex-1 basis-0 items-center gap-3 xl:flex">
+          <FocusStatus session={session} />
+          <div className="min-w-0 flex-1">
+            <FocusCaption session={session} />
+          </div>
         </div>
       )}
     </header>

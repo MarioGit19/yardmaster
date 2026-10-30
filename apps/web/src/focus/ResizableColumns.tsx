@@ -41,6 +41,9 @@ export interface ResizableColumnsProps {
   labels: Record<SideColumn | 'center', string>;
   /** The right column covers the others (the maximized terminal stack). */
   rightMaximized?: boolean;
+  /** A side column folded to its rail; its handle goes with it. */
+  leftRail?: boolean;
+  rightRail?: boolean;
   /** How each column enters (the focus view's settle after the morph). */
   settle?: HTMLMotionProps<'section'>;
 }
@@ -56,8 +59,11 @@ export function ResizableColumns({
   right,
   labels,
   rightMaximized = false,
+  leftRail = false,
+  rightRail = false,
   settle,
 }: ResizableColumnsProps) {
+  const level = useMotionLevel();
   const rootRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   // Drags and settle springs mark the grid, so the terminals refit once when it lands.
@@ -82,11 +88,34 @@ export function ResizableColumns({
     return () => ro.disconnect();
   }, []);
 
+  const rails = useRef({ left: leftRail, right: rightRail });
   useLayoutEffect(() => {
-    const fitted = fitSizes({ ...defaultSizes(width), ...chosen.current }, width);
-    leftWidth.jump(fitted.left);
-    rightWidth.jump(fitted.right);
-  }, [width, leftWidth, rightWidth]);
+    const fitted = fitSizes({ ...defaultSizes(width), ...chosen.current }, width, {
+      left: leftRail,
+      right: rightRail,
+    });
+    const folded = rails.current.left !== leftRail || rails.current.right !== rightRail;
+    rails.current = { left: leftRail, right: rightRail };
+    for (const [column, value] of [
+      ['left', leftWidth],
+      ['right', rightWidth],
+    ] as const) {
+      const to = fitted[column];
+      if (!folded || level !== 'full' || width <= 0) {
+        value.jump(to);
+      } else if (value.get() !== to) {
+        // The same spring as a released handle: the terminals refit once when it lands.
+        const source = `fold-${column}`;
+        const land = () => {
+          offCancel();
+          mark.end(source);
+        };
+        animate(value, to, { ...spring.smooth, onComplete: land });
+        const offCancel = value.on('animationCancel', land);
+        mark.start(source);
+      }
+    }
+  }, [width, leftRail, rightRail, level, leftWidth, rightWidth, mark]);
 
   const commit = (column: SideColumn, value: number) => {
     chosen.current = { ...chosen.current, [column]: value };
@@ -104,21 +133,25 @@ export function ResizableColumns({
         {...settle}
         id={ids.left}
         aria-label={labels.left}
-        className="focus-col"
+        className={cx('focus-col', leftRail && 'focus-col-rail')}
         inert={rightMaximized}
       >
         {left}
       </motion.section>
-      <Handle
-        column="left"
-        controls={ids.left}
-        label={`Resize ${labels.left.toLowerCase()}`}
-        value={leftWidth}
-        other={rightWidth}
-        width={width}
-        mark={mark}
-        onCommit={commit}
-      />
+      {leftRail ? (
+        <FoldedHandle />
+      ) : (
+        <Handle
+          column="left"
+          controls={ids.left}
+          label={`Resize ${labels.left.toLowerCase()}`}
+          value={leftWidth}
+          other={rightWidth}
+          width={width}
+          mark={mark}
+          onCommit={commit}
+        />
+      )}
       <motion.section
         {...settle}
         aria-label={labels.center}
@@ -127,26 +160,43 @@ export function ResizableColumns({
       >
         {center}
       </motion.section>
-      <Handle
-        column="right"
-        controls={ids.right}
-        label={`Resize ${labels.right.toLowerCase()}`}
-        value={rightWidth}
-        other={leftWidth}
-        width={width}
-        mark={mark}
-        onCommit={commit}
-      />
+      {rightRail ? (
+        <FoldedHandle />
+      ) : (
+        <Handle
+          column="right"
+          controls={ids.right}
+          label={`Resize ${labels.right.toLowerCase()}`}
+          value={rightWidth}
+          other={leftWidth}
+          width={width}
+          mark={mark}
+          onCommit={commit}
+        />
+      )}
       <motion.section
         {...settle}
         id={ids.right}
         aria-label={labels.right}
-        className={cx('focus-col', rightMaximized && 'focus-col-max')}
+        className={cx(
+          'focus-col',
+          rightMaximized && 'focus-col-max',
+          rightRail && 'focus-col-rail',
+        )}
       >
         {right}
       </motion.section>
       <div aria-hidden data-covering={rightMaximized || undefined} className="focus-col-cover" />
     </motion.div>
+  );
+}
+
+/** A folded column's edge: the handle's track and line, with nothing to drag. */
+function FoldedHandle() {
+  return (
+    <span aria-hidden className="flex justify-center">
+      <span className="focus-handle-line" />
+    </span>
   );
 }
 

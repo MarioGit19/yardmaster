@@ -198,7 +198,9 @@ Above the overview in every layout, on the phone too, a strip lists everything w
 ### 4.6 Focus view (project)
 
 - A shared-element transition from the pod. The background dims and blurs other content.
-- Layout: left column is the session list plus the git panel. The center is the **Claude panel** (chat). The right is a **terminal stack** (tabs or a 2×2 grid toggle). All panels are resizable with spring-snapped handles.
+- Layout: the chat comes first. The center is the **Claude panel** and takes what the side columns leave. On the left, the session list and history fold to a slim **rail** (52 px: each live session's crew member, linking to it). On the right, a **side panel** has two tabs, **Terminals** (the terminal stack: tabs or a 2×2 grid toggle) and **Changes** (the git panel), and folds to a rail with a counted button per tab. Open columns resize with spring-snapped handles (sizes per project). What is folded and which tab is on top are remembered per device. Folding springs the column on `smooth` (Reduced and Off land at once), and the terminals refit once when it lands. A terminal asked for from anywhere else (⌘K, a band character, a deep link) opens the side panel on Terminals. Below 1024 px the columns become tabs: Sessions, Claude, Terminals, Changes.
+- Header: back, the project with its branch under it (the path in the tooltip), the session's status token and its one-line caption with Allow / Deny (§4.10). Office and Transit keep their bands, and Office its small crew of selectable characters (§10.8). The mascot sits in the chat instead (§4.11).
+- Transcript detail, a toggle in the panel's header (a strip above the chat on the phone, §11), per device: **Summary** (what was said, plus file edits, subagents and failures as closed cards), **Normal** (everything, as it is), **Verbose** (thinking open, every card open, with the tool's input and its whole output). A chat keeps the reader's place across a switch, and a card the reader toggled stays as they left it. A compact chat (inside a terminal pane or a cockpit) has no toggle and reads at Normal.
 - Claude panel: message stream with markdown, collapsible thinking blocks, and tool cards (Bash with output, Edit/Write with diffs, Read/Grep as compact chips, TodoWrite as an animated checklist where checks draw in, Task as a nested subagent thread). The composer has model and permission-mode pills, Enter to send and Esc to interrupt.
 - Streaming text shows a soft caret glow at the tail. Tool cards enter with a scale 0.98→1 and fade.
 
@@ -268,7 +270,7 @@ Every project has a small original character, the **crew member**, that acts out
 - Built from separate SVG part groups (body, visor/eyes, arms, legs, prop layer) animated with Motion variants and keyframes. Use transforms and opacity only.
 - State changes **blend** (200–300 ms, `smooth`) and never snap. Props enter and leave with a quick scale and fade.
 - Idle variety (blinks, look-arounds) is randomized per instance so a board of characters never moves in sync.
-- Sizes: 24 px (session row: eyes, antenna orb and posture only, no props), 56 px (pod header: full acting), and 120 px (focus-view header: full acting plus props in detail).
+- Sizes: 24 px (session row: eyes, antenna orb and posture only, no props), 56 px (pod header: full acting), 72 px (the chat at rest: under an idle session's last message, or over a session with no messages yet, playing the done sparkle when a turn finishes) and 120 px (a blank new-session panel: full acting plus props in detail). The focus view's header carries no mascot.
 - Characters off screen or in hidden tabs are paused. At the Reduced motion level each state is a static pose. At Off it's a static pose without bubbles.
 
 ## 5. Component inventory
@@ -446,7 +448,7 @@ This layout is allowed a stronger look than the rest of the app (neon on near-bl
 
 ### 10.8 Workspace skins
 
-The focus view (§4.6) keeps one implementation: the same columns, session list, git panel, chat, tool cards, composer, terminal stack, resize handles, keyboard map and accessible names in every layout. A layout changes only how it **looks**, so a feature added to the workspace works everywhere at once.
+The focus view (§4.6) keeps one implementation: the same columns, rails, session list, side panel, git panel, chat, tool cards, composer, terminal stack, resize handles, keyboard map and accessible names in every layout. A layout changes only how it **looks**, so a feature added to the workspace works everywhere at once.
 
 - **How:** the focus view root carries `data-layout`. Each skin is (1) a token override scoped to `[data-layout="…"] .focus` (surfaces, lines, text, radii, shadows, fonts within the existing families), (2) an xterm theme, and (3) at most a few small slot components the focus view renders by layout: a **header band**, a **panel frame** and an **entry transition**. No layout forks a panel; if a skin needs a change inside a component, the change is a token or a `data-layout` CSS hook.
 - **Same meaning:** status colors, the non-color cues (§8), the ClaudeOrb's states and every caption stay readable and mean the same thing. Contrast meets §8 in both themes.
@@ -471,6 +473,7 @@ The board must be fully usable one-handed on a phone (360–430 px wide, portrai
   - **Item pages:** tapping a card opens that item full screen: a Claude chat, or a terminal's output. The header shows the item's name and status. Tapping the name opens a **switcher sheet** listing every item in the project (the same groups as the hub) to jump between them, and swiping left or right moves to the neighbouring item. A Claude chat that runs in a terminal has a *Chat / Terminal* segmented toggle in its header. When another item in the project needs you, a slim amber bar under the header says so and opens it.
   - **Words over icons:** every action on a phone has a visible text label (an icon with a word under or beside it), or lives in a labelled menu. Terminal actions read *Stop* (Ctrl+C), *Restart*, *Open in Cursor*, *Find*, *Clear*. History rows say *Resume here* / *Resume in Cursor*. Board-owned terminals get a key bar (Tab, Esc, Ctrl, arrows) above the keyboard.
   - **Reachability:** from the overview, any session's chat, any terminal's output, a waiting approval and a new terminal are each at most two taps away. Back always returns to the hub, and the hub's scroll position and the last-opened item are kept.
+  - A chat page has the transcript detail toggle (§4.6) in a strip under its header.
   - The composer is pinned to the bottom and rides above the on-screen keyboard (`interactive-widget=resizes-content` in the viewport meta, `visualViewport` as a fallback), so the field and Send are always visible while typing. Its state is written as a sentence ("Claude is working, you can reply when it's done") with *Stop* as a labelled button.
 - **Sheets and dialogs** are bottom sheets, at most 90 dvh, with a drag handle and their own scroll; nothing opens as a centered desktop dialog on a phone.
 - Toasts sit above the tab bar (or above the composer in a workspace) and never cover the tab bar or Send.

@@ -8,19 +8,21 @@ import { useBoard } from '../data/index.js';
 import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { dur, ease } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
+import { usePreference } from '../prefs.js';
 import { sessionHref } from '../routes.js';
 import { formatCount, totalTokens } from '../status.js';
-import { useSessionView } from '../statusTokens.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
-import { StatusDot } from '../ui/StatusDot.js';
 import { EmptyState } from '../views/Page.js';
 import { SessionComposer } from './Composer.js';
 import { ChatDensityContext, chatColumn, useCompactChat } from './density.js';
 import { OriginBadge } from './OriginBadge.js';
+import { useRestingCrew } from './RestingCrew.js';
 import { streamingTail } from './transcript.js';
 import { useTranscript } from './useTranscript.js';
+import { VerbosityToggle } from './VerbosityToggle.js';
+import { verbosityPreference } from './verbosity.js';
 
 // Markdown, highlighting and virtualization load with the first conversation, not the app.
 const MessageList = lazy(() =>
@@ -29,6 +31,8 @@ const MessageList = lazy(() =>
 
 /** Statuses during which Claude may still be writing the last text block. */
 const WRITING = new Set<ClaudeSession['status']['kind']>(['working', 'tool']);
+/** The crew member under an idle transcript, and over one with no messages yet. */
+const REST_CREW_PX = 72;
 
 /**
  * The focus view's center column: one session's conversation (DESIGN.md §4.6). `compact` is the
@@ -55,7 +59,6 @@ export function ClaudePanel({
   }, [settled]);
   // The replay of a long transcript is hundreds of socket messages: keep them out of the morph.
   const { rows, loaded } = useTranscript(session.id, settled);
-  const status = useSessionView(session);
   const writing = WRITING.has(session.status.kind);
   // Board sessions stream into `draft`, cleared as the block lands in the transcript.
   const tail =
@@ -74,6 +77,11 @@ export function ClaudePanel({
   const column = chatColumn(compact);
   // Claude Code's automatic name or the first prompt: under the name, never in its place.
   const subtitle = sessionSubtitle(session);
+  // A compact chat has no room for the toggle, so it always reads at Normal.
+  const chosen = usePreference(verbosityPreference);
+  const verbosity = compact ? 'normal' : chosen;
+  const crew = useRestingCrew(session, session.projectId ?? '', REST_CREW_PX);
+  const resting = !compact && session.status.kind === 'idle';
 
   return (
     <ChatDensityContext value={compact ? 'compact' : 'regular'}>
@@ -83,8 +91,8 @@ export function ClaudePanel({
         data-density={compact ? 'compact' : undefined}
       >
         {!compact && header && (
-          <header className="flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
-            {/* The name keeps room for a few characters; the status word gives way first. */}
+          <header className="claude-head flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
+            {/* The name keeps room for a few characters; the subtitle gives way first. */}
             <div className="flex min-w-24 flex-1 items-baseline gap-2">
               <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">
                 {sessionDisplayName(session)}
@@ -105,23 +113,23 @@ export function ClaudePanel({
               )}
             </div>
             <OriginBadge origin={session.origin} compact="narrow" />
-            <StatusDot
-              tone={status.tone}
-              label={status.label}
-              showLabel
-              className="min-w-0 text-meta text-text-2"
-            />
             {session.model && (
-              <span className="hidden min-w-0 max-w-40 xl:flex">
+              <span data-head-model className="min-w-0 max-w-40">
                 <Chip mono title={session.model}>
                   {session.model.replace(/^claude-/, '')}
                 </Chip>
               </span>
             )}
-            <span className="tabular shrink-0 font-mono text-meta text-text-2">
+            <span data-head-tokens className="tabular shrink-0 font-mono text-meta text-text-2">
               {formatCount(totalTokens(session))} tok
             </span>
+            <VerbosityToggle />
           </header>
+        )}
+        {!compact && !header && (
+          <div className="flex shrink-0 justify-end border-line border-b px-4 py-1">
+            <VerbosityToggle />
+          </div>
         )}
         <BackgroundPanel session={session} />
         {/* The skeleton cross-fades into the transcript, and one session's into the next's; the old
@@ -139,7 +147,10 @@ export function ClaudePanel({
               {!loaded ? (
                 <TranscriptSkeleton />
               ) : rows.length === 0 && tail === null ? (
-                <div className={cx('min-h-0 flex-1', column.gutter)}>
+                <div
+                  className={cx('flex min-h-0 flex-1 flex-col items-center pt-8', column.gutter)}
+                >
+                  {!compact && crew}
                   <EmptyState title="No messages yet">
                     {session.origin === 'board'
                       ? 'Your first message and Claude’s reply show up here.'
@@ -154,6 +165,8 @@ export function ClaudePanel({
                     caption={caption}
                     cwd={session.cwd ?? undefined}
                     forkedAt={session.forkedFrom?.at ?? null}
+                    verbosity={verbosity}
+                    rest={resting ? crew : null}
                   />
                 </Suspense>
               )}

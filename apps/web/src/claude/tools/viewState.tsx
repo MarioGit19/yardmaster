@@ -10,25 +10,29 @@ import {
 
 type Store = Map<string, boolean>;
 
-const ViewStateContext = createContext<{ store: Store; collapsed: boolean }>({
+const ViewStateContext = createContext<{ store: Store; collapsed: boolean; opened: boolean }>({
   store: new Map(),
   collapsed: false,
+  opened: false,
 });
 
 /**
  * Holds the open/closed state of tool cards for one message list. Virtual rows unmount when they
  * scroll away; the state lives here, so a card comes back the way the reader left it.
- * `collapsed`: every card starts closed, whatever it would open itself for.
+ * `collapsed`: every card starts closed, whatever it would open itself for. `opened`: every card
+ * starts open, showing everything it has.
  */
 export function ToolViewState({
   collapsed = false,
+  opened = false,
   children,
 }: {
   collapsed?: boolean;
+  opened?: boolean;
   children: ReactNode;
 }) {
   const store = useRef<Store>(new Map());
-  const value = useMemo(() => ({ store: store.current, collapsed }), [collapsed]);
+  const value = useMemo(() => ({ store: store.current, collapsed, opened }), [collapsed, opened]);
   return <ViewStateContext value={value}>{children}</ViewStateContext>;
 }
 
@@ -37,13 +41,17 @@ export function ToolViewState({
  * Until the reader toggles it, it follows `fallback` (a card can open itself when its tool fails).
  */
 export function useStickyFlag(key: string, fallback: boolean): [boolean, () => void] {
-  const { store, collapsed } = useContext(ViewStateContext);
+  const { store, collapsed, opened } = useContext(ViewStateContext);
   const [local, setLocal] = useState<{ key: string; value: boolean } | null>(null);
   // A changed key (a different row in this slot) drops the local value and reads the store.
-  const value = (local?.key === key ? local.value : store.get(key)) ?? (fallback && !collapsed);
+  const value =
+    (local?.key === key ? local.value : store.get(key)) ?? (opened || (fallback && !collapsed));
   const toggle = useCallback(() => {
     store.set(key, !value);
     setLocal({ key, value: !value });
   }, [store, key, value]);
   return [value, toggle];
 }
+
+/** Whether cards show their full input and output instead of a preview. */
+export const useFullTools = () => useContext(ViewStateContext).opened;

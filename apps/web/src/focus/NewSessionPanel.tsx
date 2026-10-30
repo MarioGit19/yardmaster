@@ -1,7 +1,11 @@
 import type { Project } from '@yardmaster/protocol';
 import { NewSessionComposer } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
+import { useRestingCrew } from '../claude/RestingCrew.js';
 import { EmptyState } from '../views/Page.js';
+
+/** The crew member over an empty chat: full acting with props in detail (DESIGN.md §4.11). */
+const EMPTY_CREW_PX = 120;
 
 /** A blank composer that starts a board session in the project, until the session exists. */
 export function NewSessionPanel({
@@ -15,6 +19,7 @@ export function NewSessionPanel({
   /** Off on the phone's page, whose own header says what it is. */
   header?: boolean;
 }) {
+  const crew = useRestingCrew(null, project.id, EMPTY_CREW_PX);
   return (
     <div className="claude-panel flex h-full min-h-0 flex-col" data-new-session-panel>
       {header && (
@@ -25,7 +30,8 @@ export function NewSessionPanel({
           <OriginBadge origin="board" />
         </header>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5">
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-5 pt-8">
+        {crew}
         <EmptyState title={missing ? 'This session is no longer available' : 'Start a session'}>
           Claude runs headless from the board in {project.name}, with your own Claude Code login.
           Pick a model and how much it may do without asking.

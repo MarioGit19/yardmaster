@@ -336,7 +336,12 @@ for (const layout of FOCUS_LAYOUTS) {
       const { card } = await openFirstProject(page, layout);
       // The view's own tabs; the terminal stack inside has tabs of its own.
       const panels = card.getByRole('tablist', { name: 'Focus view panels' });
-      await expect(panels.getByRole('tab')).toHaveText(['Sessions', 'Claude', 'Terminals']);
+      await expect(panels.getByRole('tab')).toHaveText([
+        'Sessions',
+        'Claude',
+        'Terminals',
+        'Changes',
+      ]);
       await expect(panels.getByRole('tab', { name: 'Claude' })).toHaveAttribute(
         'aria-selected',
         'true',

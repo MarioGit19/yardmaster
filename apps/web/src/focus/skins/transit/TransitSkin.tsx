@@ -32,7 +32,7 @@ import { buttonClass } from '../../../ui/Button.js';
 import { cx } from '../../../ui/cx.js';
 import { StatusDot } from '../../../ui/StatusDot.js';
 import { Tooltip } from '../../../ui/Tooltip.js';
-import { FocusCaption } from '../../FocusCaption.js';
+import { FocusCaption, FocusStatus } from '../../FocusCaption.js';
 import type {
   EntryTransitionProps,
   HeaderBandProps,
@@ -181,8 +181,11 @@ function TransitHeaderBand({ project, session, headingRef }: HeaderBandProps) {
         </div>
       </TipContext.Provider>
       {session && live && (
-        <div className="ts-band-caption hidden min-w-0 xl:block">
-          <FocusCaption session={session} />
+        <div className="ts-band-caption hidden min-w-0 items-center gap-3 xl:flex">
+          <FocusStatus session={session} />
+          <div className="min-w-0 flex-1">
+            <FocusCaption session={session} />
+          </div>
         </div>
       )}
       {tip && <TipCard tip={tip} placement="below" />}

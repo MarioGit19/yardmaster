@@ -78,7 +78,9 @@ for (const layout of FOCUS_LAYOUTS) {
         await expect(list.locator('[data-row="assistant"]')).toHaveCount(2);
         // Escape stopped Claude; it didn't close the focus view.
         await expect(session).toBeVisible();
-        await expect(session.locator('header')).toContainText('Idle');
+        await expect(
+          page.locator(`[data-focus] a[data-session="${sessionId}"] [data-status]`),
+        ).toHaveAttribute('data-status', 'idle');
       });
 
       test("a terminal session's composer types into its terminal; the fork is in its menu", async ({

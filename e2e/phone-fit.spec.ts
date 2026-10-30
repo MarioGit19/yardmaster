@@ -417,7 +417,9 @@ async function walk(page: Page, query: string, phone: boolean) {
     } else {
       const tabs = focus.getByRole('tablist', { name: 'Focus view panels' });
       const tabbed = (await tabs.count()) > 0;
-      for (const tab of tabbed ? (['Sessions', 'Claude', 'Terminals'] as const) : [null]) {
+      for (const tab of tabbed
+        ? (['Sessions', 'Claude', 'Terminals', 'Changes'] as const)
+        : [null]) {
         if (tab) await tabs.getByRole('tab', { name: tab, exact: true }).click();
         if (tab === 'Claude' || tab === null) diffs += await openToolCards(focus);
         await check(`workspace ${tab ?? 'columns'} (${n})`);

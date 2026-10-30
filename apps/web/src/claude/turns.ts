@@ -7,7 +7,11 @@ interface TurnItem {
 }
 
 const speakerOf = (item: TurnItem | undefined): Speaker | null =>
-  !item || item.kind === 'fork' ? null : item.kind === 'user' ? 'you' : 'claude';
+  !item || item.kind === 'fork' || item.kind === 'rest'
+    ? null
+    : item.kind === 'user'
+      ? 'you'
+      : 'claude';
 
 const clock = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',

@@ -33,12 +33,14 @@ test('an interrupted board session resumes from its row and takes a reply', asyn
 
   await page.locator(`[data-focus] [data-row-resume]`).click();
   await expect(bar).toHaveCount(0);
-  await expect(panel.locator('header')).toContainText('Idle');
+  await expect(page.locator('[data-focus] header').first()).toContainText('Idle');
   await expect(page.locator(`[data-focus] a[data-session="${sessionId}"]`)).not.toContainText(
     'Interrupted',
   );
 
-  const before = Number(await list.getAttribute('data-count'));
+  // The crew member resting under the last message isn't a message.
+  const resting = await list.locator('[data-row="rest"]').count();
+  const before = Number(await list.getAttribute('data-count')) - resting;
   const reply = panel.getByRole('textbox', { name: /^Message / });
   await reply.fill('Carry on where you stopped.');
   await reply.press('Enter');

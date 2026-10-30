@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { attentionOpen } from '../attention/attention.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
@@ -109,6 +110,8 @@ export interface TerminalStackProps {
   besideSessionId?: string;
   /** "Show here instead": the Claude column lets the session go so the stack can show it. */
   onShowChatHere?: (sessionId: string) => void;
+  /** Where the stack's actions go when a panel's tabs already name it; null until it exists. */
+  actionsSlot?: HTMLElement | null;
 }
 
 /** How long a new terminal may take to show up before the stack stops waiting to select it. */
@@ -127,6 +130,7 @@ export function TerminalStack({
   deferRenderers = false,
   besideSessionId,
   onShowChatHere,
+  actionsSlot,
 }: TerminalStackProps) {
   const [renderersReady, setRenderersReady] = useState(!deferRenderers);
   useEffect(() => {
@@ -249,34 +253,40 @@ export function TerminalStack({
     tabRefs.current.get(next)?.focus();
   };
 
+  const actions = (
+    <>
+      {ordered.length > 1 && <LayoutToggle layout={layout} />}
+      {onMaximizedChange && (
+        <IconButton
+          size="sm"
+          label={maximized ? 'Restore terminals' : 'Maximize terminals'}
+          aria-pressed={maximized}
+          icon={
+            maximized ? (
+              <Minimize2 className="size-4" strokeWidth={1.5} />
+            ) : (
+              <Maximize2 className="size-4" strokeWidth={1.5} />
+            )
+          }
+          onClick={() => onMaximizedChange(!maximized)}
+        />
+      )}
+    </>
+  );
+
   return (
     <div data-terminal-stack={projectId} className="flex h-full min-h-0 flex-col gap-3">
-      <ColumnHeading
-        className=""
-        meta={ordered.length > 0 ? ordered.length : undefined}
-        actions={
-          <>
-            {ordered.length > 1 && <LayoutToggle layout={layout} />}
-            {onMaximizedChange && (
-              <IconButton
-                size="sm"
-                label={maximized ? 'Restore terminals' : 'Maximize terminals'}
-                aria-pressed={maximized}
-                icon={
-                  maximized ? (
-                    <Minimize2 className="size-4" strokeWidth={1.5} />
-                  ) : (
-                    <Maximize2 className="size-4" strokeWidth={1.5} />
-                  )
-                }
-                onClick={() => onMaximizedChange(!maximized)}
-              />
-            )}
-          </>
-        }
-      >
-        Terminals
-      </ColumnHeading>
+      {actionsSlot === undefined ? (
+        <ColumnHeading
+          className=""
+          meta={ordered.length > 0 ? ordered.length : undefined}
+          actions={actions}
+        >
+          Terminals
+        </ColumnHeading>
+      ) : (
+        actionsSlot && createPortal(actions, actionsSlot)
+      )}
 
       {ordered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-control border border-line border-dashed px-6 text-center">

@@ -4,6 +4,7 @@ import { ArrowDown, ChevronRight, Eye, EyeOff, GitFork } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   memo,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -23,6 +24,7 @@ import { ToolCard } from './tools/ToolCard.js';
 import { ToolViewState } from './tools/viewState.js';
 import { inheritedRows, type ToolRow, type TranscriptRow } from './transcript.js';
 import { turnHead } from './turns.js';
+import { nearestShown, shownRows, type Verbosity } from './verbosity.js';
 
 /** Within this many px of the bottom the list counts as "at the latest" and follows new rows. */
 export const STICK_THRESHOLD_PX = 48;
@@ -41,6 +43,7 @@ type Item =
   | TranscriptRow
   | { kind: 'tail'; id: typeof TAIL_ID; text: string }
   | { kind: 'caption'; id: typeof TAIL_ID; caption: Caption }
+  | { kind: 'rest'; id: typeof TAIL_ID }
   | { kind: 'fork'; id: typeof FORK_ID };
 
 /** `collapsed`: tool cards start closed (a compact chat), so only their header counts. */
@@ -54,6 +57,8 @@ function estimate(item: Item | undefined, collapsed: boolean): number {
       return 40;
     case 'fork':
       return 44;
+    case 'rest':
+      return 88;
     case 'user':
       return 56 + Math.min(10, Math.floor(item.text.length / 80)) * 20;
     default:
@@ -114,6 +119,10 @@ export interface MessageListProps {
   cwd?: string;
   /** A fork: rows up to this time are its parent's, dimmed above a "Forked here" divider. */
   forkedAt?: number | null;
+  /** How much of the transcript to show. */
+  verbosity?: Verbosity;
+  /** Shown after the last row while the session rests (its crew member). */
+  rest?: ReactNode;
 }
 
 /**
@@ -121,16 +130,19 @@ export interface MessageListProps {
  * offers a "Jump to latest" pill once the reader scrolls away.
  */
 export function MessageList({
-  rows,
+  rows: allRows,
   tail,
   caption = null,
   cwd,
   forkedAt = null,
+  verbosity = 'normal',
+  rest = null,
 }: MessageListProps) {
   const still = useMotionLevel() !== 'full';
   const compact = useCompactChat();
   const column = chatColumn(compact);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rows = useMemo(() => shownRows(allRows, verbosity), [allRows, verbosity]);
   const inherited = inheritedRows(rows, forkedAt);
   const body: Item[] =
     inherited > 0
@@ -141,7 +153,9 @@ export function MessageList({
       ? [...body, { kind: 'tail', id: TAIL_ID, text: tail }]
       : caption !== null
         ? [...body, { kind: 'caption', id: TAIL_ID, caption }]
-        : body;
+        : rest !== null
+          ? [...body, { kind: 'rest', id: TAIL_ID }]
+          : body;
   const [atEnd, setAtEnd] = useState(true);
   const atEndRef = useRef(true);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -149,8 +163,9 @@ export function MessageList({
   const initial = useRef<Set<string> | null>(null);
   const awayFrom = useRef(rows.length);
 
-  if (initial.current === null && rows.length > 0) {
-    initial.current = new Set(rows.map((r) => r.id));
+  // Every row, shown or not: a level switch reveals rows, it doesn't deliver them.
+  if (initial.current === null && allRows.length > 0) {
+    initial.current = new Set(allRows.map((r) => r.id));
   }
 
   const virtualizer = useVirtualizer({
@@ -238,6 +253,26 @@ export function MessageList({
   useEffect(() => {
     if (atEnd) awayFrom.current = rows.length;
   }, [atEnd, rows.length]);
+
+  // A level switch changes every height: a reader at the end stays there, one further up keeps
+  // the row at the top of the list, or the next one the new level still shows.
+  const topRow = useRef<string | null>(null);
+  const level = useRef(verbosity);
+  useLayoutEffect(() => {
+    if (level.current === verbosity) return;
+    level.current = verbosity;
+    awayFrom.current = rows.length;
+    if (stuck.current || topRow.current === null) {
+      toEnd();
+      return;
+    }
+    const id = nearestShown(allRows, rows, topRow.current);
+    const index = items.findIndex((item) => item.id === id);
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'start' });
+  });
+  useEffect(() => {
+    topRow.current = items[virtualizer.range?.startIndex ?? -1]?.id ?? null;
+  });
   const unseen = atEnd ? 0 : Math.max(0, rows.length - awayFrom.current);
 
   const toggle = useCallback((id: string) => {
@@ -261,7 +296,7 @@ export function MessageList({
 
   const virtualItems = virtualizer.getVirtualItems();
   return (
-    <ToolViewState collapsed={compact}>
+    <ToolViewState collapsed={compact || verbosity === 'summary'} opened={verbosity === 'verbose'}>
       <div className="relative min-h-0 flex-1">
         <div
           ref={scrollRef}
@@ -322,9 +357,11 @@ export function MessageList({
                     <Row
                       item={item}
                       cwd={cwd}
-                      expanded={expanded.has(item.id)}
+                      // Verbose starts every row open; a toggled row flips from there.
+                      expanded={expanded.has(item.id) !== (verbosity === 'verbose')}
                       onToggle={toggle}
                       entering={enter}
+                      rest={rest}
                       previousTodos={
                         enter && item.kind === 'tool' && item.name === 'TodoWrite'
                           ? previousTodos(items, v.index)
@@ -373,7 +410,7 @@ export function MessageList({
 
 /** The row with its secrets masked; the same object when it has none. */
 export function redactItem(item: Item): Item {
-  if (item.kind === 'fork') return item;
+  if (item.kind === 'fork' || item.kind === 'rest') return item;
   if (item.kind === 'caption') {
     const text = redact(item.caption.text);
     return text === item.caption.text ? item : { ...item, caption: { ...item.caption, text } };
@@ -398,6 +435,7 @@ interface RowProps {
   expanded: boolean;
   onToggle: (id: string) => void;
   entering: boolean;
+  rest: ReactNode;
   previousTodos: { content: string; status: TodoStatus }[] | null | undefined;
 }
 
@@ -433,7 +471,7 @@ const Row = memo(function Row(props: RowProps) {
   );
 });
 
-function RowBody({ item, cwd, expanded, onToggle, entering, previousTodos }: RowProps) {
+function RowBody({ item, cwd, expanded, onToggle, entering, rest, previousTodos }: RowProps) {
   switch (item.kind) {
     case 'user':
       return <UserBubble row={item} expanded={expanded} onToggle={onToggle} />;
@@ -453,6 +491,8 @@ function RowBody({ item, cwd, expanded, onToggle, entering, previousTodos }: Row
       );
     case 'thinking':
       return <Thinking row={item} expanded={expanded} onToggle={onToggle} />;
+    case 'rest':
+      return rest;
     case 'fork':
       return <ForkDivider />;
     case 'tool':

@@ -19,6 +19,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `density`  | `switch`: Comfortable → Compact → List → Comfortable through the palette (applies at once: nothing should fly across the grid) |
 | `busy`     | `activity` (8 s) on `--demo-stress`: set it beside `overview-activity` to compare a calm and a busy board |
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |
+| `panels`   | `rail` (fold and unfold the session list), `side` (fold and unfold the side panel), `tabs` (Terminals ↔ Changes), `verbosity` (Summary → Verbose → Normal) |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
 | `fx`       | `text` (decrypt, glitch, split-flap), `darkveil`, `softaurora`, `faultyterminal` (energy 0.1 → 1), `ripplegrid`, `lighttunnel` (dive and surge), `phone` (swipe and hold), cropped to the `/#/_tokens` fx sections |

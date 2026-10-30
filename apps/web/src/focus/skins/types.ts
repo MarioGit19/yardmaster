@@ -1,6 +1,5 @@
 import type { ClaudeSession, Project, SessionStatus } from '@yardmaster/protocol';
 import type { ComponentType, ReactNode, RefObject } from 'react';
-import type { CrewView } from '../../pod/SessionCrew.js';
 import type { Tone } from '../../status.js';
 
 /** What the focus view hands its header band: the same facts in every skin. */
@@ -8,11 +7,6 @@ export interface HeaderBandProps {
   project: Project;
   /** The session in the Claude column; null while composing a new one or with none. */
   session: ClaudeSession | null;
-  /** The Claude column holds a blank composer for a new session. */
-  composing: boolean;
-  accent: string;
-  crew: CrewView;
-  now: number;
   /** The project name's heading, focused when the view opens. */
   headingRef: RefObject<HTMLHeadingElement | null>;
   /** Taking part in the pod morph (Minimal only). */

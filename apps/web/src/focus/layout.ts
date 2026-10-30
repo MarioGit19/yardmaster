@@ -44,6 +44,8 @@ export function defaultSizes(width: number): ColumnSizes {
 export const CENTER_MIN = 360;
 /** Each resize handle is its own grid track. */
 export const HANDLE_PX = 12;
+/** A folded side column: a slim rail of buttons. */
+export const RAIL_PX = 52;
 /** How close (px) a release must be to a snap width to land on it. */
 export const SNAP_RADIUS = 28;
 /** Keyboard steps: arrows, and arrows with Shift. */
@@ -62,13 +64,22 @@ export function maxWidth(column: SideColumn, other: number, width: number): numb
 
 /**
  * Fits stored sizes into a body `width` px wide: each column within its limits, then the right
- * and then the left column give way until the Claude panel has `CENTER_MIN`.
+ * and then the left column give way until the Claude panel has `CENTER_MIN`. A column in `rails`
+ * is folded to `RAIL_PX`, whatever its stored size.
  */
-export function fitSizes(sizes: ColumnSizes, width: number): ColumnSizes {
-  let left = clamp(sizes.left, COLUMN_LIMITS.left.min, COLUMN_LIMITS.left.max);
-  let right = clamp(sizes.right, COLUMN_LIMITS.right.min, COLUMN_LIMITS.right.max);
-  right = Math.min(right, maxWidth('right', left, width));
-  left = Math.min(left, maxWidth('left', right, width));
+export function fitSizes(
+  sizes: ColumnSizes,
+  width: number,
+  rails: Partial<Record<SideColumn, boolean>> = {},
+): ColumnSizes {
+  let left = rails.left
+    ? RAIL_PX
+    : clamp(sizes.left, COLUMN_LIMITS.left.min, COLUMN_LIMITS.left.max);
+  let right = rails.right
+    ? RAIL_PX
+    : clamp(sizes.right, COLUMN_LIMITS.right.min, COLUMN_LIMITS.right.max);
+  if (!rails.right) right = Math.min(right, maxWidth('right', left, width));
+  if (!rails.left) left = Math.min(left, maxWidth('left', right, width));
   return { left: Math.round(left), right: Math.round(right) };
 }
 

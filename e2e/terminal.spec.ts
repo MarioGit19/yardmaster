@@ -114,12 +114,12 @@ for (const layout of FOCUS_LAYOUTS) {
         page,
       }) => {
         const stack = await openStack(page);
-        await stack.getByRole('button', { name: 'Show up to four terminals' }).click();
+        await page.getByRole('button', { name: 'Show up to four terminals' }).click();
         await expect(stack.locator('[data-pane]')).toHaveCount(4);
-        await stack.getByRole('button', { name: 'Show one terminal' }).click();
+        await page.getByRole('button', { name: 'Show one terminal' }).click();
         await expect(stack.locator('[data-pane]')).toHaveCount(1);
 
-        await stack.getByRole('button', { name: 'Maximize terminals' }).click();
+        await page.getByRole('button', { name: 'Maximize terminals' }).click();
         await expect(page.locator('.focus-col-max')).toBeVisible();
         await page.keyboard.press('Escape');
         await expect(page.locator('.focus-col-max')).toHaveCount(0);

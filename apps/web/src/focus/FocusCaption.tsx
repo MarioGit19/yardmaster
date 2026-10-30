@@ -7,8 +7,10 @@ import { selectApproval, useBoard, useBoardClient } from '../data/index.js';
 import { formatUptime } from '../lanes/lane.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import { sessionCaption } from '../pod/model.js';
+import { useSessionView } from '../statusTokens.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { Button } from '../ui/Button.js';
+import { StatusDot } from '../ui/StatusDot.js';
 
 /** A tool running at least this long shows its elapsed time. */
 export const ELAPSED_AFTER_MS = 3_000;
@@ -19,6 +21,19 @@ export function formatElapsed(ms: number): string {
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
   return formatUptime(ms);
+}
+
+/** The focused session's status token, beside its caption in the header. */
+export function FocusStatus({ session }: { session: ClaudeSession }) {
+  const status = useSessionView(session);
+  return (
+    <StatusDot
+      tone={status.tone}
+      label={status.label}
+      showLabel
+      className="shrink-0 whitespace-nowrap text-meta text-text-2"
+    />
+  );
 }
 
 /**

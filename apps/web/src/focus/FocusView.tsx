@@ -4,7 +4,7 @@ import {
   sessionDisplayName,
   sessionSubtitle,
 } from '@yardmaster/protocol';
-import { LoaderCircle, Play, Plus } from 'lucide-react';
+import { LoaderCircle, PanelLeftClose, PanelLeftOpen, Play, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -48,12 +48,15 @@ import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { StatusDot } from '../ui/StatusDot.js';
+import { Tooltip } from '../ui/Tooltip.js';
 import { EmptyState } from '../views/Page.js';
 import { ColumnHeading } from './ColumnHeading.js';
 import { claudeColumnSession } from './claudeColumn.js';
 import { NewSessionPanel } from './NewSessionPanel.js';
+import { railPreference, type SidePanelState, sidePanelPreference, sideTab } from './panels.js';
 import { PhoneWorkspace } from './phone/PhoneWorkspace.js';
 import { ResizableColumns } from './ResizableColumns.js';
+import { SidePanel, SideRail } from './SidePanel.js';
 import { sharedId } from './shared.js';
 import { SkinContext, useStatusWord } from './skins/registry.js';
 import type { PanelFrameProps } from './skins/types.js';
@@ -62,8 +65,12 @@ import { type ActiveSkin, useWorkspaceSkin } from './skins/useWorkspaceSkin.js';
 /** Below this width the three columns become tabs. */
 export const FOCUS_TABS_QUERY = '(max-width: 1023px)';
 
-const LABELS = { left: 'Sessions, history and git', center: 'Claude', right: 'Terminals' } as const;
-type PanelId = 'sessions' | 'claude' | 'terminals';
+const LABELS = {
+  left: 'Sessions and history',
+  center: 'Claude',
+  right: 'Terminals and changes',
+} as const;
+type PanelId = 'sessions' | 'claude' | 'terminals' | 'changes';
 /** Sleeping crews only need to notice five quiet minutes. */
 const IDLE_CLOCK_MS = 15_000;
 
@@ -226,6 +233,10 @@ function ProjectFocus({
   }, [sessionId]);
   const now = useNow(IDLE_CLOCK_MS);
   const crew = useCrewTerminals(terminals);
+  const rail = usePreference(railPreference);
+  const sidePanel = usePreference(sidePanelPreference);
+  const railed = rail === 'closed' && !tabs;
+  const sideClosed = sidePanel === 'closed' && !tabs;
   const level = useMotionLevel();
   const still = level !== 'full';
   const settle = columnSettle(still, shared ? dur.base : 0);
@@ -241,7 +252,11 @@ function ProjectFocus({
       activity: claudeSession ? [activityKey.session(claudeSession.id)] : [],
       tone: claudeTone === 'wait' || claudeTone === 'err' ? claudeTone : undefined,
     },
-    terminals: { title: 'Terminals', activity: terminals.map((t) => activityKey.terminal(t.id)) },
+    terminals: {
+      title: sideTab(sidePanel) === 'changes' ? 'Changes' : 'Terminals',
+      activity: terminals.map((t) => activityKey.terminal(t.id)),
+    },
+    changes: { title: 'Changes', activity: [activityKey.project(project.id)] },
   };
   const framed = (id: PanelId, content: ReactNode) =>
     PanelFrame ? <PanelFrame {...frames[id]}>{content}</PanelFrame> : content;
@@ -263,6 +278,7 @@ function ProjectFocus({
       sharedOrbs={shared && !tabs}
       composing={composing}
       onNewSession={() => setComposing(true)}
+      onFold={tabs ? undefined : (byKeyboard) => foldRail('closed', byKeyboard)}
     />
   );
   const claudeColumn = (
@@ -274,6 +290,28 @@ function ProjectFocus({
     />
   );
   const [maximized, setMaximized] = useState(false);
+  // Folding swaps the toggle out from under the keyboard: focus follows it to the new one.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const refocus = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once the fold has rendered.
+  useEffect(() => {
+    if (refocus.current) cardRef.current?.querySelector<HTMLElement>(refocus.current)?.focus();
+    refocus.current = null;
+  }, [rail, sidePanel]);
+  const foldRail = (state: 'open' | 'closed', byKeyboard: boolean) => {
+    if (byKeyboard) refocus.current = '[data-rail-toggle]';
+    railPreference.set(state);
+  };
+  const setSidePanel = (state: SidePanelState, byKeyboard = false) => {
+    if (byKeyboard) refocus.current = '[data-panel-toggle]';
+    setMaximized(false);
+    sidePanelPreference.set(state);
+  };
+  // A terminal asked for from anywhere else has to end up on screen.
+  useEffect(() => {
+    if (terminalRequested && !tabs) sidePanelPreference.set('terminals');
+  }, [terminalRequested, tabs]);
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   const terminalsColumn = (
     <TerminalStack
       projectId={project.id}
@@ -283,11 +321,15 @@ function ProjectFocus({
       besideSessionId={tabs || maximized || composing ? undefined : session?.id}
       onShowChatHere={showChatInStack}
       {...(tabs ? {} : { maximized, onMaximizedChange: setMaximized })}
+      {...(tabs ? {} : { actionsSlot: sidePanel === 'terminals' ? actionsSlot : null })}
     />
   );
+  const changesColumn = <GitPanel git={project.git} now={Date.now()} />;
+  const sideCounts = { terminals: terminals.length, changes: project.git?.dirty ?? 0 };
 
   return (
     <motion.div
+      ref={cardRef}
       layoutId={shared ? sharedId.container(project.id) : undefined}
       transition={spring.smooth}
       {...(fade && (entering ? { exit: cardFade.exit } : cardFade))}
@@ -315,10 +357,6 @@ function ProjectFocus({
           <HeaderBand
             project={project}
             session={composing ? null : (session ?? null)}
-            composing={composing}
-            accent={accent}
-            crew={crew}
-            now={now}
             headingRef={headingRef}
             shared={shared}
           />
@@ -351,15 +389,51 @@ function ProjectFocus({
                     label: 'Terminals',
                     content: framed('terminals', terminalsColumn),
                   },
+                  { id: 'changes', label: 'Changes', content: framed('changes', changesColumn) },
                 ]}
               />
             ) : (
               <ResizableColumns
                 projectId={project.id}
                 labels={LABELS}
-                left={framed('sessions', sessionsColumn)}
+                left={
+                  railed ? (
+                    <SessionRail
+                      project={project}
+                      sessions={sessions}
+                      activeId={composing ? undefined : session?.id}
+                      accent={accent}
+                      crew={crew}
+                      now={now}
+                      onUnfold={(byKeyboard) => foldRail('open', byKeyboard)}
+                    />
+                  ) : (
+                    framed('sessions', sessionsColumn)
+                  )
+                }
                 center={framed('claude', claudeColumn)}
-                right={framed('terminals', terminalsColumn)}
+                right={
+                  <>
+                    {sideClosed && <SideRail counts={sideCounts} onOpen={setSidePanel} />}
+                    {/* Closed, it stays mounted: its terminals keep their screens. */}
+                    <div hidden={sideClosed} className="focus-side">
+                      {framed(
+                        'terminals',
+                        <SidePanel
+                          tab={sideTab(sidePanel)}
+                          counts={sideCounts}
+                          onTab={setSidePanel}
+                          onClose={(byKeyboard) => setSidePanel('closed', byKeyboard)}
+                          actionsRef={setActionsSlot}
+                          terminals={terminalsColumn}
+                          changes={changesColumn}
+                        />,
+                      )}
+                    </div>
+                  </>
+                }
+                leftRail={railed}
+                rightRail={sideClosed}
                 rightMaximized={maximized}
                 settle={settle}
               />
@@ -490,6 +564,7 @@ function SessionsColumn({
   sharedOrbs,
   composing,
   onNewSession,
+  onFold,
 }: {
   project: Project;
   sessions: readonly ClaudeSession[];
@@ -501,6 +576,8 @@ function SessionsColumn({
   sharedOrbs: boolean;
   composing: boolean;
   onNewSession: () => void;
+  /** Folds the column to its rail; `byKeyboard` when Enter or Space did it. */
+  onFold?: (byKeyboard: boolean) => void;
 }) {
   const live = podSessions(sessions);
   const ended = sessions.filter((s) => s.status.kind === 'ended');
@@ -516,14 +593,25 @@ function SessionsColumn({
         <ColumnHeading
           meta={sessions.length || undefined}
           actions={
-            <IconButton
-              label="New session"
-              icon={<Plus className="size-4" strokeWidth={1.5} />}
-              size="sm"
-              aria-pressed={composing}
-              onClick={onNewSession}
-              data-new-session
-            />
+            <>
+              <IconButton
+                label="New session"
+                icon={<Plus className="size-4" strokeWidth={1.5} />}
+                size="sm"
+                aria-pressed={composing}
+                onClick={onNewSession}
+                data-new-session
+              />
+              {onFold && (
+                <IconButton
+                  label="Fold the session list"
+                  icon={<PanelLeftClose className="size-4" strokeWidth={1.5} />}
+                  size="sm"
+                  data-rail-toggle
+                  onClick={(e) => onFold(e.detail === 0)}
+                />
+              )}
+            </>
           }
         >
           Sessions
@@ -567,8 +655,84 @@ function SessionsColumn({
         refreshKey={ended.length}
         branch={project.git?.branch ?? null}
       />
-      <GitPanel git={project.git} now={Date.now()} />
     </div>
+  );
+}
+
+/** The folded session list: each live session's crew member, linking to it. */
+function SessionRail({
+  project,
+  sessions,
+  activeId,
+  accent,
+  crew,
+  now,
+  onUnfold,
+}: {
+  project: Project;
+  sessions: readonly ClaudeSession[];
+  activeId: string | undefined;
+  accent: string;
+  crew: CrewView;
+  now: number;
+  onUnfold: (byKeyboard: boolean) => void;
+}) {
+  return (
+    <nav aria-label="Sessions" data-session-rail className="focus-rail">
+      <IconButton
+        label="Unfold the session list"
+        tooltipSide="right"
+        data-rail-toggle
+        icon={<PanelLeftOpen className="size-4" strokeWidth={1.5} />}
+        onClick={(e) => onUnfold(e.detail === 0)}
+      />
+      {podSessions(sessions).map((s) => (
+        <RailSession
+          key={s.id}
+          session={s}
+          projectId={project.id}
+          active={s.id === activeId}
+          accent={accent}
+          crew={crew}
+          now={now}
+        />
+      ))}
+    </nav>
+  );
+}
+
+function RailSession({
+  session,
+  projectId,
+  active,
+  accent,
+  crew,
+  now,
+}: {
+  session: ClaudeSession;
+  projectId: string;
+  active: boolean;
+  accent: string;
+  crew: CrewView;
+  now: number;
+}) {
+  const status = useSessionView(session);
+  const name = sessionDisplayName(session);
+  return (
+    <Tooltip content={`${name} · ${status.label}`} side="right">
+      <Link
+        href={sessionHref(projectId, session.id)}
+        aria-label={`${name}, ${status.label}`}
+        aria-current={active ? 'page' : undefined}
+        data-session={session.id}
+        className={cx(
+          'flex size-9 touch:size-11 shrink-0 items-center justify-center rounded-control transition-colors duration-fast',
+          active ? 'bg-bg-2 shadow-raised' : 'hover:bg-bg-2/60',
+        )}
+      >
+        <SessionCrew session={session} accent={accent} crew={crew} now={now} countdown={null} />
+      </Link>
+    </Tooltip>
   );
 }
 

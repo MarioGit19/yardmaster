@@ -48,7 +48,7 @@ import {
   urlParts,
   urlsIn,
 } from './results.js';
-import { useStickyFlag } from './viewState.js';
+import { useFullTools, useStickyFlag } from './viewState.js';
 
 const FAMILY_ICON = {
   bash: Terminal,
@@ -277,9 +277,11 @@ function Card({
   );
 }
 
-/** Result text as monospace, cut to a sane size. */
+/** Result text as monospace, cut to a sane size unless the chat asked for everything. */
 function ResultText({ text, tone }: { text: string; tone?: 'error' }) {
-  const clipped = text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}\n…` : text;
+  const full = useFullTools();
+  const clipped =
+    !full && text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}\n…` : text;
   const ref = useScrollFocus<HTMLPreElement>(tone === 'error' ? 'Error output' : 'Output');
   return (
     <pre
@@ -291,6 +293,15 @@ function ResultText({ text, tone }: { text: string; tone?: 'error' }) {
     >
       {clipped || <span className="font-sans text-text-2 italic">No output</span>}
     </pre>
+  );
+}
+
+/** A tool's raw input, above its result, when the chat shows everything. */
+function ToolInput({ input }: { input: unknown }) {
+  return (
+    <div data-tool-input className="border-line border-b">
+      <ResultText text={prettyJson(input)} />
+    </div>
   );
 }
 
@@ -357,6 +368,7 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
   const [first = '', ...restLines] = call.command.split('\n');
   const output = row.result ? bashOutput(row.result.text) : null;
   const commandRef = useScrollFocus<HTMLPreElement>('Command');
+  const full = useFullTools();
   return (
     <Card
       row={row}
@@ -389,7 +401,7 @@ function BashCard({ row, appear, call }: CardProps & { call: CallOf<'bash'> }) {
       }
       defaultOpen={exit !== null && exit !== 0}
     >
-      {restLines.length > 0 && (
+      {(full || restLines.length > 0) && (
         <pre
           ref={commandRef}
           className="max-h-40 overflow-auto border-line border-b px-3 py-2 font-mono text-label leading-5 whitespace-pre-wrap text-text-1"
@@ -522,6 +534,7 @@ function ChipCard({
   const failed = result?.isError ?? false;
   const glitch = useGlitch(row);
   const [open, toggle] = useStickyFlag(row.id, false);
+  const full = useFullTools();
   const bodyId = useId();
   const Icon = FAMILY_ICON[toolFamily(row.name)];
 
@@ -621,12 +634,15 @@ function ChipCard({
           id={bodyId}
           className="msg-fade mt-1 w-full overflow-hidden rounded-control border border-line bg-bg-1"
         >
+          {full && <ToolInput input={row.input} />}
           <ChipPreview call={call} text={result.text} failed={failed} cwd={cwd} />
         </div>
       )}
     </div>
   );
 }
+
+const usePreviewLimit = () => (useFullTools() ? Number.POSITIVE_INFINITY : PREVIEW_LINES);
 
 function ChipPreview({
   call,
@@ -639,6 +655,8 @@ function ChipPreview({
   failed: boolean;
   cwd: string | undefined;
 }) {
+  const limit = usePreviewLimit();
+  const full = useFullTools();
   if (failed) return <ResultText text={stripAnsi(text)} tone="error" />;
   switch (call.kind) {
     case 'read': {
@@ -646,10 +664,10 @@ function ChipPreview({
       if (!lines) return <ResultText text={text} />;
       return (
         <CodeLines
-          lines={lines.slice(0, PREVIEW_LINES).map((l) => l.text)}
+          lines={lines.slice(0, limit).map((l) => l.text)}
           lang={extensionOf(call.filePath)}
           firstNo={lines[0]?.no ?? 1}
-          more={Math.max(0, lines.length - PREVIEW_LINES)}
+          more={Math.max(0, lines.length - limit)}
         />
       );
     }
@@ -657,11 +675,11 @@ function ChipPreview({
     case 'grep': {
       const paths =
         call.kind === 'glob' || /^Found \d+ files?\n/.test(text) ? listedPaths(text) : null;
-      const shown = (paths ?? text.split('\n')).slice(0, PREVIEW_LINES);
+      const shown = (paths ?? text.split('\n')).slice(0, limit);
       const total = paths?.length ?? text.split('\n').length;
       return (
         <ResultText
-          text={`${shown.map((p) => (cwd && p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : p)).join('\n')}${total > PREVIEW_LINES ? `\n… ${total - PREVIEW_LINES} more` : ''}`}
+          text={`${shown.map((p) => (cwd && p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : p)).join('\n')}${total > limit ? `\n… ${total - limit} more` : ''}`}
         />
       );
     }
@@ -669,7 +687,7 @@ function ChipPreview({
       return (
         <div className="space-y-2 px-3 py-2">
           {call.prompt && <p className="text-meta text-text-2">{call.prompt}</p>}
-          <Markdown className="md-sm" text={text.slice(0, MAX_RESULT_CHARS)} />
+          <Markdown className="md-sm" text={full ? text : text.slice(0, MAX_RESULT_CHARS)} />
         </div>
       );
     case 'search': {
@@ -817,6 +835,7 @@ function TodoMark({ status, draw }: { status: TodoStatus; draw: boolean }) {
 function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
   const [promptOpen, togglePrompt] = useStickyFlag(`${row.id}:prompt`, false);
   const long = call.prompt.length > 280 || call.prompt.split('\n').length > 4;
+  const full = useFullTools();
   return (
     <Card
       row={row}
@@ -862,7 +881,10 @@ function TaskCard({ row, call }: CardProps & { call: CallOf<'task'> }) {
         ) : row.result.isError ? (
           <ResultText text={stripAnsi(row.result.text)} tone="error" />
         ) : (
-          <Markdown className="md-sm" text={row.result.text.slice(0, MAX_RESULT_CHARS)} />
+          <Markdown
+            className="md-sm"
+            text={full ? row.result.text : row.result.text.slice(0, MAX_RESULT_CHARS)}
+          />
         )}
       </div>
     </Card>
@@ -883,6 +905,7 @@ function firstText(input: unknown): string {
 function OtherCard({ row, cwd }: CardProps) {
   const json = useMemo(() => prettyJson(row.input), [row.input]);
   const lines = json.split('\n');
+  const limit = usePreviewLimit();
   return (
     <Card
       row={row}
@@ -897,10 +920,10 @@ function OtherCard({ row, cwd }: CardProps) {
       defaultOpen={row.result?.isError ?? false}
     >
       <CodeLines
-        lines={lines.slice(0, PREVIEW_LINES)}
+        lines={lines.slice(0, limit)}
         lang="json"
         firstNo={null}
-        more={Math.max(0, lines.length - PREVIEW_LINES)}
+        more={Math.max(0, lines.length - limit)}
       />
       {row.result && (
         <div className="border-line border-t">
