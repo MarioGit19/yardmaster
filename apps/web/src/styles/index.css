@@ -2408,6 +2408,33 @@
 .office-room[data-dim] :is([data-office-station] > *, .office-face) {
   opacity: 0.7;
 }
+/* Name plates on the floor, in front of the stations: readable without pointing at anyone. */
+.office-plate-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  width: fit-content;
+  height: 16px;
+  padding-inline: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--text-1);
+  outline: none;
+}
+.office-plate-line[data-tone="wait"] {
+  color: var(--st-wait-ink);
+}
+.office-plate-line[data-tone="err"] {
+  color: var(--st-err-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  a.office-plate-line:hover > :last-child {
+    text-decoration: underline;
+  }
+}
 .office-tag {
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
@@ -3242,6 +3269,9 @@ main[data-office-zoom] {
   animation: transit-due var(--dur-breathe) var(--ease-in-out) infinite;
 }
 .transit-board-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   font-size: 12px;
   line-height: 16px;
@@ -3376,13 +3406,25 @@ main[data-office-zoom] {
   top: 2px;
   right: 6px;
   left: 6px;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 600;
   font-size: 12px;
   line-height: 16px;
   white-space: nowrap;
-  text-overflow: ellipsis;
   color: var(--text-1);
+  outline: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  a.transit-station-name:hover > :last-child {
+    text-decoration: underline;
+  }
+}
+.transit-spur-label {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-2);
 }
 .transit-station-name[data-tone="wait"] {
   color: var(--st-wait-ink);

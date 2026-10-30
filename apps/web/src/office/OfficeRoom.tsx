@@ -16,6 +16,8 @@ import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { dur, ease, spring } from '../motion.js';
 import { FAMILY_TOKEN } from '../orb/model.js';
 import { PodMenu } from '../pod/PodMenu.js';
+import { useMediaQuery } from '../prefs.js';
+import { projectHref } from '../routes.js';
 import { toneLabel } from '../status.js';
 import { cx } from '../ui/cx.js';
 import { Bookshelf, Couch, Desk, ServerRack, SideDesk, Workbench } from './kit/furniture.js';
@@ -23,6 +25,7 @@ import { PortSign } from './kit/PortSign.js';
 import { type DoorLight, RoomShell } from './kit/RoomShell.js';
 import { Whiteboard } from './kit/Whiteboard.js';
 import { OfficeCharacter } from './OfficeCharacter.js';
+import { RoomPlate } from './RoomPlate.js';
 import {
   FLOOR,
   FURNITURE_SCALE,
@@ -30,6 +33,7 @@ import {
   planRoom,
   ROOM_HEIGHT,
   rackTagClear,
+  roomPlates,
   WHITEBOARD,
   type WorkStation,
 } from './room.js';
@@ -103,6 +107,7 @@ export const OfficeRoom = memo(function OfficeRoom({
     work.current = plan.work;
   }, [plan]);
 
+  const coarse = useMediaQuery('(pointer: coarse)');
   const actors = useMemo(() => new Map(project.actors.map((a) => [a.id, a])), [project.actors]);
   const whiteboard = project.todos.length > 0 || Boolean(project.summary);
   // The main session (the oldest) wears the project's accent; everyone else the status colors.
@@ -195,6 +200,7 @@ export const OfficeRoom = memo(function OfficeRoom({
       >
         <RoomShell
           project={project}
+          href={coarse ? undefined : projectHref(project.id)}
           branch={project.branch}
           dirty={project.dirty}
           doorLight={DOOR_LIGHT[project.tone] ?? 'off'}
@@ -250,6 +256,10 @@ export const OfficeRoom = memo(function OfficeRoom({
               );
             })}
           </AnimatePresence>
+
+          {roomPlates(plan).map((plate) => (
+            <RoomPlate key={plate.key} plate={plate} actors={actors} fit={fit} linked={!coarse} />
+          ))}
 
           {plan.hidden > 0 && (
             <span

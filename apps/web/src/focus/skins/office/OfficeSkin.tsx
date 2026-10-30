@@ -16,6 +16,7 @@ import { ProjectAvatar } from '../../../shell/ProjectAvatar.js';
 import { terminalTarget } from '../../../terminal/target.js';
 import { buttonClass } from '../../../ui/Button.js';
 import { cx } from '../../../ui/cx.js';
+import { StatusDot } from '../../../ui/StatusDot.js';
 import { Tooltip } from '../../../ui/Tooltip.js';
 import { FocusCaption, FocusStatus } from '../../FocusCaption.js';
 import type {
@@ -267,6 +268,13 @@ function BandCharacter({
       >
         <span className="relative block" style={{ width: size, height: size }}>
           <ActorMascot actor={actor} size={size} color={color} drawing={false} />
+          {actor.tone !== 'idle' && (
+            <StatusDot
+              tone={actor.tone}
+              label={actor.label}
+              className="absolute top-0 right-0 rounded-full bg-bg-1/90 p-0.5"
+            />
+          )}
         </span>
       </button>
     </Tooltip>

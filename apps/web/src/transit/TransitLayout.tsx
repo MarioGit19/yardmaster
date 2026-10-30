@@ -3,12 +3,19 @@ import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
 import { useBoard } from '../data/index.js';
+import { StatusLegend } from '../layouts/StatusLegend.js';
 import type { SceneProject } from '../layouts/scene.js';
 import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { useMediaQuery } from '../prefs.js';
 import { cx } from '../ui/cx.js';
 import { DeparturesBoard } from './DeparturesBoard.js';
-import { buildServiceLog, busiestLine, type ServiceEvent, transitMode } from './map.js';
+import {
+  buildServiceLog,
+  busiestLine,
+  type ServiceEvent,
+  TRANSIT_LEGEND,
+  transitMode,
+} from './map.js';
 import { PhoneLine } from './PhoneLine.js';
 import { TipCard, TipContext, useTipLayer } from './shared.js';
 import { ROW, TransitLine } from './TransitLine.js';
@@ -89,6 +96,7 @@ export default function TransitLayout() {
           </p>
         ) : (
           <TipContext.Provider value={tipApi}>
+            <StatusLegend lines={TRANSIT_LEGEND} />
             <div
               className={cx('transit-concourse', mode === 'wide' ? 'is-wide' : 'is-stacked')}
               style={

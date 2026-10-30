@@ -1,5 +1,6 @@
 import type { Project } from '@yardmaster/protocol';
 import { type CSSProperties, type ReactNode, useId, useRef } from 'react';
+import { Link } from 'wouter';
 import { ProjectAvatar } from '../../shell/ProjectAvatar.js';
 import { cx } from '../../ui/cx.js';
 import { at } from './art.js';
@@ -10,6 +11,8 @@ export type DoorLight = 'off' | 'wait' | 'err';
 
 export interface RoomShellProps {
   project: Pick<Project, 'name' | 'accent'>;
+  /** Where the nameplate leads: the project's focus view. */
+  href?: string;
   branch?: string | null;
   /** Uncommitted files, shown after the branch. */
   dirty?: number;
@@ -30,12 +33,16 @@ export const ROOM = { w: 360, h: 220, floor: 184 } as const;
 
 const DOOR = { x: 14, y: 96, w: 40, h: ROOM.floor - 96 };
 
+const NAMEPLATE =
+  'absolute flex min-w-0 items-center gap-2 rounded-control border border-line bg-bg-1/90 px-2 py-1 shadow-raised transition-colors duration-fast';
+
 /**
  * One project's room (DESIGN.md §10.3): back wall and floor, the door with its nameplate and
  * door light on the left, a window, and the ceiling light whose glow follows the activity level.
  */
 export function RoomShell({
   project,
+  href,
   branch = null,
   dirty = 0,
   doorLight = 'off',
@@ -51,6 +58,25 @@ export function RoomShell({
   const lamp = dim ? 0.06 : 0.14 + 0.5 * Math.min(1, Math.max(0, light));
   const accent = `var(--accent-${project.accent})`;
   const floor = (ROOM.floor / ROOM.h) * h;
+  const plateAt = { left: (DOOR.x / ROOM.w) * w, top: 12, maxWidth: w * 0.52 };
+  const plate = (
+    <>
+      <ProjectAvatar project={project} size="sm" />
+      <span className="min-w-0">
+        <span className="block truncate text-label font-medium text-text-1" title={project.name}>
+          {project.name}
+        </span>
+        {branch && (
+          <span className="flex min-w-0 items-center gap-1 font-mono text-label text-text-3">
+            <span className="truncate" title={branch}>
+              {branch}
+            </span>
+            {dirty > 0 && <span className="shrink-0 text-st-wait-ink tabular">●{dirty}</span>}
+          </span>
+        )}
+      </span>
+    </>
+  );
 
   return (
     <div
@@ -124,28 +150,24 @@ export function RoomShell({
         style={at(w, h, DOOR.x + DOOR.w / 2 - 4, DOOR.y - 14, 8, 8)}
       />
 
-      <div
-        data-kit-nameplate
-        className="absolute flex min-w-0 items-center gap-2 rounded-control border border-line bg-bg-1/90 px-2 py-1 shadow-raised"
-        style={{ left: (DOOR.x / ROOM.w) * w, top: 12, maxWidth: w * 0.52 }}
-      >
-        <ProjectAvatar project={project} size="sm" />
-        <span className="min-w-0">
-          <span className="block truncate text-label font-medium text-text-1" title={project.name}>
-            {project.name}
-          </span>
-          {branch && (
-            <span className="flex min-w-0 items-center gap-1 font-mono text-label text-text-3">
-              <span className="truncate" title={branch}>
-                {branch}
-              </span>
-              {dirty > 0 && <span className="shrink-0 text-st-wait-ink tabular">●{dirty}</span>}
-            </span>
-          )}
-        </span>
-      </div>
-
       {children && <div className="absolute inset-0">{children}</div>}
+
+      {href ? (
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-label={`Open ${project.name}`}
+          data-kit-nameplate
+          className={cx(NAMEPLATE, 'outline-none hover:border-line-strong')}
+          style={plateAt}
+        >
+          {plate}
+        </Link>
+      ) : (
+        <div data-kit-nameplate className={NAMEPLATE} style={plateAt}>
+          {plate}
+        </div>
+      )}
     </div>
   );
 }

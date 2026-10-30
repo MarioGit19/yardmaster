@@ -1,5 +1,6 @@
 import { type ActivityEvent, HISTORY_WINDOW_MS } from '@yardmaster/protocol';
 import { isCrashExit } from '../data/selectors.js';
+import type { LegendLines } from '../layouts/StatusLegend.js';
 import {
   type ActorState,
   actorRank,
@@ -139,36 +140,48 @@ export interface BoardStatus {
   tone: Tone;
 }
 
-/** What each state reads as on the board. */
-export function boardStatus(actor: Pick<SceneActor, 'state' | 'tone' | 'exit'>): BoardStatus {
-  switch (actor.state) {
-    case 'waiting':
-      return { word: 'Due · needs you', tone: 'wait' };
-    case 'error':
+/** What each status token reads as on the board; a quiet train says where it stands. */
+export function boardStatus(
+  actor: Pick<SceneActor, 'state' | 'token' | 'tone' | 'exit'>,
+): BoardStatus {
+  switch (actor.token) {
+    case 'needs_you':
+      return { word: 'Due · needs you', tone: actor.tone };
+    case 'failed':
       return {
         word: actor.exit !== null ? `Cancelled · exit ${actor.exit}` : 'Cancelled',
-        tone: 'err',
+        tone: actor.tone,
       };
-    case 'thinking':
-    case 'typing':
-    case 'reading':
     case 'running':
-    case 'delegating':
-      return { word: 'Departing', tone: actor.tone };
-    case 'serving':
-      return { word: 'In service', tone: actor.tone };
-    case 'done':
-      return { word: 'Arrived', tone: 'ok' };
+      return { word: actor.state === 'serving' ? 'In service' : 'Departing', tone: actor.tone };
     case 'stale':
-      return { word: 'Signal lost', tone: 'stale' };
+      return { word: 'Signal lost', tone: actor.tone };
+    case 'done_unseen':
+      return { word: 'Arrived', tone: actor.tone };
+    case 'quiet':
+      break;
+  }
+  switch (actor.state) {
+    case 'done':
+      return { word: 'Arrived', tone: actor.tone };
     case 'sleeping':
-      return { word: 'Stabled', tone: 'idle' };
+      return { word: 'Stabled', tone: actor.tone };
     case 'exited':
-      return { word: 'Out of service', tone: 'idle' };
+      return { word: 'Out of service', tone: actor.tone };
     default:
-      return { word: 'At platform', tone: 'idle' };
+      return { word: 'At platform', tone: actor.tone };
   }
 }
+
+/** The concourse's legend: each token in station-board words and what its train does. */
+export const TRANSIT_LEGEND: LegendLines = {
+  needs_you: 'Due, amber doors',
+  failed: 'Cancelled, rose car halted',
+  running: 'Departing or in service',
+  stale: 'Signal lost, parked',
+  done_unseen: 'Arrived, green windows',
+  quiet: 'At platform',
+};
 
 export interface BoardRow {
   actor: SceneActor;

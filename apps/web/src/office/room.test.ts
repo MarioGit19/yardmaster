@@ -8,6 +8,7 @@ import {
   planRoom,
   READ_TRIP_MS,
   rackTagClear,
+  roomPlates,
   walkSeconds,
 } from './room.js';
 
@@ -204,5 +205,47 @@ describe('rackTagClear', () => {
   it('keeps it clear of the whiteboard, or when there is none', () => {
     expect(rackTagClear(200, true)).toBe(true);
     expect(rackTagClear(150, false)).toBe(true);
+  });
+});
+
+describe('name plates', () => {
+  const plan = (actors: SceneActor[]) => planRoom(actors, { width: WIDTH, now: NOW });
+
+  it('gives every drawn character a name at its station, never overlapping', () => {
+    const p = plan([
+      actor('s:a', { kind: 'claude' }),
+      actor('s:b', { kind: 'claude' }),
+      actor('t:srv', { state: 'serving' }),
+      actor('t:idle'),
+    ]);
+    const plates = roomPlates(p);
+    expect(plates.flatMap((plate) => plate.actorIds).sort()).toEqual(
+      p.placements.map((placement) => placement.actorId).sort(),
+    );
+    for (const [i, plate] of plates.entries()) {
+      const next = plates[i + 1];
+      if (next) expect(plate.x + plate.w).toBeLessThanOrEqual(next.x);
+    }
+  });
+
+  it('stacks a shared couch and keeps a name at the desk during a trip', () => {
+    const couch = roomPlates(plan([actor('t:a'), actor('t:b')]));
+    expect(couch).toHaveLength(1);
+    expect(couch[0]?.actorIds).toEqual(['t:a', 't:b']);
+
+    const away = plan([actor('s:a', { kind: 'claude', planning: true })]);
+    expect(away.placements[0]?.at).toBe('whiteboard');
+    expect(roomPlates(away)[0]).toMatchObject({ key: 'desk:s:a', actorIds: ['s:a'] });
+  });
+
+  it("holds all a side desk's subagents on one plate", () => {
+    const p = plan([
+      actor('s:a', { kind: 'claude' }),
+      actor('b:1', { kind: 'subagent', parentId: 's:a' }),
+      actor('b:2', { kind: 'subagent', parentId: 's:a' }),
+    ]);
+    const plate = roomPlates(p).find((x) => x.key === 'side-desk');
+    expect(plate?.actorIds).toEqual(['b:1', 'b:2']);
+    expect(plate?.w).toBeGreaterThanOrEqual(66);
   });
 });

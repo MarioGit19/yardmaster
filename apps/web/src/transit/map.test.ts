@@ -1,6 +1,7 @@
-import type { ActivityEvent, ActivityKind } from '@yardmaster/protocol';
+import type { ActivityEvent, ActivityKind, StatusToken } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import type { ActorState, SceneActor } from '../layouts/scene.js';
+import type { Tone } from '../status.js';
 import {
   BIN_PX,
   binHeight,
@@ -153,17 +154,29 @@ describe('trains', () => {
 
 describe('the departures board', () => {
   it('words each state like a station board', () => {
-    expect(boardStatus({ state: 'waiting', tone: 'wait', exit: null })).toEqual({
+    const status = (over: Parameters<typeof boardStatus>[0]) => boardStatus(over);
+    expect(status({ state: 'waiting', token: 'needs_you', tone: 'wait', exit: null })).toEqual({
       word: 'Due · needs you',
       tone: 'wait',
     });
-    expect(boardStatus({ state: 'error', tone: 'err', exit: 2 })).toEqual({
+    expect(status({ state: 'error', token: 'failed', tone: 'err', exit: 2 })).toEqual({
       word: 'Cancelled · exit 2',
       tone: 'err',
     });
-    expect(boardStatus({ state: 'typing', tone: 'tool', exit: null }).word).toBe('Departing');
-    expect(boardStatus({ state: 'serving', tone: 'tool', exit: null }).word).toBe('In service');
-    expect(boardStatus({ state: 'idle', tone: 'idle', exit: null }).word).toBe('At platform');
+    const word = (state: ActorState, token: StatusToken, tone: Tone) =>
+      status({ state, token, tone, exit: null }).word;
+    expect(word('typing', 'running', 'tool')).toBe('Departing');
+    expect(word('serving', 'running', 'tool')).toBe('In service');
+    expect(word('stale', 'stale', 'stale')).toBe('Signal lost');
+    expect(word('idle', 'quiet', 'idle')).toBe('At platform');
+    expect(word('sleeping', 'quiet', 'idle')).toBe('Stabled');
+  });
+
+  it('takes its colour from the token, so a seen arrival carries no mark', () => {
+    const arrived = (token: StatusToken, tone: Tone) =>
+      boardStatus({ state: 'done', token, tone, exit: null });
+    expect(arrived('done_unseen', 'ok')).toEqual({ word: 'Arrived', tone: 'ok' });
+    expect(arrived('quiet', 'idle')).toEqual({ word: 'Arrived', tone: 'idle' });
   });
 
   it('lists what needs you first across projects, then work, in project order, capped', () => {

@@ -28,6 +28,8 @@ export const ROW = { height: 128, line: 62, stationTop: 30, spur: 86, logTop: 10
 const DROP = ROW.spur - ROW.line;
 const MINIS = 2;
 const MINI_STEP = 30;
+/** Below this width a spur's name stays in its train's hover card. */
+const SPUR_LABEL_MIN = 44;
 /** A mini train's middle on the spur off the mark at `mark`. */
 const miniAt = (mark: number, i: number) => mark + DROP + 20 + i * MINI_STEP;
 /** The track's ends: a terminus bar at each, the stations between. */
@@ -300,6 +302,16 @@ function Station({
   const tip = useTip();
   const motion = trainMotion(actor.state);
   const status = boardStatus(actor);
+  // The spur's label runs from past its last train (and its "+N") to the slot's end.
+  const spurLabel =
+    miniAt(left + 8, Math.min(minis.length, MINIS) - 1) + (minis.length > MINIS ? 44 : 16);
+  const spurRoom = left + slot - 18 - spurLabel;
+  const name = (
+    <>
+      {status.tone !== 'idle' && <StatusDot tone={status.tone} label={status.word} />}
+      <span className="min-w-0 truncate">{actor.label}</span>
+    </>
+  );
   const button = (
     <button
       type="button"
@@ -322,9 +334,11 @@ function Station({
       }))}
       className="transit-station"
     >
-      <span className="transit-station-name" data-tone={status.tone}>
-        {actor.label}
-      </span>
+      {select && (
+        <span className="transit-station-name" data-tone={status.tone}>
+          {name}
+        </span>
+      )}
       <span aria-hidden className="transit-mark" data-kind={actor.kind} />
       <TrainCar kind={actor.kind} motion={motion} />
     </button>
@@ -338,12 +352,25 @@ function Station({
         {select ? (
           button
         ) : (
-          <ActorInspector
-            projectId={actor.projectId}
-            actorId={actor.id}
-            label={`${projectName}, ${actor.label}`}
-            trigger={button}
-          />
+          <>
+            <ActorInspector
+              projectId={actor.projectId}
+              actorId={actor.id}
+              label={`${projectName}, ${actor.label}`}
+              trigger={button}
+            />
+            <Link
+              href={actor.links.href}
+              tabIndex={-1}
+              aria-label={`Open ${actor.label}`}
+              title={actor.label}
+              data-transit-open={actor.id}
+              data-tone={status.tone}
+              className="transit-station-name"
+            >
+              {name}
+            </Link>
+          </>
         )}
       </div>
       {minis.slice(0, MINIS).map((mini, i) => (
@@ -363,6 +390,15 @@ function Station({
           style={{ left: miniAt(left + 8, MINIS - 1) + 24, top: ROW.spur - 8 }}
         >
           +{minis.length - MINIS}
+        </span>
+      )}
+      {minis[0] && spurRoom >= SPUR_LABEL_MIN && (
+        <span
+          className="transit-spur-label absolute truncate"
+          title={minis[0].label}
+          style={{ left: spurLabel, top: ROW.spur - 8, width: spurRoom }}
+        >
+          {minis[0].label}
         </span>
       )}
     </>

@@ -3,6 +3,7 @@ import { ActorInspector } from '../layouts/ActorInspector.js';
 import type { SceneProject } from '../layouts/scene.js';
 import { useHeldOrder } from '../order.js';
 import { cx } from '../ui/cx.js';
+import { StatusDot } from '../ui/StatusDot.js';
 import { type BoardRow, boardRows } from './map.js';
 import { Roundel } from './TransitLine.js';
 
@@ -146,6 +147,7 @@ function Row({
               </span>
             </span>
             <span key={status.word} className="transit-board-status" data-tone={status.tone}>
+              {status.tone !== 'idle' && <StatusDot tone={status.tone} label={status.word} />}
               {status.word}
             </span>
           </button>

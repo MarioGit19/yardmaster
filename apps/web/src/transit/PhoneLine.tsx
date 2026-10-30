@@ -6,6 +6,7 @@ import type { SceneActor, SceneProject } from '../layouts/scene.js';
 import { spring } from '../motion.js';
 import { projectHref } from '../routes.js';
 import { cx } from '../ui/cx.js';
+import { StatusDot } from '../ui/StatusDot.js';
 import {
   boardStatus,
   lineStations,
@@ -144,6 +145,7 @@ function PhoneStation({
               {actor.label}
             </span>
             <span className="transit-board-status shrink-0" data-tone={status.tone}>
+              {status.tone !== 'idle' && <StatusDot tone={status.tone} label={status.word} />}
               {status.word}
             </span>
           </button>

@@ -288,6 +288,71 @@ test.describe('the Office building', () => {
     }
   });
 
+  test('names every character on the floor; plates and nameplates open the focus view', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit2');
+      const session = page.locator('[data-room] [data-scene-actor^="s:"]').first();
+      await expect(session).toBeVisible();
+      const actorId = (await session.getAttribute('data-scene-actor')) as string;
+      // Every drawn character has a name in the room without hovering; side desks share one.
+      const named = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-room]')].every((room) => {
+          const seated = room.querySelectorAll(
+            '[data-office-at]:not([data-office-at="side-desk"])',
+          );
+          const lines = room.querySelectorAll(
+            '[data-office-plate]:not([data-office-plate="side-desk"]) .office-plate-line',
+          );
+          return seated.length === lines.length;
+        }),
+      );
+      expect(named).toBe(true);
+
+      await page.locator(`[data-office-open="${actorId}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`#/p/[^/]+/s/${actorId.slice(2)}$`));
+      await page.goBack();
+      await expect(layout(page)).toHaveAttribute('data-layout', 'office');
+
+      const room = page.locator('[data-room]').first();
+      const projectId = await room.getAttribute('data-room');
+      await room.locator('a[data-kit-nameplate]').click();
+      await expect(page).toHaveURL(new RegExp(`#/p/${projectId}$`));
+    } finally {
+      await stop();
+    }
+  });
+
+  test('the legend maps each status token and stays folded per device', async ({ browser }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit2');
+      const legend = page.locator('[data-status-legend]');
+      await expect(legend).toHaveAttribute('data-status-legend', 'open');
+      await expect(legend.locator('[data-legend-token]')).toHaveCount(6);
+      await expect(legend.locator('[data-legend-token="quiet"] [data-status]')).toHaveCount(0);
+      await legend.getByRole('button', { name: 'Legend' }).click();
+      await expect(legend).toHaveAttribute('data-status-legend', 'closed');
+      await page.reload();
+      await expect(page.locator('[data-status-legend]')).toHaveAttribute(
+        'data-status-legend',
+        'closed',
+      );
+      await page.keyboard.press('Alt+Digit4');
+      await expect(page.locator('[data-transit-line]').first()).toBeVisible();
+      // The old layout's legend leaves with its cross-fade.
+      await expect(page.locator('[data-status-legend]')).toHaveCount(1);
+      await expect(page.locator('[data-status-legend]')).toHaveAttribute(
+        'data-status-legend',
+        'closed',
+      );
+    } finally {
+      await stop();
+    }
+  });
+
   test('on a phone: one room per floor, characters pause off screen', async ({ browser }) => {
     const { page, stop } = await openBoard(browser, {
       viewport: { width: 390, height: 844 },
@@ -1176,6 +1241,27 @@ test.describe('the Transit concourse', () => {
       const projectId = await name.getAttribute('data-transit-name');
       await name.click();
       await expect(page).toHaveURL(new RegExp(`#/p/${projectId}$`));
+    } finally {
+      await stop();
+    }
+  });
+
+  test('a station name opens the focus view, with a token mark on what needs you', async ({
+    browser,
+  }) => {
+    const { page, stop } = await openBoard(browser);
+    try {
+      await page.keyboard.press('Alt+Digit4');
+      await expect(page.locator('[data-transit-open]').first()).toBeVisible();
+      await expect(
+        page.locator('[data-transit-open][data-tone="wait"] [data-mark="wait"]').first(),
+      ).toBeVisible({
+        timeout: 30_000,
+      });
+      const session = page.locator('[data-transit-open^="s:"]').first();
+      const actorId = (await session.getAttribute('data-transit-open')) as string;
+      await page.locator(`[data-transit-open="${actorId}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`#/p/[^/]+/s/${actorId.slice(2)}$`));
     } finally {
       await stop();
     }

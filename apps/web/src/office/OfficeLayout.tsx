@@ -12,10 +12,12 @@ import { useOwnBackdrop } from '../ambient/backdrop.js';
 import { useNow } from '../anim/clock.js';
 import { OffstageContext } from '../anim/useFrame.js';
 import { attentionOpen } from '../attention/attention.js';
+import { StatusLegend } from '../layouts/StatusLegend.js';
 import { SCENE_TICK_MS, useOverviewScene } from '../layouts/useScene.js';
 import { dur, ease, spring, useMotionLevel } from '../motion.js';
 import { useMediaQuery } from '../prefs.js';
 import { isTypingTarget } from '../shell/railNav.js';
+import { OFFICE_LEGEND } from './legend.js';
 import { OfficeRoom } from './OfficeRoom.js';
 import { RoomPanel } from './RoomPanel.js';
 import { buildingColumns, MIN_ROOM_WIDTH, ROOM_HEIGHT } from './room.js';
@@ -256,6 +258,7 @@ export default function OfficeLayout() {
   return (
     <>
       <OfficeSky />
+      <StatusLegend lines={OFFICE_LEGEND} away={roomId !== null} />
       {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: Esc does the same from the keyboard. */}
       <div
         ref={ref}

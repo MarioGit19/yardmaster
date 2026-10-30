@@ -22,6 +22,8 @@ export const MAX_CHARACTERS = 8;
 export const READ_TRIP_MS = 3_000;
 /** A command running this long is long-running: it moves to a rack (§10.3). */
 export const LONG_RUN_MS = 30_000;
+/** The side desk is at least this wide, so its name plate has room. */
+const PLATE_MIN_W = 66;
 /** Rooms are never narrower than this (in units), so the stations keep their spacing. */
 export const MIN_ROOM_WIDTH = 340;
 
@@ -171,7 +173,7 @@ function layoutStations(
     items.push({
       key: 'side-desk',
       kind: 'side-desk',
-      w: Math.max(FURNITURE_W['side-desk'], minis * 16 + 10),
+      w: Math.max(PLATE_MIN_W, minis * 16 + 10),
       owner: null,
     });
   }
@@ -297,6 +299,31 @@ export function planRoom(
     }
   }
   return { stations, placements, hidden: actors.length - placements.length, work };
+}
+
+/** A plate on the floor in front of a station, naming who works there. */
+export interface Plate {
+  key: string;
+  /** Left edge and width, room units: the station's. */
+  x: number;
+  w: number;
+  /** One name per line: a shared couch stacks its two; a side desk names its first. */
+  actorIds: string[];
+}
+
+/**
+ * The room's name plates, one per station with someone at it. They sit on the floor under the
+ * furniture, so they never overlap, and they stay at the station while its owner is on a trip.
+ */
+export function roomPlates({ stations, placements }: Pick<RoomPlan, 'stations' | 'placements'>) {
+  const plates: Plate[] = [];
+  for (const { key, x, w, owner } of stations) {
+    const actorIds = owner
+      ? [owner]
+      : placements.filter((placement) => placement.at === key).map((p) => p.actorId);
+    if (actorIds.length > 0) plates.push({ key, x, w, actorIds });
+  }
+  return plates;
 }
 
 function spot(actorId: string, at: string, x: number, y: number, front = false): Placement {
