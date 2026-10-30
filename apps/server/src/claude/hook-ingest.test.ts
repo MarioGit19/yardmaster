@@ -144,6 +144,7 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     expect(app.store.state.sessions[FIXTURE_SESSION_ID]?.status).toEqual({
       kind: 'error',
       message: 'Rate limit reached',
+      reason: 'rate_limit',
     });
 
     expect(app.hookStats.received).toBe(6);
@@ -204,6 +205,51 @@ describe(`POST ${HOOK_ROUTE}`, () => {
     expect(app.store.state.sessions.other?.projectId).toBe(outer);
     expect(app.store.state.sessions.sibling?.projectId).toBe(projectIdFromPath(`${tmp}-other`));
     expect(app.store.state.projects[inner]?.lastActivityAt).toEqual(expect.any(Number));
+  });
+
+  it('moves a session to the project of its new folder', async () => {
+    tmp = await realpath(await mkdtemp(join(tmpdir(), 'yardmaster-hooks-')));
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
+    const inner = projectIdFromPath(join(tmp, 'packages'));
+    app.store.upsertProject({
+      id: inner,
+      path: join(tmp, 'packages'),
+      name: 'demo',
+      accent: 0,
+      source: 'editor',
+      git: null,
+      createdAt: 1,
+      lastActivityAt: null,
+    });
+
+    await post(hookFixture('session-start', { cwd: tmp }));
+    await post(hookFixture('cwd-changed', { cwd: tmp, new_cwd: join(tmp, 'packages') }));
+    await settled();
+
+    expect(app.store.state.sessions[FIXTURE_SESSION_ID]?.projectId).toBe(inner);
+    expect(app.store.state.sessions[FIXTURE_SESSION_ID]?.cwd).toBe(join(tmp, 'packages'));
+  });
+
+  it.each([
+    ['permission-denied', 'permission.denied'],
+    ['task-created', 'task.created'],
+    ['task-completed', 'task.completed'],
+    ['cwd-changed', 'cwd.changed'],
+    ['notification-agent-needs-input', 'notification'],
+    ['notification-agent-completed', 'notification'],
+    ['notification-quota-fired', 'notification'],
+    ['notification-quota-stale', 'notification'],
+    ['notification-quota-disabled', 'notification'],
+    ['stop-failure-auth', 'stop.failure'],
+    ['stop-failure-billing', 'stop.failure'],
+  ] as const)('applies %s and records it as %s', async (fixture, kind) => {
+    app = await buildServer(config, { token, dbPath: ':memory:', processes: false });
+    await post(hookFixture(fixture));
+    await settled();
+    expect(app.store.state.sessions[FIXTURE_SESSION_ID]).toBeDefined();
+    app.store.flush();
+    const activity = app.persistence.listActivity({ sessionId: FIXTURE_SESSION_ID });
+    expect(activity.map((event) => event.kind)).toContain(kind);
   });
 
   it('skips malformed payloads without failing the request', async () => {

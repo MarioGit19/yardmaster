@@ -2,9 +2,10 @@ import { z } from 'zod';
 import { Pid, SessionId, Timestamp, TokenUsage } from './domain.js';
 
 /**
- * One `~/.claude/sessions/<pid>.json` file, PRD §6.4. Undocumented and version-dependent:
- * only `pid` and `sessionId` are required, a malformed optional field reads as absent, and
- * every other field in the file is dropped.
+ * A live session: a row of `claude agents --json`, or the `~/.claude/sessions/<pid>.json` file
+ * read as a fallback (PRD §6.4). Both change between versions: only `pid` and `sessionId` are
+ * required (a queued background job has neither yet, so that row is skipped), a malformed
+ * optional field reads as absent, and every other field is dropped.
  */
 export const SessionRegistryEntry = z.object({
   pid: Pid,
@@ -14,6 +15,8 @@ export const SessionRegistryEntry = z.object({
   kind: z.string().max(64).optional().catch(undefined),
   entrypoint: z.string().max(64).optional().catch(undefined),
   name: z.string().max(512).optional().catch(undefined),
+  /** What a `waiting` session waits on, e.g. `input needed` or `dialog open`. */
+  waitingFor: z.string().max(256).optional().catch(undefined),
 });
 export type SessionRegistryEntry = z.infer<typeof SessionRegistryEntry>;
 

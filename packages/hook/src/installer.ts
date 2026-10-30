@@ -4,7 +4,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
-/** Observer events from PRD §6.1. `PermissionRequest` is away mode only and installed separately. */
+/**
+ * Observer events from PRD §6.1. `PermissionRequest` is away mode only and installed separately.
+ * `WorktreeCreate` and `WorktreeRemove` stay out on purpose: a handler for either replaces Claude
+ * Code's own git worktree handling, and an observer that prints nothing would break it.
+ */
 export const OBSERVER_EVENTS = [
   'SessionStart',
   'SessionEnd',
@@ -19,6 +23,10 @@ export const OBSERVER_EVENTS = [
   'SubagentStop',
   'PreCompact',
   'PostCompact',
+  'PermissionDenied',
+  'TaskCreated',
+  'TaskCompleted',
+  'CwdChanged',
 ] as const;
 
 /** Our handlers are recognised by this name in their command. */

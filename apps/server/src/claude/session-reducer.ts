@@ -12,10 +12,12 @@ import {
   parseLiveTasks,
   reconcileBackground,
   type SessionStatus,
+  STOP_FAILURE_LABEL,
   type Subagent,
   sameTaskId,
   startBackground,
   stopAllBackground,
+  stopFailureReason,
   type ToolActivity,
   toolFamily,
   toolInputDetail,
@@ -142,8 +144,17 @@ export function sessionReducer(
       if (hook.notification_type === 'permission_prompt') {
         return to({ kind: 'waiting_permission', approvalId: null });
       }
-      if (hook.notification_type === 'idle_prompt') return to({ kind: 'waiting_input' });
-      return next;
+      // The prompt is idle, but the session isn't done while its background work runs.
+      if (hook.notification_type === 'idle_prompt') {
+        return hasRunningWork(next) ? next : to({ kind: 'waiting_input' });
+      }
+      // Agent view sends these about the sessions it lists, under its own id, so only a session
+      // the board already follows is taken at its word. `agent_completed` is only ever about
+      // another session, and stays in Pulse.
+      if (hook.notification_type === 'agent_needs_input' && session) {
+        return to({ kind: 'waiting_input' });
+      }
+      return withQuotaResume(next, hook, status, ts);
 
     case 'PermissionRequest':
       if (ended) return next;
@@ -154,11 +165,28 @@ export function sessionReducer(
       next = withLiveTasks(next, hook.background_tasks, ts);
       return ended ? next : to({ kind: 'idle' });
 
-    case 'StopFailure':
+    case 'StopFailure': {
       next = withAssistantText(next, hook.last_assistant_message, ts);
-      return ended
-        ? next
-        : to({ kind: 'error', message: errorMessage(hook.error_details, hook.error) });
+      if (ended) return next;
+      const reason = stopFailureReason(hook.error);
+      return to({
+        kind: 'error',
+        message: errorMessage(hook.error_details, reason ? STOP_FAILURE_LABEL[reason] : hook.error),
+        ...(reason ? { reason } : {}),
+      });
+    }
+
+    case 'PermissionDenied':
+      return status.kind === 'tool' || status.kind === 'waiting_permission'
+        ? to({ kind: 'working' })
+        : next;
+
+    case 'CwdChanged':
+      return { ...next, cwd: hook.new_cwd ?? next.cwd };
+
+    case 'TaskCreated':
+    case 'TaskCompleted':
+      return next;
 
     case 'PreCompact':
       if (status.kind === 'ended' || status.kind === 'compacting') return next;
@@ -199,6 +227,32 @@ export function sessionReducer(
       };
     }
   }
+}
+
+/** Subagents or background tasks still running, whatever the turn itself is doing. */
+export function hasRunningWork(session: ClaudeSession): boolean {
+  return (
+    session.subagents.some((agent) => agent.status === 'running') ||
+    (session.background ?? []).some((task) => task.status === 'running')
+  );
+}
+
+/**
+ * Claude Code's own recovery from a usage limit: `fired` means it is continuing, `stale` and
+ * `disabled` mean it won't, and their message says what the user can do instead.
+ */
+function withQuotaResume(
+  session: ClaudeSession,
+  hook: Extract<KnownHookEvent, { hook_event_name: 'Notification' }>,
+  status: SessionStatus,
+  ts: number,
+): ClaudeSession {
+  if (status.kind !== 'error' || status.reason !== 'rate_limit') return session;
+  const type = hook.notification_type;
+  if (type === 'quota_auto_resume_fired') return withStatus(session, { kind: 'working' }, ts);
+  if (type !== 'quota_auto_resume_stale' && type !== 'quota_auto_resume_disabled') return session;
+  const message = clipLine(hook.message, DETAIL_MAX) ?? status.message;
+  return withStatus(session, { ...status, message }, ts);
 }
 
 type ToolResultHook = Extract<

@@ -72,7 +72,10 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
      Notification(idle_prompt) ──▶ waiting_input
      StopFailure ──▶ error        SessionEnd / process gone ──▶ ended
      PreCompact ──▶ compacting ──PostCompact──▶ previous state
+     PermissionDenied ──▶ working    quota_auto_resume_fired ──▶ working
 ```
+
+`StopFailure` keeps why the turn failed when it's the account's doing (`reason`: `rate_limit`, `auth`, `billing`). Subagents and background tasks keep a session Running after its turn: an `idle_prompt` doesn't move it to waiting while they run.
 
 The status must also degrade gracefully: if no hook has arrived for a live process, fall back to "unknown, alive". If the process is gone, mark it "ended".
 
@@ -171,7 +174,9 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 
 - Registered in `~/.claude/settings.json` under `hooks.<Event>[] = { matcher?, hooks: [{ type: "command", command, async?, timeout? }] }`. User-level hooks apply to interactive, `claude -p`, and Agent SDK sessions (unless `--bare` or `settingSources: []`).
 - Common stdin fields: `session_id`, `transcript_path`, `cwd`, `permission_mode`, `hook_event_name`.
-- Events we subscribe to: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, and (away mode only) `PermissionRequest`.
+- Events we subscribe to: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, `PermissionDenied`, `TaskCreated`, `TaskCompleted`, `CwdChanged`, and (away mode only) `PermissionRequest`.
+- **Never subscribe to `WorktreeCreate` or `WorktreeRemove`.** A handler for either replaces Claude Code's own git worktree handling: creation fails unless the hook prints a path, and removal counts as done once the hook succeeds. Verified in Claude Code 2.1.308.
+- `Notification` types: `permission_prompt` and `idle_prompt` set the status. `agent_needs_input` does too, but only for a session already on the board: agent view sends it about the sessions it lists, under its own session id. `agent_completed` is only ever about another session, so it stays in Pulse. `quota_auto_resume_fired` puts a usage-limited session back to work; `quota_auto_resume_stale` and `quota_auto_resume_disabled` keep it failed and replace the message.
 - Exit-code semantics: 0 = success (stdout parsed as JSON if it is one object), 2 = blocking error on blockable events, other = non-blocking error notice. **Our observer hook always exits 0 and prints nothing.**
 - `"async": true` command hooks run in the background without blocking Claude. All observer hooks use this.
 - Handler types include `http`, but we use `command` so that we can (a) attach `$PPID` for terminal linking, (b) read the token from a file rather than embedding it in settings, and (c) fail silently.
@@ -205,9 +210,12 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - The format is **undocumented and changes between versions**. Prefer the SDK helpers (`getSessionMessages`) for history. Raw-tail the file only for live increments, and parse defensively: only `type: "user" | "assistant"` lines with `message.content[]` blocks (`text`, `thinking`, `tool_use`, `tool_result`). Ignore unknown types. Never crash on a bad line.
 - Token usage comes from `assistant.message.usage`.
 
-### 6.4 Live-session registry (optional enrichment, undocumented)
+### 6.4 Live sessions (optional enrichment)
 
-- Current Claude Code versions write `~/.claude/sessions/<pid>.json` with `pid`, `sessionId`, `cwd`, `status`, `kind`, `entrypoint` and `name`. Use it **only as an optional, feature-detected hint** to discover live sessions that started before Yardmaster did, with a try/catch around every read. Never depend on it. Never read other files in `~/.claude` beyond transcripts and this registry. Never read credentials.
+- **`claude agents --json`** is the supported read. It prints a JSON array of live sessions: `pid`, `sessionId`, `cwd`, `kind` (`interactive`, `background`), `startedAt`, `name`, `status` (`busy`, `idle`, `waiting`), `waitingFor`, and `state` for background jobs. `pid` and `sessionId` can be missing on a background job; those rows are skipped. Checked on Claude Code 2.1.308, on one machine: it listed every live registry file, which covered entrypoints `cli`, `sdk-ts` and `sdk-cli`, so terminal and SDK sessions both appear. Nothing there separates a session in a Cursor/VS Code terminal from any other `cli` session, and that case wasn't tested on its own.
+- Run with `execFile` every 30 s and when a board connects (at most every 5 s). It's feature-detected and never required: if it fails or prints something else, the registry below serves for 10 minutes and it's tried again. `YARDMASTER_CLAUDE_BIN` overrides the binary.
+- Hooks and transcripts stay the primary source. The list finds sessions and corrects a terminal session's status only when the board's has sat unchanged for 30 s and disagrees: a missed `Stop`, a missed prompt, a prompt answered in the terminal, a question hooks didn't report. It leaves failures, the `idle_prompt` wait, approvals the board holds, board sessions, and `dialog open` (a slash-command panel) alone.
+- **Fallback:** current Claude Code versions write `~/.claude/sessions/<pid>.json`, undocumented, with `pid`, `sessionId`, `cwd`, `status`, `kind`, `entrypoint`, `name` and `waitingFor`. It's read only when the list isn't available, only as a feature-detected hint, with a try/catch around every read, and never corrects a status hooks set. Never read other files in `~/.claude` beyond transcripts and this registry. Never read credentials.
 
 ### 6.5 VS Code / Cursor extension API (verified in `@types/vscode` 1.105)
 

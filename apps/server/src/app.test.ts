@@ -90,7 +90,11 @@ describe('server', () => {
       token,
       dbPath: ':memory:',
       processes: { platform: 'darwin', run },
-      discovery: { listHistory: null, registryDir: '/nonexistent/yardmaster-test' },
+      discovery: {
+        listHistory: null,
+        listAgents: null,
+        registryDir: '/nonexistent/yardmaster-test',
+      },
     });
     expect(app.sessionLinker).not.toBeNull();
     app.store.upsertTerminal({ id: 't-1', windowId: 'w-1', name: 'zsh', shellPid: 4242 });
@@ -114,6 +118,7 @@ describe('server', () => {
       git: false,
       discovery: {
         registryDir: '/nonexistent/yardmaster-test',
+        listAgents: null,
         listHistory: async (dir) =>
           dir === path
             ? [
@@ -215,7 +220,11 @@ describe('server', () => {
         dbPath: join(tmpHome as string, 'board.db'),
         processes: false,
         git: false,
-        discovery: { listHistory: null, registryDir: '/nonexistent/yardmaster-test' },
+        discovery: {
+          listHistory: null,
+          listAgents: null,
+          registryDir: '/nonexistent/yardmaster-test',
+        },
         transcripts: { loadHistory: async () => [], watchFile: () => async () => {} },
         runner: { query, newId: () => sessionId },
       } satisfies BuildOptions);

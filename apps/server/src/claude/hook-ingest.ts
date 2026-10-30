@@ -77,7 +77,9 @@ export class HookIngest {
     if (!known.success) {
       this.options.logger.debug({ event: common.data.hook_event_name }, 'unrecognised hook event');
     }
-    const cwd = common.data.cwd;
+    const movedTo =
+      known.success && known.data.hook_event_name === 'CwdChanged' ? known.data.new_cwd : undefined;
+    const cwd = movedTo ?? common.data.cwd;
     const projectId = cwd
       ? await projectForCwd(this.options.store, cwd, ts, this.resolvePath)
       : null;

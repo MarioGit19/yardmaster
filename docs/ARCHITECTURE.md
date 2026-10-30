@@ -61,7 +61,7 @@ pnpm workspaces, TypeScript (strict, ESM), Node ≥ 22.
 
 The installer (`yardmaster hooks install|uninstall|status`) registers command hooks in `~/.claude/settings.json`. User-level hooks apply to interactive, `claude -p` and Agent SDK sessions. It merges idempotently, recognizes its own entries by the `yardmaster-hook` command path, writes a timestamped backup first, supports `--dry-run`, never touches other hooks, and asks before writing unless `--yes` is passed.
 
-Subscribed events: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, and in away mode `PermissionRequest`.
+Subscribed events: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, `PermissionDenied`, `TaskCreated`, `TaskCompleted`, `CwdChanged`, and in away mode `PermissionRequest`. Never `WorktreeCreate` or `WorktreeRemove`: a handler for either replaces Claude Code's own worktree handling.
 
 **Observer hook** (`packages/hook/bin/yardmaster-hook`): POSIX `sh` and `curl`, no Node startup. It reads the event from stdin and POSTs it to `/api/hooks/claude` over the board's socket, with the token (read from `~/.yardmaster/token`, never embedded in settings) and Claude's PID (`$PPID`), with a 1 s timeout. It runs `async`, so Claude never waits for it. It always exits 0 and never prints, because hook output can be read as a decision.
 
@@ -84,6 +84,7 @@ We use `command` hooks rather than `http` ones so the hook can attach `$PPID` fo
      Notification(idle_prompt) ──▶ waiting_input
      StopFailure ──▶ error        SessionEnd / process gone ──▶ ended
      PreCompact ──▶ compacting ──PostCompact──▶ previous state
+     PermissionDenied ──▶ working    quota_auto_resume_fired ──▶ working
 ```
 
 With no hook for a live process the status falls back to "unknown, alive"; once the process is gone the session is marked ended.
@@ -98,7 +99,7 @@ Board sessions run through the locally installed, signed-in Claude Code of whoev
 
 `~/.claude/projects/<encoded-cwd>/<session_id>.jsonl`. The format is undocumented and changes between versions, so history goes through the SDK helpers and the raw file is only tailed for live increments. The reader keeps `user` and `assistant` lines with `text`, `thinking`, `tool_use` and `tool_result` blocks, ignores unknown types and never fails on a bad line. Token usage comes from `assistant.message.usage`.
 
-Current Claude Code versions also write `~/.claude/sessions/<pid>.json`. Yardmaster uses it only as an optional, feature-detected hint to find sessions that started before it did. It reads nothing else under `~/.claude`, and never credentials.
+To find sessions that started before it did, and to repair a status after a missed hook, Yardmaster runs `claude agents --json` every 30 s and when a board connects. It's feature-detected and never required, and hooks stay the primary source. Where it isn't available, Yardmaster reads `~/.claude/sessions/<pid>.json` instead, as a hint only. It reads nothing else under `~/.claude` beyond transcripts, and never credentials.
 
 ### Editor extension
 

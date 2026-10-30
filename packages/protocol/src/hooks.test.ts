@@ -4,6 +4,7 @@ import {
   HOOK_EVENT_NAMES,
   KnownHookEvent,
   normalizeHookEvent,
+  stopFailureReason,
   summarizeToolInput,
 } from './hooks.js';
 
@@ -61,11 +62,42 @@ describe('normalizeHookEvent', () => {
     'pre-compact': 'compact.start',
     'post-compact': 'compact.end',
     'permission-request': 'permission.request',
+    'permission-denied': 'permission.denied',
+    'task-created': 'task.created',
+    'task-completed': 'task.completed',
+    'cwd-changed': 'cwd.changed',
+    'notification-agent-needs-input': 'notification',
+    'notification-agent-completed': 'notification',
+    'notification-quota-fired': 'notification',
+    'notification-quota-stale': 'notification',
+    'notification-quota-disabled': 'notification',
+    'stop-failure-auth': 'stop.failure',
+    'stop-failure-billing': 'stop.failure',
     'unknown-event': 'unknown',
   };
 
   it.each(Object.entries(kinds))('%s → %s', (name, kind) => {
     expect(normalizeHookEvent(byName(name)).kind).toBe(kind);
+  });
+
+  it('names the reason a turn failed, when it has one', () => {
+    expect(normalizeHookEvent(byName('stop-failure')).data.reason).toBe('rate_limit');
+    expect(normalizeHookEvent(byName('stop-failure-auth')).data.reason).toBe('auth');
+    expect(stopFailureReason('server_error')).toBeNull();
+    expect(stopFailureReason(undefined)).toBeNull();
+    expect(stopFailureReason('constructor')).toBeNull();
+  });
+
+  it('keeps the details of the newer events', () => {
+    expect(normalizeHookEvent(byName('cwd-changed')).data).toMatchObject({
+      oldCwd: '/home/dev/acme-shop',
+      newCwd: '/home/dev/acme-shop/packages/cart',
+    });
+    expect(normalizeHookEvent(byName('task-created')).summary).toBe('Wire the cart totals');
+    expect(normalizeHookEvent(byName('permission-denied')).data).toMatchObject({
+      tool: 'Bash',
+      reason: 'Blocked by the auto mode classifier',
+    });
   });
 
   it('uses the given clock and id', () => {

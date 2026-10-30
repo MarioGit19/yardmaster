@@ -36,16 +36,19 @@ export function eventTone(event: ActivityEvent): Tone {
   switch (event.kind) {
     case 'tool.error':
     case 'stop.failure':
+    case 'permission.denied':
       return 'err';
     case 'exec.end': {
       const code = exitCodeOf(event);
       if (code === null || code === 0) return 'ok';
       return code === INTERRUPTED_EXIT ? 'idle' : 'err';
     }
-    case 'permission.request':
     case 'notification':
+      return event.data.notificationType === 'agent_completed' ? 'ok' : 'wait';
+    case 'permission.request':
       return 'wait';
     case 'stop':
+    case 'task.completed':
       return 'ok';
     case 'background.end': {
       const status = event.data.status;
@@ -63,8 +66,10 @@ export function eventTone(event: ActivityEvent): Tone {
     case 'compact.end':
     case 'exec.start':
     case 'permission.decision':
+    case 'task.created':
       return 'work';
     case 'session.end':
+    case 'cwd.changed':
     case 'unknown':
       return 'idle';
   }
@@ -90,6 +95,14 @@ export function eventLabel(event: ActivityEvent): string {
       return 'Needs approval';
     case 'permission.decision':
       return 'Approval decided';
+    case 'permission.denied':
+      return 'Denied automatically';
+    case 'task.created':
+      return 'Task added';
+    case 'task.completed':
+      return 'Task completed';
+    case 'cwd.changed':
+      return 'Folder changed';
     case 'stop':
       return 'Turn finished';
     case 'stop.failure':

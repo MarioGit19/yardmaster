@@ -92,6 +92,7 @@ export async function startBoard({
       YARDMASTER_HOME: home,
       YARDMASTER_LOG_LEVEL: 'warn',
       CLAUDE_CONFIG_DIR: claudeDir,
+      YARDMASTER_CLAUDE_BIN: join(claudeDir, 'no-claude'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

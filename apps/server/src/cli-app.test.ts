@@ -393,7 +393,7 @@ describe('yardmaster hooks', () => {
     const accepted = testIo(env(), { confirm });
     expect(await runCli(['hooks', 'install'], accepted.io)).toBe(0);
     expect(confirm).toHaveBeenCalledOnce();
-    expect(accepted.out()).toContain('Installed the Yardmaster hook for 13 events');
+    expect(accepted.out()).toContain('Installed the Yardmaster hook for 17 events');
   });
 
   it('install-hooks replaces the handlers installed under the old c-board name', async () => {
@@ -421,7 +421,7 @@ describe('yardmaster hooks', () => {
     const path = join(home, 'elsewhere', 'settings.json');
     const before = testIo();
     expect(await runCli(['hooks', 'status', '--settings-path', path], before.io)).toBe(1);
-    expect(before.out()).toContain('0/13 hook events installed');
+    expect(before.out()).toContain('0/17 hook events installed');
 
     expect(await runCli(['hooks', 'install', '--yes', '--settings-path', path], testIo().io)).toBe(
       0,
@@ -432,7 +432,7 @@ describe('yardmaster hooks', () => {
 
     const status = testIo();
     expect(await runCli(['hooks', 'status', '--settings-path', path], status.io)).toBe(0);
-    expect(status.out()).toContain('13/13 hook events installed');
+    expect(status.out()).toContain('17/17 hook events installed');
 
     const removed = testIo();
     expect(await runCli(['hooks', 'uninstall', '--yes', '--settings-path', path], removed.io)).toBe(

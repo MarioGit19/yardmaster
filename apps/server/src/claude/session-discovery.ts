@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -13,8 +14,19 @@ import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 import type { BoardStore } from '../store.js';
 import { type PathResolver, projectForCwd, resolveDir } from './project-lookup.js';
+import { hasRunningWork } from './session-reducer.js';
 
 export const DISCOVERY_INTERVAL_MS = 10_000;
+/** How often `claude agents --json` runs. */
+export const AGENTS_INTERVAL_MS = 30_000;
+/** How often an on-demand refresh may run it. */
+export const AGENTS_REFRESH_MS = 5_000;
+/** After a failed run, the registry files serve until this much later: Claude Code may update. */
+export const AGENTS_RETRY_MS = 10 * 60_000;
+/** Hooks are async: a board status younger than this may just be ahead of, or behind, the list. */
+export const RECONCILE_GRACE_MS = 30_000;
+const AGENTS_TIMEOUT_MS = 5_000;
+const AGENTS_MAX_OUTPUT = 4 * 1024 * 1024;
 /** How long a project's `listSessions` result is reused. */
 export const HISTORY_TTL_MS = 60_000;
 export const HISTORY_LIMIT = 20;
@@ -26,6 +38,8 @@ const TITLE_MAX = 120;
 
 /** Lists a project's past sessions; returns raw `SDKSessionInfo`-shaped items. */
 export type HistoryLister = (dir: string, limit: number) => Promise<unknown[]>;
+/** The stdout of `claude agents --json`; rejects when it can't run. */
+export type AgentLister = () => Promise<string>;
 
 export interface SessionDiscoveryOptions {
   store: BoardStore;
@@ -37,7 +51,10 @@ export interface SessionDiscoveryOptions {
   isAlive?: (pid: number) => boolean;
   /** Defaults to the Agent SDK's `listSessions`; null turns history off. */
   listHistory?: HistoryLister | null;
+  /** Defaults to running `claude agents --json`; null keeps to the registry files. */
+  listAgents?: AgentLister | null;
   intervalMs?: number;
+  agentsIntervalMs?: number;
   historyTtlMs?: number;
   now?: () => number;
   resolvePath?: PathResolver;
@@ -50,11 +67,12 @@ interface Discovered {
 }
 
 /**
- * Finds live Claude Code sessions through the optional `~/.claude/sessions/<pid>.json`
- * registry (PRD §6.4), so sessions started before Yardmaster still show up, and ends them
- * when their process is gone. Hooks stay the source of truth: the registry only fills
- * gaps and sets the status of sessions no hook has reported on. Also keeps a per-project
- * list of recent sessions from the SDK for the history browser.
+ * Finds live Claude Code sessions through `claude agents --json`, or the optional
+ * `~/.claude/sessions/<pid>.json` registry where that isn't available (PRD §6.4), so sessions
+ * started before Yardmaster still show up, and ends them when their process is gone. Hooks stay
+ * the source of truth: the list fills gaps, sets the status of sessions no hook has reported on,
+ * and corrects a status that has stopped matching it. Also keeps a per-project list of recent
+ * sessions from the SDK for the history browser.
  */
 export class SessionDiscovery {
   private readonly store: BoardStore;
@@ -74,6 +92,11 @@ export class SessionDiscovery {
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> = Promise.resolve();
   private registryAvailable: boolean | null = null;
+  private readonly listAgents: AgentLister | null;
+  private readonly agentsIntervalMs: number;
+  private agentsAt = Number.NEGATIVE_INFINITY;
+  private agentsRetryAt = Number.NEGATIVE_INFINITY;
+  private refreshWanted = false;
 
   constructor(options: SessionDiscoveryOptions) {
     this.store = options.store;
@@ -83,6 +106,8 @@ export class SessionDiscovery {
     this.registryDir = options.registryDir ?? join(configDir, 'sessions');
     this.isAlive = options.isAlive ?? processAlive;
     this.listHistory = options.listHistory === undefined ? sdkListSessions : options.listHistory;
+    this.listAgents = options.listAgents === undefined ? runClaudeAgents : options.listAgents;
+    this.agentsIntervalMs = options.agentsIntervalMs ?? AGENTS_INTERVAL_MS;
     this.intervalMs = options.intervalMs ?? DISCOVERY_INTERVAL_MS;
     this.historyTtlMs = options.historyTtlMs ?? HISTORY_TTL_MS;
     this.now = options.now ?? Date.now;
@@ -114,6 +139,13 @@ export class SessionDiscovery {
       }
     });
     return this.running;
+  }
+
+  /** Asks the live list again now, at most every `AGENTS_REFRESH_MS`. Never throws. */
+  refresh(): Promise<void> {
+    if (this.now() - this.agentsAt < AGENTS_REFRESH_MS) return this.running;
+    this.refreshWanted = true;
+    return this.tick();
   }
 
   /** Cached recent sessions of a project, newest first. */
@@ -177,19 +209,19 @@ export class SessionDiscovery {
   }
 
   private async scan(): Promise<void> {
-    const entries = await this.readRegistry();
+    const listing = await this.liveSessions();
     const ts = this.now();
     const seen = new Set<string>();
     // A session can appear twice (a stale file next to a resumed one): the live pid wins.
     const byId = new Map<string, { entry: SessionRegistryEntry; alive: boolean }>();
-    for (const entry of entries) {
+    for (const entry of listing?.entries ?? []) {
       const alive = this.isAlive(entry.pid);
       const prev = byId.get(entry.sessionId);
       if (!prev || (alive && !prev.alive)) byId.set(entry.sessionId, { entry, alive });
     }
     for (const { entry, alive } of byId.values()) {
       seen.add(entry.sessionId);
-      if (alive) await this.applyAlive(entry, ts);
+      if (alive) await this.applyAlive(entry, ts, listing?.reconcile ?? false);
       else this.applyDead(entry.sessionId, entry.pid, ts);
     }
     // Files can vanish with their process; check what we found earlier.
@@ -198,7 +230,55 @@ export class SessionDiscovery {
     }
   }
 
-  private async applyAlive(entry: SessionRegistryEntry, ts: number): Promise<void> {
+  /**
+   * What's live now: the agents list when it's due, the registry when the list isn't available,
+   * and null between two runs of the list. Only the list is trusted to correct a status.
+   */
+  private async liveSessions(): Promise<{
+    entries: SessionRegistryEntry[];
+    reconcile: boolean;
+  } | null> {
+    const ts = this.now();
+    if (this.listAgents === null || ts < this.agentsRetryAt) {
+      return { entries: await this.readRegistry(), reconcile: false };
+    }
+    const wanted = this.refreshWanted;
+    this.refreshWanted = false;
+    if (!wanted && ts - this.agentsAt < this.agentsIntervalMs) return null;
+    this.agentsAt = ts;
+    const entries = await this.readAgents(this.listAgents);
+    if (entries) return { entries, reconcile: true };
+    this.agentsRetryAt = ts + AGENTS_RETRY_MS;
+    return { entries: await this.readRegistry(), reconcile: false };
+  }
+
+  /** Valid rows of the list, or null when this Claude Code can't produce one. */
+  private async readAgents(list: AgentLister): Promise<SessionRegistryEntry[] | null> {
+    let rows: unknown;
+    try {
+      rows = JSON.parse(await list());
+    } catch (err) {
+      this.log.debug({ code: errorCode(err) }, 'claude agents --json unavailable');
+      return null;
+    }
+    if (!Array.isArray(rows)) {
+      this.log.debug('claude agents --json did not print a list');
+      return null;
+    }
+    const entries: SessionRegistryEntry[] = [];
+    for (const row of rows) {
+      const parsed = SessionRegistryEntry.safeParse(row);
+      if (parsed.success) entries.push(parsed.data);
+      else this.log.debug({ issues: parsed.error.issues.length }, 'skipped a claude agents row');
+    }
+    return entries;
+  }
+
+  private async applyAlive(
+    entry: SessionRegistryEntry,
+    ts: number,
+    reconcile: boolean,
+  ): Promise<void> {
     const { sessionId: id, pid } = entry;
     const name = entry.name ? clipLine(entry.name) : null;
     // Claude Code names a session `<folder>-<code>` until the user renames it.
@@ -218,7 +298,7 @@ export class SessionDiscovery {
         claudePid: pid,
         title,
         customTitle,
-        status: registryStatus(entry.status),
+        status: liveStatus(entry) ?? { kind: 'unknown', alive: true },
         startedAt: ts,
         updatedAt: ts,
       });
@@ -243,19 +323,27 @@ export class SessionDiscovery {
     if (customTitle && customTitle !== existing.customTitle) fields.customTitle = customTitle;
     let updatedAt = existing.updatedAt;
     if (owned) {
-      const status = registryStatus(entry.status);
-      if (resumed || status.kind !== existing.status.kind) {
+      const status = liveStatus(entry) ?? (resumed ? { kind: 'unknown', alive: true } : null);
+      if (status && (resumed || status.kind !== existing.status.kind)) {
         fields.status = status;
         fields.endedAt = null;
         updatedAt = Math.max(ts, existing.updatedAt);
       }
+    }
+    const corrected = reconcile && !owned ? correctedStatus(existing, entry, ts) : null;
+    if (corrected) {
+      this.log.debug({ from: existing.status.kind, to: corrected.kind }, 'corrected a status');
+      fields.status = corrected;
+      fields.currentTool = null;
+      updatedAt = ts;
     }
     if (Object.keys(fields).length > 0) {
       // Metadata fills aren't session activity; only a status change moves `updatedAt`.
       this.store.updateSession(id, { ...fields, updatedAt });
     }
     // Tracked either way so a vanished file still ends it; -1 never matches `updatedAt`.
-    this.discovered.set(id, { pid, writtenAt: owned ? updatedAt : (known?.writtenAt ?? -1) });
+    const wrote = owned || corrected !== null;
+    this.discovered.set(id, { pid, writtenAt: wrote ? updatedAt : (known?.writtenAt ?? -1) });
   }
 
   private applyDead(id: string, pid: number, ts: number): void {
@@ -317,10 +405,46 @@ export class SessionDiscovery {
   }
 }
 
-function registryStatus(status: string | undefined): SessionStatus {
-  if (status === 'busy') return { kind: 'working' };
-  if (status === 'idle') return { kind: 'idle' };
-  return { kind: 'unknown', alive: true };
+/** What Claude Code says of a live session; null when that says nothing about the board. */
+function liveStatus(entry: SessionRegistryEntry): SessionStatus | null {
+  if (entry.status === 'busy') return { kind: 'working' };
+  if (entry.status === 'idle') return { kind: 'idle' };
+  if (entry.status !== 'waiting') return null;
+  // An open slash-command panel is the user at the keyboard, not the session asking for them.
+  if (entry.waitingFor === 'dialog open') return null;
+  return /permission|sandbox|worker/i.test(entry.waitingFor ?? '')
+    ? { kind: 'waiting_permission', approvalId: null }
+    : { kind: 'waiting_input' };
+}
+
+/**
+ * The status a live terminal session should have instead, or null to leave it: this repairs a
+ * missed hook, it doesn't overrule one. A failure stays until the next turn, and an approval
+ * the board holds stays until it's decided.
+ */
+function correctedStatus(
+  session: ClaudeSession,
+  entry: SessionRegistryEntry,
+  now: number,
+): SessionStatus | null {
+  if (session.origin !== 'terminal' || now - session.updatedAt < RECONCILE_GRACE_MS) return null;
+  const live = liveStatus(entry);
+  const status = session.status;
+  if (live === null || live.kind === status.kind) return null;
+  if (status.kind === 'error' || status.kind === 'ended' || status.kind === 'interrupted') {
+    return null;
+  }
+  if (status.kind === 'waiting_permission' && status.approvalId !== null) return null;
+  switch (live.kind) {
+    case 'idle':
+      // The `idle_prompt` notification: an idle session waiting on its next prompt.
+      return status.kind === 'waiting_input' ? null : live;
+    case 'working':
+      if (status.kind === 'tool' || status.kind === 'compacting') return null;
+      return status.kind === 'idle' && hasRunningWork(session) ? null : live;
+    default:
+      return status.kind === 'waiting_input' || status.kind === 'waiting_permission' ? null : live;
+  }
 }
 
 /** Signal 0 checks existence; EPERM means it exists under another user. */
@@ -377,6 +501,17 @@ function toHistoryEntry(projectId: string, info: SdkSessionInfo): SessionHistory
     tokens: null,
   };
 }
+
+/** Reads local session state only; no API call or login involved. */
+const runClaudeAgents: AgentLister = () =>
+  new Promise((resolve, reject) => {
+    execFile(
+      process.env.YARDMASTER_CLAUDE_BIN || 'claude',
+      ['agents', '--json'],
+      { timeout: AGENTS_TIMEOUT_MS, maxBuffer: AGENTS_MAX_OUTPUT, windowsHide: true },
+      (err, stdout) => (err ? reject(err) : resolve(stdout)),
+    );
+  });
 
 /** Reads local transcripts only; no API call or login involved. */
 const sdkListSessions: HistoryLister = async (dir, limit) => {

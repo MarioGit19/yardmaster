@@ -3,6 +3,7 @@ import {
   type ActivityEvent,
   type ActivityKind,
   Pid,
+  type StopFailureReason,
   Timestamp,
   type ToolFamily,
 } from './domain.js';
@@ -26,6 +27,10 @@ export const HOOK_EVENT_NAMES = [
   'PreCompact',
   'PostCompact',
   'PermissionRequest',
+  'PermissionDenied',
+  'TaskCreated',
+  'TaskCompleted',
+  'CwdChanged',
 ] as const;
 export const HookEventName = z.enum(HOOK_EVENT_NAMES);
 export type HookEventName = z.infer<typeof HookEventName>;
@@ -117,6 +122,24 @@ export const PermissionRequestHook = hook('PermissionRequest', {
   permission_suggestions: z.array(z.unknown()).optional(),
 });
 
+export const PermissionDeniedHook = hook('PermissionDenied', {
+  ...ToolFields,
+  reason: Str.optional(),
+});
+const TaskFields = {
+  task_id: z.string().max(256).optional(),
+  task_subject: Str.optional(),
+  task_description: Str.optional(),
+  teammate_name: z.string().max(256).optional(),
+  team_name: z.string().max(256).optional(),
+};
+export const TaskCreatedHook = hook('TaskCreated', TaskFields);
+export const TaskCompletedHook = hook('TaskCompleted', TaskFields);
+export const CwdChangedHook = hook('CwdChanged', {
+  old_cwd: Str.optional(),
+  new_cwd: Str.optional(),
+});
+
 /**
  * What a `PermissionRequest` hook prints on stdout to decide (verified against
  * https://code.claude.com/docs/en/hooks on 2026-10-22):
@@ -165,6 +188,10 @@ export const KnownHookEvent = z.discriminatedUnion('hook_event_name', [
   PreCompactHook,
   PostCompactHook,
   PermissionRequestHook,
+  PermissionDeniedHook,
+  TaskCreatedHook,
+  TaskCompletedHook,
+  CwdChangedHook,
 ]);
 export type KnownHookEvent = z.infer<typeof KnownHookEvent>;
 
@@ -183,7 +210,34 @@ const HOOK_KIND: Record<HookEventName, ActivityKind> = {
   PreCompact: 'compact.start',
   PostCompact: 'compact.end',
   PermissionRequest: 'permission.request',
+  PermissionDenied: 'permission.denied',
+  TaskCreated: 'task.created',
+  TaskCompleted: 'task.completed',
+  CwdChanged: 'cwd.changed',
 };
+
+/** `StopFailure.error` values worth telling apart; the rest are plain failures. */
+const STOP_FAILURE_REASONS: Record<string, StopFailureReason> = {
+  rate_limit: 'rate_limit',
+  authentication_failed: 'auth',
+  oauth_org_not_allowed: 'auth',
+  cloud_credential_error: 'auth',
+  account_on_hold: 'auth',
+  verification_required: 'auth',
+  billing_error: 'billing',
+};
+
+export const STOP_FAILURE_LABEL: Record<StopFailureReason, string> = {
+  rate_limit: 'Usage limit reached',
+  auth: 'Claude login needs attention',
+  billing: 'Billing problem',
+};
+
+/** Why a turn failed, when it's something the user has to deal with outside the session. */
+export function stopFailureReason(error: unknown): StopFailureReason | null {
+  if (typeof error !== 'string' || !Object.hasOwn(STOP_FAILURE_REASONS, error)) return null;
+  return STOP_FAILURE_REASONS[error] as StopFailureReason;
+}
 
 const SUMMARY_MAX = 200;
 
@@ -263,6 +317,26 @@ function describeHook(event: KnownHookEvent): {
       };
     case 'UserPromptSubmit':
       return { summary: clip(event.prompt), data: { prompt: event.prompt ?? null } };
+    case 'PermissionDenied':
+      return {
+        summary: summarizeToolInput(event.tool_name, event.tool_input),
+        data: {
+          tool: event.tool_name,
+          toolUseId: event.tool_use_id ?? null,
+          reason: clip(event.reason),
+        },
+      };
+    case 'TaskCreated':
+    case 'TaskCompleted':
+      return {
+        summary: clip(event.task_subject) ?? 'Task',
+        data: { taskId: event.task_id ?? null, teammate: event.teammate_name ?? null },
+      };
+    case 'CwdChanged':
+      return {
+        summary: clip(event.new_cwd) ?? 'Folder changed',
+        data: { oldCwd: event.old_cwd ?? null, newCwd: event.new_cwd ?? null },
+      };
     case 'PreToolUse':
     case 'PostToolUse':
     case 'PermissionRequest':
@@ -300,7 +374,8 @@ function describeHook(event: KnownHookEvent): {
       };
     case 'StopFailure': {
       const error = clip(errorText(event.error));
-      return { summary: error ?? 'Turn failed', data: { error } };
+      const reason = stopFailureReason(event.error);
+      return { summary: error ?? 'Turn failed', data: { error, reason } };
     }
     case 'SubagentStart':
     case 'SubagentStop':

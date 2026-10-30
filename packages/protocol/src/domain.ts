@@ -231,7 +231,14 @@ const WaitingPermissionStatus = z.object({
   approvalId: ApprovalId.nullable(),
 });
 const WaitingInputStatus = z.object({ kind: z.literal('waiting_input') });
-const ErrorStatus = z.object({ kind: z.literal('error'), message: z.string().nullable() });
+export const StopFailureReason = z.enum(['rate_limit', 'auth', 'billing']);
+export type StopFailureReason = z.infer<typeof StopFailureReason>;
+const ErrorStatus = z.object({
+  kind: z.literal('error'),
+  message: z.string().nullable(),
+  /** Set when the turn failed on the account's limit, login or billing. */
+  reason: StopFailureReason.optional(),
+});
 const EndedStatus = z.object({ kind: z.literal('ended') });
 /** A board session whose query stopped with the server; `turnRunning`: mid-turn when it did. */
 const InterruptedStatus = z.object({ kind: z.literal('interrupted'), turnRunning: z.boolean() });
@@ -431,6 +438,10 @@ export const ActivityKind = z.enum([
   'notification',
   'permission.request',
   'permission.decision',
+  'permission.denied',
+  'task.created',
+  'task.completed',
+  'cwd.changed',
   'stop',
   'stop.failure',
   'subagent.start',

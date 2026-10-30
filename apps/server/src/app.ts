@@ -551,6 +551,8 @@ export async function buildServer(
       })
     : undefined;
   registerUiGateway(app, gateway, worstGateway, (request, socket) => {
+    // A board that just opened shouldn't show a status that went stale while nobody looked.
+    void discovery?.refresh();
     const session = request.browserSession();
     if (session === null) return;
     sessions.track(session, socket, WS_UNAUTHORIZED);

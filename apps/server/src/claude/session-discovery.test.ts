@@ -1,10 +1,19 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { projectIdFromPath } from '@yardmaster/protocol';
+import { projectIdFromPath, type SessionStatus } from '@yardmaster/protocol';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardStore } from '../store.js';
-import { type HistoryLister, processAlive, SessionDiscovery } from './session-discovery.js';
+import {
+  AGENTS_INTERVAL_MS,
+  AGENTS_RETRY_MS,
+  type AgentLister,
+  DISCOVERY_INTERVAL_MS,
+  type HistoryLister,
+  processAlive,
+  RECONCILE_GRACE_MS,
+  SessionDiscovery,
+} from './session-discovery.js';
 import { sessionReducer } from './session-reducer.js';
 
 const logger = { warn: () => {}, debug: () => {} };
@@ -47,7 +56,12 @@ async function writeEntry(pid: number, sessionId: string, extra: Record<string, 
 }
 
 function setup(
-  options: { alive?: Set<number>; listHistory?: HistoryLister | null; registryDir?: string } = {},
+  options: {
+    alive?: Set<number>;
+    listHistory?: HistoryLister | null;
+    listAgents?: AgentLister | null;
+    registryDir?: string;
+  } = {},
 ) {
   const alive = options.alive ?? new Set<number>();
   let now = 1_000;
@@ -58,6 +72,7 @@ function setup(
     registryDir: options.registryDir ?? registry,
     isAlive: (pid) => alive.has(pid),
     listHistory: options.listHistory ?? null,
+    listAgents: options.listAgents ?? null,
     now: () => now,
     resolvePath: async (path) => path,
   });
@@ -273,6 +288,7 @@ describe('SessionDiscovery registry scan', () => {
         registryDir: registry,
         isAlive,
         listHistory: null,
+        listAgents: null,
         intervalMs: 10_000,
         resolvePath: async (path) => path,
       });
@@ -435,5 +451,216 @@ describe('processAlive', () => {
   it('sees the current process and not a free pid', () => {
     expect(processAlive(process.pid)).toBe(true);
     expect(processAlive(2 ** 22 + 12_345)).toBe(false);
+  });
+});
+
+describe('claude agents --json', () => {
+  const row = (extra: Record<string, unknown> = {}) => ({
+    pid: 4242,
+    cwd: CWD,
+    kind: 'interactive',
+    startedAt: 1,
+    sessionId: LIVE_ID,
+    name: 'acme-shop-a1b2',
+    status: 'busy',
+    ...extra,
+  });
+  const listOf =
+    (...rows: unknown[]): AgentLister =>
+    async () =>
+      JSON.stringify(rows);
+
+  const live = (listAgents: AgentLister) => setup({ alive: new Set([4242]), listAgents });
+
+  /** A session hooks last reported on `age` ms ago. */
+  function hooked(
+    { store, advance }: ReturnType<typeof setup>,
+    status: SessionStatus,
+    age = RECONCILE_GRACE_MS,
+  ) {
+    store.upsertSession({
+      id: LIVE_ID,
+      origin: 'terminal',
+      cwd: CWD,
+      claudePid: 4242,
+      status,
+      startedAt: 1_000,
+      updatedAt: 1_000,
+    });
+    advance(age);
+  }
+
+  it('reads live sessions from the list instead of the registry', async () => {
+    await writeEntry(1, OTHER_ID);
+    const { service, store } = setup({
+      alive: new Set([1, 4242]),
+      listAgents: listOf(row()),
+    });
+    await service.tick();
+    expect(Object.keys(store.state.sessions)).toEqual([LIVE_ID]);
+    expect(store.state.sessions[LIVE_ID]?.status.kind).toBe('working');
+  });
+
+  it('runs the claude on the path with the agents arguments, by default', async () => {
+    const bin = join(dir, 'claude-stub');
+    const list = JSON.stringify([row({ status: 'idle' })]);
+    await writeFile(bin, `#!/bin/sh\n[ "$1 $2" = "agents --json" ] && printf '%s' '${list}'\n`, {
+      mode: 0o755,
+    });
+    vi.stubEnv('YARDMASTER_CLAUDE_BIN', bin);
+    const store = new BoardStore();
+    const service = new SessionDiscovery({
+      store,
+      logger,
+      registryDir: registry,
+      isAlive: () => true,
+      listHistory: null,
+      resolvePath: async (path) => path,
+    });
+    services.push(service);
+    await service.tick();
+    vi.unstubAllEnvs();
+    expect(store.state.sessions[LIVE_ID]?.status.kind).toBe('idle');
+  });
+
+  it('skips a row it cannot tie to a session', async () => {
+    const { service, store } = live(
+      listOf({ id: 'job-1', kind: 'background', state: 'working' }, row()),
+    );
+    await service.tick();
+    expect(Object.keys(store.state.sessions)).toEqual([LIVE_ID]);
+  });
+
+  it.each([
+    ['fails', (async () => Promise.reject(new Error('not found'))) as AgentLister],
+    ['prints text', (async () => 'No agents configured') as AgentLister],
+    ['prints an object', (async () => '{}') as AgentLister],
+  ])('falls back to the registry when it %s, then tries again later', async (_name, broken) => {
+    await writeEntry(4242, LIVE_ID);
+    const listAgents = vi.fn(broken);
+    const { service, store, advance } = live(listAgents);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]).toBeDefined();
+    advance(DISCOVERY_INTERVAL_MS);
+    await service.tick();
+    expect(listAgents).toHaveBeenCalledTimes(1);
+    advance(AGENTS_RETRY_MS);
+    await service.tick();
+    expect(listAgents).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs on its slow interval, and on demand at most every few seconds', async () => {
+    const listAgents = vi.fn(listOf());
+    const { service, advance } = live(listAgents);
+    await service.tick();
+    advance(DISCOVERY_INTERVAL_MS);
+    await service.tick();
+    expect(listAgents).toHaveBeenCalledTimes(1);
+    await service.refresh();
+    expect(listAgents).toHaveBeenCalledTimes(2);
+    await service.refresh();
+    expect(listAgents).toHaveBeenCalledTimes(2);
+    advance(AGENTS_INTERVAL_MS);
+    await service.tick();
+    expect(listAgents).toHaveBeenCalledTimes(3);
+  });
+
+  it('still ends a session between runs when its process goes', async () => {
+    const { service, store, alive, advance } = live(listOf(row()));
+    await service.tick();
+    alive.delete(4242);
+    advance(DISCOVERY_INTERVAL_MS);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status.kind).toBe('ended');
+  });
+
+  const WAITING_INPUT = { kind: 'waiting_input' } as const;
+  const WAITING_PERMISSION = { kind: 'waiting_permission', approvalId: null } as const;
+  const TOOL = { kind: 'tool', tool: 'Bash', toolUseId: null } as const;
+  const WORKING = { kind: 'working' } as const;
+  const IDLE = { kind: 'idle' } as const;
+  const ERROR = { kind: 'error', message: 'Boom' } as const;
+
+  it.each<[string, SessionStatus, Record<string, unknown>, SessionStatus]>([
+    ['a missed Stop', WORKING, { status: 'idle' }, IDLE],
+    ['a missed Stop during a tool', TOOL, { status: 'idle' }, IDLE],
+    ['a prompt answered in the terminal', WAITING_PERMISSION, { status: 'busy' }, WORKING],
+    ['a missed prompt', IDLE, { status: 'busy' }, WORKING],
+    [
+      'a question hooks missed',
+      WORKING,
+      { status: 'waiting', waitingFor: 'input needed' },
+      WAITING_INPUT,
+    ],
+    [
+      'a sandbox request hooks missed',
+      IDLE,
+      { status: 'waiting', waitingFor: 'sandbox request' },
+      WAITING_PERMISSION,
+    ],
+    ['a stale idle prompt', WAITING_INPUT, { status: 'busy' }, WORKING],
+  ])('corrects %s', async (_name, from, row_, to) => {
+    const ctx = live(listOf(row(row_)));
+    const { service, store } = ctx;
+    hooked(ctx, from);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(to);
+    expect(store.state.sessions[LIVE_ID]?.currentTool ?? null).toBeNull();
+  });
+
+  it.each<[string, SessionStatus, Record<string, unknown>]>([
+    ['the same status', WORKING, { status: 'busy' }],
+    ['a busy tool', TOOL, { status: 'busy' }],
+    ['a failure', ERROR, { status: 'idle' }],
+    ['the idle prompt', WAITING_INPUT, { status: 'idle' }],
+    ['a waiting session', WAITING_PERMISSION, { status: 'waiting', waitingFor: 'input needed' }],
+    ['an open dialog', WORKING, { status: 'waiting', waitingFor: 'dialog open' }],
+    ['a held approval', { kind: 'waiting_permission', approvalId: 'apr-1' }, { status: 'idle' }],
+    ['an unknown status', WORKING, { status: 'paused' }],
+  ])('leaves %s alone', async (_name, from, row_) => {
+    const ctx = live(listOf(row(row_)));
+    const { service, store } = ctx;
+    hooked(ctx, from);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(from);
+  });
+
+  it('gives hooks time to arrive first', async () => {
+    const ctx = live(listOf(row({ status: 'idle' })));
+    const { service, store } = ctx;
+    hooked(ctx, WORKING, RECONCILE_GRACE_MS - 1);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(WORKING);
+  });
+
+  it('leaves board sessions to the SDK', async () => {
+    const ctx = live(listOf(row({ status: 'idle' })));
+    const { service, store } = ctx;
+    hooked(ctx, WORKING);
+    store.updateSession(LIVE_ID, { origin: 'board' });
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(WORKING);
+  });
+
+  it('keeps an idle session with running subagents as it is', async () => {
+    const ctx = live(listOf(row({ status: 'busy' })));
+    const { service, store } = ctx;
+    hooked(ctx, IDLE);
+    store.updateSession(LIVE_ID, {
+      subagents: [
+        { id: 'a', type: null, description: null, status: 'running', startedAt: 1, endedAt: null },
+      ],
+    });
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(IDLE);
+  });
+
+  it('never corrects from the registry files', async () => {
+    await writeEntry(4242, LIVE_ID, { status: 'idle' });
+    const ctx = setup({ alive: new Set([4242]) });
+    const { service, store } = ctx;
+    hooked(ctx, WORKING);
+    await service.tick();
+    expect(store.state.sessions[LIVE_ID]?.status).toEqual(WORKING);
   });
 });

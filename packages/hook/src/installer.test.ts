@@ -72,6 +72,14 @@ const ours = {
   hooks: [{ type: 'command', command: COMMAND, async: true, timeout: HOOK_TIMEOUT_S }],
 };
 
+describe('OBSERVER_EVENTS', () => {
+  // A handler for either replaces Claude Code's own worktree handling and must print a path.
+  it('never takes over worktree creation or removal', () => {
+    expect(OBSERVER_EVENTS).not.toContain('WorktreeCreate');
+    expect(OBSERVER_EVENTS).not.toContain('WorktreeRemove');
+  });
+});
+
 describe('hook installer', () => {
   it('installs into a missing file, creating the directory, without a backup', async () => {
     expect(await install()).toBeUndefined();

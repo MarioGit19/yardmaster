@@ -4,8 +4,15 @@ import { readFileSync } from 'node:fs';
 const FIXTURES = new URL('../../../../packages/protocol/fixtures/hooks/', import.meta.url);
 
 export type HookFixture =
+  | 'cwd-changed'
+  | 'notification-agent-completed'
+  | 'notification-agent-needs-input'
   | 'notification-idle'
   | 'notification-permission'
+  | 'notification-quota-disabled'
+  | 'notification-quota-fired'
+  | 'notification-quota-stale'
+  | 'permission-denied'
   | 'permission-request'
   | 'post-compact'
   | 'post-tool-use-agent-async'
@@ -20,10 +27,14 @@ export type HookFixture =
   | 'session-end'
   | 'session-start'
   | 'stop-background'
+  | 'stop-failure-auth'
+  | 'stop-failure-billing'
   | 'stop-failure'
   | 'stop'
   | 'subagent-start'
   | 'subagent-stop'
+  | 'task-completed'
+  | 'task-created'
   | 'unknown-event'
   | 'user-prompt-submit';
 

@@ -162,9 +162,13 @@ const TRANSITIONS: Row[] = [
     working,
     'stop-failure',
     {},
-    { kind: 'error', message: 'Rate limit reached' },
+    { kind: 'error', message: 'Rate limit reached', reason: 'rate_limit' },
   ],
   ['ended -StopFailure-> ended', ended, 'stop-failure', {}, ended],
+  ['waiting -PermissionDenied-> working', permission, 'permission-denied', {}, working],
+  ['working -CwdChanged-> working', working, 'cwd-changed', {}, working],
+  ['working -TaskCreated-> working', working, 'task-created', {}, working],
+  ['working -TaskCompleted-> working', working, 'task-completed', {}, working],
   ['working -PreCompact-> compacting', working, 'pre-compact', {}, compactingWorking],
   [
     'idle -PreCompact-> compacting',
@@ -358,17 +362,98 @@ describe('sessionReducer fields', () => {
 
   it('records the error on StopFailure, falling back to the error code', () => {
     const detailed = sessionReducer(inStatus(working), event('stop-failure'));
-    expect(detailed.status).toEqual({ kind: 'error', message: 'Rate limit reached' });
+    expect(detailed.status).toEqual({
+      kind: 'error',
+      message: 'Rate limit reached',
+      reason: 'rate_limit',
+    });
     const bare = sessionReducer(
       inStatus(working),
       event('stop-failure', { error_details: undefined }),
     );
-    expect(bare.status).toEqual({ kind: 'error', message: 'rate_limit' });
+    expect(bare.status).toEqual({
+      kind: 'error',
+      message: 'Usage limit reached',
+      reason: 'rate_limit',
+    });
+    const plain = sessionReducer(
+      inStatus(working),
+      event('stop-failure', { error: 'server_error', error_details: undefined }),
+    );
+    expect(plain.status).toEqual({ kind: 'error', message: 'server_error' });
     const none = sessionReducer(
       inStatus(working),
       event('stop-failure', { error: undefined, error_details: undefined }),
     );
     expect(none.status).toEqual({ kind: 'error', message: null });
+  });
+
+  it('marks auth and billing failures', () => {
+    expect(sessionReducer(inStatus(working), event('stop-failure-auth')).status).toEqual({
+      kind: 'error',
+      message: 'Claude login needs attention',
+      reason: 'auth',
+    });
+    expect(sessionReducer(inStatus(working), event('stop-failure-billing')).status).toEqual({
+      kind: 'error',
+      message: 'Billing problem',
+      reason: 'billing',
+    });
+  });
+
+  it('stays out of Needs you at an idle prompt while subagents run', () => {
+    const start = sessionReducer(inStatus(idle), event('subagent-start'));
+    expect(sessionReducer(start, event('notification-idle')).status).toEqual(idle);
+    const stop = sessionReducer(start, event('subagent-stop'));
+    expect(sessionReducer(stop, event('notification-idle')).status.kind).toBe('waiting_input');
+  });
+
+  it('asks for the user on agent_needs_input only for a session it follows', () => {
+    expect(
+      sessionReducer(inStatus(working), event('notification-agent-needs-input')).status.kind,
+    ).toBe('waiting_input');
+    expect(sessionReducer(undefined, event('notification-agent-needs-input')).status.kind).toBe(
+      'unknown',
+    );
+  });
+
+  it('leaves the status alone on agent_completed: it reports on another session', () => {
+    expect(sessionReducer(inStatus(working), event('notification-agent-completed')).status).toEqual(
+      working,
+    );
+  });
+
+  it('follows Claude Code recovering from a usage limit', () => {
+    const limited = sessionReducer(inStatus(working), event('stop-failure'));
+    expect(sessionReducer(limited, event('notification-quota-fired')).status.kind).toBe('working');
+    expect(sessionReducer(limited, event('notification-quota-stale')).status).toEqual({
+      kind: 'error',
+      message: 'Usage limit has reset, press enter to continue',
+      reason: 'rate_limit',
+    });
+    expect(sessionReducer(limited, event('notification-quota-disabled')).status).toEqual({
+      kind: 'error',
+      message: 'Automatic continue was turned off',
+      reason: 'rate_limit',
+    });
+    // Without a usage-limit failure there is nothing to recover from.
+    expect(sessionReducer(inStatus(idle), event('notification-quota-fired')).status).toEqual(idle);
+  });
+
+  it('moves on from a tool the permission rules denied', () => {
+    const tool = { kind: 'tool' as const, tool: 'Bash', toolUseId: 'toolu_01denied' };
+    expect(sessionReducer(inStatus(tool), event('permission-denied')).status).toEqual(working);
+    expect(sessionReducer(inStatus(idle), event('permission-denied')).status).toEqual(idle);
+  });
+
+  it('follows the session into a new folder', () => {
+    const moved = sessionReducer(inStatus(working), event('cwd-changed'));
+    expect(moved.cwd).toBe('/home/dev/acme-shop/packages/cart');
+    expect(moved.status).toEqual(working);
+  });
+
+  it.each(['task-created', 'task-completed'] as const)('%s leaves the status alone', (name) => {
+    expect(sessionReducer(inStatus(working), event(name)).status).toEqual(working);
   });
 
   it('sets endedAt on SessionEnd and clears it on resume', () => {
