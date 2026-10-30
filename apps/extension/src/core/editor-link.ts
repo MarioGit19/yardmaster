@@ -1,4 +1,3 @@
-import { connect } from 'node:net';
 import {
   decodeServerToEditor,
   EDITOR_CLOSE_REPLACED,
@@ -160,12 +159,13 @@ export class EditorLink {
     const { socketPath, token } = located.board;
 
     let reason: string | null = null;
-    // The URL only names the path: the connection always goes to the socket.
-    const socket = new WebSocket(`ws://localhost${LOCAL_ROUTES.editor}`, {
+    // A ws+unix URL makes ws pass `socketPath` to http.request. The editor's proxy patch leaves
+    // such requests alone; with a custom `createConnection` instead, it swaps in its own agent
+    // and the request goes to TCP port 80.
+    const socket = new WebSocket(`ws+unix:${socketPath}:${LOCAL_ROUTES.editor}`, {
       headers: { [TOKEN_HEADER]: token },
       maxPayload: MAX_SERVER_MESSAGE * 4,
       handshakeTimeout: 5_000,
-      createConnection: () => connect(socketPath),
     });
     this.socket = socket;
 
@@ -224,8 +224,11 @@ export class EditorLink {
       this.options.maxBackoffMs,
       this.options.random,
     );
+    // The first failure of a streak at info, so a link that never connects says why.
+    const line = `disconnected (${reason}); retrying in ${retryInMs} ms`;
+    if (this.failures === 0) this.log.info(line);
+    else this.log.debug(line);
     this.failures += 1;
-    this.log.debug(`disconnected (${reason}); retrying in ${retryInMs} ms`);
     this.setStatus({ kind: 'disconnected', reason, retryInMs });
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;

@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import http, { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EDITOR_CLOSE_REPLACED } from '@yardmaster/protocol';
@@ -146,6 +146,28 @@ describe('EditorLink', () => {
     expect(s.received[0]).toMatchObject({ v: 1, type: 'editor.hello', payload: hello });
     expect(statuses.map((status) => status.kind)).toEqual(['connecting', 'connected']);
     expect(l.status.kind).toBe('connected');
+  });
+
+  it("connects through an editor's proxy patch, which only spares socketPath requests", async () => {
+    // VS Code and Cursor wrap http.request and give a request without `socketPath` or an agent
+    // their own proxy agent, which ignores `createConnection`. Stand in for that patch.
+    const original = http.request;
+    const routed: (string | undefined)[] = [];
+    http.request = ((...args: Parameters<typeof http.request>) => {
+      const options = args[0] as http.RequestOptions;
+      routed.push(options.socketPath);
+      if (!options.socketPath) throw new Error('sent to the proxy agent');
+      return original(...args);
+    }) as typeof http.request;
+    try {
+      const s = await server();
+      const { link: l } = link(s.socketPath);
+      l.start();
+      await waitFor(() => s.received.length > 0);
+      expect(routed).toEqual([s.socketPath]);
+    } finally {
+      http.request = original;
+    }
   });
 
   it('sends heartbeats while connected', async () => {
