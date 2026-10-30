@@ -114,7 +114,7 @@ pnpm --filter yardmaster-extension package
 cursor --install-extension apps/extension/dist/yardmaster.vsix --force
 ```
 
-For VS Code, use `code --install-extension` instead. Terminals show their output from the next command they run; a process that was already running shows up with "restart to capture".
+For VS Code, use `code --install-extension` instead. Each [release](https://github.com/MarioGit19/yardmaster/releases) also has the `.vsix` attached, so you can download it and install it directly. Terminals show their output from the next command they run; a process that was already running shows up with "restart to capture".
 
 **4. Check the setup** with `pnpm yardmaster doctor`.
 

@@ -1,0 +1,81 @@
+name: Bug report
+description: Something doesn't work or looks wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please remove anything private before you submit: paths, project names, tokens, terminal output.
+        Found a security problem? Don't open an issue; use the Security tab's **Report a vulnerability** instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the board with `yardmaster start`
+        2. Open …
+        3. …
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `yardmaster doctor`
+      description: Run `yardmaster doctor` (or `pnpm yardmaster doctor` in the clone) and paste the result.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Yardmaster version
+      description: "`yardmaster --version`, or the commit you built from."
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: editor
+    attributes:
+      label: Editor
+      options:
+        - Cursor
+        - VS Code
+        - Other / none
+  - type: dropdown
+    id: layout
+    attributes:
+      label: Layout (if it's a UI problem)
+      options:
+        - Minimal
+        - Office
+        - Grid
+        - Transit
+        - Retro
+        - Not layout-specific
+  - type: dropdown
+    id: device
+    attributes:
+      label: Where you saw it
+      options:
+        - Browser on the computer
+        - Phone (over Tailscale)
+        - Both
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: The editor's "Yardmaster" output panel, browser console errors, or a screenshot. Demo mode (`pnpm dev:demo`) is a good way to show a UI bug without your own data.
