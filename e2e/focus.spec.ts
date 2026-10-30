@@ -84,6 +84,33 @@ async function openFirstProject(page: Page, layout: FocusLayout) {
 }
 
 /**
+ * Notes a skin's entry from the page as it plays, with its still copy and the card's opacity. The
+ * entry is short and a loaded runner may poll after it has gone. Call before the click that opens
+ * the workspace; gives up after 5 s without one.
+ */
+function watchEntry(page: Page, entryAttr: string, ghostAttr: string) {
+  return page.evaluate(
+    ({ entryAttr, ghostAttr }) =>
+      new Promise<{ entry: boolean; ghost: boolean; opacity: string }>((resolve) => {
+        const observer = new MutationObserver(() => {
+          const entry = document.querySelector(`[${entryAttr}]`);
+          if (!entry) return;
+          observer.disconnect();
+          const card = entry.closest<HTMLElement>('[data-focus]');
+          resolve({
+            entry: true,
+            ghost: entry.querySelector(`[${ghostAttr}]`) !== null,
+            opacity: card ? getComputedStyle(card).opacity : '',
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => resolve({ entry: false, ghost: false, opacity: '' }), 5_000);
+      }),
+    { entryAttr, ghostAttr },
+  );
+}
+
+/**
  * Samples an element's box every frame for `ms` from the moment it changes (or appears), to
  * check a morph is continuous. Gives up after 10 s without a change.
  */
@@ -522,25 +549,7 @@ test.describe('office at 1440', () => {
   }) => {
     const id = await enterRoom(page);
     const open = page.locator(OPENERS.office.link(id));
-    // The entry is short; note it from the page as it plays (a loaded runner may poll after it).
-    const seen = page.evaluate(
-      () =>
-        new Promise<{ entry: boolean; ghost: boolean; opacity: string }>((resolve) => {
-          const observer = new MutationObserver(() => {
-            const entry = document.querySelector('[data-office-entry]');
-            if (!entry) return;
-            observer.disconnect();
-            const card = entry.closest<HTMLElement>('[data-focus]');
-            resolve({
-              entry: true,
-              ghost: entry.querySelector('[data-office-ghost]') !== null,
-              opacity: card ? getComputedStyle(card).opacity : '',
-            });
-          });
-          observer.observe(document.body, { childList: true, subtree: true });
-          setTimeout(() => resolve({ entry: false, ghost: false, opacity: '' }), 5_000);
-        }),
-    );
+    const seen = watchEntry(page, 'data-office-entry', 'data-office-ghost');
     await open.click();
     const card = page.locator(`[data-focus="${id}"]`);
     // The card is there at once; the room's still copy moves into the band, then goes.
@@ -641,11 +650,11 @@ test.describe('transit at 1440', () => {
     page,
   }) => {
     const { id, sign } = await openLine(page);
+    const seen = watchEntry(page, 'data-transit-entry', 'data-transit-ghost');
     await sign.click();
     const card = page.locator(`[data-focus="${id}"]`);
     // The card is there at once; a still copy of the line moves into the band, then goes.
-    await expect(card.locator('[data-transit-entry]')).toBeAttached();
-    expect(await card.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+    expect(await seen).toEqual({ entry: true, ghost: true, opacity: '1' });
     await expect(card.locator('[data-transit-entry]')).toHaveCount(0);
     await expect(card).toHaveAttribute('data-layout', 'transit');
     const band = card.locator(`[data-transit-band="${id}"]`);
