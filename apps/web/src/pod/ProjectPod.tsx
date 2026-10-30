@@ -30,6 +30,7 @@ import { formatCount, toneLabel } from '../status.js';
 import { useProjectTone } from '../statusTokens.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
+import { StatusDot } from '../ui/StatusDot.js';
 import { isDimmed } from './activity.js';
 import { MAX_SESSION_ROWS, podSessions } from './model.js';
 import { ActivityBorder, DoneSweep, EventSparks } from './PodActivity.js';
@@ -204,13 +205,23 @@ export function ProjectPod({ project }: { project: Project }) {
             <ProjectAvatar project={project} />
           </span>
           <div className="pod-title flex min-w-0 flex-1 flex-col">
-            <Link
-              href={projectHref(project.id)}
-              title={project.name}
-              className="truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
-            >
-              {project.name}
-            </Link>
+            <span className="flex min-w-0 items-center gap-2">
+              <Link
+                href={projectHref(project.id)}
+                title={project.name}
+                className="min-w-0 truncate font-medium text-title-sm text-text-1 after:absolute after:inset-0 after:rounded-panel focus-visible:shadow-none focus-visible:after:shadow-focus"
+              >
+                {project.name}
+              </Link>
+              {tone !== 'idle' && (
+                <StatusDot
+                  tone={tone}
+                  label={toneLabel(tone)}
+                  showLabel
+                  className="pod-status shrink-0 text-meta text-text-2"
+                />
+              )}
+            </span>
             {opening ? <OpeningLine {...opening} /> : <GitLine git={project.git} />}
           </div>
           <PodCrew
@@ -231,6 +242,7 @@ export function ProjectPod({ project }: { project: Project }) {
                 accent={accent}
                 crew={crew}
                 now={now}
+                projectBranch={project.git?.branch ?? null}
               />
             ))}
             {hiddenSessions > 0 && (

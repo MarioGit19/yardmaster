@@ -58,8 +58,8 @@ export function projectTone(
 }
 
 const TONE_LABEL: Record<Tone, string> = {
-  work: 'Working',
-  tool: 'Tool active',
+  work: 'Running',
+  tool: 'Running',
   wait: 'Needs you',
   stale: 'Stale',
   ok: 'Done, unseen',

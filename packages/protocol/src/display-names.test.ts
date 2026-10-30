@@ -6,8 +6,23 @@ import {
   sessionDisplayName,
   sessionSubtitle,
   terminalDisplayName,
+  worktreeName,
 } from './display-names.js';
 import type { ClaudeSession } from './domain.js';
+
+describe('worktreeName', () => {
+  it('reads the worktree folder out of a path', () => {
+    expect(worktreeName('/home/dev/acme-shop/.claude/worktrees/tax-fix')).toBe('tax-fix');
+    expect(worktreeName('/home/dev/acme-shop/.claude/worktrees/tax-fix/src')).toBe('tax-fix');
+    expect(worktreeName('/home/dev/acme-shop/.worktrees/tax-fix')).toBe('tax-fix');
+  });
+
+  it('finds none in an ordinary folder', () => {
+    expect(worktreeName('/home/dev/acme-shop')).toBeNull();
+    expect(worktreeName('/home/dev/worktrees/acme-shop')).toBeNull();
+    expect(worktreeName(null)).toBeNull();
+  });
+});
 
 describe('isAutomaticTerminalName', () => {
   it.each(['zsh', 'bash', 'fish', 'sh', 'pwsh', 'node', 'python', 'python3.12', 'claude'])(

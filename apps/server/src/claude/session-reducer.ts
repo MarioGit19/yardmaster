@@ -91,7 +91,8 @@ export function sessionReducer(
 
   switch (hook.hook_event_name) {
     case 'SessionStart':
-      next = { ...next, model: hook.model ?? next.model, endedAt: null };
+      next = { ...withHookTitle(next, hook.session_title), model: hook.model ?? next.model };
+      next = { ...next, endedAt: null };
       // A compaction restarts the session mid-turn; PostCompact restores the status.
       return status.kind === 'compacting' ? next : to({ kind: 'idle' });
 
@@ -100,6 +101,7 @@ export function sessionReducer(
 
     case 'UserPromptSubmit':
       if (ended) return next;
+      next = withHookTitle(next, hook.session_title);
       if (next.title === null) next = { ...next, title: clipLine(hook.prompt, TITLE_MAX) };
       // The previous turn's answer is not this turn's.
       next = { ...next, lastAssistantText: null, lastAssistantAt: null };
@@ -251,6 +253,12 @@ function subagentDescription(session: ClaudeSession, agentId: string | undefined
   }
   const tool = session.currentTool;
   return tool?.family === 'task' && tool.status === 'running' ? tool.summary : null;
+}
+
+/** Claude Code's generated title replaces the first-prompt stand-in once it exists. */
+function withHookTitle(session: ClaudeSession, title: string | undefined): ClaudeSession {
+  const clipped = clipLine(title, TITLE_MAX);
+  return clipped === null ? session : { ...session, title: clipped };
 }
 
 function withAssistantText(

@@ -11,6 +11,7 @@ import {
   risingPods,
   selectPodOrder,
   sessionCaption,
+  sessionWhen,
 } from './model.js';
 
 const session = (status: ClaudeSession['status'], over: Partial<ClaudeSession> = {}) => ({
@@ -118,16 +119,59 @@ describe('sessionCaption', () => {
       text: 'Error: Overloaded',
       tone: 'err',
     });
-    expect(sessionCaption(session({ kind: 'idle' }))).toMatchObject({
+    expect(sessionCaption(session({ kind: 'idle' }, { lastAssistantText: null }))).toMatchObject({
       text: 'Checkout fix',
       tone: 'rest',
     });
-    expect(sessionCaption(session({ kind: 'idle' }, { title: null })).text).toBe('Idle');
+    const blank = { title: null, lastAssistantText: null };
+    expect(sessionCaption(session({ kind: 'idle' }, blank)).text).toBe('Ready');
     expect(sessionCaption(session({ kind: 'working' })).text).toBe('Thinking…');
   });
 });
 
+describe('the one line on a card', () => {
+  it('leads an idle session with what it produced, cut to one line', () => {
+    const s = session({ kind: 'idle' }, { lastAssistantText: 'Checked it.\n\nAll 12 tests pass.' });
+    expect(sessionCaption(s).text).toBe('All 12 tests pass.');
+    const long = session({ kind: 'idle' }, { lastAssistantText: 'x'.repeat(5_000) });
+    expect(sessionCaption(long).text).toHaveLength(240);
+  });
+
+  it('skips the automatic session name', () => {
+    const s = session(
+      { kind: 'idle' },
+      { title: 'acme-shop-c3', cwd: '/home/dev/acme-shop', lastAssistantText: null },
+    );
+    expect(sessionCaption(s).text).toBe('Ready');
+  });
+});
+
+describe('sessionWhen', () => {
+  const now = 10 * 60_000;
+
+  it('counts a blocked session from the approval, else its last change', () => {
+    const blocked = session({ kind: 'waiting_input' }, { updatedAt: now - 3 * 60_000 });
+    expect(sessionWhen(blocked, null, now)?.text).toBe('waiting 3m');
+    const asked = session({ kind: 'waiting_permission', approvalId: 'a1' });
+    const approval = { createdAt: now - 5 * 60_000 } as Approval;
+    expect(sessionWhen(asked, approval, now)?.text).toBe('waiting 5m');
+  });
+
+  it('dates a quiet session by its last reply and leaves a running one undated', () => {
+    const quiet = session({ kind: 'idle' }, { lastAssistantAt: now - 4 * 60_000, updatedAt: now });
+    expect(sessionWhen(quiet, null, now)).toEqual({ text: '4m ago', at: now - 4 * 60_000 });
+    expect(sessionWhen(session({ kind: 'working' }), null, now)).toBeNull();
+  });
+});
+
 describe('lastLine', () => {
+  it('passes over a line that only introduces a code block', () => {
+    expect(lastLine('Totals are fixed.\n\nThe core of it:\n\n```ts\nx\n```')).toBe(
+      'Totals are fixed.',
+    );
+    expect(lastLine('The core of it:\n\n```ts\nx\n```')).toBe('The core of it:');
+  });
+
   it('takes the last meaningful line, whitespace collapsed', () => {
     expect(lastLine('First.\n\n  Then   the totals.  \n```\n')).toBe('Then the totals.');
     expect(lastLine('')).toBeNull();

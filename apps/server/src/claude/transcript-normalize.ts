@@ -101,6 +101,15 @@ export function customTitleOf(raw: unknown): string | null {
   return parsed.data.customTitle.replace(/\s+/g, ' ').trim() || null;
 }
 
+const BranchEntry = z.looseObject({ gitBranch: z.string().min(1).max(256) });
+
+/** The branch a transcript line was written on; a detached HEAD names none. */
+export function gitBranchOf(raw: unknown): string | null {
+  const parsed = BranchEntry.safeParse(raw);
+  if (!parsed.success || parsed.data.gitBranch === 'HEAD') return null;
+  return parsed.data.gitBranch;
+}
+
 /**
  * Normalizes one raw entry into chat messages (one per content block).
  * Unknown line types, sidechain lines and unknown blocks yield nothing.

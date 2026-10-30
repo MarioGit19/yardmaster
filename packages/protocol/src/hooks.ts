@@ -57,9 +57,13 @@ export const SessionStartHook = hook('SessionStart', {
   source: z.string().max(64).optional(),
   model: z.string().max(256).optional(),
   agent_type: z.string().max(256).optional(),
+  session_title: Str.optional(),
 });
 export const SessionEndHook = hook('SessionEnd', { reason: z.string().max(256).optional() });
-export const UserPromptSubmitHook = hook('UserPromptSubmit', { prompt: Str.optional() });
+export const UserPromptSubmitHook = hook('UserPromptSubmit', {
+  prompt: Str.optional(),
+  session_title: Str.optional(),
+});
 export const PreToolUseHook = hook('PreToolUse', ToolFields);
 export const PostToolUseHook = hook('PostToolUse', {
   ...ToolFields,

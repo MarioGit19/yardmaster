@@ -975,6 +975,7 @@ export class DemoSimulator {
       origin: 'terminal',
       projectId: project.id,
       cwd: project.def.path,
+      branch: project.def.branch,
       model,
       permissionMode: 'default',
       terminalId: terminal.id,

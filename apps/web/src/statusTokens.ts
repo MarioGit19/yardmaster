@@ -183,6 +183,16 @@ export function useSessionView(session: ClaudeSession): StatusView {
   return { tone, label };
 }
 
+/** Why a session reads Stale, or null. Needs you and Failed never do, whatever the stream says. */
+export function useSessionStale(session: ClaudeSession): string | null {
+  const seen = useSeenItems();
+  const now = useNow(STALE_TICK_MS);
+  return useBoard((s) => {
+    const ctx = statusContext(s, seen, now);
+    return sessionToken(session, ctx) === 'stale' ? sessionStaleReason(session, ctx) : null;
+  });
+}
+
 /** A terminal's lane with its token applied: stale instead of a frozen "running". */
 export function useLaneStatus(terminal: Terminal, lane: LaneView): LaneView {
   const seen = useSeenItems();

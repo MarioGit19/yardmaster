@@ -213,6 +213,19 @@ describe('sessionReducer transitions', () => {
 });
 
 describe('sessionReducer fields', () => {
+  it('prefers the generated session title to the first prompt', () => {
+    const fromPrompt = sessionReducer(
+      undefined,
+      event('user-prompt-submit', { prompt: 'fix the cart', session_title: undefined }),
+    );
+    expect(fromPrompt.title).toBe('fix the cart');
+    const titled = sessionReducer(
+      fromPrompt,
+      event('user-prompt-submit', { prompt: 'and tax', session_title: 'Cart totals fix' }),
+    );
+    expect(titled.title).toBe('Cart totals fix');
+  });
+
   it('creates a terminal session from the common fields', () => {
     const session = sessionReducer(
       undefined,

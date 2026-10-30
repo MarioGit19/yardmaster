@@ -7,9 +7,12 @@ import {
 } from '@yardmaster/protocol';
 import type { BoardStoreState } from '../data/index.js';
 import { projectTone, type Tone } from '../status.js';
+import { formatWaited, formatWhen } from '../time.js';
 
 /** Session rows per pod before the rest collapse into a count. */
 export const MAX_SESSION_ROWS = 3;
+/** Longest one-line summary; the box truncates it further to fit. */
+const CAPTION_MAX = 240;
 
 /**
  * Pod order on the overview: projects that need you first (waiting, then errors), the rest by
@@ -162,18 +165,59 @@ export function sessionCaption(session: ClaudeSession, approval?: Approval | nul
         tone: 'rest',
       };
     case 'idle': {
-      // The last turn's title; Claude Code's automatic `<folder>-<code>` name says nothing.
+      // What the last turn produced, else its title; Claude Code's automatic `<folder>-<code>`
+      // name says nothing.
       const title = session.title?.trim();
-      const said = title && !isAutomaticSessionName(title, session.cwd) ? title : null;
-      return { glyph: null, text: said ?? 'Idle', tone: 'rest' };
+      const named = title && !isAutomaticSessionName(title, session.cwd) ? title : null;
+      const text = lastLine(session.lastAssistantText) ?? named ?? 'Ready';
+      return { glyph: null, text: clipCaption(text), tone: 'rest' };
     }
   }
 }
 
+const clipCaption = (text: string) =>
+  text.length > CAPTION_MAX ? `${text.slice(0, CAPTION_MAX - 1)}…` : text;
+
+/** A Running that can't be vouched for says why instead of repeating its last action. */
+export const staleCaption = (reason: string): Caption => ({
+  glyph: null,
+  text: reason,
+  tone: 'rest',
+});
+
+export interface SessionWhen {
+  text: string;
+  /** The moment `text` counts from, for a tooltip with the absolute time. */
+  at: number;
+}
+
+/**
+ * A session's time on a card: how long it has waited while blocked, how long ago it last did
+ * something otherwise, and nothing while it runs, when its caption is the news.
+ */
+export function sessionWhen(
+  session: ClaudeSession,
+  approval: Approval | null | undefined,
+  now: number,
+): SessionWhen | null {
+  const { kind } = session.status;
+  if (kind === 'waiting_permission' || kind === 'waiting_input') {
+    const at = approval?.createdAt ?? session.updatedAt;
+    return { text: `waiting ${formatWaited(Math.max(0, now - at))}`, at };
+  }
+  if (isBusy(kind)) return null;
+  const at = session.lastAssistantAt ?? session.updatedAt;
+  return { text: formatWhen(at, now), at };
+}
+
+const isBusy = (kind: ClaudeSession['status']['kind']) =>
+  kind === 'working' || kind === 'tool' || kind === 'compacting';
+
 /**
  * The last line of the assistant's text that reads as prose, whitespace collapsed: code inside
  * fences (closed or still streaming) and bracket-only lines are skipped, and list, quote and
- * heading markers and inline backticks are dropped.
+ * heading markers and inline backticks are dropped. A line that ends in a colon loses to any
+ * other prose.
  */
 export function lastLine(text: string | null): string | null {
   if (!text) return null;
@@ -191,7 +235,9 @@ export function lastLine(text: string | null): string | null {
       .replace(/`/g, '')
       .replace(/\s+/g, ' ')
       .trim();
-    if (line && !/^[\s`#>*\-_|=~{}[\]();,.:]+$/.test(line)) found = line;
+    if (!line || /^[\s`#>*\-_|=~{}[\]();,.:]+$/.test(line)) continue;
+    // "The fix:" only introduces what follows; it stands in when nothing else was said.
+    if (found === null || !line.endsWith(':')) found = line;
   }
   return found;
 }

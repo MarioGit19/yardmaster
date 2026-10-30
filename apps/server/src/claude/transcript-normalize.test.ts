@@ -3,6 +3,7 @@ import { ChatMessage } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   entryUuid,
+  gitBranchOf,
   MAX_INPUT_STRING,
   MAX_TEXT,
   normalizeEntry,
@@ -13,6 +14,15 @@ import {
 
 const FIXTURE = new URL('../../fixtures/transcripts/session.jsonl', import.meta.url);
 const lines = readFileSync(FIXTURE, 'utf8').split('\n');
+
+describe('gitBranchOf', () => {
+  it('reads the branch off a line, and none from a detached HEAD', () => {
+    expect(gitBranchOf({ type: 'user', gitBranch: 'feat/cart' })).toBe('feat/cart');
+    expect(gitBranchOf({ type: 'user', gitBranch: 'HEAD' })).toBeNull();
+    expect(gitBranchOf({ type: 'user', gitBranch: 7 })).toBeNull();
+    expect(gitBranchOf({ type: 'user' })).toBeNull();
+  });
+});
 
 describe('parseTranscriptLine', () => {
   it('parses objects and rejects blank, invalid and non-object lines', () => {

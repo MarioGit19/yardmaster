@@ -30,6 +30,7 @@ import {
   orderPods,
   podSessions,
   sessionCaption,
+  staleCaption,
 } from '../pod/model.js';
 import { sessionHref, terminalHref } from '../routes.js';
 import type { Tone } from '../status.js';
@@ -210,8 +211,6 @@ function tokenState(token: StatusToken, state: ActorState): ActorState {
   if (token === 'stale') return 'stale';
   return token === 'done_unseen' ? 'done' : state;
 }
-
-const staleCaption = (reason: string): Caption => ({ glyph: null, text: reason, tone: 'rest' });
 
 /** Attention first: waiting, errors, then work, then rest. */
 const STATE_RANK: Record<ActorState, number> = {

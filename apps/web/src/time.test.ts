@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatStarted, formatWhen } from './time.js';
+import { formatWaited, formatWhen } from './time.js';
 
 const NOW = new Date(2026, 5, 15, 12, 0).getTime();
 const MIN = 60_000;
@@ -20,10 +20,11 @@ describe('formatWhen', () => {
   });
 });
 
-describe('formatStarted', () => {
-  it('shows the time today and adds the day before', () => {
-    const now = new Date(2026, 2, 4, 18, 30).getTime();
-    expect(formatStarted(new Date(2026, 2, 4, 9, 5).getTime(), now)).toBe('09:05');
-    expect(formatStarted(new Date(2026, 2, 3, 23, 59).getTime(), now)).toBe('Mar 3, 23:59');
+describe('formatWaited', () => {
+  it('counts in the largest whole unit', () => {
+    expect(formatWaited(20_000)).toBe('<1m');
+    expect(formatWaited(3 * 60_000)).toBe('3m');
+    expect(formatWaited(2 * 3_600_000 + 60_000)).toBe('2h');
+    expect(formatWaited(4 * 86_400_000)).toBe('4d');
   });
 });

@@ -53,7 +53,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
 - **Window:** a connected Cursor/VS Code window (extension instance). Belongs to 1..n projects.
 - **Terminal:** an integrated terminal in a window, or (stretch) a board-owned PTY. Has a name, shell PID, cwd, state, process subtree (CPU/mem), listening ports, and a list of executions.
 - **Execution:** one command run in a terminal (via shell integration): command line, cwd, start and end time, exit code, output stream (kept in a ring buffer).
-- **Claude session:** identified by `session_id`. Origin is either `terminal` (interactive, observed through hooks and transcripts) or `board` (headless, run through the Agent SDK). Has a status, title, model, permission mode, token usage and context size, current tool, todo list, subagents, and the linked terminal (when known).
+- **Claude session:** identified by `session_id`. Origin is either `terminal` (interactive, observed through hooks and transcripts) or `board` (headless, run through the Agent SDK). Has a status, title, git branch, model, permission mode, token usage and context size, current tool, todo list, subagents, and the linked terminal (when known).
 - **Approval:** a pending permission decision, from an SDK `canUseTool` callback (board sessions) or from a `PermissionRequest` hook (terminal sessions in away mode).
 - **Activity event:** a normalized, timestamped event used by the Pulse timeline and history.
 

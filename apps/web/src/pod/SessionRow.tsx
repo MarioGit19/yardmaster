@@ -1,4 +1,10 @@
-import { type ClaudeSession, sessionDisplayName } from '@yardmaster/protocol';
+import {
+  type ClaudeSession,
+  sessionDisplayName,
+  sessionSubtitle,
+  worktreeName,
+} from '@yardmaster/protocol';
+import { FolderGit2, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { useInView } from '../anim/useFrame.js';
@@ -13,9 +19,11 @@ import { spring } from '../motion.js';
 import { ToolChip } from '../orb/ToolChip.js';
 import { plural } from '../plural.js';
 import { formatCount, totalTokens } from '../status.js';
-import { formatStarted } from '../time.js';
+import { useSessionStale, useSessionView } from '../statusTokens.js';
+import { formatDateTime } from '../time.js';
+import { StatusDot } from '../ui/StatusDot.js';
 import { LiveCaption } from './LiveCaption.js';
-import { isStreaming, lastLine, sessionCaption } from './model.js';
+import { isStreaming, lastLine, sessionCaption, sessionWhen, staleCaption } from './model.js';
 import { type CrewView, SessionCrew } from './SessionCrew.js';
 
 export interface SessionRowProps {
@@ -23,28 +31,29 @@ export interface SessionRowProps {
   accent: string;
   crew: CrewView;
   now: number;
+  /** The branch on the pod's header: a row only repeats it when it says something else. */
+  projectBranch: string | null;
 }
 
 /**
- * One Claude session in a pod, DESIGN.md §4.3: crew member · live caption (slides in on change) ·
- * tool chip (rows ≥ 360 px) · tokens, over the last assistant line, which shimmers while the
- * session streams.
+ * One Claude session in a pod, DESIGN.md §4.3: crew member · status mark · what it is doing,
+ * needs or produced (slides in on change) · tool chip (rows ≥ 360 px) · tokens, over the last
+ * assistant line while that is still news, then the session's name, time and branch.
  */
-export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
+export function SessionRow({ session, accent, crew, now, projectBranch }: SessionRowProps) {
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
-  const caption = sessionCaption(session, approval);
-  const line = lastLine(session.lastAssistantText);
-  const lineRef = useRef<HTMLParagraphElement>(null);
-  const lineOnScreen = useInView(lineRef);
-  const title = session.title?.trim() || null;
-  // Untitled sessions with no reply yet would read the same: their start time and short id
-  // (what `claude --resume` takes) tell them apart.
-  const fallback =
-    title && title !== caption.text
-      ? title
-      : `Started ${formatStarted(session.startedAt, Date.now())} · ${session.id.slice(0, 8)}`;
+  const status = useSessionView(session);
+  const stale = useSessionStale(session);
+  const caption = stale ? staleCaption(stale) : sessionCaption(session, approval);
+  // An idle row's caption already is this line.
+  const line = session.status.kind === 'idle' ? null : lastLine(session.lastAssistantText);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const onScreen = useInView(rowRef);
+  const when = sessionWhen(session, approval, now);
+  const worktree = worktreeName(session.cwd);
+  const branch = session.branch && (worktree || session.branch !== projectBranch);
   const tokens = totalTokens(session);
   const streaming = isStreaming(session);
   const tool = session.status.kind === 'tool' ? session.status.tool : null;
@@ -54,7 +63,11 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
       : null;
 
   return (
-    <li data-session={session.id} className="@container flex min-w-0 items-center gap-3">
+    <li
+      ref={rowRef}
+      data-session={session.id}
+      className="@container flex min-w-0 items-center gap-3"
+    >
       <motion.span
         layoutId={sharedId.orb(session.id)}
         layoutDependency={POD_LAYOUT_DEPENDENCY}
@@ -85,6 +98,9 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
       </motion.span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-3">
+          {status.tone !== 'idle' && (
+            <StatusDot tone={status.tone} label={status.label} className="self-center" />
+          )}
           <LiveCaption caption={caption} className="caption flex-1 text-body-sm" />
           <DraftMarker draft={draftKey.session(session.id)} className="self-center" />
           <ToolChip tool={tool} className="hidden self-center @min-[360px]:inline-block" />
@@ -97,15 +113,52 @@ export function SessionRow({ session, accent, crew, now }: SessionRowProps) {
             </span>
           )}
         </div>
+        {line !== null && (
+          <p
+            dir="auto"
+            data-shimmer={streaming || undefined}
+            data-offscreen={!onScreen || undefined}
+            title={line}
+            className="shimmer relative truncate text-label text-text-2"
+          >
+            {line}
+          </p>
+        )}
         <p
-          ref={lineRef}
-          dir="auto"
-          data-shimmer={(streaming && line !== null) || undefined}
-          data-offscreen={!lineOnScreen || undefined}
-          title={line ?? undefined}
-          className="shimmer relative truncate text-label text-text-2"
+          data-session-meta
+          className="flex min-w-0 items-center gap-2 text-meta text-text-2 tabular"
         >
-          {line ?? fallback}
+          <span className="min-w-0 truncate" title={sessionSubtitle(session) ?? undefined}>
+            {sessionDisplayName(session)}
+          </span>
+          {when && (
+            <time
+              dateTime={new Date(when.at).toISOString()}
+              title={formatDateTime(when.at)}
+              className="shrink-0"
+            >
+              {when.text}
+            </time>
+          )}
+          {branch && (
+            <span
+              title={session.branch ?? undefined}
+              className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
+            >
+              <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{session.branch}</span>
+            </span>
+          )}
+          {worktree && (
+            <span
+              title={`Worktree ${worktree}`}
+              className="flex min-w-[min(3rem,100%)] items-center gap-1 font-mono"
+            >
+              <FolderGit2 aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{worktree}</span>
+              <span className="sr-only"> worktree</span>
+            </span>
+          )}
         </p>
         <BackgroundLine session={session} className="mt-0.5" />
       </div>

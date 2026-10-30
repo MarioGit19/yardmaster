@@ -146,8 +146,9 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 ┌───────────────────────────────────────────────────────────┐  ← 1px accent hairline on top edge
 │ ◉ acme-shop        ⎇ feat/checkout  ●3   ↑1      ⋯       │  ← avatar w/ accent ring · branch · dirty · ahead
 │                                                           │
-│  (orb)  Claude · Editing src/cart.ts            12.4k tok │  ← each session row: orb, status text (typewriter), tokens
-│         "Refactoring the cart totals to use…"            │  ← last assistant line, 1-line clamp, shimmer while streaming
+│  (orb) ● Editing src/cart.ts                    12.4k tok │  ← each session row: orb, status mark, what it is doing, needs or produced, tokens
+│         "Refactoring the cart totals to use…"            │  ← last assistant line while busy or blocked, 1-line clamp, shimmer while streaming
+│         Claude · waiting 3m · ⎇ fix/tax · ▣ tax-fix      │  ← name, time, branch when it isn't the pod's, worktree
 │                                                           │
 │  ▸ backend     pnpm dev        ▁▂▅▇▅▂▁   :3000  ● 2m     │  ← terminal lanes: name · cmd · throughput sparkline · port · uptime
 │  ▸ web         pnpm dev        ▁▁▂▁▁▁▁   :5173  ●        │
@@ -155,6 +156,8 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 └───────────────────────────────────────────────────────────┘
 ```
 
+- **Lead with what needs you:** the header carries the project's status token next to its name, and each row leads with the session's own token (§2.1). Quiet shows no mark and no word. The caption says what the session is doing (tool and target), what it needs (the waiting reason), or what it produced: the last line of `last_assistant_message`, then the session title, then "Ready". Stale replaces it with the reason.
+- **Times are relative**, with the absolute time in a tooltip: `4m ago`, and `waiting 3m` on a blocked row. A running row shows no time. Session hashes, the word "Idle" and clock times stay off cards.
 - Hover: a cursor-following spotlight (radial gradient at the pointer position, 6% white) plus border brightening. No lift or scale: hover feedback stays quiet so status motion stands out.
 - Throughput sparkline: a 60-sample rolling canvas line. New samples slide in from the right. Its color is the project accent, and it turns rose on error output.
 - **Flow light:** when a lane is streaming, a thin gradient "comet" travels along its bottom border (CSS keyframe on a pseudo-element, transform only).

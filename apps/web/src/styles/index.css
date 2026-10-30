@@ -942,6 +942,12 @@
 .pod-title {
   container: pod-title / inline-size;
 }
+/* The name matters more than the word: the mark stays, the article's label still says it. */
+@container pod-title (width < 13rem) {
+  .pod-status > :last-child {
+    display: none;
+  }
+}
 @container pod-title (width < 12rem) {
   .pod-git-sync {
     display: none;

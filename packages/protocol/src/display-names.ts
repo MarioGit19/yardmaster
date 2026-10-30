@@ -75,6 +75,11 @@ export function isAutomaticSessionName(name: string, cwd: string | null | undefi
   return value.startsWith(`${folder}-`) && /^[a-z0-9]{1,8}$/.test(value.slice(folder.length + 1));
 }
 
+/** The worktree a folder sits in, by the layouts Claude Code and common tools create. */
+export function worktreeName(cwd: string | null | undefined): string | null {
+  return cwd?.match(/[\\/]\.(?:claude[\\/])?worktrees[\\/]([^\\/]+)/)?.[1] ?? null;
+}
+
 /** "Claude", "Claude 2"…, or the name the user gave it. */
 export function sessionDisplayName(session: SessionNameFields): string {
   const custom = session.customTitle?.trim();

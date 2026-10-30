@@ -59,6 +59,9 @@ interface SessionDef {
   title?: string | null;
   /** A name the user gave it (`/rename`). */
   customTitle?: string;
+  /** Its own branch, in a `.claude/worktrees/<name>` folder when `worktree` is set. */
+  branch?: string;
+  worktree?: string;
   model?: string | null;
   tokens?: Partial<TokenUsage>;
   tool?: { tool: string; summary: string | null };
@@ -242,6 +245,8 @@ const PROJECTS: ProjectDef[] = [
       },
       {
         status: { kind: 'idle' },
+        branch: 'feature/a-branch-name-long-enough-to-run-off-the-side-of-any-card-at-any-width',
+        worktree: 'a-worktree-with-a-name-nearly-as-long-as-its-branch',
         title: 'تحسين صفحة الدفع',
         text: 'انتهيت من تحديث صفحة الدفع، وجميع الاختبارات ناجحة الآن.',
         tokens: { input: 1, output: 0, cacheRead: 0, cacheCreation: 0 },
@@ -524,8 +529,9 @@ export class WorstBoard {
         }
         this.store.upsertSession({
           id: sessionId,
+          ...(s.branch ? { branch: s.branch } : {}),
           projectId: id,
-          cwd: path,
+          cwd: s.worktree ? `${path}/.claude/worktrees/${s.worktree}` : path,
           status,
           title: s.title === undefined ? `Session ${i + 1}` : s.title,
           ...(s.customTitle ? { customTitle: s.customTitle } : {}),

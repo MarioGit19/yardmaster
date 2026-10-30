@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useNow } from '../anim/clock.js';
 import {
+  selectApproval,
   selectConnection,
   selectProjects,
   selectSessionsByProject,
@@ -26,6 +27,8 @@ import {
   useMotionLevel,
 } from '../motion.js';
 import { countOf } from '../plural.js';
+import { CAPTION_COLOR } from '../pod/LiveCaption.js';
+import { podSessions, sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import {
   eventDetail,
@@ -108,6 +111,11 @@ function ProjectRow({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const tone = useProjectTone(sessions, terminals);
+  const top = podSessions(sessions)[0];
+  const approval = useBoard(
+    selectApproval(top?.status.kind === 'waiting_permission' ? (top.status.approvalId ?? '') : ''),
+  );
+  const lead = top ? sessionCaption(top, approval) : null;
   const branch = project.git?.branch;
   const level = useMotionLevel();
   const x = useMotionValue(0);
@@ -169,13 +177,26 @@ function ProjectRow({ project }: { project: Project }) {
               {project.name}
             </span>
             <span className="flex min-w-0 items-center gap-2 text-label text-text-2">
-              <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
+              {tone !== 'idle' && (
+                <StatusDot tone={tone} label={toneLabel(tone)} showLabel className="shrink-0" />
+              )}
               {branch && (
                 <span className="min-w-0 truncate font-mono" title={branch}>
-                  · {branch}
+                  {tone !== 'idle' && '· '}
+                  {branch}
                 </span>
               )}
             </span>
+            {lead && (
+              <span
+                dir="auto"
+                data-phone-lead
+                className={cx('truncate text-label', CAPTION_COLOR[lead.tone])}
+                title={lead.text}
+              >
+                {lead.text}
+              </span>
+            )}
           </span>
           <ChevronRight aria-hidden className="size-4 shrink-0 text-text-3" strokeWidth={1.5} />
         </Link>

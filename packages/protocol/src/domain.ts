@@ -345,6 +345,8 @@ export const ClaudeSession = z.object({
   origin: SessionOrigin,
   projectId: ProjectId.nullable(),
   cwd: z.string().nullable(),
+  /** The git branch its transcript last reported; the project's may differ in a worktree. */
+  branch: z.string().max(256).nullable().optional(),
   status: SessionStatus,
   /** An automatic name (Claude Code's `<folder>-<code>`, or the first prompt); a subtitle only. */
   title: z.string().nullable(),

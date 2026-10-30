@@ -21,6 +21,7 @@ import { JsonlTail } from './jsonl-tail.js';
 import {
   customTitleOf,
   entryUuid,
+  gitBranchOf,
   normalizeEntry,
   parseTranscriptLine,
   taskNotificationsOf,
@@ -297,9 +298,11 @@ export class TranscriptService {
     let usageChanged = false;
     let model: string | null = null;
     let customTitle: string | null = null;
+    let branch: string | null = null;
     const notes: TaskNotification[] = [];
     for (const entry of entries) {
       customTitle = customTitleOf(entry) ?? customTitle;
+      branch = gitBranchOf(entry) ?? branch;
       notes.push(...taskNotificationsOf(entry));
       const uuid = entryUuid(entry);
       if (uuid !== null) {
@@ -319,7 +322,7 @@ export class TranscriptService {
         for (const listener of this.listeners) listener(streamId, seq, chunk);
       }
     }
-    this.publish(t, usageChanged, model, customTitle);
+    this.publish(t, usageChanged, model, customTitle, branch);
     if (notes.length > 0) this.finishBackground(t.id, notes);
   }
 
@@ -337,6 +340,7 @@ export class TranscriptService {
     usageChanged: boolean,
     model: string | null,
     customTitle: string | null,
+    branch: string | null,
   ): void {
     const session = this.store.state.sessions[t.id];
     if (!session) return;
@@ -345,6 +349,7 @@ export class TranscriptService {
       contextTokens?: number | null;
       model?: string;
       customTitle?: string;
+      branch?: string;
     } = {};
     if (usageChanged) {
       fields.tokens = t.usage.tokens;
@@ -353,6 +358,7 @@ export class TranscriptService {
     if (model !== null && model !== session.model) fields.model = model;
     if (customTitle !== null && customTitle !== session.customTitle)
       fields.customTitle = customTitle;
+    if (branch !== null && branch !== session.branch) fields.branch = branch;
     if (Object.keys(fields).length === 0) return;
     // Transcript reads aren't session activity: keep `updatedAt` as the hooks set it.
     this.store.updateSession(t.id, { ...fields, updatedAt: session.updatedAt });
