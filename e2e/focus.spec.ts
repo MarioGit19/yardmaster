@@ -143,11 +143,23 @@ function sampleBoxes(page: Page, selector: string, ms: number) {
   );
 }
 
+/**
+ * A context on a browser with the GPU, for one test. The headless shell draws the blurred overview
+ * on the CPU, and one composite can hold back rAF for 300+ ms, which is what a frame count measures.
+ */
+const onGpu = test.extend({
+  context: async ({ playwright, baseURL, storageState, viewport, colorScheme }, use) => {
+    const browser = await playwright.chromium.launch({ channel: 'chromium' });
+    await use(await browser.newContext({ baseURL, storageState, viewport, colorScheme }));
+    await browser.close();
+  },
+});
+
 // Pods morph into their focus view; other layouts enter through their skin (below).
 test.describe('minimal at 1440', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('the pod morphs into the focus view and back', async ({ page }) => {
+  onGpu('the pod morphs into the focus view and back', async ({ page }) => {
     await openRoute(page, '/');
     const first = page.locator('[data-pod]').first();
     await expect(first).toBeVisible();
