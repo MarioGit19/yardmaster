@@ -18,25 +18,11 @@ playwright-report/
 *.pem
 *.key
 
-# local agent run logs and state (logs contain full transcripts)
-loop/logs/
-loop/.state/
-
 # personal terms for scripts/privacy-check.sh (never commit)
 .privacy-denylist
 
 .DS_Store
 .idea/
-
-# local Claude Code skills, references and personal settings
-.claude/skills/
-.claude/references/
-.claude/settings.local.json
-
-# Impeccable's local state (the hook cache holds absolute home paths)
-**/.impeccable/hook.cache.json
-**/.impeccable/hook.pending.json
-**/.impeccable/config.local.json
 
 # brand assets rendered from apps/web/src/brand/logo.svg (pnpm brand:build, and the web build)
 apps/web/public/*.png
