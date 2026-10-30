@@ -150,7 +150,7 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 │         "Refactoring the cart totals to use…"            │  ← last assistant line while busy or blocked, 1-line clamp, shimmer while streaming
 │         Claude · waiting 3m · ⎇ fix/tax · ▣ tax-fix      │  ← name, time, branch when it isn't the pod's, worktree
 │                                                           │
-│  ▸ backend     pnpm dev        ▁▂▅▇▅▂▁   :3000  ● 2m     │  ← terminal lanes: name · cmd · throughput sparkline · port · uptime
+│  ▸ backend     pnpm dev        ▁▂▅▇▅▂▁   :3000  ● 2m     │  ← terminal lanes: name · cmd · activity (line, ticks or value) · port · uptime
 │  ▸ web         pnpm dev        ▁▁▂▁▁▁▁   :5173  ●        │
 │  ▸ zsh         git status      ✓ 0                        │
 └───────────────────────────────────────────────────────────┘
@@ -159,7 +159,13 @@ Subagents appear as tiny satellite orbs orbiting the parent orb.
 - **Lead with what needs you:** the header carries the project's status token next to its name, and each row leads with the session's own token (§2.1). Quiet shows no mark and no word. The caption says what the session is doing (tool and target), what it needs (the waiting reason), or what it produced: the last line of `last_assistant_message`, then the session title, then "Ready". Stale replaces it with the reason.
 - **Times are relative**, with the absolute time in a tooltip: `4m ago`, and `waiting 3m` on a blocked row. A running row shows no time. Session hashes, the word "Idle" and clock times stay off cards.
 - Hover: a cursor-following spotlight (radial gradient at the pointer position, 6% white) plus border brightening. No lift or scale: hover feedback stays quiet so status motion stands out.
-- Throughput sparkline: a 60-sample rolling canvas line. New samples slide in from the right. Its color is the project accent, and it turns rose on error output.
+- **Activity track:** it draws only what says something, and the first match wins:
+  1. **CPU line**, when the CPU moved at least 10 points inside its 5-minute window (60 samples, one every 5 s, at least 2 minutes of them). The axis is fixed at 0–100 %, so multi-core work pins to the top and nothing auto-scales. An end dot sits on the current value, and the window label reads `5m`.
+  2. **Output ticks**, when the terminal wrote in the last minute (60 samples, one a second): output comes in bursts, so each second with output is a tick instead of a joined line. Height is on a fixed log scale up to 64 KiB/s, the same for every terminal. The window label reads `1m`.
+  3. **CPU as text** (`12%`), when a command is running and using at least 2 %.
+  4. **Nothing**, when the terminal is idle.
+
+  New samples slide in from the right. The color is the project accent, and it turns rose on error output. The full reading is in the tooltip. In a pod narrower than 22rem the graphs and labels go first and only the number stays.
 - **Flow light:** when a lane is streaming, a thin gradient "comet" travels along its bottom border (CSS keyframe on a pseudo-element, transform only).
 - The pod border takes the highest-priority status color of its children (wait > err > work).
 - **Terminal peek:** hovering (or focusing) a lane expands a live 6-line preview of that terminal's latest output beneath it (DOM text, Geist Mono 11px, ANSI colors, updated at most 10×/s), so you can read logs without opening anything.
@@ -218,7 +224,7 @@ The rule: **if something is doing work, it moves, and if it's not, it's still.**
 | **Crew mascot** (§4.11) | idle fidgets, or asleep after 5 min | acts out the work: typing, reading, running a command, delegating, thinking | raises a hand with an amber "!" / sweats with ×-eyes |
 | **Claude session** (orb, §4.2) | dim, slow breathing | swirling core while thinking, orbiting particles while running a tool (colored by tool family) | amber ripple then breathing glow / rose glitch |
 | **Session row caption** | the last turn's summary in `--text-3` | a live caption of the current action ("✎ Editing src/cart.ts", "⌕ Searching \"totals\"", "▶ pnpm test") that swaps with a quick vertical slide and a shimmer sweep across it | "Waiting for approval: Bash(pnpm test)" in amber |
-| **Terminal lane** | flat sparkline, grey dot | sparkline scrolling with output rate, a pulsing green dot (pulse speed ∝ lines/s, capped), and a comet light running along the lane's bottom edge | rose dot, exit badge pops in, the last error line slides into the caption |
+| **Terminal lane** | empty activity track, grey dot | CPU line or output ticks scrolling (§4.3), a pulsing green dot (pulse speed ∝ lines/s, capped), and a comet light running along the lane's bottom edge | rose dot, exit badge pops in, the last error line slides into the caption |
 | **Pod** | dims to 70% after 5 min with no activity | an **activity border**: a soft light travels around the pod's edge (conic-gradient rotation, speed ∝ how many things are active), plus a tiny particle on the top hairline for each new event | border becomes a steady amber or rose glow (§3 rule 4/6) |
 | **Turn finished** | | one gentle green sweep across the pod (left to right, 600 ms), played once | |
 | **Whole board** | ambient field calm | ambient field brightens and flows faster as total activity rises (§4.1) | amber bloom toward the waiting pod |
@@ -412,7 +418,7 @@ This layout is allowed a stronger look than the rest of the app (neon on near-bl
 
 ### 10.6 Retro
 
-**Concept.** A 1980s green-phosphor terminal. Everything is text: box-drawing frames per project, `[RUN]` `[WAIT]` `[ERR]` tags, ASCII sparklines (`▁▂▃▅▇`), a blinking block cursor on whatever is working, and the live caption typed out character by character. It's the densest layout (fits 20+ projects on one screen) and works over any connection.
+**Concept.** A 1980s green-phosphor terminal. Everything is text: box-drawing frames per project, `[RUN]` `[WAIT]` `[ERR]` tags, ASCII output ticks over the last minute (`▁▂▃▅▇`, on the lanes' fixed scale, blank when quiet, dropped on phones), a blinking block cursor on whatever is working, and the live caption typed out character by character. It's the densest layout (fits 20+ projects on one screen) and works over any connection.
 - Look: Geist Mono only, one phosphor hue for text, status shown with tag text **and** the status colors at reduced saturation, a faint scanline and a gentle screen curvature vignette at the edges (CSS only), a subtle phosphor glow on text (text-shadow).
 - Motion: the cursor blinks at 1 Hz on working items only, captions type in, new lines scroll up. Nothing else moves. Reduced: no typing, no blink. Off: static.
 - Keyboard-first: every project and actor has a number shortcut shown in the frame (`[3]`), Enter opens, Esc goes back.

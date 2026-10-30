@@ -859,6 +859,46 @@
   .lane-crash-dot {
     display: none;
   }
+  /* Graphs are the first thing to go: the number stays, and it needs no window label. */
+  .lane-signal-graph,
+  .lane-signal-window {
+    display: none;
+  }
+  .lane-signal[data-sparkline="line"] .lane-signal-value {
+    display: inline;
+  }
+}
+
+/* A lane's activity track: a graph with its window label, or the current value as text. */
+.lane-signal {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  height: 24px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.lane-signal-graph {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.lane-signal-window {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-3);
+}
+.lane-signal-value {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.lane-signal[data-sparkline="line"] .lane-signal-value {
+  display: none;
 }
 
 /* Flow light: a comet along the bottom edge while the lane streams (transform only). The loop is
@@ -3807,6 +3847,14 @@ main[data-office-zoom] {
 .retro-spark {
   flex: none;
   color: var(--retro-ink);
+  white-space: pre;
+}
+.retro-spark[data-ruled] {
+  display: inline-block;
+  height: var(--retro-line);
+  vertical-align: top;
+  background:
+    linear-gradient(var(--retro-dim-ink), var(--retro-dim-ink)) center / 100% 1px no-repeat;
 }
 
 .retro-tag[data-tone="work"] {

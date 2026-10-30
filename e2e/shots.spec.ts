@@ -289,6 +289,24 @@ test.describe('terminal lanes', () => {
   }
 });
 
+// The lane activity track once the CPU has enough samples to draw a line.
+test.describe('lane activity', () => {
+  for (const theme of THEMES) {
+    test.describe(theme, () => {
+      test.use({ theme, viewport: { width: 1440, height: 900 } });
+      test('cpu line and ticks', async ({ page }) => {
+        test.setTimeout(180_000);
+        await openRoute(page, '/');
+        await expect(page.locator('[data-sparkline="line"]').first()).toBeAttached({
+          timeout: 150_000,
+        });
+        await page.waitForTimeout(600);
+        await page.screenshot({ path: new URL(`lane-activity-${theme}.png`, OUT_DIR).pathname });
+      });
+    });
+  }
+});
+
 // A pod waiting for approval: the amber glow, with the strip above the grid.
 test.describe('waiting pod', () => {
   for (const theme of THEMES) {

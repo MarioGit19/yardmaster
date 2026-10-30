@@ -200,6 +200,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
               terminalId={terminal.id}
               color={accent}
               error={view.tone === 'err'}
+              running={view.running}
               className="pod-dim"
             />
             <span className="flex min-w-0 items-center">

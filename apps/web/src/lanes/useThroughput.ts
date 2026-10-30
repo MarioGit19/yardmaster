@@ -25,7 +25,7 @@ export function useThroughput(terminalId: string, listener: ThroughputListener):
   const callback = useRef(listener);
   callback.current = listener;
   useEffect(
-    () => throughputSampler(store).watch(terminalId, (ring) => callback.current(ring)),
+    () => throughputSampler(store).watch(terminalId, (ring, cpu) => callback.current(ring, cpu)),
     [store, terminalId],
   );
 }

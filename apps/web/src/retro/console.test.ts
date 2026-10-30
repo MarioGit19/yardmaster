@@ -95,20 +95,29 @@ describe('rowColumns', () => {
 });
 
 describe('asciiSpark', () => {
-  it('is flat without output and rises toward the newest burst', () => {
-    expect(asciiSpark([ring({})], 8)).toBe('▁▁▁▁▁▁▁▁');
+  it('prints nothing without output and ticks where it arrived', () => {
+    expect(asciiSpark([ring({})], 8)).toBe('        ');
     const spark = asciiSpark([ring({ 0: 50_000, 1: 50_000, 12: 2_000 })], 8);
     expect(spark).toHaveLength(8);
-    expect(spark.at(-1)).toBe('█');
-    // Age 12 lands in the fourth bucket from the end.
-    expect(spark[4]).not.toBe('▁');
-    expect(spark[0]).toBe('▁');
+    expect(spark.at(-1)).not.toBe(' ');
+    // Age 12 lands in the second bucket from the end, at eight samples a character.
+    expect(spark[6]).not.toBe(' ');
+    expect(spark[0]).toBe(' ');
+  });
+
+  it('covers the same minute at any width', () => {
+    expect(asciiSpark([ring({ 59: 4_000 })], 6)[0]).not.toBe(' ');
+    expect(asciiSpark([ring({ 59: 4_000 })], 8).trim()).toHaveLength(1);
+  });
+
+  it('keeps a burst the same height whatever else is in the window', () => {
+    const alone = asciiSpark([ring({ 0: 800 })], 8).at(-1);
+    expect(asciiSpark([ring({ 0: 800, 20: 2_000_000 })], 8).at(-1)).toBe(alone);
   });
 
   it('adds rings together', () => {
-    const one = asciiSpark([ring({ 0: 10_000 }), ring({ 20: 10_000 })], 8);
-    expect(one.at(-1)).toBe('█');
-    expect(one[2]).toBe('█');
+    const many = Array.from({ length: 30 }, () => ring({ 0: 4_000 }));
+    expect(asciiSpark(many, 8).at(-1)).not.toBe(asciiSpark([ring({ 0: 4_000 })], 8).at(-1));
   });
 });
 

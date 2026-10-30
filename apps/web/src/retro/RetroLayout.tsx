@@ -28,7 +28,6 @@ import {
   asciiSpark,
   bodyLines,
   consoleGrid,
-  FLAT_SPARK,
   fit,
   GAP,
   isBusy,
@@ -308,7 +307,7 @@ function RetroFrame({ project, number, width, body, stacked, fresh }: FrameProps
         <TopBorder project={project} number={number} width={width} />
         {stacked && (
           <Line>
-            <Bar /> <MetaLine project={project} width={inner} terminals={terminals} /> <Bar />
+            <Bar /> <MetaLine project={project} width={inner} /> <Bar />
           </Line>
         )}
       </Link>
@@ -518,39 +517,34 @@ function BottomBorder({
       </Cell>
       <Border> </Border>
       <Rule width={fill} />
-      <Border> </Border>
-      <Spark terminals={terminals} width={PROJECT_SPARK} />
-      <Border> </Border>
+      <Spark terminals={terminals} width={PROJECT_SPARK + 2} ruled />
       <Rule width={1} />
       <Corner at="br" />
     </Line>
   );
 }
 
-/** The phone's second header line: meta on the left, the project's sparkline on the right. */
-function MetaLine({
-  project,
-  width,
-  terminals,
-}: {
-  project: SceneProject;
-  width: number;
-  terminals: readonly string[];
-}) {
+/** The phone's second header line. Narrow frames drop the project's ticks first. */
+function MetaLine({ project, width }: { project: SceneProject; width: number }) {
   const meta = metaText(project);
   return (
-    <>
-      <Cell width={width - PROJECT_SPARK - 1} className="retro-dim" title={meta}>
-        {fit(meta, width - PROJECT_SPARK - 1)}
-      </Cell>
-      <span aria-hidden> </span>
-      <Spark terminals={terminals} width={PROJECT_SPARK} />
-    </>
+    <Cell width={width} className="retro-dim" title={meta}>
+      {fit(meta, width)}
+    </Cell>
   );
 }
 
-/** An ASCII sparkline of the terminals' output, repainted once a sample without re-rendering. */
-function Spark({ terminals, width }: { terminals: readonly string[]; width: number }) {
+/** ASCII ticks of the terminals' output, blank when quiet, repainted once a sample without re-rendering. */
+function Spark({
+  terminals,
+  width,
+  ruled = false,
+}: {
+  terminals: readonly string[];
+  width: number;
+  /** On a frame's border: the rule shows through a quiet stretch. */
+  ruled?: boolean;
+}) {
   const store = useBoardStore();
   const ref = useRef<HTMLSpanElement>(null);
   const key = terminals.join('\n');
@@ -562,7 +556,7 @@ function Spark({ terminals, width }: { terminals: readonly string[]; width: numb
     const paint = () => {
       element.textContent = asciiSpark([...rings.values()], width);
     };
-    element.textContent = FLAT_SPARK(width);
+    element.textContent = ' '.repeat(width);
     const sampler = throughputSampler(store);
     const stops = terminals.map((id) =>
       sampler.watch(id, (ring) => {
@@ -574,7 +568,15 @@ function Spark({ terminals, width }: { terminals: readonly string[]; width: numb
       for (const stop of stops) stop();
     };
   }, [store, key, width]);
-  return <span ref={ref} aria-hidden data-retro-spark className="retro-spark" />;
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      data-retro-spark
+      data-ruled={ruled || undefined}
+      className="retro-spark"
+    />
+  );
 }
 
 const CAPTION_CLASS: Record<CaptionTone, string> = {

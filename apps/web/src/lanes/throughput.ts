@@ -1,19 +1,29 @@
 import type { BoardState } from '@yardmaster/protocol';
 
-// Per-terminal output rate for the lane sparklines (DESIGN.md §4.3): one timer for the whole
-// board samples each watched terminal's byte counter once per `SAMPLE_MS` into a 60-slot ring.
+// Per-terminal activity for the lane graphs (DESIGN.md §4.3): one timer for the whole board
+// samples each watched terminal's byte counter once per `SAMPLE_MS` into a 60-slot ring, and its
+// CPU every `CPU_SAMPLE_EVERY` ticks into another, so the two windows are 1 and 5 minutes.
 
 export const SAMPLES = 60;
 export const SAMPLE_MS = 1_000;
+export const CPU_SAMPLE_EVERY = 5;
 
 /** A fixed-size ring of bytes-per-sample values, oldest first when read. */
 export class SampleRing {
   private readonly values = new Float64Array(SAMPLES);
   private head = 0;
+  /** Samples pushed so far; it also tells a watcher whether anything new arrived. */
+  count = 0;
 
   push(value: number): void {
     this.values[this.head] = Math.max(0, value);
     this.head = (this.head + 1) % SAMPLES;
+    this.count++;
+  }
+
+  /** How many of the slots hold a real sample. */
+  get filled(): number {
+    return Math.min(this.count, SAMPLES);
   }
 
   /** `i` = 0 is the oldest sample, `SAMPLES - 1` the newest. */
@@ -77,7 +87,8 @@ export function backfill(board: BoardState, terminalId: string, now: number): Sa
   return ring;
 }
 
-export type ThroughputListener = (ring: SampleRing) => void;
+/** `ring` holds output bytes per second, `cpu` the terminal's CPU percent. */
+export type ThroughputListener = (ring: SampleRing, cpu: SampleRing) => void;
 
 export interface ThroughputSource {
   getBoard(): BoardState;
@@ -88,6 +99,7 @@ export interface ThroughputSource {
 
 interface Watched {
   ring: SampleRing;
+  cpu: SampleRing;
   last: number;
   listeners: Set<ThroughputListener>;
 }
@@ -96,6 +108,7 @@ interface Watched {
 export class ThroughputSampler {
   private readonly watched = new Map<string, Watched>();
   private timer: unknown = null;
+  private ticks = 0;
 
   constructor(private readonly source: ThroughputSource) {}
 
@@ -104,8 +117,11 @@ export class ThroughputSampler {
     let entry = this.watched.get(terminalId);
     if (!entry) {
       const board = this.source.getBoard();
+      const cpu = new SampleRing();
+      cpu.push(board.terminals[terminalId]?.stats?.cpu ?? 0);
       entry = {
         ring: backfill(board, terminalId, this.source.now()),
+        cpu,
         last: bytesByTerminal(board).get(terminalId) ?? 0,
         listeners: new Set(),
       };
@@ -113,7 +129,7 @@ export class ThroughputSampler {
     }
     entry.listeners.add(listener);
     this.timer ??= this.source.setInterval(() => this.sample(), SAMPLE_MS);
-    listener(entry.ring);
+    listener(entry.ring, entry.cpu);
     return () => {
       const current = this.watched.get(terminalId);
       current?.listeners.delete(listener);
@@ -127,15 +143,19 @@ export class ThroughputSampler {
 
   /** Takes one sample of every watched terminal. Called by the timer. */
   sample(): void {
-    const totals = bytesByTerminal(this.source.getBoard());
+    const board = this.source.getBoard();
+    const totals = bytesByTerminal(board);
+    this.ticks++;
+    const cpuDue = this.ticks % CPU_SAMPLE_EVERY === 0;
     for (const [terminalId, entry] of this.watched) {
       const bytes = totals.get(terminalId) ?? 0;
       // A drop (executions pruned, a fresh snapshot) counts as no output.
       entry.ring.push(Math.max(0, bytes - entry.last));
       entry.last = bytes;
+      if (cpuDue) entry.cpu.push(board.terminals[terminalId]?.stats?.cpu ?? 0);
       for (const listener of [...entry.listeners]) {
         try {
-          listener(entry.ring);
+          listener(entry.ring, entry.cpu);
         } catch (error) {
           console.error('[yardmaster] throughput listener failed', error);
         }

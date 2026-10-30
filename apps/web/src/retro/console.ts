@@ -1,4 +1,4 @@
-import { sparkLevel } from '../lanes/spark.js';
+import { outputLevel } from '../lanes/spark.js';
 import { SAMPLES } from '../lanes/throughput.js';
 import type { ActorKind, ActorState } from '../layouts/scene.js';
 import type { Tone } from '../status.js';
@@ -131,29 +131,27 @@ export interface Samples {
 }
 
 /**
- * An ASCII sparkline `width` characters long of the newest samples of every ring added together,
- * each character the sum of `per` samples, on the lanes' log scale (`lanes/spark.ts`).
+ * The newest minute of every ring added together as `width` characters of ticks, each the sum of
+ * its share of the samples, on the lanes' fixed scale (`lanes/spark.ts`). A character with no
+ * output is blank, so a quiet terminal prints nothing.
  */
-export function asciiSpark(rings: readonly Samples[], width: number, per = 4): string {
+export function asciiSpark(rings: readonly Samples[], width: number): string {
+  const per = Math.ceil(SAMPLES / width);
   const buckets = new Array<number>(width).fill(0);
-  const span = Math.min(SAMPLES, width * per);
   for (const ring of rings) {
-    for (let age = 0; age < span; age++) {
+    for (let age = 0; age < SAMPLES; age++) {
       const bucket = width - 1 - Math.floor(age / per);
       buckets[bucket] = (buckets[bucket] ?? 0) + ring.at(SAMPLES - 1 - age);
     }
   }
-  const peak = Math.max(0, ...buckets);
   return buckets
     .map((value) => {
-      if (value <= 0) return BARS[0];
-      const level = sparkLevel(value / per, peak / per);
-      return BARS[Math.min(BARS.length - 1, 1 + Math.round(level * (BARS.length - 2)))];
+      if (value <= 0) return ' ';
+      const level = outputLevel(value / per);
+      return BARS[Math.min(BARS.length - 1, Math.round(level * (BARS.length - 1)))];
     })
     .join('');
 }
-
-export const FLAT_SPARK = (width: number) => BARS[0]?.repeat(width) ?? '';
 
 /**
  * A typed number shortcut (§10.6) against `count` targets numbered from 1. `index` is where it
