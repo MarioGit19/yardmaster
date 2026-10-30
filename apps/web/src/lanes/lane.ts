@@ -98,7 +98,7 @@ export function laneView(
   } else if (terminal.state === 'closed' && terminal.exitCode !== null) {
     exit = { key: `${terminal.id}:closed`, code: terminal.exitCode };
   }
-  const tone: Tone = exit && exit.code !== 0 ? 'err' : running ? 'ok' : 'idle';
+  const tone: Tone = exit && exit.code !== 0 ? 'err' : running ? 'tool' : 'idle';
   const command = shownCommand(execution.commandLine);
   const status = running
     ? 'running'

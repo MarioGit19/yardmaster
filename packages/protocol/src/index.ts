@@ -14,6 +14,7 @@ export * from './patch.js';
 export * from './project.js';
 export * from './push.js';
 export * from './redact.js';
+export * from './status-token.js';
 export * from './tools.js';
 export * from './transcript.js';
 export * from './trust.js';

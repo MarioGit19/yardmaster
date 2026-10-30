@@ -9,7 +9,8 @@ import { MORPH_SETTLE_MS } from '../focus/shared.js';
 import { dur, ease } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { sessionHref } from '../routes.js';
-import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import { formatCount, totalTokens } from '../status.js';
+import { useSessionView } from '../statusTokens.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
@@ -54,7 +55,7 @@ export function ClaudePanel({
   }, [settled]);
   // The replay of a long transcript is hundreds of socket messages: keep them out of the morph.
   const { rows, loaded } = useTranscript(session.id, settled);
-  const status = sessionStatusView(session.status);
+  const status = useSessionView(session);
   const writing = WRITING.has(session.status.kind);
   // Board sessions stream into `draft`, cleared as the block lands in the transcript.
   const tail =

@@ -6,7 +6,8 @@ import { sessionCaption } from '../../../pod/model.js';
 import { NUMBER_WAIT_MS, pickNumber, projectTag } from '../../../retro/console.js';
 import { routes } from '../../../routes.js';
 import { isTypingTarget } from '../../../shell/railNav.js';
-import { sessionStatusView, type Tone } from '../../../status.js';
+import type { Tone } from '../../../status.js';
+import { sessionView, useStatusReader } from '../../../statusTokens.js';
 import { FocusCaption } from '../../FocusCaption.js';
 import type {
   EntryTransitionProps,
@@ -35,7 +36,8 @@ function RetroHeaderBand({ project, session, headingRef }: HeaderBandProps) {
   const approvalId =
     session?.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
-  const status = session ? sessionStatusView(session.status) : null;
+  const readStatus = useStatusReader();
+  const status = session ? sessionView(session, readStatus()) : null;
   const live = session !== null && session.status.kind !== 'ended';
   const caption = session && live ? sessionCaption(session, approval) : null;
   return (

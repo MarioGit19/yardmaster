@@ -1,5 +1,6 @@
 import type { Execution } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
+import type { BoardStoreState } from '../data/store.js';
 import { createBoardStore } from '../data/store.js';
 import { makeSession, makeTerminal, sampleBoard } from '../test/board.js';
 import { hudSeverity, selectHudCounts, selectHudItems, startOfLocalDay } from './counts.js';
@@ -28,7 +29,10 @@ function stateOf(edit: (board: ReturnType<typeof sampleBoard>) => void = () => {
   edit(board);
   const store = createBoardStore();
   store.getState().replaceBoard(board);
-  return store.getState();
+  // Every session has just been heard from.
+  const heard = { energy: 0, at: NOW, lastAt: NOW, events: 0 };
+  const pulses = Object.fromEntries(Object.keys(board.sessions).map((id) => [`s:${id}`, heard]));
+  return { ...store.getState(), pulses: pulses as BoardStoreState['pulses'] };
 }
 
 const countsOf = (edit?: (board: ReturnType<typeof sampleBoard>) => void) =>
@@ -129,7 +133,7 @@ describe('selectHudCounts', () => {
       board.executions[id] = execution(id, 't-fail', { endedAt: NOW, exitCode: 2 });
       board.terminals[failed.id] = failed;
     };
-    const seen = new Set(['e-1']);
+    const seen = { since: 0, marks: { 'e-1': NOW } };
     const counted = (id: string) => selectHudCounts(() => NOW, seen)(stateOf(fail(id))).failed;
     expect(countsOf(fail('e-1')).failed).toBe(2);
     expect(counted('e-1')).toBe(1);
@@ -140,7 +144,7 @@ describe('selectHudCounts', () => {
     const state = stateOf();
     const failed = selectHudItems('failed')(state);
     expect(failed.map((i) => i.kind)).toEqual(['terminal']);
-    const active = selectHudItems('active')(state);
+    const active = selectHudItems('active', undefined, () => NOW)(state);
     expect(active.map((i) => (i.kind === 'session' ? i.session.id : i.terminal.id))).toEqual([
       's-2',
     ]);

@@ -25,6 +25,7 @@ function actor(id: string, overrides: Partial<SceneActor> = {}): SceneActor {
     projectId: 'p1',
     parentId: null,
     state: 'idle',
+    token: 'quiet',
     tone: 'idle',
     activity: 0,
     label: id,

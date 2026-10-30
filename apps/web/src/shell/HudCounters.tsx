@@ -7,16 +7,18 @@ import {
   useState,
 } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useNow } from '../anim/clock.js';
 import { useBoardShallow, useBoardStore } from '../data/index.js';
 import { selectLaneExecution, terminalDisplay } from '../lanes/lane.js';
 import { sessionHref, terminalHref } from '../routes.js';
+import { useSeenItems } from '../seen.js';
 import { sessionStatusView, type Tone } from '../status.js';
+import { STALE_TICK_MS } from '../statusTokens.js';
 import { cx } from '../ui/cx.js';
 import { Popover } from '../ui/Popover.js';
 import { TONE_MARK } from '../ui/StatusDot.js';
 import { Tooltip } from '../ui/Tooltip.js';
 import { type HudCounts, type HudItem, selectHudCounts, selectHudItems } from './counts.js';
-import { useSeenFailures } from './seenFailures.js';
 
 export const COUNTER_HINT = {
   needsYou: 'Approvals, questions and sessions waiting for a reply',
@@ -30,6 +32,7 @@ export const SEVERITY_RING: Record<Tone, string> = {
   err: 'shadow-[inset_0_0_0_1px_var(--st-err-glow)]',
   work: 'shadow-[inset_0_0_0_1px_var(--st-work-glow)]',
   tool: 'shadow-[inset_0_0_0_1px_var(--st-tool-glow)]',
+  stale: 'shadow-[inset_0_0_0_1px_var(--st-idle-glow)]',
   ok: 'shadow-[inset_0_0_0_1px_var(--st-ok-glow)]',
   idle: '',
 };
@@ -39,8 +42,10 @@ export const COUNTER_BUTTON =
 
 /** The HUD's counts, leaving out the terminal failures this browser has already opened. */
 export function useHudCounts(): HudCounts {
-  const seen = useSeenFailures();
-  const select = useMemo(() => selectHudCounts(Date.now, seen), [seen]);
+  const seen = useSeenItems();
+  // A session going silent changes nothing on the board, so the count re-reads the clock itself.
+  const now = useNow(STALE_TICK_MS);
+  const select = useMemo(() => selectHudCounts(() => now, seen), [seen, now]);
   return useBoardShallow(select);
 }
 
@@ -88,7 +93,7 @@ export function JumpCounter({
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
   const store = useBoardStore();
-  const seen = useSeenFailures();
+  const seen = useSeenItems();
   const items = () => selectHudItems(bucket, seen)(store.getState());
   const empty = value === 0;
   return (
@@ -126,7 +131,7 @@ export function JumpCounter({
 
 function HudItems({ bucket, onPick }: { bucket: 'failed' | 'active'; onPick: () => void }) {
   const store = useBoardStore();
-  const seen = useSeenFailures();
+  const seen = useSeenItems();
   const state = store.getState();
   const projects = state.board.projects;
   return (

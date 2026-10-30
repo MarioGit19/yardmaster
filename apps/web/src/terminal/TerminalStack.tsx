@@ -59,8 +59,9 @@ import { LiveCaption } from '../pod/LiveCaption.js';
 import { sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
+import { seenItems } from '../seen.js';
 import { isTypingTarget } from '../shell/railNav.js';
-import { seenFailures } from '../shell/seenFailures.js';
+import { useLaneStatus } from '../statusTokens.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
@@ -430,7 +431,8 @@ export function useTerminalView(terminal: Terminal) {
   const execution = useBoardShallow(selectLaneExecution(terminal));
   const session = useBoard(selectTerminalSession(terminal.id));
   const display = terminalDisplay(terminal, execution, session);
-  return { execution, session, display, view: laneView(terminal, execution, display.name) };
+  const view = useLaneStatus(terminal, laneView(terminal, execution, display.name));
+  return { execution, session, display, view };
 }
 
 /**
@@ -669,7 +671,7 @@ function Pane({
   const failure = view.tone === 'err' ? view.exit?.key : undefined;
   const onScreen = active || inGrid;
   useEffect(() => {
-    if (failure && onScreen) seenFailures.mark(failure);
+    if (failure && onScreen) seenItems.mark(failure);
   }, [failure, onScreen]);
   const kind = paneKind(execution.id === null ? null : execution, terminal);
   const masked = useMasked(`term:${terminal.id}`);

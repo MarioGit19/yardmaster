@@ -41,7 +41,9 @@ afterEach(() => {
 
 function render(path = '/') {
   const store: BoardStore = createBoardStore();
-  store.getState().replaceBoard(sampleBoard());
+  const board = sampleBoard();
+  for (const session of Object.values(board.sessions)) session.updatedAt = Date.now();
+  store.getState().replaceBoard(board);
   store.getState().setConnection({ status: 'live' });
   const client = new BoardClient({ url: 'ws://test.invalid/ws/ui', store });
   const location = memoryLocation({ path, record: true });
@@ -163,7 +165,10 @@ describe('Hud', () => {
 
     act(() => {
       const board = structuredClone(store.getState().board);
-      board.sessions['s-3'] = makeSession('s-3', 'p-zen', { kind: 'working' });
+      board.sessions['s-3'] = {
+        ...makeSession('s-3', 'p-zen', { kind: 'working' }),
+        updatedAt: Date.now(),
+      };
       store.getState().replaceBoard(board);
     });
     act(() => hudButton('active')?.click());

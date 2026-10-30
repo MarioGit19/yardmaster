@@ -12,7 +12,8 @@ import { DecryptedText } from '../../../fx/DecryptedText.js';
 import { podSessions } from '../../../pod/model.js';
 import { routes } from '../../../routes.js';
 import { ProjectAvatar } from '../../../shell/ProjectAvatar.js';
-import { projectTone, sessionStatusView, toneLabel } from '../../../status.js';
+import { toneLabel } from '../../../status.js';
+import { sessionView, useProjectTone, useStatusReader } from '../../../statusTokens.js';
 import { buttonClass } from '../../../ui/Button.js';
 import { Chip } from '../../../ui/Chip.js';
 import { StatusDot } from '../../../ui/StatusDot.js';
@@ -34,10 +35,10 @@ function GridHeaderBand({ project, session, headingRef }: HeaderBandProps) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const live = session !== null && session.status.kind !== 'ended';
+  const readStatus = useStatusReader();
+  const projectStatus = useProjectTone(podSessions(sessions), terminals);
   // The focused session's state, or the project's as its cockpit showed it.
-  const tone = live
-    ? sessionStatusView(session.status).tone
-    : projectTone(podSessions(sessions), terminals);
+  const tone = live ? sessionView(session, readStatus()).tone : projectStatus;
   return (
     <header data-grid-band className="gs-band">
       <Tooltip content="Back to the overview" shortcut="Esc">
@@ -62,7 +63,7 @@ function GridHeaderBand({ project, session, headingRef }: HeaderBandProps) {
         <div className="flex min-w-0 items-center gap-3">
           <StatusDot
             tone={tone}
-            label={live ? sessionStatusView(session.status).label : toneLabel(tone)}
+            label={live ? sessionView(session, readStatus()).label : toneLabel(tone)}
             showLabel
             className="gs-band-state shrink-0"
           />

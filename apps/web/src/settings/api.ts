@@ -14,6 +14,8 @@ import {
   PortSharesResponse,
   PushInfoResponse,
   RotateTokenResponse,
+  SeenResponse,
+  type SeenUpdate,
   ServerStatus,
 } from '@yardmaster/protocol';
 import { boardFetch } from '../auth/session.js';
@@ -60,6 +62,8 @@ async function request<T>(
 }
 
 export const api = {
+  seen: () => request(SeenResponse, 'GET', '/api/seen'),
+  markSeen: (update: SeenUpdate) => request(OkResponse, 'POST', '/api/seen', update),
   status: (signal?: AbortSignal) => request(ServerStatus, 'GET', '/api/status', undefined, signal),
   settings: (signal?: AbortSignal) =>
     request(BoardSettings, 'GET', '/api/settings', undefined, signal),

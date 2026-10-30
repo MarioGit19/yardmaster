@@ -20,7 +20,7 @@ describe('opsMascotState', () => {
 describe('ops colors', () => {
   it('use the status colors, so the visor means what a dot means', () => {
     expect(OPS_COLOR.running).toBe('var(--st-tool)');
-    expect(OPS_COLOR.serving).toBe('var(--st-ok)');
+    expect(OPS_COLOR.serving).toBe('var(--st-tool)');
     expect(OPS_COLOR.error).toBe('var(--st-err)');
     expect(OPS_COLOR.waiting).toBe('var(--st-wait)');
   });

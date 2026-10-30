@@ -3,6 +3,8 @@ import {
   type ClaudeSession,
   type Execution,
   type Project,
+  type SeenResponse,
+  type StatusToken,
   sessionDisplayName,
   type Terminal,
   toolFamily,
@@ -19,7 +21,7 @@ import {
 import { activityKey, levelAt, type Pulses, QUIET_LEVEL } from '../data/activity.js';
 import { isCrashExit, terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
-import { laneExecution, shownCommand, terminalDisplay } from '../lanes/lane.js';
+import { laneExecution, laneView, shownCommand, terminalDisplay } from '../lanes/lane.js';
 import { isDimmed } from '../pod/activity.js';
 import {
   attentionRank,
@@ -30,7 +32,17 @@ import {
   sessionCaption,
 } from '../pod/model.js';
 import { sessionHref, terminalHref } from '../routes.js';
-import { projectTone, type Tone } from '../status.js';
+import type { Tone } from '../status.js';
+import {
+  NOTHING_NEW,
+  projectStatusTone,
+  type StatusContext,
+  sessionStaleReason,
+  sessionToken,
+  terminalStaleReason,
+  terminalToken,
+  tokenTone,
+} from '../statusTokens.js';
 
 // The scene-neutral model every layout draws (DESIGN.md §10.1): projects in attention-first
 // order, each with its actors. No layout reads the store any other way, so a state can't mean
@@ -42,7 +54,7 @@ export type ActorKind = 'claude' | 'subagent' | 'background' | 'terminal';
 export type OpsState = 'idle' | 'sleeping' | 'running' | 'serving' | 'done' | 'error' | 'exited';
 
 /** The crew states (§4.11) plus the terminals' `serving` and `exited`. */
-export type ActorState = MascotState | 'serving' | 'exited';
+export type ActorState = MascotState | 'serving' | 'exited' | 'stale';
 
 export interface ActorLinks {
   /** Where Open goes: the focus view with this session or terminal selected. */
@@ -68,6 +80,8 @@ export interface SceneActor {
   /** The session actor a subagent or background task belongs to. */
   parentId: string | null;
   state: ActorState;
+  /** What the state means everywhere (DESIGN.md §2.1). */
+  token: StatusToken;
   tone: Tone;
   /** 0..1, DESIGN.md §4.10. */
   activity: number;
@@ -178,11 +192,26 @@ const STATE_TONE: Record<ActorState, Tone> = {
   waiting: 'wait',
   error: 'err',
   done: 'ok',
-  serving: 'ok',
+  serving: 'tool',
   exited: 'idle',
+  stale: 'stale',
 };
 
 export const actorTone = (state: ActorState): Tone => STATE_TONE[state];
+
+/** A token's tone; Running keeps the state's work or tool colour. */
+function actorTokenTone(token: StatusToken, state: ActorState): Tone {
+  const tone = actorTone(state);
+  return tokenTone(token, tone === 'tool' ? 'tool' : 'work');
+}
+
+/** What the state acts out once the token is known: a frozen actor stops, an unopened one is done. */
+function tokenState(token: StatusToken, state: ActorState): ActorState {
+  if (token === 'stale') return 'stale';
+  return token === 'done_unseen' ? 'done' : state;
+}
+
+const staleCaption = (reason: string): Caption => ({ glyph: null, text: reason, tone: 'rest' });
 
 /** Attention first: waiting, errors, then work, then rest. */
 const STATE_RANK: Record<ActorState, number> = {
@@ -199,6 +228,7 @@ const STATE_RANK: Record<ActorState, number> = {
   idle: 1,
   sleeping: 0,
   exited: 0,
+  stale: 2,
 };
 
 export const actorRank = (state: ActorState) => STATE_RANK[state];
@@ -227,7 +257,7 @@ function actorName(project: string, label: string, kind: ActorKind, caption: Cap
   return `${project}, ${what}, ${lowerFirst(caption.text)}`;
 }
 
-function terminalCaption(state: OpsState, command: string | null, exit: number | null): Caption {
+function terminalCaption(state: ActorState, command: string | null, exit: number | null): Caption {
   switch (state) {
     case 'running':
       return { glyph: '▶', text: command ?? 'Running a command', tone: 'active' };
@@ -243,8 +273,7 @@ function terminalCaption(state: OpsState, command: string | null, exit: number |
       return { glyph: '✓', text: command ? `Finished: ${command}` : 'Finished', tone: 'rest' };
     case 'exited':
       return { glyph: null, text: 'Closed', tone: 'rest' };
-    case 'sleeping':
-    case 'idle':
+    default:
       return { glyph: null, text: command ? `Idle, last ran ${command}` : 'Idle', tone: 'rest' };
   }
 }
@@ -296,6 +325,7 @@ function projectActors(
   project: Project,
   group: Group,
   now: number,
+  status: StatusContext,
 ): SceneActor[] {
   const crew: CrewTerminal[] = group.terminals.map((t) => {
     const pulse = pulses[activityKey.terminal(t.id)];
@@ -318,8 +348,10 @@ function projectActors(
       session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
     const approval = approvalId ? board.approvals[approvalId] : undefined;
     const pending = approval?.state === 'pending' ? approval : null;
-    const state = mascotStateFor(session, crew, { now });
-    const caption = sessionCaption(session, pending);
+    const token = sessionToken(session, status);
+    const state = tokenState(token, mascotStateFor(session, crew, { now }));
+    const stale = token === 'stale' ? sessionStaleReason(session, status) : null;
+    const caption = stale ? staleCaption(stale) : sessionCaption(session, pending);
     const label = sessionDisplayName(session);
     const id = actorId.session(session.id);
     const activity = level(pulses, activityKey.session(session.id), now);
@@ -348,8 +380,9 @@ function projectActors(
         kind,
         projectId: project.id,
         parentId: id,
-        state: kind === 'subagent' ? 'thinking' : 'running',
-        tone: kind === 'subagent' ? 'work' : 'tool',
+        state: stale ? 'stale' : kind === 'subagent' ? 'thinking' : 'running',
+        token: stale ? 'stale' : 'running',
+        tone: stale ? 'stale' : kind === 'subagent' ? 'work' : 'tool',
         activity,
         label: item.label,
         caption: childCaption,
@@ -366,7 +399,8 @@ function projectActors(
         projectId: project.id,
         parentId: null,
         state,
-        tone: actorTone(state),
+        token,
+        tone: actorTokenTone(token, state),
         activity,
         label,
         caption,
@@ -391,15 +425,20 @@ function projectActors(
       if (execution) executions.push(execution);
     }
     const pulse = pulses[activityKey.terminal(terminal.id)];
-    const state = opsStateFor(terminal, executions, {
-      now,
-      listening: ports.has(terminal.id),
-      lastOutputAt: pulse?.lastAt ?? null,
-    });
     const last = laneExecution(board, terminal);
+    const token = terminalToken(terminal, last, laneView(terminal, last, ''), status);
+    const state = tokenState(
+      token,
+      opsStateFor(terminal, executions, {
+        now,
+        listening: ports.has(terminal.id),
+        lastOutputAt: pulse?.lastAt ?? null,
+      }),
+    );
     const label = terminalDisplay(terminal, last).name;
     const command = shownCommand(last.commandLine);
-    const caption = terminalCaption(state, command, last.exitCode);
+    const stale = token === 'stale' ? terminalStaleReason(terminal, status) : null;
+    const caption = stale ? staleCaption(stale) : terminalCaption(state, command, last.exitCode);
     let running: Execution | null = null;
     for (const execution of executions) {
       if (execution.endedAt === null && (!running || execution.startedAt > running.startedAt))
@@ -412,7 +451,8 @@ function projectActors(
         projectId: project.id,
         parentId: null,
         state,
-        tone: actorTone(state),
+        token,
+        tone: actorTokenTone(token, state),
         activity: levelAt(pulse, now),
         label,
         caption,
@@ -465,10 +505,19 @@ function groupByProject(board: BoardState): Map<string, Group> {
 
 const EMPTY: Group = { sessions: [], terminals: [] };
 
-/**
- * The scene model for the board at `now`. Projects come in the overview's order (waiting, then
- * errors, then by name); actors inside a project attention first.
- */
+/** What this device adds to the board: what it has opened and whether it still hears the server. */
+export interface SceneDevice {
+  seen?: SeenResponse;
+  live?: boolean;
+}
+
+const sceneStatus = (
+  board: BoardState,
+  pulses: Pulses,
+  now: number,
+  { seen = NOTHING_NEW, live = true }: SceneDevice,
+): StatusContext => ({ board, pulses, now, seen, live });
+
 /** The terminal's newest command failed (`selectCrashedCount`'s rule). */
 function crashedTerminal(board: BoardState, terminal: Terminal): boolean {
   for (let i = terminal.executionIds.length - 1; i >= 0; i--) {
@@ -485,8 +534,9 @@ function sceneProject(
   project: Project,
   group: Group,
   now: number,
+  status: StatusContext,
 ): SceneProject {
-  const tone = projectTone(group.sessions, group.terminals);
+  const tone = projectStatusTone(group.sessions, group.terminals, status);
   const live = podSessions(group.sessions);
   const main = live.find((s) => s.todos.length > 0) ?? live[0] ?? null;
   const ports = new Set<number>();
@@ -501,7 +551,7 @@ function sceneProject(
     name: project.name,
     accent: project.accent,
     tone,
-    actors: projectActors(board, pulses, project, group, now),
+    actors: projectActors(board, pulses, project, group, now, status),
     branch: git ? (git.branch ?? (git.head ? git.head.slice(0, 7) : null)) : null,
     dirty: git?.dirty ?? 0,
     ports: [...ports].sort((a, b) => a - b),
@@ -520,13 +570,19 @@ function sceneProject(
  * The scene model for the board at `now`. Projects come in the overview's order (waiting, then
  * errors, then by name); actors inside a project attention first.
  */
-export function buildSceneModel(board: BoardState, pulses: Pulses, now: number): SceneModel {
+export function buildSceneModel(
+  board: BoardState,
+  pulses: Pulses,
+  now: number,
+  device: SceneDevice = {},
+): SceneModel {
+  const status = sceneStatus(board, pulses, now, device);
   const groups = groupByProject(board);
   const projects = new Map<string, SceneProject>();
   for (const project of Object.values(board.projects)) {
     projects.set(
       project.id,
-      sceneProject(board, pulses, project, groups.get(project.id) ?? EMPTY, now),
+      sceneProject(board, pulses, project, groups.get(project.id) ?? EMPTY, now, status),
     );
   }
   const order = orderPods(
@@ -617,6 +673,7 @@ export function buildSceneProject(
   pulses: Pulses,
   projectId: string,
   now: number,
+  device: SceneDevice = {},
 ): SceneProject | null {
   const project = board.projects[projectId];
   if (!project) return null;
@@ -624,7 +681,7 @@ export function buildSceneProject(
     sessions: Object.values(board.sessions).filter((s) => s.projectId === projectId),
     terminals: Object.values(board.terminals).filter((t) => t.projectId === projectId),
   };
-  return sceneProject(board, pulses, project, group, now);
+  return sceneProject(board, pulses, project, group, now, sceneStatus(board, pulses, now, device));
 }
 
 /** `buildSceneModel` as a store selector. Pair it with a clock: it changes on every tick. */
@@ -638,6 +695,8 @@ export function actorStateLabel(actor: Pick<SceneActor, 'state' | 'kind'>): stri
   switch (actor.state) {
     case 'serving':
       return 'Serving';
+    case 'stale':
+      return 'Stale';
     case 'exited':
       return 'Closed';
     case 'running':

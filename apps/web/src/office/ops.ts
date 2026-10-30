@@ -29,7 +29,7 @@ export const OPS_COLOR: Record<OpsMascotState, string> = {
   idle: 'var(--ops-idle)',
   sleeping: 'var(--ops-idle)',
   running: 'var(--st-tool)',
-  serving: 'var(--st-ok)',
+  serving: 'var(--st-tool)',
   done: 'var(--st-ok)',
   error: 'var(--st-err)',
   waiting: 'var(--st-wait)',

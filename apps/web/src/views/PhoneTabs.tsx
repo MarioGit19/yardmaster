@@ -40,7 +40,8 @@ import { pulseFilterPreference } from '../pulse/prefs.js';
 import { projectHref, routes } from '../routes.js';
 import { connectionView } from '../shell/Hud.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
-import { projectTone, toneLabel } from '../status.js';
+import { toneLabel } from '../status.js';
+import { useProjectTone } from '../statusTokens.js';
 import { terminalTarget } from '../terminal/target.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
 import { cx } from '../ui/cx.js';
@@ -106,7 +107,7 @@ const FLICK_VELOCITY = 400;
 function ProjectRow({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
-  const tone = projectTone(sessions, terminals);
+  const tone = useProjectTone(sessions, terminals);
   const branch = project.git?.branch;
   const level = useMotionLevel();
   const x = useMotionValue(0);

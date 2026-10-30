@@ -89,6 +89,17 @@ export function makeTerminal(
 /** Three projects: one waiting, one working, one idle with a crashed terminal. */
 export function sampleBoard(): BoardState {
   const board = emptyBoardState();
+  board.windows['win-1'] = {
+    id: 'win-1',
+    appName: 'Cursor',
+    appVersion: '1.0.0',
+    extensionVersion: '0.1.0',
+    workspaceFolders: [],
+    projectIds: [],
+    capabilities: { shellExecution: true },
+    connectedAt: T0,
+    lastSeenAt: T0,
+  };
   const projects = [
     makeProject('p-acme', 'acme-shop', 3),
     makeProject('p-orbit', 'orbit-api', 6),

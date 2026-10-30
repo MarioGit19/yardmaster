@@ -26,9 +26,11 @@ import { orbStateFor } from '../orb/model.js';
 import { LiveCaption } from '../pod/LiveCaption.js';
 import { type Caption, sessionCaption } from '../pod/model.js';
 import { sessionHref } from '../routes.js';
+import { useLaneStatus } from '../statusTokens.js';
 import { claudeTerminalLabel } from '../terminal/claudeTerminal.js';
 import { cx } from '../ui/cx.js';
 import { ExitBadge } from '../ui/ExitBadge.js';
+import { StatusDot } from '../ui/StatusDot.js';
 import {
   formatUptime,
   laneView,
@@ -74,7 +76,7 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
   const session = useBoard(selectTerminalSession(terminal.id));
   const display = terminalDisplay(terminal, execution, session);
   const name = display.name;
-  const view = laneView(terminal, execution, name);
+  const view = useLaneStatus(terminal, laneView(terminal, execution, name));
   const still = useMotionLevel() !== 'full';
   const rowRef = useRef<HTMLDivElement>(null);
   // Pulse speed and comet follow the store's activity level for the terminal (§4.10).
@@ -243,7 +245,11 @@ export function TerminalLane({ terminal, accent }: TerminalLaneProps) {
                     exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
                     className="inline-flex items-center gap-1.5"
                   >
-                    <LaneDot running={view.running} level={streaming ? level : 0} />
+                    {view.tone === 'stale' ? (
+                      <StatusDot tone="stale" label="Stale" />
+                    ) : (
+                      <LaneDot running={view.running} level={streaming ? level : 0} />
+                    )}
                     {uptime && <span title={`Running for ${uptime}`}>{uptime}</span>}
                   </motion.span>
                 )}
@@ -319,7 +325,7 @@ function ClaudeLaneHead({
   );
 }
 
-/** The uptime dot; while the lane streams, a ring pulses out of it. */
+/** The uptime dot, a Running mark; quiet lanes keep its space and show nothing. */
 function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const full = useMotionLevel() === 'full';
@@ -333,7 +339,7 @@ function LaneDot({ running, level }: { running: boolean; level: 0 | 1 | 2 | 3 })
       data-level={pulsing ? level : undefined}
       className={cx(
         'lane-dot pod-dim size-1.5 rounded-full',
-        running ? 'bg-st-ok text-st-ok' : 'bg-st-idle text-st-idle',
+        running ? 'bg-st-tool text-st-tool' : 'invisible',
       )}
     />
   );

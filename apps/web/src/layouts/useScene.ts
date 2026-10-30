@@ -3,12 +3,15 @@ import { useNow } from '../anim/clock.js';
 import { useBoard } from '../data/index.js';
 import { useActiveProjects } from '../library/useActive.js';
 import { dur } from '../motion.js';
+import { useSeenItems } from '../seen.js';
+import { hearsServer } from '../statusTokens.js';
 import {
   buildSceneModel,
   buildSceneProject,
   type LeavingProject,
   lingerProjects,
   type SceneActor,
+  type SceneDevice,
   type SceneModel,
   type SceneProject,
   shareScene,
@@ -16,6 +19,12 @@ import {
 
 /** How often the scene re-reads activity levels and sleep timers when nothing else changes. */
 export const SCENE_TICK_MS = 1_000;
+
+function useSceneDevice(): SceneDevice {
+  const seen = useSeenItems();
+  const live = hearsServer(useBoard((s) => s.connection.status));
+  return useMemo(() => ({ seen, live }), [seen, live]);
+}
 
 /**
  * The whole board as a scene (DESIGN.md §10.1), rebuilt on board changes and once a second. A
@@ -25,11 +34,12 @@ export function useSceneModel(): SceneModel {
   const board = useBoard((s) => s.board);
   const pulses = useBoard((s) => s.pulses);
   const now = useNow(SCENE_TICK_MS);
+  const device = useSceneDevice();
   const last = useRef<SceneModel | null>(null);
   return useMemo(() => {
-    last.current = shareScene(last.current, buildSceneModel(board, pulses, now));
+    last.current = shareScene(last.current, buildSceneModel(board, pulses, now, device));
     return last.current;
-  }, [board, pulses, now]);
+  }, [board, pulses, now, device]);
 }
 
 /** How long a project that went inactive stays drawn for its exit: `dur.fast`, plus a frame. */
@@ -85,8 +95,9 @@ export function useSceneProject(projectId: string): SceneProject | null {
   const board = useBoard((s) => s.board);
   const pulses = useBoard((s) => s.pulses);
   const now = useNow(SCENE_TICK_MS);
+  const device = useSceneDevice();
   return useMemo(
-    () => buildSceneProject(board, pulses, projectId, now),
-    [board, pulses, projectId, now],
+    () => buildSceneProject(board, pulses, projectId, now, device),
+    [board, pulses, projectId, now, device],
   );
 }

@@ -336,8 +336,12 @@
   content: "[ERR]" / "";
 }
 .focus[data-layout="retro"] [data-status="ok"]::before {
-  content: "[OK]" / "";
+  content: "[DONE]" / "";
   color: var(--retro-tone-ok);
+}
+.focus[data-layout="retro"] [data-status="stale"]::before {
+  content: "[LOST]" / "";
+  color: var(--retro-dim-ink);
 }
 .focus[data-layout="retro"] [data-status="idle"]::before {
   content: "[IDLE]" / "";

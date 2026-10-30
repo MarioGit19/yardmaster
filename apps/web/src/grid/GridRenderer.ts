@@ -169,6 +169,7 @@ const TONE_TOKEN: Record<Tone, string> = {
   work: '--st-work',
   tool: '--st-tool',
   wait: '--st-wait',
+  stale: '--st-idle',
   ok: '--st-ok',
   err: '--st-err',
   idle: '--st-idle',

@@ -12,7 +12,8 @@ import {
 import { pickerOpen } from '../library/OpenProject.js';
 import { useClosedProjects } from '../library/useActive.js';
 import { projectHref, routes } from '../routes.js';
-import { projectTone, toneLabel } from '../status.js';
+import { type Tone, toneLabel } from '../status.js';
+import { useProjectTone } from '../statusTokens.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
 import { Skeleton } from '../ui/Skeleton.js';
@@ -143,7 +144,7 @@ function ProjectRailItem({
 }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
-  const tone = projectTone(sessions, terminals);
+  const tone = useProjectTone(sessions, terminals);
   return (
     <RailLink
       href={projectHref(project.id)}
@@ -167,7 +168,7 @@ interface RailLinkProps {
   icon: ReactNode;
   trailing?: ReactNode;
   /** Collapsed rails show status as a dot on the icon. */
-  badge?: 'work' | 'tool' | 'wait' | 'ok' | 'err';
+  badge?: Exclude<Tone, 'idle'>;
   collapsed: boolean;
   active: boolean;
   tabStop: boolean;

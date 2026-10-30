@@ -3,8 +3,12 @@ import {
   type BrowserSession,
   type BrowserSessionKind,
   type BrowserSessionsResponse,
+  MAX_SEEN_MARKS,
   PAIRING_CODE_TTL_MS,
   REMOTE_SESSION_IDLE_MS,
+  SeenMarks,
+  type SeenResponse,
+  SeenUpdate,
   SIGN_IN_CODE_TTL_MS,
 } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
@@ -30,6 +34,8 @@ const StoredSession = z.object({
   hash: z.string().min(1).max(128),
   createdAt: z.number().int(),
   lastSeenAt: z.number().int(),
+  /** What this browser has opened, so each device clears its own Done and Failed marks. */
+  seen: SeenMarks.optional(),
 });
 type StoredSession = z.infer<typeof StoredSession>;
 
@@ -171,6 +177,26 @@ export class BrowserSessions {
     this.persist();
   }
 
+  /** What a session's browser has opened, or null for an unknown session. */
+  seen(id: string): SeenResponse | null {
+    const session = this.sessions.find((s) => s.id === id);
+    return session ? { since: session.createdAt, marks: session.seen ?? {} } : null;
+  }
+
+  /** Records what a browser opened, newest time winning. False for an unknown session. */
+  markSeen(id: string, marks: SeenMarks): boolean {
+    const session = this.sessions.find((s) => s.id === id);
+    if (!session) return false;
+    const merged = { ...session.seen };
+    for (const [key, at] of Object.entries(marks)) merged[key] = Math.max(merged[key] ?? 0, at);
+    const newest = Object.entries(merged)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_SEEN_MARKS);
+    session.seen = Object.fromEntries(newest);
+    this.persist();
+    return true;
+  }
+
   /** Ends sessions that expired, closing their open sockets, even if nothing asks for them. */
   sweep(): void {
     this.live();
@@ -238,7 +264,7 @@ export class BrowserSessions {
   }
 
   private view(session: StoredSession, currentId: string | null): BrowserSession {
-    const { hash: _hash, ...rest } = session;
+    const { hash: _hash, seen: _seen, ...rest } = session;
     return { ...rest, current: session.id === currentId };
   }
 
@@ -254,6 +280,24 @@ export function registerSessionRoutes(app: FastifyInstance, sessions: BrowserSes
   app.get('/api/sessions', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     return { sessions: sessions.list(request.browserSession()) } satisfies BrowserSessionsResponse;
+  });
+
+  app.get('/api/seen', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const id = request.browserSession();
+    const seen = id === null ? null : sessions.seen(id);
+    if (!seen) return reply.code(403).send({ error: 'browser_session_required' });
+    return seen;
+  });
+
+  app.post('/api/seen', async (request, reply) => {
+    const body = SeenUpdate.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'bad_request' });
+    const id = request.browserSession();
+    if (id === null || !sessions.markSeen(id, body.data.marks)) {
+      return reply.code(403).send({ error: 'browser_session_required' });
+    }
+    return { ok: true };
   });
 
   app.delete('/api/sessions/:id', async (request, reply) => {

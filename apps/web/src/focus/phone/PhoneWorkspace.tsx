@@ -62,7 +62,8 @@ import { createPreference, usePreference } from '../../prefs.js';
 import { projectHref, projectPageHref, terminalHref } from '../../routes.js';
 import { ProjectAvatar } from '../../shell/ProjectAvatar.js';
 import { historyTrack, leaveWorkspace } from '../../shell/phoneNav.js';
-import { sessionStatusView, type Tone } from '../../status.js';
+import type { Tone } from '../../status.js';
+import { laneWithToken, sessionView, terminalToken, useStatusReader } from '../../statusTokens.js';
 import { claudeTerminalView, useClaudeTerminalView } from '../../terminal/claudeTerminal.js';
 import { NewTerminalForm } from '../../terminal/NewTerminalPopover.js';
 import {
@@ -470,12 +471,16 @@ function useItemView(item: HubItem): ItemView {
   const terminal = useBoard(selectTerminal(item.terminalId ?? ''));
   const execution = useBoardShallow(selectLaneExecution(terminal ?? NO_TERMINAL));
   const word = useStatusWord();
+  const readStatus = useStatusReader();
   if (item.kind === 'session' && session) {
-    const status = sessionStatusView(session.status);
+    const status = sessionView(session, readStatus());
     return {
       name: sessionDisplayName(session),
       tone: status.tone,
-      status: word({ kind: 'session', status: session.status }, status.label),
+      status:
+        status.tone === 'stale' || status.tone === 'ok'
+          ? status.label
+          : word({ kind: 'session', status: session.status }, status.label),
       label: status.label,
       caption: sessionCaption(session, approval),
       session,
@@ -484,16 +489,20 @@ function useItemView(item: HubItem): ItemView {
   }
   if (terminal) {
     const display = terminalDisplay(terminal, execution);
-    const view = laneView(terminal, execution, display.name);
-    const status = view.running
-      ? 'Running'
-      : view.exit
-        ? view.exit.code === 0
-          ? 'Finished'
-          : `Failed, exit ${view.exit.code}`
-        : terminal.state === 'closed'
-          ? 'Closed'
-          : 'Idle';
+    const lane = laneView(terminal, execution, display.name);
+    const view = laneWithToken(lane, terminalToken(terminal, execution, lane, readStatus()));
+    const status =
+      view.tone === 'stale'
+        ? 'Stale'
+        : view.running
+          ? 'Running'
+          : view.exit
+            ? view.exit.code === 0
+              ? 'Finished'
+              : `Failed, exit ${view.exit.code}`
+            : terminal.state === 'closed'
+              ? 'Closed'
+              : 'Idle';
     return {
       name: display.name,
       tone: view.tone,

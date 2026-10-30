@@ -1,9 +1,15 @@
-import type { ClaudeSession, Terminal } from '@yardmaster/protocol';
-import { runningBackground } from '../background/model.js';
+import type { ClaudeSession, SeenResponse, Terminal } from '@yardmaster/protocol';
 import { terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
 import { type LaneView, laneView, selectLaneExecution } from '../lanes/lane.js';
 import { type Tone, totalTokens } from '../status.js';
+import {
+  NOTHING_NEW,
+  type StatusContext,
+  sessionToken,
+  statusContext,
+  terminalToken,
+} from '../statusTokens.js';
 
 export interface HudCounts {
   /** Sessions blocked on an approval, a question or a reply. */
@@ -24,23 +30,16 @@ export function startOfLocalDay(now: number): number {
   return day.getTime();
 }
 
-function sessionBucket(session: ClaudeSession): HudBucket | null {
-  switch (session.status.kind) {
-    case 'working':
-    case 'tool':
-    case 'compacting':
-      return 'active';
-    case 'waiting_permission':
-    case 'waiting_input':
+function sessionBucket(session: ClaudeSession, ctx: StatusContext): HudBucket | null {
+  switch (sessionToken(session, ctx)) {
+    case 'needs_you':
       return 'needsYou';
-    case 'error':
+    case 'failed':
       return 'failed';
-    case 'ended':
-    case 'interrupted':
-      return null;
+    case 'running':
+      return 'active';
     default:
-      // Idle, but a watcher or subagent still runs: that is work going on.
-      return runningBackground(session) > 0 ? 'active' : null;
+      return null;
   }
 }
 
@@ -48,31 +47,34 @@ function terminalBucket(
   s: BoardStoreState,
   terminal: Terminal,
   lane: LaneView,
-  seen: ReadonlySet<string>,
+  ctx: StatusContext,
 ): HudBucket | null {
   if (lane.running) {
     // `claude` running in a terminal is that session: it counts once, by the session's own state.
-    return terminalSession(s.board, terminal.id) ? null : 'active';
+    if (terminalSession(s.board, terminal.id)) return null;
+    const execution = selectLaneExecution(terminal)(s);
+    return terminalToken(terminal, execution, lane, ctx) === 'running' ? 'active' : null;
   }
-  return lane.tone === 'err' && lane.exit && !seen.has(lane.exit.key) ? 'failed' : null;
+  const opened = lane.exit && ctx.seen.marks[lane.exit.key] !== undefined;
+  return lane.tone === 'err' && lane.exit && !opened ? 'failed' : null;
 }
-
-const NOTHING_SEEN: ReadonlySet<string> = new Set();
 
 /** A flat object of numbers: pair it with a shallow compare (`useBoardShallow`). */
 export const selectHudCounts =
-  (now: () => number = Date.now, seen: ReadonlySet<string> = NOTHING_SEEN) =>
+  (now: () => number = Date.now, seen: SeenResponse = NOTHING_NEW) =>
   (s: BoardStoreState): HudCounts => {
     const counts: HudCounts = { needsYou: 0, failed: 0, active: 0, tokensToday: 0 };
-    const since = startOfLocalDay(now());
+    const at = now();
+    const since = startOfLocalDay(at);
+    const ctx = statusContext(s, seen, at);
     for (const session of Object.values(s.board.sessions)) {
-      const bucket = sessionBucket(session);
+      const bucket = sessionBucket(session, ctx);
       if (bucket) counts[bucket]++;
       if (session.updatedAt >= since) counts.tokensToday += totalTokens(session);
     }
     for (const terminal of Object.values(s.board.terminals)) {
       const lane = laneView(terminal, selectLaneExecution(terminal)(s));
-      const bucket = terminalBucket(s, terminal, lane, seen);
+      const bucket = terminalBucket(s, terminal, lane, ctx);
       if (bucket) counts[bucket]++;
     }
     return counts;
@@ -91,15 +93,16 @@ export type HudItem =
 
 /** What makes up one counter, in board order. */
 export const selectHudItems =
-  (bucket: HudBucket, seen: ReadonlySet<string> = NOTHING_SEEN) =>
+  (bucket: HudBucket, seen: SeenResponse = NOTHING_NEW, now: () => number = Date.now) =>
   (s: BoardStoreState): HudItem[] => {
     const items: HudItem[] = [];
+    const ctx = statusContext(s, seen, now());
     for (const session of Object.values(s.board.sessions)) {
-      if (sessionBucket(session) === bucket) items.push({ kind: 'session', session });
+      if (sessionBucket(session, ctx) === bucket) items.push({ kind: 'session', session });
     }
     for (const terminal of Object.values(s.board.terminals)) {
       const lane = laneView(terminal, selectLaneExecution(terminal)(s));
-      if (terminalBucket(s, terminal, lane, seen) === bucket) {
+      if (terminalBucket(s, terminal, lane, ctx) === bucket) {
         items.push({ kind: 'terminal', terminal, lane });
       }
     }

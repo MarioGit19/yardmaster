@@ -273,6 +273,7 @@ Treat these as non-negotiable. They are acceptance criteria for every phase.
 | `GET /api/status`, `/api/library`, `/api/projects/:id/sessions`, `/api/settings`, `/api/hooks`, `/api/push`, `/api/ports/shares`, `/api/sessions`, `/api/remote/devices` | TCP, socket | session or token |
 | `PUT /api/settings` | TCP, socket | session or token; remote 403 `local_only` for `editorCli`, `libraryRoots`, `remoteAllowedHosts`, `retentionDays` |
 | `POST /api/hooks/plan`, `POST /api/hooks/install`, `POST /api/token/rotate`, `POST /api/remote/pair` | TCP, socket | session or token; remote 403 `local_only` |
+| `GET`/`POST /api/seen` | TCP, socket | browser session (the token alone: 403); always the calling browser's own record |
 | `DELETE /api/sessions/:id`, `DELETE /api/remote/devices/:id` | TCP, socket | session or token; remote only its own session |
 | `POST /api/push/subscriptions` | TCP | browser session (the token alone: 403); the subscription belongs to the calling session; remote can't take over another device's endpoint |
 | `DELETE /api/push/subscriptions/:id`, `POST /api/push/test` | TCP, socket | session or token; remote only its own subscriptions |

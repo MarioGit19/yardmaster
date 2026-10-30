@@ -40,6 +40,7 @@ import { phosphorPreference } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import { useMarkProjectSeen, useSessionView } from '../statusTokens.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
 import { terminalTarget, useTerminalTarget } from '../terminal/target.js';
@@ -191,6 +192,7 @@ function ProjectFocus({
   const sessions = useBoardList(selectSessionsByProject(project.id));
   const terminals = useBoardList(selectTerminalsByProject(project.id));
   const selected = useBoard(selectSession(sessionId ?? ''));
+  useMarkProjectSeen(project.id);
   const live = podSessions(sessions);
   // A session the stack took over ("Show here instead") until a row puts it back here.
   const [released, setReleased] = useState<string | null>(null);
@@ -592,7 +594,7 @@ function SessionLink({
   /** Called on click with whether the keyboard picked the row. */
   onPick: (byKeyboard: boolean) => void;
 }) {
-  const status = sessionStatusView(session.status);
+  const status = useSessionView(session);
   const word = useStatusWord();
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
@@ -652,7 +654,11 @@ function SessionLink({
           <span className="flex min-w-0 items-center justify-between gap-2">
             <StatusDot
               tone={status.tone}
-              label={word({ kind: 'session', status: session.status }, status.label)}
+              label={
+                status.tone === 'stale' || status.tone === 'ok'
+                  ? status.label
+                  : word({ kind: 'session', status: session.status }, status.label)
+              }
               showLabel
               className="min-w-0 text-meta text-text-2"
             />

@@ -1,7 +1,7 @@
 import type { ClaudeSession, SessionStatus, Terminal } from '@yardmaster/protocol';
 
 /** Semantic status tones, DESIGN.md §2. Each maps to a `--st-*` token. */
-export type Tone = 'work' | 'tool' | 'wait' | 'ok' | 'err' | 'idle';
+export type Tone = 'work' | 'tool' | 'wait' | 'stale' | 'ok' | 'err' | 'idle';
 
 export interface StatusView {
   tone: Tone;
@@ -33,7 +33,10 @@ export function sessionStatusView(status: SessionStatus): StatusView {
   }
 }
 
-const RANK: Record<Tone, number> = { wait: 4, err: 3, tool: 2, work: 2, ok: 1, idle: 0 };
+const RANK: Record<Tone, number> = { wait: 5, err: 4, tool: 3, work: 3, stale: 2, ok: 1, idle: 0 };
+
+/** The more urgent of two tones. */
+export const rankTone = (a: Tone, b: Tone): Tone => (RANK[b] > RANK[a] ? b : a);
 
 /** A project's tone: the highest-priority status among its children (wait > err > work). */
 export function projectTone(
@@ -58,9 +61,10 @@ const TONE_LABEL: Record<Tone, string> = {
   work: 'Working',
   tool: 'Tool active',
   wait: 'Needs you',
-  ok: 'Done',
-  err: 'Error',
-  idle: 'Idle',
+  stale: 'Stale',
+  ok: 'Done, unseen',
+  err: 'Failed',
+  idle: 'Quiet',
 };
 
 export const toneLabel = (tone: Tone) => TONE_LABEL[tone];

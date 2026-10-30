@@ -69,14 +69,16 @@ const STATE_TAG: Record<ActorState, string> = {
   idle: 'IDLE',
   sleeping: 'ZZZ',
   exited: 'EXIT',
+  stale: 'LOST',
 };
 
 const TONE_TAG: Record<Tone, string> = {
   work: 'RUN',
   tool: 'RUN',
   wait: 'WAIT',
+  stale: 'LOST',
   err: 'ERR',
-  ok: 'OK',
+  ok: 'DONE',
   idle: 'IDLE',
 };
 

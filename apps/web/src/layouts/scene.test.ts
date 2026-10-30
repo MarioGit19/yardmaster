@@ -164,7 +164,7 @@ describe('buildSceneModel', () => {
     expect(dev).toMatchObject({
       kind: 'terminal',
       state: 'serving',
-      tone: 'ok',
+      tone: 'tool',
       links: { href: '/p/p-acme/t/t-dev', terminalId: 't-dev', sessionId: null },
     });
     expect(dev?.caption.text).toBe('Serving: pnpm dev');

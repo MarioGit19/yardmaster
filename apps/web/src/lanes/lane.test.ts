@@ -40,7 +40,7 @@ describe('laneView', () => {
       running: true,
       startedAt: 1_000,
       exit: null,
-      tone: 'ok',
+      tone: 'tool',
       label: 'backend: pnpm dev, running',
     });
   });

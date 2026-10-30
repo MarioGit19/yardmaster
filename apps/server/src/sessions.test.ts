@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SESSION_HEADER, WS_UNAUTHORIZED } from '@yardmaster/protocol';
+import { MAX_SEEN_MARKS, SESSION_HEADER, WS_UNAUTHORIZED } from '@yardmaster/protocol';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -146,6 +146,62 @@ describe('token rotation', () => {
     });
     sockets.push(stale);
     expect(await closeCode(stale)).toBe(WS_UNAUTHORIZED);
+  });
+});
+
+describe('seen items', () => {
+  it('belong to each browser and stay out of the session list', async () => {
+    const { app, port } = await boot();
+    const mac = sessionHeader(app, MAC_UA);
+    const phone = sessionHeader(app);
+    const host = { host: `127.0.0.1:${port}` };
+    const post = await app.inject({
+      method: 'POST',
+      url: '/api/seen',
+      headers: { ...host, ...mac },
+      payload: { marks: { 's:one': 5 } },
+    });
+    expect(post.statusCode).toBe(200);
+    const read = async (headers: Record<string, string>) =>
+      (await app.inject({ url: '/api/seen', headers: { ...host, ...headers } })).json();
+    expect((await read(mac)).marks).toEqual({ 's:one': 5 });
+    expect((await read(phone)).marks).toEqual({});
+    const list = await app.inject({ url: '/api/sessions', headers: { ...host, ...mac } });
+    expect(list.body).not.toContain('s:one');
+    await app.close();
+  });
+
+  it('rejects a bad update, and a caller with no browser session', async () => {
+    const { app, port, token } = await boot();
+    const host = { host: `127.0.0.1:${port}` };
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/seen',
+      headers: { ...host, ...sessionHeader(app) },
+      payload: { marks: { 's:one': 'soon' } },
+    });
+    expect(bad.statusCode).toBe(400);
+    const bare = await app.inject({
+      url: '/api/seen',
+      headers: { ...host, [TOKEN_HEADER]: token },
+    });
+    expect(bare.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('keeps the newest time for a key and drops the oldest past the cap', () => {
+    const sessions = new BrowserSessions({ load: () => [], save: () => {} });
+    const { id } = sessions.create('local', undefined).session;
+    sessions.markSeen(id, { a: 10 });
+    sessions.markSeen(id, { a: 3 });
+    expect(sessions.seen(id)?.marks).toEqual({ a: 10 });
+    const many = Object.fromEntries(
+      Array.from({ length: MAX_SEEN_MARKS }, (_, i) => [`k${i}`, i + 100]),
+    );
+    sessions.markSeen(id, many);
+    const marks = sessions.seen(id)?.marks ?? {};
+    expect(Object.keys(marks)).toHaveLength(MAX_SEEN_MARKS);
+    expect(marks.a).toBeUndefined();
   });
 });
 

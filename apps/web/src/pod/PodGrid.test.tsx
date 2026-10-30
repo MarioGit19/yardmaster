@@ -75,7 +75,9 @@ function render(store: BoardStore) {
 
 function sampleStore() {
   const store = createBoardStore();
-  store.getState().replaceBoard(sampleBoard());
+  const board = sampleBoard();
+  for (const session of Object.values(board.sessions)) session.updatedAt = Date.now();
+  store.getState().replaceBoard(board);
   return store;
 }
 

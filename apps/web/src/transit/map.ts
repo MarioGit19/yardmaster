@@ -117,6 +117,7 @@ const MOTION: Record<ActorState, TrainMotion> = {
   watching: 'park',
   sleeping: 'park',
   exited: 'park',
+  stale: 'park',
 };
 
 /** A working train glides out, a waiting one opens amber doors, an errored one stops (§10.5). */
@@ -155,9 +156,11 @@ export function boardStatus(actor: Pick<SceneActor, 'state' | 'tone' | 'exit'>):
     case 'delegating':
       return { word: 'Departing', tone: actor.tone };
     case 'serving':
-      return { word: 'In service', tone: 'ok' };
+      return { word: 'In service', tone: actor.tone };
     case 'done':
       return { word: 'Arrived', tone: 'ok' };
+    case 'stale':
+      return { word: 'Signal lost', tone: 'stale' };
     case 'sleeping':
       return { word: 'Stabled', tone: 'idle' };
     case 'exited':

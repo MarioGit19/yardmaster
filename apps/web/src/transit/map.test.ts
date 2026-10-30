@@ -53,6 +53,7 @@ function actor(id: string, overrides: Partial<SceneActor> = {}): SceneActor {
     projectId: 'p1',
     parentId: null,
     state: 'idle',
+    token: 'quiet',
     tone: 'idle',
     activity: 0,
     label: id,
@@ -161,7 +162,7 @@ describe('the departures board', () => {
       tone: 'err',
     });
     expect(boardStatus({ state: 'typing', tone: 'tool', exit: null }).word).toBe('Departing');
-    expect(boardStatus({ state: 'serving', tone: 'ok', exit: null }).word).toBe('In service');
+    expect(boardStatus({ state: 'serving', tone: 'tool', exit: null }).word).toBe('In service');
     expect(boardStatus({ state: 'idle', tone: 'idle', exit: null }).word).toBe('At platform');
   });
 

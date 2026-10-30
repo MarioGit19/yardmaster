@@ -180,7 +180,7 @@ export function ActorMascot({
     case 'claude':
       return (
         <CrewMascot
-          state={actor.state as MascotState}
+          state={actor.state === 'stale' ? 'idle' : (actor.state as MascotState)}
           size={size}
           color={color}
           tool={actor.tool}
@@ -195,7 +195,7 @@ export function ActorMascot({
     case 'terminal':
       return (
         <OpsMascot
-          state={opsMascotState(actor.state as OpsState)}
+          state={opsMascotState((actor.state === 'stale' ? 'idle' : actor.state) as OpsState)}
           size={size}
           activity={actor.activity}
           exit={actor.exit}

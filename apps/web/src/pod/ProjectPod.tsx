@@ -26,7 +26,8 @@ import { spring } from '../motion.js';
 import { plural } from '../plural.js';
 import { projectHref } from '../routes.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
-import { formatCount, projectTone, toneLabel } from '../status.js';
+import { formatCount, toneLabel } from '../status.js';
+import { useProjectTone } from '../statusTokens.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
 import { isDimmed } from './activity.js';
@@ -50,6 +51,7 @@ const MINI_PX = Math.round(CREW_PX * 0.46);
 
 const BORDER = {
   wait: 'glow-st-wait',
+  stale: '',
   err: 'glow-st-err',
   work: 'border-st-work/40',
   tool: 'border-st-work/40',
@@ -67,7 +69,7 @@ export function ProjectPod({ project }: { project: Project }) {
   const openTerminals = terminals
     .filter((t) => t.state === 'open')
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-  const tone = projectTone(sessions, terminals);
+  const tone = useProjectTone(sessions, terminals);
   const live = podSessions(sessions);
   const accent = `var(--accent-${project.accent})`;
   const hiddenSessions = live.length - MAX_SESSION_ROWS;

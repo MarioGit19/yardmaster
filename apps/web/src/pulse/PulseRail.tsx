@@ -87,6 +87,7 @@ const TONE_VAR: Record<Tone, string> = {
   work: 'var(--st-work)',
   tool: 'var(--st-tool)',
   wait: 'var(--st-wait)',
+  stale: 'var(--st-idle)',
   ok: 'var(--st-ok)',
   err: 'var(--st-err)',
   idle: 'var(--st-idle)',
