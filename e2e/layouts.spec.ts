@@ -427,7 +427,7 @@ async function roomViewRoundTrip(page: Page, touch: boolean) {
   const panel = page.locator(`[data-office-room-panel="${roomId}"]`);
   await expect(panel).toBeVisible();
   if (touch) await expect(panel).toHaveAttribute('data-sheet', 'true');
-  await expect(office).not.toHaveAttribute('data-office-moving', '');
+  await expect(office).not.toHaveAttribute('data-office-moving');
   expect(await buildingScale(page)).toBeGreaterThan(touch ? 0.9 : 1.5);
   // The room fills the stage: on screen, and on a phone edge to edge.
   const zoomed = await byId.boundingBox();

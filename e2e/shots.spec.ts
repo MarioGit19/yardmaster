@@ -1482,7 +1482,7 @@ test.describe('layouts', () => {
           await room.click({ position: { x: 40, y: 4 } });
           await page.waitForTimeout(80);
           await shot('zooming');
-          await expect(page.locator('[data-office]')).not.toHaveAttribute('data-office-moving', '');
+          await expect(page.locator('[data-office]')).not.toHaveAttribute('data-office-moving');
           await page.waitForTimeout(400);
           await shot('rest');
         });
@@ -1752,10 +1752,7 @@ test.describe('layouts worst case', () => {
               .first()
               .click({ position: { x: 40, y: 4 } });
             await expect(page.locator('[data-room-entered]')).toBeVisible();
-            await expect(page.locator('[data-office]')).not.toHaveAttribute(
-              'data-office-moving',
-              '',
-            );
+            await expect(page.locator('[data-office]')).not.toHaveAttribute('data-office-moving');
             await page.waitForTimeout(500);
             await shot('enter', false);
           }
