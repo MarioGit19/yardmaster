@@ -59,6 +59,14 @@ test('a status change glows amber and leaves the grid in place', async ({ page }
 });
 
 test('a pod dragged by its grip stays there after a reload', async ({ page }) => {
+  // The demo keeps adding to the strip and the grid glides with it, so a press aimed at the grip
+  // could land on a link instead, which starts the browser's own drag. Hidden from the first paint:
+  // hiding it later would start a glide of its own.
+  await page.addInitScript(() => {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync('[data-needs-you] { display: none; }');
+    document.adoptedStyleSheets = [sheet];
+  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await openRoute(page, '/');
   const pods = page.locator('[data-pod]');
@@ -66,17 +74,17 @@ test('a pod dragged by its grip stays there after a reload', async ({ page }) =>
   const ids = () => pods.evaluateAll((els) => els.map((el) => el.getAttribute('data-pod')));
   const before = await ids();
   const [first = '', second = ''] = before;
-  const pod = page.locator(`[data-pod="${first}"]`);
-  await pod.hover();
-  const grip = await pod.locator('[data-pod-grip]').boundingBox();
+  // `hover` waits for the grip to hold still, and leaves the pointer on it.
+  await page.locator(`[data-pod="${first}"] [data-pod-grip]`).hover();
   const target = await page.locator(`[data-pod="${second}"]`).boundingBox();
-  if (!grip || !target) throw new Error('no pods to drag');
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  if (!target) throw new Error('no pods to drag');
   await page.mouse.down();
-  await page.mouse.move(target.x + target.width / 2, target.y + 80, { steps: 12 });
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 });
   await page.waitForTimeout(100);
   await page.mouse.up();
-  await expect.poll(ids).toEqual([second, first, ...before.slice(2)]);
+  await expect
+    .poll(async () => (await ids()).slice(0, before.length))
+    .toEqual([second, first, ...before.slice(2)]);
   await page.reload();
   await expect(pods.nth(1)).toBeVisible();
   expect((await ids()).slice(0, 2)).toEqual([second, first]);
