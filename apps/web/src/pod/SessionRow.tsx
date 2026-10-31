@@ -18,7 +18,7 @@ import { actorId } from '../layouts/scene.js';
 import { spring } from '../motion.js';
 import { ToolChip } from '../orb/ToolChip.js';
 import { plural } from '../plural.js';
-import { formatCount, totalTokens } from '../status.js';
+import { TOKEN_ESTIMATE_HINT, tokenEstimate, totalTokens } from '../status.js';
 import { useSessionStale, useSessionView } from '../statusTokens.js';
 import { formatDateTime } from '../time.js';
 import { StatusDot } from '../ui/StatusDot.js';
@@ -58,7 +58,11 @@ export function SessionRow({
   const caption = stale ? staleCaption(stale) : sessionCaption(session, approval);
   // An idle row's caption already is this line.
   const line =
-    compact || session.status.kind === 'idle' ? null : lastLine(session.lastAssistantText);
+    compact || session.status.kind === 'idle'
+      ? null
+      : session.autoResumedAt
+        ? 'Continuing on its own after the usage limit'
+        : lastLine(session.lastAssistantText);
   const rowRef = useRef<HTMLLIElement>(null);
   const onScreen = useInView(rowRef);
   const when = sessionWhen(session, approval, now);
@@ -125,10 +129,10 @@ export function SessionRow({
           )}
           {!compact && tokens > 0 && (
             <span
-              title={`${tokens.toLocaleString('en-US')} ${plural(tokens, 'token')}`}
+              title={`${tokens.toLocaleString('en-US')} ${plural(tokens, 'token')}. ${TOKEN_ESTIMATE_HINT}`}
               className="tabular shrink-0 font-mono text-meta text-text-2"
             >
-              {formatCount(tokens)} tok
+              {tokenEstimate(tokens)}
             </span>
           )}
         </div>

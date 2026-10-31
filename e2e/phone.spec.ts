@@ -202,3 +202,18 @@ test.describe('768 to 1023 px', () => {
     await expect(page.getByRole('button', { name: 'Expand sidebar' })).toHaveCount(0);
   });
 });
+
+for (const { name, device } of PROFILES) {
+  test.describe(`usage on ${name}`, () => {
+    test.use(device);
+
+    test('the top bar and More show the limits', async ({ page }) => {
+      await openRoute(page, '/more');
+      await expect(page.locator('[data-phone-topbar] [data-hud="usage"]')).toBeVisible();
+      const list = page.locator('[data-more="usage"]');
+      await expect(list.locator('[data-usage="sevenDay"]')).toContainText('resets at');
+      await expect(page.getByText(/^as of /)).toBeVisible();
+      await noSideScroll(page);
+    });
+  });
+}

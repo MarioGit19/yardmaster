@@ -21,6 +21,7 @@ import {
   useHudCounts,
 } from './HudCounters.js';
 import { isWorkspace, PHONE_TAB_HREF, PHONE_TABS, type PhoneTab, phoneTabFor } from './phoneNav.js';
+import { UsageChip } from './UsageChip.js';
 
 const TAB_ICON = {
   overview: LayoutGrid,
@@ -168,6 +169,7 @@ function PhoneTopBar() {
           </JumpCounter>
         </li>
       </ul>
+      <UsageChip href={routes.more} className="max-[26rem]:[&>[data-usage=sevenDay]]:hidden" />
       <button
         type="button"
         aria-label="Search"

@@ -18,6 +18,7 @@ type S = BoardStoreState;
 
 export const selectConnection = (s: S) => s.connection;
 export const selectHydrated = (s: S) => s.hydrated;
+export const selectUsage = (s: S) => s.board.usage;
 
 export const selectProject = (id: string) => (s: S) => s.board.projects[id] as Project | undefined;
 export const selectWindow = (id: string) => (s: S) =>

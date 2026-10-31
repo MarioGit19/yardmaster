@@ -482,3 +482,59 @@ describe('yardmaster hooks', () => {
     expect(unknown.err()).toContain('expected one of install, uninstall, status');
   });
 });
+
+describe('yardmaster statusline', () => {
+  const settingsAt = () => join(home, 'cfg', 'settings.json');
+  const env = () => ({ CLAUDE_CONFIG_DIR: join(home, 'cfg') });
+  const command = async () =>
+    JSON.parse(await readFile(settingsAt(), 'utf8')).statusLine.command as string;
+  const run = async (...args: string[]) => {
+    const test = testIo(env());
+    return { code: await runCli(['statusline', ...args], test.io), ...test };
+  };
+
+  beforeEach(async () => {
+    await mkdir(join(home, 'cfg'));
+    await writeFile(
+      settingsAt(),
+      JSON.stringify({ statusLine: { type: 'command', command: 'ccstatus' } }),
+    );
+  });
+
+  it('shows the change on a dry run and writes nothing', async () => {
+    const result = await run('install', '--dry-run');
+    expect(result.code).toBe(0);
+    expect(result.out()).toContain('yardmaster-statusline');
+    expect(result.out()).toContain('Dry run: nothing was written.');
+    expect(await command()).toBe('ccstatus');
+  });
+
+  it('refuses to write without a terminal or --yes', async () => {
+    const result = await run('install');
+    expect(result.code).toBe(1);
+    expect(result.err()).toContain('--yes');
+    expect(await command()).toBe('ccstatus');
+  });
+
+  it('installs with a backup, and uninstall restores the old command', async () => {
+    expect((await run('install', '--yes')).out()).toContain('Backup:');
+    expect(await command()).toContain('yardmaster-statusline');
+    expect((await run('status')).out()).toContain('running your statusline');
+    expect((await run('install', '--yes')).out()).toContain('Nothing changed');
+
+    await run('uninstall', '--yes');
+    expect(await command()).toBe('ccstatus');
+    expect((await run('status')).out()).toContain('not installed');
+  });
+
+  it('reports a statusLine it cannot wrap and leaves it alone', async () => {
+    await writeFile(settingsAt(), JSON.stringify({ statusLine: { type: 'static' } }));
+    const result = await run('install', '--yes');
+    expect(result.code).toBe(1);
+    expect(result.err()).toContain('not a command');
+  });
+
+  it('turns down an unknown action', async () => {
+    expect((await run('explode')).code).toBe(2);
+  });
+});

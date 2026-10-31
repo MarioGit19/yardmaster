@@ -163,10 +163,12 @@ export function sessionReducer(
     case 'Stop':
       next = withAssistantText(next, hook.last_assistant_message, ts);
       next = withLiveTasks(next, hook.background_tasks, ts);
+      next = { ...next, autoResumedAt: null };
       return ended ? next : to({ kind: 'idle' });
 
     case 'StopFailure': {
       next = withAssistantText(next, hook.last_assistant_message, ts);
+      next = { ...next, autoResumedAt: null };
       if (ended) return next;
       const reason = stopFailureReason(hook.error);
       return to({
@@ -249,7 +251,9 @@ function withQuotaResume(
 ): ClaudeSession {
   if (status.kind !== 'error' || status.reason !== 'rate_limit') return session;
   const type = hook.notification_type;
-  if (type === 'quota_auto_resume_fired') return withStatus(session, { kind: 'working' }, ts);
+  if (type === 'quota_auto_resume_fired') {
+    return { ...withStatus(session, { kind: 'working' }, ts), autoResumedAt: ts };
+  }
   if (type !== 'quota_auto_resume_stale' && type !== 'quota_auto_resume_disabled') return session;
   const message = clipLine(hook.message, DETAIL_MAX) ?? status.message;
   return withStatus(session, { ...status, message }, ts);

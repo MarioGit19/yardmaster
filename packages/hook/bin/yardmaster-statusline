@@ -1,0 +1,62 @@
+#!/bin/sh
+# Yardmaster statusline forwarder for Claude Code (PRD §6.1).
+#
+# Sits in front of the user's own statusline: $1 is their previous command, kept in settings.json
+# so `yardmaster statusline uninstall` can put it back. The statusline JSON goes to the local board
+# in the background, through the same owner-only socket as the hooks, and the previous command gets
+# the same stdin. Its stdout and exit status are ours, so the statusline looks exactly as before.
+
+previous="${1:-}"
+
+# The x keeps trailing newlines through the command substitution.
+input=$(
+  cat
+  printf x
+)
+input="${input%x}"
+
+forward() {
+  home="${YARDMASTER_HOME:-${CBOARD_HOME:-}}"
+  if [ -z "$home" ]; then
+    home="$HOME/.yardmaster"
+    [ -r "$home/token" ] || [ ! -r "$HOME/.c-board/token" ] || home="$HOME/.c-board"
+  fi
+  # A literal "~" in YARDMASTER_HOME is expanded here on purpose.
+  # shellcheck disable=SC2088
+  case "$home" in
+    "~") home="$HOME" ;;
+    "~/"*) home="$HOME/${home#\~/}" ;;
+  esac
+
+  sock="$home/board.sock"
+  [ -S "$sock" ] || return 0
+  [ -n "$(find "$sock" -prune -type s -user "$(id -u)")" ] || return 0
+
+  token=''
+  [ -r "$home/token" ] && IFS= read -r token <"$home/token"
+  token="${token%"${token##*[![:space:]]}"}"
+  case "$token" in
+    '' | *[!A-Za-z0-9_-]*) return 0 ;;
+  esac
+
+  command -v curl || return 0
+
+  # As in the hook: the token stays out of argv, and ~/.curlrc and proxies stay out of it.
+  curl -q -s --noproxy '*' --unix-socket "$sock" -m 1 -o /dev/null \
+    -X POST \
+    -H @/dev/fd/3 \
+    -H 'Content-Type: application/json' \
+    --data-binary @- \
+    http://localhost/api/hooks/statusline 3<<HEADERS
+X-Yardmaster-Token: $token
+HEADERS
+}
+
+# Detached from stdout and stderr, so a slow board can't hold up Claude Code reading them.
+{ printf %s "$input" | forward; } </dev/null >/dev/null 2>&1 &
+
+[ -n "$previous" ] || exit 0
+
+# Claude Code runs commands in bash where it can.
+shell=$(command -v bash) || shell=/bin/sh
+{ printf %s "$input" 2>/dev/null; } | "$shell" -c "$previous"

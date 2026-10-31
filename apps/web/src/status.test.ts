@@ -11,6 +11,10 @@ describe('sessionStatusView', () => {
     });
     expect(sessionStatusView({ kind: 'waiting_input' }).tone).toBe('wait');
     expect(sessionStatusView({ kind: 'error', message: null }).tone).toBe('err');
+    expect(sessionStatusView({ kind: 'error', message: null, reason: 'rate_limit' })).toEqual({
+      tone: 'err',
+      label: 'Rate limited',
+    });
     expect(sessionStatusView({ kind: 'compacting', previous: { kind: 'working' } }).label).toBe(
       'Compacting',
     );

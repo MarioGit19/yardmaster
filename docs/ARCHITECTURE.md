@@ -59,6 +59,8 @@ pnpm workspaces, TypeScript (strict, ESM), Node ≥ 22.
 
 ### Claude Code hooks
 
+The optional statusline forwarder (`yardmaster statusline install|uninstall|status`) wraps the user's statusline to send usage over the same socket, and leaves its output as it was.
+
 The installer (`yardmaster hooks install|uninstall|status`) registers command hooks in `~/.claude/settings.json`. User-level hooks apply to interactive, `claude -p` and Agent SDK sessions. It merges idempotently, recognizes its own entries by the `yardmaster-hook` command path, writes a timestamped backup first, supports `--dry-run`, never touches other hooks, and asks before writing unless `--yes` is passed.
 
 Subscribed events: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `Stop`, `StopFailure`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`, `PermissionDenied`, `TaskCreated`, `TaskCompleted`, `CwdChanged`, and in away mode `PermissionRequest`. Never `WorktreeCreate` or `WorktreeRemove`: a handler for either replaces Claude Code's own worktree handling.

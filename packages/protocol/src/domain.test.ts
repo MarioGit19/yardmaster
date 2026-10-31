@@ -156,6 +156,11 @@ describe('terminalReplyBlock', () => {
     },
   );
 
+  it('takes a reply after a usage limit: Claude is back at its prompt', () => {
+    const limited: SessionStatus = { kind: 'error', message: null, reason: 'rate_limit' };
+    expect(terminalReplyBlock(at(limited))).toBeNull();
+  });
+
   it.each([
     { kind: 'working' },
     { kind: 'tool', tool: 'Bash', toolUseId: null },

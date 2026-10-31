@@ -22,9 +22,10 @@ import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
+import { useNow } from '../anim/clock.js';
 import { ApprovalCard } from '../attention/ApprovalCard.js';
 import { type AttentionDecision, canAlwaysAllow } from '../attention/attention.js';
-import { selectApproval, useBoard, useBoardClient } from '../data/index.js';
+import { selectApproval, selectUsage, useBoard, useBoardClient } from '../data/index.js';
 import { draftKey, drafts, useDraftText } from '../drafts/drafts.js';
 import { dur, ease, move, spring, useMotionLevel } from '../motion.js';
 import { useMediaQuery } from '../prefs.js';
@@ -33,6 +34,7 @@ import { useBoardSettings } from '../settings/boardSettings.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import { ESC } from '../terminal/claudeTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
+import { formatClock } from '../time.js';
 import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { IconButton } from '../ui/IconButton.js';
@@ -72,8 +74,72 @@ const errorText = (code: string, fallback: string) =>
  * the same composer typing into its terminal (F14), or the fork bar where it can't.
  */
 export function SessionComposer({ session }: { session: ClaudeSession }) {
-  if (session.origin === 'terminal') return <TerminalSessionComposer session={session} />;
-  return <BoardComposer session={session} />;
+  const limited = session.status.kind === 'error' && session.status.reason === 'rate_limit';
+  return (
+    <>
+      {limited && <RateLimitBar session={session} />}
+      {session.origin === 'terminal' ? (
+        <TerminalSessionComposer session={session} />
+      ) : (
+        <BoardComposer session={session} />
+      )}
+    </>
+  );
+}
+
+/** What the one-tap Continue sends: the same word a user would type at the prompt. */
+export const CONTINUE_PROMPT = 'continue';
+
+/**
+ * A turn stopped on the usage limit. Claude's own word on auto-resume, when it gave one, is the
+ * message. Continue is only ever the user's tap; nothing here schedules or sends it.
+ */
+function RateLimitBar({ session }: { session: ClaudeSession }) {
+  const client = useBoardClient();
+  const { settings } = useBoardSettings();
+  const usage = useBoard(selectUsage);
+  const now = useNow(60_000);
+  const [sending, setSending] = useState(false);
+  const terminal = session.origin === 'terminal';
+  const canSend = !terminal || (session.terminalId !== null && settings?.terminalReply !== false);
+
+  const resets = [usage?.fiveHour, usage?.sevenDay]
+    .filter((window) => window != null && window.resetsAt > now && window.usedPercent >= 100)
+    .map((window) => window?.resetsAt ?? 0);
+  const message = session.status.kind === 'error' ? session.status.message : null;
+  const text = [
+    message ?? 'Usage limit reached.',
+    resets.length > 0 ? `Resets at ${formatClock(Math.max(...resets), now)}.` : '',
+  ]
+    .join(' ')
+    .trim();
+
+  const send = async () => {
+    setSending(true);
+    const result = terminal
+      ? await client.action({
+          kind: 'session.replyInTerminal',
+          sessionId: session.id,
+          text: CONTINUE_PROMPT,
+        })
+      : await client.request('session.send', { sessionId: session.id, text: CONTINUE_PROMPT });
+    setSending(false);
+    if (!result.ok) toast.error(errorText(result.error, 'Could not continue the session'));
+  };
+
+  return (
+    <DockCard
+      data-rate-limit-bar
+      text={text}
+      action={
+        canSend ? (
+          <ResumeButton busy={sending} onClick={() => void send()}>
+            Continue
+          </ResumeButton>
+        ) : null
+      }
+    />
+  );
 }
 
 function BoardComposer({ session }: { session: ClaudeSession }) {

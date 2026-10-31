@@ -21,7 +21,7 @@ export function sessionStatusView(status: SessionStatus): StatusView {
     case 'waiting_input':
       return { tone: 'wait', label: 'Waiting for input' };
     case 'error':
-      return { tone: 'err', label: 'Error' };
+      return { tone: 'err', label: status.reason === 'rate_limit' ? 'Rate limited' : 'Error' };
     case 'compacting':
       return { tone: 'work', label: 'Compacting' };
     case 'unknown':
@@ -72,6 +72,27 @@ export const toneLabel = (tone: Tone) => TONE_LABEL[tone];
 export function totalTokens(session: Pick<ClaudeSession, 'tokens'>): number {
   const { input, output, cacheRead, cacheCreation } = session.tokens;
   return input + output + cacheRead + cacheCreation;
+}
+
+/** Tokens and dollars are counted here, not billed: every figure is labelled as an estimate. */
+export const TOKEN_ESTIMATE_HINT = 'Estimate from the session transcript';
+export const COST_ESTIMATE_HINT = 'Estimated list price, from Claude Code. Not a bill.';
+
+export const tokenEstimate = (tokens: number) => `≈${formatCount(tokens)} tok`;
+
+export const formatCost = (usd: number) =>
+  `≈$${usd < 10 ? usd.toFixed(2) : Math.round(usd).toLocaleString('en-US')}`;
+
+/** Tokens and estimated cost across a project's sessions; cost is null when none reported one. */
+export function projectBurn(sessions: readonly ClaudeSession[]) {
+  let tokens = 0;
+  let costUsd: number | null = null;
+  for (const session of sessions) {
+    tokens += totalTokens(session);
+    const cost = session.meter?.costUsd;
+    if (cost != null) costUsd = (costUsd ?? 0) + cost;
+  }
+  return { tokens, costUsd };
 }
 
 const COUNT_UNITS = [

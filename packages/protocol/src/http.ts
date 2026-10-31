@@ -24,6 +24,10 @@ export const ServerStatus = z.object({
     received: z.number().int().nonnegative(),
     lastAt: Timestamp.nullable(),
   }),
+  /** Statusline deliveries from the forwarder since the server started. */
+  statusline: z
+    .object({ received: z.number().int().nonnegative(), lastAt: Timestamp.nullable() })
+    .optional(),
   /** First-run detection, remembered across restarts: has the board ever seen these? */
   setup: z.object({
     hookSeen: z.boolean(),
@@ -116,6 +120,12 @@ export const RemoteHost = z
   });
 
 /** `GET /api/settings` (authenticated): settings the server owns. */
+/** Choices for when a usage window turns to the warning colour, in percent used. */
+export const USAGE_WARN_PERCENT = [50, 70, 80, 90, 95] as const;
+export const DEFAULT_USAGE_WARN_PERCENT = 80;
+export const UsageWarnPercent = z.literal(USAGE_WARN_PERCENT);
+export type UsageWarnPercent = z.infer<typeof UsageWarnPercent>;
+
 export const BoardSettings = z.object({
   retentionDays: RetentionDays,
   /** Route `PermissionRequest` hooks from terminal sessions to the board (F13). */
@@ -139,6 +149,9 @@ export const BoardSettings = z.object({
   notifyHideDetails: z.boolean(),
   /** `notify.mutedProjects`: projects that never push. */
   notifyMutedProjects: NotifyMutedProjects,
+  /** `usage.warnFiveHour`, `usage.warnSevenDay`: where the usage chip turns to the warning colour. */
+  usageWarnFiveHour: UsageWarnPercent,
+  usageWarnSevenDay: UsageWarnPercent,
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 

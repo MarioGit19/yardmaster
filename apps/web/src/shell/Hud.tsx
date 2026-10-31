@@ -36,6 +36,7 @@ import {
   SEVERITY_RING,
   useHudCounts,
 } from './HudCounters.js';
+import { UsageChip } from './UsageChip.js';
 
 const THEME_ICON = { dark: Moon, light: Sun, system: Monitor } as const;
 const THEME_NAME: Record<ThemeSetting, string> = {
@@ -158,6 +159,7 @@ export function Hud() {
         </span>
       </div>
       <div className="flex-1" />
+      <UsageChip href={routes.settings} className="max-md:hidden" />
       <Tooltip content="Open project" shortcut={IS_MAC ? '⌘O' : 'Ctrl+O'}>
         <button
           type="button"

@@ -20,6 +20,7 @@ import {
   DEFAULT_IDLE_HIDE_MIN,
   DEFAULT_NOTIFY_EVENTS,
   DEFAULT_RETENTION_DAYS,
+  DEFAULT_USAGE_WARN_PERCENT,
   EditorCliPath,
   HooksInstallRequest,
   type HooksInstallResponse,
@@ -33,6 +34,7 @@ import {
   NotifyEvent,
   ProjectId,
   RetentionDays,
+  UsageWarnPercent,
 } from '@yardmaster/protocol';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { tildify } from './doctor.js';
@@ -55,6 +57,10 @@ export const EDITOR_CLI_KEY = 'editor.cli';
 export const NOTIFY_EVENTS_KEY = 'notify.events';
 export const NOTIFY_HIDE_DETAILS_KEY = 'notify.hideDetails';
 export const NOTIFY_MUTED_KEY = 'notify.mutedProjects';
+export const USAGE_WARN_FIVE_HOUR_KEY = 'usage.warnFiveHour';
+export const USAGE_WARN_SEVEN_DAY_KEY = 'usage.warnSevenDay';
+/** The last limits a statusline reported, so the usage chip survives a restart. */
+export const USAGE_KEY = 'usage.last';
 
 /**
  * Settings only this machine may change: they reach the disk, the editor or who may connect, or
@@ -121,6 +127,11 @@ export function fingerprint(raw: string | undefined): string {
   return createHash('sha256')
     .update(raw === undefined ? '\0missing' : `\0file${raw}`)
     .digest('base64url');
+}
+
+function usageWarn(value: unknown): UsageWarnPercent {
+  const parsed = UsageWarnPercent.safeParse(value);
+  return parsed.success ? parsed.data : DEFAULT_USAGE_WARN_PERCENT;
 }
 
 export function retentionDays(value: unknown): RetentionDays {
@@ -252,6 +263,8 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     editorCli: editorCliSetting(settings),
     remoteAllowedHosts: remoteHosts(settings),
     ...notifySettings(settings),
+    usageWarnFiveHour: usageWarn(settings[USAGE_WARN_FIVE_HOUR_KEY]),
+    usageWarnSevenDay: usageWarn(settings[USAGE_WARN_SEVEN_DAY_KEY]),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -276,6 +289,12 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
     if (patch.data.awayTimeoutSec !== undefined) save(AWAY_TIMEOUT_KEY, patch.data.awayTimeoutSec);
     if (patch.data.terminalReply !== undefined) save(TERMINAL_REPLY_KEY, patch.data.terminalReply);
+    if (patch.data.usageWarnFiveHour !== undefined) {
+      save(USAGE_WARN_FIVE_HOUR_KEY, patch.data.usageWarnFiveHour);
+    }
+    if (patch.data.usageWarnSevenDay !== undefined) {
+      save(USAGE_WARN_SEVEN_DAY_KEY, patch.data.usageWarnSevenDay);
+    }
     if (patch.data.libraryRoots !== undefined) {
       save(LIBRARY_ROOTS_KEY, [...new Set(patch.data.libraryRoots)]);
     }

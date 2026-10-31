@@ -11,9 +11,13 @@ import {
   hookStatus,
   InvalidSettingsError,
   OBSERVER_EVENTS,
+  type Plan,
   planInstall,
+  planStatuslineInstall,
+  planStatuslineUninstall,
   planUninstall,
   readSettings,
+  statuslineStatus,
   unifiedDiff,
 } from '@yardmaster/hook';
 import { DashboardLinkResponse, LOCAL_ROUTES } from '@yardmaster/protocol';
@@ -73,6 +77,9 @@ Commands:
                                Manage the Yardmaster hooks in Claude's settings.json.
                                --away also installs the away-mode permission hook
   install-hooks [--away] …     Same as hooks install
+  statusline install|uninstall|status [--dry-run] [--yes] [--settings-path <file>]
+                               Forward Claude's usage to the board. Your statusline keeps
+                               working; uninstall puts the old command back
 
 Options:
   -h, --help                   Show this help
@@ -266,6 +273,40 @@ async function token(args: string[], config: ServerConfig, io: CliIo): Promise<n
   return 0;
 }
 
+/** Shows a settings.json change, asks unless `--yes`, and writes it with a backup. */
+async function writePlan(
+  name: string,
+  plan: Plan,
+  path: string,
+  flags: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined },
+  io: CliIo,
+  done: () => string,
+): Promise<number> {
+  const shown = tildify(path, io.home);
+  const diff = unifiedDiff(plan.before ?? '', plan.after, shown, shown);
+  if (flags['dry-run']) {
+    io.stdout.write(`${diff}Dry run: nothing was written.\n`);
+    return 0;
+  }
+  if (!flags.yes) {
+    if (!io.confirm) {
+      io.stderr.write(
+        `yardmaster ${name}: no terminal to confirm on; pass --yes to edit ${shown}.\n`,
+      );
+      return 1;
+    }
+    io.stdout.write(diff);
+    if (!(await io.confirm(`Write these changes to ${shown}?`))) {
+      io.stdout.write('Nothing was written.\n');
+      return 1;
+    }
+  }
+  const backup = await applyPlan(path, plan);
+  io.stdout.write(`${done()}\n`);
+  if (backup) io.stdout.write(`Backup: ${tildify(backup, io.home)}\n`);
+  return 0;
+}
+
 const HOOK_ACTIONS = ['install', 'uninstall', 'status'] as const;
 
 async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<number> {
@@ -316,35 +357,67 @@ async function hooks(args: string[], _config: ServerConfig, io: CliIo): Promise<
       );
       return 0;
     }
-    const diff = unifiedDiff(plan.before ?? '', plan.after, shown, shown);
-    if (flags['dry-run']) {
-      io.stdout.write(`${diff}Dry run: nothing was written.\n`);
-      return 0;
-    }
-    if (!flags.yes) {
-      if (!io.confirm) {
-        io.stderr.write(
-          `yardmaster hooks: no terminal to confirm on; pass --yes to edit ${shown}.\n`,
-        );
-        return 1;
-      }
-      io.stdout.write(diff);
-      if (!(await io.confirm(`Write these changes to ${shown}?`))) {
-        io.stdout.write('Nothing was written.\n');
-        return 1;
-      }
-    }
-    const backup = await applyPlan(path, plan);
-    io.stdout.write(
+    return await writePlan('hooks', plan, path, flags, io, () =>
       install
-        ? `Installed the Yardmaster hook for ${OBSERVER_EVENTS.length} events${flags.away ? ' and the away-mode permission hook' : ''} in ${shown}.\n`
-        : `Removed the Yardmaster hooks from ${shown}.\n`,
+        ? `Installed the Yardmaster hook for ${OBSERVER_EVENTS.length} events${flags.away ? ' and the away-mode permission hook' : ''} in ${shown}.`
+        : `Removed the Yardmaster hooks from ${shown}.`,
     );
-    if (backup) io.stdout.write(`Backup: ${tildify(backup, io.home)}\n`);
-    return 0;
   } catch (err) {
     if (!(err instanceof InvalidSettingsError)) throw err;
     io.stderr.write(`yardmaster hooks: ${shown} ${err.message}. Nothing was written.\n`);
+    return 1;
+  }
+}
+
+async function statusline(args: string[], _config: ServerConfig, io: CliIo): Promise<number> {
+  const [action, ...rest] = args;
+  if (!HOOK_ACTIONS.includes(action as (typeof HOOK_ACTIONS)[number])) {
+    throw new UsageError(`expected one of ${HOOK_ACTIONS.join(', ')}`);
+  }
+  const flags = parse(rest, {
+    'dry-run': { type: 'boolean' },
+    yes: { type: 'boolean', short: 'y' },
+    'settings-path': { type: 'string' },
+  });
+  const path = resolve(flags['settings-path'] ?? claudeSettingsPath(io.env, io.home));
+  const shown = tildify(path, io.home);
+
+  try {
+    const raw = await readSettings(path);
+    if (action === 'status') {
+      const { state, previous } = statuslineStatus(raw);
+      if (state === 'missing') {
+        io.stdout.write(
+          `The statusline forwarder is not installed in ${shown} (optional: \`yardmaster statusline install\`)\n`,
+        );
+        return 0;
+      }
+      io.stdout.write(
+        `Statusline forwarder ${state} in ${shown}, ${previous === null ? 'with no statusline of your own' : 'running your statusline'}\n`,
+      );
+      if (state === 'installed') return 0;
+      io.stdout.write('Run `yardmaster statusline install` to fix this.\n');
+      return 1;
+    }
+
+    const install = action === 'install';
+    const plan = install ? planStatuslineInstall(raw) : planStatuslineUninstall(raw);
+    if (!plan.changed) {
+      io.stdout.write(
+        install
+          ? `The statusline forwarder is already installed in ${shown}. Nothing changed.\n`
+          : `No statusline forwarder found in ${shown}. Nothing changed.\n`,
+      );
+      return 0;
+    }
+    return await writePlan('statusline', plan, path, flags, io, () =>
+      install
+        ? `Installed the statusline forwarder in ${shown}. Your statusline looks the same.`
+        : `Removed the statusline forwarder from ${shown}.`,
+    );
+  } catch (err) {
+    if (!(err instanceof InvalidSettingsError)) throw err;
+    io.stderr.write(`yardmaster statusline: ${shown} ${err.message}. Nothing was written.\n`);
     return 1;
   }
 }
@@ -355,6 +428,7 @@ const COMMANDS = {
   doctor,
   token,
   hooks,
+  statusline,
   'install-hooks': (args: string[], config: ServerConfig, io: CliIo) =>
     hooks(['install', ...args], config, io),
 } as const;

@@ -11,6 +11,7 @@ export const LOCAL_ROUTES = {
   editor: '/ws/editor',
   hooks: '/api/hooks/claude',
   permission: '/api/hooks/permission',
+  statusline: '/api/hooks/statusline',
   away: '/api/away',
   dashboardLink: '/api/local/dashboard-link',
 } as const;

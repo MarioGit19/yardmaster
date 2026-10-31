@@ -31,6 +31,8 @@ import { generateToken } from './token.js';
 
 const host = '127.0.0.1:4317';
 const LIBRARY_DEFAULTS = {
+  usageWarnFiveHour: 80,
+  usageWarnSevenDay: 80,
   libraryRoots: [],
   libraryIdleHideMin: 30,
   pinnedProjects: [],
@@ -189,6 +191,15 @@ describe('settings routes', () => {
       ...LIBRARY_DEFAULTS,
     });
     expect(app.persistence.retention).toBe(30 * 24 * 60 * 60 * 1000);
+  });
+
+  it('stores the usage warnings, from the offered choices only', async () => {
+    const { token } = await boot();
+    expect((await call('PUT', '/api/settings', token, { usageWarnFiveHour: 73 })).statusCode).toBe(
+      400,
+    );
+    const res = await call('PUT', '/api/settings', token, { usageWarnSevenDay: 95 });
+    expect(res.json()).toMatchObject({ usageWarnFiveHour: 80, usageWarnSevenDay: 95 });
   });
 
   it('stores the library roots, idle window and pins, validated and deduplicated', async () => {

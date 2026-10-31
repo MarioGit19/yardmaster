@@ -12,7 +12,8 @@
     }
   },
   "bin": {
-    "yardmaster-hook": "./bin/yardmaster-hook"
+    "yardmaster-hook": "./bin/yardmaster-hook",
+    "yardmaster-statusline": "./bin/yardmaster-statusline"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

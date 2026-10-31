@@ -425,7 +425,10 @@ describe('sessionReducer fields', () => {
 
   it('follows Claude Code recovering from a usage limit', () => {
     const limited = sessionReducer(inStatus(working), event('stop-failure'));
-    expect(sessionReducer(limited, event('notification-quota-fired')).status.kind).toBe('working');
+    const resumed = sessionReducer(limited, event('notification-quota-fired'));
+    expect(resumed.status.kind).toBe('working');
+    expect(resumed.autoResumedAt).toBeTypeOf('number');
+    expect(sessionReducer(resumed, event('stop')).autoResumedAt).toBeNull();
     expect(sessionReducer(limited, event('notification-quota-stale')).status).toEqual({
       kind: 'error',
       message: 'Usage limit has reset, press enter to continue',

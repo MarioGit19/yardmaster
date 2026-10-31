@@ -35,6 +35,8 @@ beforeEach(() => {
   // The pods read the server settings (pins, the idle window).
   serverSettings = {
     retentionDays: 7,
+    usageWarnFiveHour: 80,
+    usageWarnSevenDay: 80,
     awayMode: false,
     awayTimeoutSec: 120,
     terminalReply: true,

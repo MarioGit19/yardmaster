@@ -47,6 +47,7 @@ import { pulseFilterPreference } from '../pulse/prefs.js';
 import { projectHref, routes } from '../routes.js';
 import { connectionView } from '../shell/Hud.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
+import { UsageList } from '../shell/UsageChip.js';
 import { toneLabel } from '../status.js';
 import { useProjectTone } from '../statusTokens.js';
 import { terminalTarget } from '../terminal/target.js';
@@ -401,6 +402,7 @@ export function MorePage() {
             ))}
           </div>
         </section>
+        <UsageList />
         <SettingsSection title="Appearance">
           <SettingRow title="Theme" data="theme" description="Follows the system unless set here.">
             <Segmented

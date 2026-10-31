@@ -75,7 +75,7 @@ Nothing shows all of it in one place, and nothing lets you act on it (approve, r
      PermissionDenied ──▶ working    quota_auto_resume_fired ──▶ working
 ```
 
-`StopFailure` keeps why the turn failed when it's the account's doing (`reason`: `rate_limit`, `auth`, `billing`). Subagents and background tasks keep a session Running after its turn: an `idle_prompt` doesn't move it to waiting while they run.
+`StopFailure` keeps why the turn failed when it's the account's doing (`reason`: `rate_limit`, `auth`, `billing`). A `rate_limit` session reads "Rate limited", and offers a one-tap **Continue** that the user sends; the board never sends it by itself, and Claude's own auto-resume messages replace the text. Subagents and background tasks keep a session Running after its turn: an `idle_prompt` doesn't move it to waiting while they run.
 
 The status must also degrade gracefully: if no hook has arrived for a live process, fall back to "unknown, alive". If the process is gone, mark it "ended".
 
@@ -194,6 +194,8 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - A handler installed before this (the observer script with `--permission`) gives no decision; any `yardmaster hooks install` replaces it.
 
 **Installer** (`yardmaster hooks install|uninstall|status`): merges idempotently into `~/.claude/settings.json`, identifies its own entries by the `yardmaster-hook` command path, writes a timestamped backup first, supports `--dry-run` (prints a diff), and never touches other hooks. It always asks for confirmation unless `--yes` is passed.
+
+**Statusline forwarder** (`yardmaster statusline install|uninstall|status`, optional): Claude Code gives its statusline command JSON that hooks don't, the account's `rate_limits` above all. The installer sets `statusLine` to `yardmaster-statusline`, with the user's previous command as its argument, so `settings.json` itself holds what `uninstall` restores; it writes a backup and takes `--dry-run`. The script posts its stdin to `POST /api/hooks/statusline` over the local socket in the background (1 s limit), runs the previous command on the same stdin in bash, and passes on its stdout and exit status. Without a socket it posts nothing, so the statusline is never slower for it. The board reads `rate_limits.five_hour` and `seven_day`, `cost`, `context_window` and `worktree`; `rate_limits` is absent for API keys and some team plans, and before a session's first reply. The last limits are kept in `board.db`.
 
 ### 6.2 Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, verified against 0.3.308 typings)
 

@@ -10,7 +10,13 @@ import { dur, ease } from '../motion.js';
 import { sessionCaption } from '../pod/model.js';
 import { usePreference } from '../prefs.js';
 import { sessionHref } from '../routes.js';
-import { formatCount, totalTokens } from '../status.js';
+import {
+  COST_ESTIMATE_HINT,
+  formatCost,
+  TOKEN_ESTIMATE_HINT,
+  tokenEstimate,
+  totalTokens,
+} from '../status.js';
 import { Chip } from '../ui/Chip.js';
 import { cx } from '../ui/cx.js';
 import { Skeleton } from '../ui/Skeleton.js';
@@ -120,9 +126,22 @@ export function ClaudePanel({
                 </Chip>
               </span>
             )}
-            <span data-head-tokens className="tabular shrink-0 font-mono text-meta text-text-2">
-              {formatCount(totalTokens(session))} tok
+            <span
+              data-head-tokens
+              title={TOKEN_ESTIMATE_HINT}
+              className="tabular shrink-0 font-mono text-meta text-text-2"
+            >
+              {tokenEstimate(totalTokens(session))}
             </span>
+            {session.meter?.costUsd != null && (
+              <span
+                data-head-cost
+                title={COST_ESTIMATE_HINT}
+                className="tabular shrink-0 font-mono text-meta text-text-2"
+              >
+                {formatCost(session.meter.costUsd)}
+              </span>
+            )}
             <VerbosityToggle />
           </header>
         )}

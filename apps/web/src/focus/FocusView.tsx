@@ -39,7 +39,15 @@ import { useMediaQuery, usePreference } from '../prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
-import { formatCount, sessionStatusView, totalTokens } from '../status.js';
+import {
+  COST_ESTIMATE_HINT,
+  formatCost,
+  projectBurn,
+  sessionStatusView,
+  TOKEN_ESTIMATE_HINT,
+  tokenEstimate,
+  totalTokens,
+} from '../status.js';
 import { useMarkProjectSeen, useSessionView } from '../statusTokens.js';
 import { useNewTerminalRequest } from '../terminal/newTerminal.js';
 import { TerminalStack } from '../terminal/TerminalStack.js';
@@ -616,6 +624,7 @@ function SessionsColumn({
         >
           Sessions
         </ColumnHeading>
+        <ProjectBurn sessions={sessions} />
         {ordered.length === 0 ? (
           <p className="text-body-sm text-text-2">No Claude sessions</p>
         ) : (
@@ -828,8 +837,11 @@ function SessionLink({
             />
             {/* An interrupted session's Resume button sits here, outside the link. */}
             {!interrupted && (
-              <span className="tabular shrink-0 font-mono text-meta text-text-2">
-                {formatCount(totalTokens(session))} tok
+              <span
+                title={TOKEN_ESTIMATE_HINT}
+                className="tabular shrink-0 font-mono text-meta text-text-2"
+              >
+                {tokenEstimate(totalTokens(session))}
               </span>
             )}
           </span>
@@ -900,5 +912,20 @@ function FocusSkeleton() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** The project's burn so far, both figures labelled as the estimates they are. */
+function ProjectBurn({ sessions }: { sessions: readonly ClaudeSession[] }) {
+  const { tokens, costUsd } = projectBurn(sessions);
+  if (tokens === 0) return null;
+  return (
+    <p data-project-burn className="tabular mb-2 font-mono text-meta text-text-2">
+      <span title={TOKEN_ESTIMATE_HINT}>{tokenEstimate(tokens)}</span>
+      {costUsd !== null && (
+        <span title={COST_ESTIMATE_HINT}> · {formatCost(costUsd)} list price</span>
+      )}
+      <span className="font-sans text-text-3"> (estimate)</span>
+    </p>
   );
 }

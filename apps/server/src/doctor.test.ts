@@ -1,3 +1,4 @@
+import { statuslineCommand } from '@yardmaster/hook';
 import { describe, expect, it } from 'vitest';
 import type { ServerConfig } from './config.js';
 import {
@@ -127,6 +128,7 @@ describe('runDoctor', () => {
       'data',
       'channel',
       'hooks',
+      'statusline',
       'extensions',
       'editor-cli',
       'pty',
@@ -302,6 +304,27 @@ describe('runDoctor', () => {
       const checks = await runDoctor(config, fakeDeps({ files }), NOW);
       expect(byId(checks, 'hooks')).toMatchObject({ level: 'warn' });
       expect(byId(checks, 'hooks').message).toContain('not installed');
+    });
+
+    it('reports the statusline forwarder, which is optional', async () => {
+      const settings = (statusLine?: unknown) => ({
+        ...tokenFile,
+        '/home/dev/.claude/settings.json': { text: JSON.stringify({ statusLine }) },
+      });
+      const check = async (statusLine?: unknown) =>
+        byId(await runDoctor(config, fakeDeps({ files: settings(statusLine) }), NOW), 'statusline');
+
+      expect(await check()).toMatchObject({ level: 'skip' });
+      expect(await check({ type: 'command', command: 'ccstatus' })).toMatchObject({
+        level: 'skip',
+      });
+      expect(await check({ type: 'static' })).toMatchObject({ level: 'skip' });
+      expect(
+        await check({ type: 'command', command: statuslineCommand('ccstatus') }),
+      ).toMatchObject({ level: 'ok', message: expect.stringContaining('runs your statusline') });
+      expect(
+        await check({ type: 'command', command: '/old/place/yardmaster-statusline ccstatus' }),
+      ).toMatchObject({ level: 'warn' });
     });
 
     it('warns about invalid JSON', async () => {

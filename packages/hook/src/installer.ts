@@ -51,7 +51,7 @@ export function claudeSettingsPath(env: NodeJS.ProcessEnv, home: string): string
   return join(dir ? dir : join(home, '.claude'), 'settings.json');
 }
 
-function shellQuote(word: string): string {
+export function shellQuote(word: string): string {
   return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
 }
 
@@ -162,7 +162,7 @@ function serialize(settings: Json): string {
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
-function plan(raw: string | undefined, settings: Json, changed: boolean): Plan {
+export function settingsPlan(raw: string | undefined, settings: Json, changed: boolean): Plan {
   return { before: raw, after: changed ? serialize(settings) : (raw ?? ''), changed };
 }
 
@@ -195,14 +195,14 @@ export function planInstall(
     hooks[event] = [...stripOurs(groups), desiredGroup(event, wanted)];
     changed = true;
   }
-  return plan(raw, changed ? { ...settings, hooks } : settings, changed);
+  return settingsPlan(raw, changed ? { ...settings, hooks } : settings, changed);
 }
 
 /** Removes every Yardmaster handler, including an away-mode `PermissionRequest` one. */
 export function planUninstall(raw: string | undefined): Plan {
   const settings = parseSettings(raw);
   const current = settings.hooks as HookMap | undefined;
-  if (current === undefined) return plan(raw, settings, false);
+  if (current === undefined) return settingsPlan(raw, settings, false);
   const hooks: HookMap = {};
   let changed = false;
   for (const [event, groups] of Object.entries(current)) {
@@ -214,10 +214,10 @@ export function planUninstall(raw: string | undefined): Plan {
     const rest = stripOurs(groups);
     if (rest.length > 0) hooks[event] = rest;
   }
-  if (!changed) return plan(raw, settings, false);
+  if (!changed) return settingsPlan(raw, settings, false);
   const next: Json = { ...settings, hooks };
   if (Object.keys(hooks).length === 0) delete next.hooks;
-  return plan(raw, next, true);
+  return settingsPlan(raw, next, true);
 }
 
 export interface HookStatus {

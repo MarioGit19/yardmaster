@@ -20,6 +20,14 @@ export function formatWhen(ts: number, now: number): string {
   });
 }
 
+/** A time on the clock: `3:10 PM` today, `Fri 9:00 AM` on another day. */
+export function formatClock(ts: number, now: number): string {
+  const date = new Date(ts);
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === new Date(now).toDateString()) return time;
+  return `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}`;
+}
+
 /** The full local date and time, for a tooltip. */
 export const formatDateTime = (ts: number) =>
   new Date(ts).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });

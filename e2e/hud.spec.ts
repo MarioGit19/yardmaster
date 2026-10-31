@@ -139,3 +139,26 @@ test('killing the server shows the disconnected state', async ({ browser }) => {
     await board.stop();
   }
 });
+
+test('the usage chip shows both limits and warns at the threshold set in Settings', async ({
+  page,
+}) => {
+  await openRoute(page, '/settings');
+  const chip = page.locator('[data-hud="usage"]');
+  await expect(chip.locator('[data-usage="fiveHour"]')).toContainText('5h');
+  await expect(chip.locator('[data-usage="sevenDay"]')).toContainText('18%');
+  await expect(chip).toHaveAttribute('aria-label', /5-hour \d+% used, resets at .*as of /);
+  await expect(chip.locator('[data-usage="fiveHour"]')).not.toHaveAttribute('data-warn', 'true');
+
+  await page
+    .locator('[data-setting="usageWarnFiveHour"]')
+    .getByRole('button', { name: '50%' })
+    .click();
+  await expect(chip.locator('[data-usage="fiveHour"]')).toHaveAttribute('data-warn', 'true');
+});
+
+test('the Settings row explains the chip, and it links there', async ({ page }) => {
+  await openRoute(page, '/');
+  await page.locator('[data-hud="usage"]').click();
+  await expect(page.locator('[data-setting="usageWarnSevenDay"]')).toBeVisible();
+});

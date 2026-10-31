@@ -1,4 +1,5 @@
 import {
+  type AccountUsage,
   type Approval,
   type ApprovalState,
   type BoardState,
@@ -49,7 +50,7 @@ export interface ExecStartInput {
 
 export type SessionInput = Pick<ClaudeSession, 'id'> & Partial<Omit<ClaudeSession, 'id'>>;
 
-type Collections = keyof BoardState;
+type Collections = Exclude<keyof BoardState, 'usage'>;
 
 /**
  * In-memory board state. Every mutation goes through the typed mutators
@@ -253,6 +254,12 @@ export class BoardStore {
     if (execution && !execution.interactive) {
       this.set(['executions', execId, 'interactive'], true);
     }
+  }
+
+  // Account usage
+
+  setUsage(usage: AccountUsage | null): void {
+    this.set(['usage'], usage);
   }
 
   // Claude sessions

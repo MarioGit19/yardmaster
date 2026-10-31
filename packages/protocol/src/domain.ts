@@ -297,6 +297,40 @@ export const TokenUsage = z.object({
 });
 export type TokenUsage = z.infer<typeof TokenUsage>;
 
+/** A git worktree session, as its statusline reports it. */
+export const SessionWorktree = z.object({
+  name: z.string(),
+  path: z.string(),
+  branch: z.string().nullable(),
+  originalCwd: z.string().nullable(),
+  originalBranch: z.string().nullable(),
+});
+export type SessionWorktree = z.infer<typeof SessionWorktree>;
+
+/** What the statusline forwarder last said about a session. Not persisted. */
+export const SessionMeter = z.object({
+  /** Claude Code's own estimate at list price, not a bill. */
+  costUsd: z.number().nonnegative().nullable(),
+  contextPercent: z.number().nullable(),
+  contextSize: z.number().nullable(),
+  worktree: SessionWorktree.nullable(),
+});
+export type SessionMeter = z.infer<typeof SessionMeter>;
+
+export const UsageWindow = z.object({
+  usedPercent: z.number().nonnegative(),
+  resetsAt: Timestamp,
+});
+export type UsageWindow = z.infer<typeof UsageWindow>;
+
+/** The account's 5-hour and 7-day limits. Updates only while a session runs, so it carries `at`. */
+export const AccountUsage = z.object({
+  fiveHour: UsageWindow.nullable(),
+  sevenDay: UsageWindow.nullable(),
+  at: Timestamp,
+});
+export type AccountUsage = z.infer<typeof AccountUsage>;
+
 export const TodoItem = z.object({
   content: z.string(),
   status: z.enum(['pending', 'in_progress', 'completed']),
@@ -367,6 +401,9 @@ export const ClaudeSession = z.object({
   permissionMode: PermissionMode.nullable(),
   tokens: TokenUsage,
   contextTokens: z.number().int().nonnegative().nullable(),
+  meter: SessionMeter.optional(),
+  /** Claude resumed this session itself after a usage limit; cleared when that turn ends. */
+  autoResumedAt: Timestamp.nullable().optional(),
   currentTool: ToolActivity.nullable(),
   todos: z.array(TodoItem),
   subagents: z.array(Subagent),
@@ -396,7 +433,9 @@ export function terminalReplyBlock(
   if (session.origin !== 'terminal') return 'not_terminal_session';
   if (session.terminalId === null) return 'no_linked_terminal';
   const { kind } = session.status;
-  return kind === 'idle' || kind === 'waiting_input' ? null : 'session_busy';
+  if (kind === 'idle' || kind === 'waiting_input') return null;
+  // A turn stopped by the usage limit leaves Claude at its prompt.
+  return kind === 'error' && session.status.reason === 'rate_limit' ? null : 'session_busy';
 }
 
 export const ApprovalSource = z.enum(['sdk', 'hook']);
@@ -502,6 +541,8 @@ export const BoardState = z.object({
   sessions: keyedBy(ClaudeSession),
   approvals: keyedBy(Approval),
   ports: keyedBy(PortBinding),
+  /** Null until a statusline reports limits; API-key and some team setups never do. */
+  usage: AccountUsage.nullable().optional(),
 });
 export type BoardState = z.infer<typeof BoardState>;
 
@@ -514,5 +555,6 @@ export function emptyBoardState(): BoardState {
     sessions: {},
     approvals: {},
     ports: {},
+    usage: null,
   };
 }

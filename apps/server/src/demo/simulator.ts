@@ -71,6 +71,10 @@ export const DEMO_APPROVAL_TIMEOUT_MS = 120_000;
 const CRASH_CHANCE = 0.012;
 /** What a crashed dev server exits with. */
 const CRASH_EXIT_CODE = 1;
+/** Percent used at boot. The chip stays under the default warning of 80%. */
+const DEMO_USAGE = { fiveHour: 64, sevenDay: 18, ceiling: 78 } as const;
+const HOUR_MS = 3_600_000;
+
 /** The `staysDown` dev server crashes on this tick (a few seconds after it boots). */
 const STAYS_DOWN_AFTER_TICKS = 2;
 /** A quiet terminal's newest history is at least this old, past the board's idle threshold. */
@@ -268,6 +272,7 @@ export class DemoSimulator {
     if (this.running) return;
     this.running = true;
     this.seedBoard();
+    this.seedUsage();
     for (const terminal of this.terminals) {
       this.backfillTerminal(terminal);
       this.bootTerminal(terminal);
@@ -1456,14 +1461,56 @@ export class DemoSimulator {
     const input = Math.round(rawInput * this.pace.tokenScale);
     const output = Math.round(rawOutput * this.pace.tokenScale);
     const cacheRead = input > 0 ? input * this.rng.int(3, 8) : 0;
+    const tokens = {
+      input: current.tokens.input + input,
+      output: current.tokens.output + output,
+      cacheRead: current.tokens.cacheRead + cacheRead,
+      cacheCreation: current.tokens.cacheCreation + Math.round(input / 4),
+    };
     this.store.updateSession(session.id, {
-      tokens: {
-        input: current.tokens.input + input,
-        output: current.tokens.output + output,
-        cacheRead: current.tokens.cacheRead + cacheRead,
-        cacheCreation: current.tokens.cacheCreation + Math.round(input / 4),
-      },
+      tokens,
       contextTokens: (current.contextTokens ?? 0) + input + output,
+    });
+    this.meterTurn(session.id, tokens);
+  }
+
+  private seedUsage(): void {
+    const ts = this.now();
+    this.store.setUsage({
+      fiveHour: { usedPercent: DEMO_USAGE.fiveHour, resetsAt: ts + 2 * HOUR_MS + 10 * 60_000 },
+      sevenDay: { usedPercent: DEMO_USAGE.sevenDay, resetsAt: ts + 4 * 24 * HOUR_MS },
+      at: ts,
+    });
+  }
+
+  /** A little more of the limit goes with each turn, and the reading is that recent. */
+  private meterTurn(sessionId: string, tokens: ClaudeSession['tokens']): void {
+    const usage = this.store.state.usage;
+    if (usage) {
+      const { fiveHour } = usage;
+      const usedPercent = Math.min((fiveHour?.usedPercent ?? 0) + 0.02, DEMO_USAGE.ceiling);
+      this.store.setUsage({
+        ...usage,
+        fiveHour: fiveHour && { ...fiveHour, usedPercent },
+        at: this.now(),
+      });
+    }
+    const costUsd =
+      Math.round(
+        (tokens.input * 3 +
+          tokens.output * 15 +
+          tokens.cacheRead * 0.3 +
+          tokens.cacheCreation * 3.75) /
+          10_000,
+      ) / 100;
+    const contextTokens = this.store.state.sessions[sessionId]?.contextTokens ?? 0;
+    this.store.updateSession(sessionId, {
+      meter: {
+        costUsd,
+        contextPercent: Math.min(100, Math.round(contextTokens / 2_000)),
+        contextSize: 200_000,
+        worktree: null,
+      },
     });
   }
 

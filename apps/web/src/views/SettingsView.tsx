@@ -1,4 +1,5 @@
 import {
+  DEFAULT_USAGE_WARN_PERCENT,
   EditorCliPath,
   IDLE_HIDE_MIN,
   type IdleHideMin,
@@ -7,6 +8,8 @@ import {
   type LibraryRootStatus,
   RETENTION_DAYS,
   type RetentionDays,
+  USAGE_WARN_PERCENT,
+  type UsageWarnPercent,
 } from '@yardmaster/protocol';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -16,7 +19,7 @@ import { AMBIENT_STYLE_LABEL, AMBIENT_STYLES, ambientStylePreference } from '../
 import { setSessionSecret } from '../auth/session.js';
 import { Wordmark } from '../brand/Logo.js';
 import { TAGLINE } from '../brand/name.js';
-import { selectWindows, useBoardList } from '../data/index.js';
+import { selectUsage, selectWindows, useBoard, useBoardList } from '../data/index.js';
 import { LAYOUT_NAME, LAYOUTS, layoutPreference } from '../layouts/registry.js';
 import { MOTION_SETTINGS, type MotionSetting, motionPreference } from '../motion.js';
 import { hooksInstalled } from '../onboarding/model.js';
@@ -182,6 +185,7 @@ export function SettingsView() {
 
         <SettingsSection title="Claude">
           <TerminalReplyRow server={server} />
+          <UsageWarnRows server={server} />
         </SettingsSection>
 
         <SettingsSection title="Connections">
@@ -419,6 +423,47 @@ function TerminalReplyRow({ server: { settings, update } }: { server: ServerSett
         disabled={settings === null}
       />
     </SettingRow>
+  );
+}
+
+const USAGE_WARN_OPTIONS = USAGE_WARN_PERCENT.map(String);
+const USAGE_WARN_LABELS = Object.fromEntries(USAGE_WARN_OPTIONS.map((p) => [p, `${p}%`]));
+
+/** Where the usage chip warns, and how to get the chip when there's nothing to show. */
+function UsageWarnRows({ server: { settings, update } }: { server: ServerSettings }) {
+  const reported = useBoard(selectUsage) != null;
+  const row = (
+    key: 'usageWarnFiveHour' | 'usageWarnSevenDay',
+    title: string,
+    description: string,
+  ) => (
+    <SettingRow title={title} description={description} data={key}>
+      <Segmented
+        label={title}
+        options={USAGE_WARN_OPTIONS}
+        labels={USAGE_WARN_LABELS}
+        value={String(settings?.[key] ?? DEFAULT_USAGE_WARN_PERCENT)}
+        onChange={(value) =>
+          void update(
+            { [key]: Number(value) as UsageWarnPercent },
+            'Could not save the usage warning',
+          )
+        }
+        disabled={settings === null}
+      />
+    </SettingRow>
+  );
+  return (
+    <>
+      {row(
+        'usageWarnFiveHour',
+        '5-hour usage warning',
+        reported
+          ? 'The usage chip in the top bar turns amber at this much of your 5-hour limit.'
+          : 'The usage chip stays hidden until Claude Code reports your limits. Run yardmaster statusline install, then get a reply from Claude. API-key and some team setups never report them.',
+      )}
+      {row('usageWarnSevenDay', '7-day usage warning', 'The same for your 7-day limit.')}
+    </>
   );
 }
 

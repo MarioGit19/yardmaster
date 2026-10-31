@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import websocket from '@fastify/websocket';
 import {
+  AccountUsage,
   type ActivityEvent,
   type ApprovalDecision,
   type DashboardLinkResponse,
@@ -26,6 +27,7 @@ import { FolderTrust, TRUSTED_FOLDERS_KEY } from './claude/folder-trust.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
+import { registerStatuslineRoute } from './claude/statusline-ingest.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { secureDataDir } from './data-dir.js';
@@ -109,6 +111,7 @@ import {
   retentionMs,
   rotateTokenFile,
   terminalReplyEnabled,
+  USAGE_KEY,
 } from './settings-routes.js';
 import { registerStatic } from './static.js';
 import { BoardStore } from './store.js';
@@ -595,6 +598,19 @@ export async function buildServer(
   app.decorate('hookIngest', hookIngest);
   app.decorate('localChannel', new LocalChannel(app, logger.child({ component: 'socket' })));
   registerHookRoute(app, hookIngest);
+  const statuslineStats: HookStats = { received: 0, lastAt: null };
+  const savedUsage = AccountUsage.safeParse(settings[USAGE_KEY]);
+  if (demo === null && savedUsage.success) store.setUsage(savedUsage.data);
+  registerStatuslineRoute(app, {
+    store,
+    logger: logger.child({ component: 'statusline' }),
+    apply: demo === null,
+    onUsage: (usage) => persistence.setSetting(USAGE_KEY, usage),
+    onReceived: (ts) => {
+      statuslineStats.received += 1;
+      statuslineStats.lastAt = ts;
+    },
+  });
   const awayApprovals: AwayApprovals = new AwayApprovals({
     store,
     ingest: hookIngest,
@@ -629,6 +645,7 @@ export async function buildServer(
       uptimeMs: Date.now() - startedAt,
       editors,
       hooks: { ...app.hookStats },
+      statusline: { ...statuslineStats },
       setup: { hookSeen: seen(HOOK_SEEN_KEY), editorSeen: seen(EDITOR_SEEN_KEY) },
       watched: options.watched ?? false,
       boardSessions: runner.liveCount,

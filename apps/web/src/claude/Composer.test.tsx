@@ -168,6 +168,43 @@ describe('session dock', () => {
     });
   });
 
+  describe('a turn stopped by the usage limit', () => {
+    const limited = {
+      kind: 'error',
+      message: 'Automatic continue stopped',
+      reason: 'rate_limit',
+    } as const;
+
+    it('offers Continue for a terminal session, and only sends on the tap', async () => {
+      action.mockResolvedValue({ ok: true });
+      renderSession({ ...makeSession('s-4', PROJECT, limited), terminalId: 't-1' });
+      expect(container.querySelector('[data-rate-limit-bar]')?.textContent).toContain(
+        'Automatic continue stopped',
+      );
+      expect(action).not.toHaveBeenCalled();
+      await act(async () => button('Continue').click());
+      expect(action).toHaveBeenCalledWith({
+        kind: 'session.replyInTerminal',
+        sessionId: 's-4',
+        text: 'continue',
+      });
+    });
+
+    it('has nothing to tap when the board cannot reach the terminal', () => {
+      renderSession(makeSession('s-5', PROJECT, limited));
+      expect(container.querySelector('[data-rate-limit-bar]')).not.toBeNull();
+      expect(() => button('Continue')).toThrow();
+    });
+
+    it('stays out of the way of other failures', () => {
+      renderSession({
+        ...makeSession('s-6', PROJECT, { kind: 'error', message: 'Bad gateway' }),
+        terminalId: 't-1',
+      });
+      expect(container.querySelector('[data-rate-limit-bar]')).toBeNull();
+    });
+  });
+
   it('forks a session still running in a terminal the board cannot type into', () => {
     renderSession(makeSession('s-3', PROJECT, { kind: 'idle' }));
     expect(container.querySelector('[data-fork-bar]')?.textContent).toContain(

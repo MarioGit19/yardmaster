@@ -4,7 +4,12 @@ import { access, lstat, readFile, stat } from 'node:fs/promises';
 import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
-import { claudeSettingsPath, isHookCommand } from '@yardmaster/hook';
+import {
+  claudeSettingsPath,
+  InvalidSettingsError,
+  isHookCommand,
+  statuslineStatus,
+} from '@yardmaster/hook';
 import { HealthResponse, LOCAL_SOCKET_FILE, ServerStatus } from '@yardmaster/protocol';
 import type { ServerConfig } from './config.js';
 import { DB_FILE } from './data-dir.js';
@@ -23,6 +28,7 @@ export interface DoctorCheck {
     | 'data'
     | 'channel'
     | 'hooks'
+    | 'statusline'
     | 'extensions'
     | 'editor-cli'
     | 'pty'
@@ -477,6 +483,47 @@ async function checkHooks(
   };
 }
 
+/** The optional usage forwarder: not installing it only hides the usage chip. */
+async function checkStatusline(
+  deps: DoctorDeps,
+  status: ServerStatus | undefined,
+  now: number,
+): Promise<DoctorCheck> {
+  const base = { id: 'statusline', label: 'Statusline' } as const;
+  let installed: ReturnType<typeof statuslineStatus>;
+  try {
+    installed = statuslineStatus(await deps.readText(claudeSettingsPath(deps.env, deps.home)));
+  } catch (err) {
+    if (!(err instanceof InvalidSettingsError)) throw err;
+    return { ...base, level: 'skip', message: `not checked: settings ${err.message}` };
+  }
+  if (installed.state === 'missing') {
+    return {
+      ...base,
+      level: 'skip',
+      message: 'forwarder not installed (optional)',
+      hint: 'Run `yardmaster statusline install` for the usage chip. Your statusline stays as it is.',
+    };
+  }
+  if (installed.state === 'outdated') {
+    return {
+      ...base,
+      level: 'warn',
+      message: 'the forwarder points at another Yardmaster install',
+      hint: 'Run `yardmaster statusline install` to update it.',
+    };
+  }
+  const wrapped =
+    installed.previous === null ? 'no statusline of your own' : 'runs your statusline';
+  const last = status?.statusline?.lastAt;
+  const heard = !status
+    ? ''
+    : last == null
+      ? '; nothing received yet'
+      : `; last ${ago(now - last)}`;
+  return { ...base, level: 'ok', message: `forwarder installed, ${wrapped}${heard}` };
+}
+
 function checkExtensions(
   probe: ServerProbe,
   status: ServerStatus | 'unauthorized' | undefined,
@@ -607,9 +654,10 @@ export async function runDoctor(
   const status =
     probe.state === 'board' ? await fetchStatus(config, deps, tokenResult.token) : undefined;
   const liveStatus = typeof status === 'object' ? status : undefined;
-  const [channel, hooks, editorCli, pty, claude] = await Promise.all([
+  const [channel, hooks, statusline, editorCli, pty, claude] = await Promise.all([
     checkChannel(config, deps, probe),
     checkHooks(deps, liveStatus, now),
+    checkStatusline(deps, liveStatus, now),
     checkEditorCli(deps, liveStatus),
     checkPty(deps, liveStatus),
     checkClaude(deps),
@@ -621,6 +669,7 @@ export async function runDoctor(
     data,
     channel,
     hooks,
+    statusline,
     checkExtensions(probe, status),
     editorCli,
     pty,

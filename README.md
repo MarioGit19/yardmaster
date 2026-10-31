@@ -107,6 +107,8 @@ It prints a one-time sign-in link (single use, valid for 5 minutes); open it in 
 pnpm yardmaster hooks install
 ```
 
+Optional: `pnpm yardmaster statusline install` puts your 5-hour and 7-day Claude usage in the top bar. Your statusline keeps working exactly as before, and `uninstall` puts the old command back.
+
 **3. Install the editor extension**, then reload every Cursor window:
 
 ```bash

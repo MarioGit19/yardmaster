@@ -81,9 +81,11 @@ describe('DemoSimulator', () => {
     expect(Object.values(state.projects).map((p) => p.name)).toEqual(
       DEMO_PROJECTS.map((p) => p.name),
     );
-    for (const collection of Object.keys(state) as (keyof BoardState)[]) {
-      expect(Object.keys(state[collection]).length, collection).toBeGreaterThan(0);
+    const { usage, ...collections } = state;
+    for (const [collection, entries] of Object.entries(collections)) {
+      expect(Object.keys(entries).length, collection).toBeGreaterThan(0);
     }
+    expect(usage?.fiveHour?.usedPercent).toBeGreaterThan(0);
 
     for (const project of Object.values(state.projects)) {
       expect(project.path.startsWith('/home/dev/')).toBe(true);
