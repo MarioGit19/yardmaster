@@ -2,12 +2,14 @@ import type { Approval, ClaudeSession } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import { makeSession } from '../test/board.js';
 import {
+  endedSessions,
   isStreaming,
   lastLine,
   podSessions,
   risingPods,
   sessionCaption,
   sessionWhen,
+  stationSessions,
 } from './model.js';
 
 const session = (status: ClaudeSession['status'], over: Partial<ClaudeSession> = {}) => ({
@@ -36,6 +38,43 @@ describe('podSessions', () => {
       { ...makeSession('wait', 'p', { kind: 'waiting_input' }), startedAt: 0 },
     ];
     expect(podSessions(list).map((s) => s.id)).toEqual(['wait', 'work-new', 'work-old', 'idle']);
+  });
+});
+
+describe('session order', () => {
+  const at = (id: string, status: ClaudeSession['status'], updatedAt: number, startedAt = 0) => ({
+    ...makeSession(id, 'p', status),
+    updatedAt,
+    startedAt,
+  });
+
+  it('sorts by most recent activity inside an urgency', () => {
+    const list = [
+      at('idle-old', { kind: 'idle' }, 1, 9),
+      at('idle-new', { kind: 'idle' }, 5, 1),
+      at('wait', { kind: 'waiting_input' }, 0),
+    ];
+    expect(podSessions(list).map((s) => s.id)).toEqual(['wait', 'idle-new', 'idle-old']);
+  });
+
+  it('keeps running sessions in place as their tools tick', () => {
+    const list = [at('first', { kind: 'working' }, 1, 2), at('second', { kind: 'working' }, 9, 1)];
+    expect(podSessions(list).map((s) => s.id)).toEqual(['first', 'second']);
+  });
+
+  it('keeps a scene seat whatever the activity', () => {
+    const list = [at('a', { kind: 'idle' }, 1, 2), at('b', { kind: 'idle' }, 9, 1)];
+    expect(stationSessions(list).map((s) => s.id)).toEqual(['a', 'b']);
+  });
+
+  it('lists finished sessions newest first, without the archived ones', () => {
+    const ended = { kind: 'ended' } as const;
+    const list = [
+      at('old', ended, 1),
+      at('new', ended, 5),
+      { ...at('gone', ended, 9), endedAt: 9, archivedAt: 10 },
+    ];
+    expect(endedSessions(list).map((s) => s.id)).toEqual(['new', 'old']);
   });
 });
 

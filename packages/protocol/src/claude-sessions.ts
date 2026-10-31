@@ -33,6 +33,8 @@ export const SessionHistoryEntry = z.object({
   fileSize: z.number().int().nonnegative().nullable(),
   /** Known only for sessions the board has seen live; the SDK listing carries no usage. */
   tokens: TokenUsage.nullable().default(null),
+  /** Taken off the board's lists; listed here so it can be found and put back. */
+  archived: z.boolean().optional(),
 });
 export type SessionHistoryEntry = z.infer<typeof SessionHistoryEntry>;
 

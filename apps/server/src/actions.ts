@@ -37,6 +37,8 @@ export function stubActionHandlers(): ActionHandlers {
     'session.resumeInEditor': notImplemented,
     'session.interrupt': notImplemented,
     'session.close': notImplemented,
+    'session.rename': notImplemented,
+    'session.archive': notImplemented,
     'session.setModel': notImplemented,
     'session.setPermissionMode': notImplemented,
     'session.replyInTerminal': notImplemented,

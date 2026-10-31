@@ -124,6 +124,8 @@ const uiToServer: UiToServer[] = [
   env('action', { kind: 'session.resumeInEditor', projectId: 'p1', sessionId: 'sess-1' }),
   env('action', { kind: 'session.interrupt', sessionId: 'sess-1' }),
   env('action', { kind: 'session.close', sessionId: 'sess-1' }),
+  env('action', { kind: 'session.rename', sessionId: 'sess-1', title: 'Cart fix' }),
+  env('action', { kind: 'session.archive', sessionId: 'sess-1', archived: true }),
   env('action', { kind: 'session.setModel', sessionId: 'sess-1', model: 'claude-sonnet-5-5' }),
   env('action', { kind: 'session.setPermissionMode', sessionId: 'sess-1', permissionMode: 'plan' }),
   env('action', { kind: 'session.replyInTerminal', sessionId: 'sess-1', text: 'yes, go ahead' }),

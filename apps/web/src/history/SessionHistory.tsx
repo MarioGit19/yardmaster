@@ -2,6 +2,7 @@ import type { SessionHistoryEntry, UiAction } from '@yardmaster/protocol';
 import { GitBranch, Play, SquareTerminal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { UnarchiveButton } from '../claude/SessionTools.js';
 import { useBoard, useBoardClient } from '../data/index.js';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
 import { formatCount } from '../status.js';
@@ -169,6 +170,14 @@ function HistoryRow({
           >
             {formatWhen(entry.updatedAt, now)}
           </time>
+          {entry.archived && (
+            <>
+              <span aria-hidden>·</span>
+              <span data-history-archived className="shrink-0">
+                Archived
+              </span>
+            </>
+          )}
           {tokens !== null && (
             <>
               <span aria-hidden>·</span>
@@ -204,9 +213,11 @@ function HistoryRow({
             <SquareTerminal aria-hidden className="size-3.5" strokeWidth={1.5} />
             Resume in {editor ?? 'Cursor'}
           </button>
+          {entry.archived && <UnarchiveButton sessionId={entry.id} labelled />}
         </div>
       ) : (
         <div className="history-actions flex shrink-0 items-center">
+          {entry.archived && <UnarchiveButton sessionId={entry.id} />}
           <IconButton
             size="sm"
             label="Resume in board"

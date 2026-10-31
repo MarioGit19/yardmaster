@@ -23,7 +23,13 @@ import { isCrashExit, terminalSession } from '../data/selectors.js';
 import type { BoardStoreState } from '../data/store.js';
 import { laneExecution, laneView, shownCommand, terminalDisplay } from '../lanes/lane.js';
 import { isDimmed } from '../pod/activity.js';
-import { type Caption, lastLine, podSessions, sessionCaption, staleCaption } from '../pod/model.js';
+import {
+  type Caption,
+  lastLine,
+  sessionCaption,
+  staleCaption,
+  stationSessions,
+} from '../pod/model.js';
 import { sessionHref, terminalHref } from '../routes.js';
 import type { Tone } from '../status.js';
 import {
@@ -332,7 +338,7 @@ function projectActors(
   // Terminals running Claude Code are drawn as their session.
   const claudeTerminals = new Set<string>();
 
-  for (const session of podSessions(group.sessions)) {
+  for (const session of stationSessions(group.sessions)) {
     if (session.terminalId && session.origin === 'terminal')
       claudeTerminals.add(session.terminalId);
     const approvalId =
@@ -528,7 +534,7 @@ function sceneProject(
   status: StatusContext,
 ): SceneProject {
   const tone = projectStatusTone(group.sessions, group.terminals, status);
-  const live = podSessions(group.sessions);
+  const live = stationSessions(group.sessions);
   const main = live.find((s) => s.todos.length > 0) ?? live[0] ?? null;
   const ports = new Set<number>();
   for (const binding of Object.values(board.ports))

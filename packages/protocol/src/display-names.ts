@@ -4,7 +4,7 @@ import type { ClaudeSession, Terminal } from './domain.js';
 // things automatically (`zsh`, `yardmaster-c3`); a name the user gave always wins.
 
 export type SessionNameFields = Pick<ClaudeSession, 'title'> &
-  Partial<Pick<ClaudeSession, 'customTitle' | 'ordinal'>>;
+  Partial<Pick<ClaudeSession, 'aiTitle' | 'boardTitle' | 'customTitle' | 'ordinal'>>;
 
 export const CLAUDE_NAME = 'Claude';
 /** Longest command shown in place of an automatic terminal name. */
@@ -80,10 +80,11 @@ export function worktreeName(cwd: string | null | undefined): string | null {
   return cwd?.match(/[\\/]\.(?:claude[\\/])?worktrees[\\/]([^\\/]+)/)?.[1] ?? null;
 }
 
-/** "Claude", "Claude 2"…, or the name the user gave it. */
+/** The name the user gave it, else Claude Code's generated title, else "Claude", "Claude 2"… */
 export function sessionDisplayName(session: SessionNameFields): string {
-  const custom = session.customTitle?.trim();
-  if (custom) return custom;
+  const named =
+    session.boardTitle?.trim() || session.customTitle?.trim() || session.aiTitle?.trim();
+  if (named) return named;
   const n = session.ordinal ?? 1;
   return n > 1 ? `${CLAUDE_NAME} ${n}` : CLAUDE_NAME;
 }
@@ -93,6 +94,10 @@ export function sessionSubtitle(session: SessionNameFields): string | null {
   const title = session.title?.trim();
   return title && title !== sessionDisplayName(session) ? title : null;
 }
+
+/** A session's name in a list that spans projects: `acme-shop · Fix the cart`. */
+export const projectSessionName = (projectName: string, session: SessionNameFields): string =>
+  `${projectName} · ${sessionDisplayName(session)}`;
 
 /**
  * The lowest number no other live unnamed session of the project holds. Ended sessions keep

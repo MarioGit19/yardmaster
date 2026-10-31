@@ -8,6 +8,7 @@ import {
   Execution,
   emptyBoardState,
   GitInfo,
+  isArchivedSession,
   PortBinding,
   ProcessStats,
   Project,
@@ -181,5 +182,21 @@ describe('terminalReplyBlock', () => {
     expect(terminalReplyBlock({ origin: 'terminal', terminalId: null, status: idle })).toBe(
       'no_linked_terminal',
     );
+  });
+});
+
+describe('isArchivedSession', () => {
+  const ended = { status: { kind: 'ended' as const }, endedAt: 100 };
+
+  it('holds until the session runs again', () => {
+    expect(isArchivedSession({ ...ended, archivedAt: 200 })).toBe(true);
+    expect(isArchivedSession({ ...ended, archivedAt: null })).toBe(false);
+    expect(isArchivedSession({ status: { kind: 'idle' }, endedAt: null, archivedAt: 200 })).toBe(
+      false,
+    );
+  });
+
+  it('lets go when a resumed session ends again', () => {
+    expect(isArchivedSession({ ...ended, endedAt: 300, archivedAt: 200 })).toBe(false);
   });
 });

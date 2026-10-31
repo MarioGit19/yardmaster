@@ -14,6 +14,7 @@ import { useBackgroundRequests } from '../background/open.js';
 import { ClaudePanel } from '../claude/ClaudePanel.js';
 import { useResume } from '../claude/Composer.js';
 import { OriginBadge } from '../claude/OriginBadge.js';
+import { ArchiveButton } from '../claude/SessionTools.js';
 import { useCrewTerminals } from '../crew/useCrewTerminals.js';
 import {
   activityKey,
@@ -30,10 +31,11 @@ import {
 import { DraftMarker } from '../drafts/DraftMarker.js';
 import { draftKey } from '../drafts/drafts.js';
 import { GitPanel } from '../git/GitPanel.js';
+import { historyRefreshKey, listedSessionIds } from '../history/model.js';
 import { SessionHistory } from '../history/SessionHistory.js';
 import { markOpened } from '../library/useActive.js';
 import { dur, ease, slide, spring, tabGlide, useMotionLevel } from '../motion.js';
-import { podSessions } from '../pod/model.js';
+import { endedSessions, podSessions } from '../pod/model.js';
 import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
@@ -588,9 +590,8 @@ function SessionsColumn({
   onFold?: (byKeyboard: boolean) => void;
 }) {
   const live = podSessions(sessions);
-  const ended = sessions.filter((s) => s.status.kind === 'ended');
-  const ordered = [...live, ...ended];
-  const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
+  const ordered = [...live, ...endedSessions(sessions)];
+  const knownIds = useMemo(() => listedSessionIds(sessions), [sessions]);
   // Rows only measure when the list itself changes, not on every status tick.
   const orderKey = ordered.map((s) => s.id).join('|');
   // The highlight pill glides to a clicked row and snaps for keyboard picks (§3 rule 11).
@@ -599,7 +600,7 @@ function SessionsColumn({
     <div className="flex flex-col gap-6">
       <div>
         <ColumnHeading
-          meta={sessions.length || undefined}
+          meta={ordered.length || undefined}
           actions={
             <>
               <IconButton
@@ -661,7 +662,7 @@ function SessionsColumn({
       <SessionHistory
         projectId={project.id}
         knownIds={knownIds}
-        refreshKey={ended.length}
+        refreshKey={historyRefreshKey(sessions)}
         branch={project.git?.branch ?? null}
       />
     </div>
@@ -777,6 +778,7 @@ function SessionLink({
       ? { startedAt: approval.createdAt, endsAt: approval.expiresAt }
       : null;
   const interrupted = session.status.kind === 'interrupted';
+  const ended = session.status.kind === 'ended';
   return (
     <div className="relative">
       <Link
@@ -812,7 +814,9 @@ function SessionLink({
             countdown={countdown}
           />
         </motion.span>
-        <span className={cx('flex min-w-0 flex-1 flex-col gap-0.5', interrupted && 'pr-9')}>
+        <span
+          className={cx('flex min-w-0 flex-1 flex-col gap-0.5', (interrupted || ended) && 'pr-9')}
+        >
           <span className="flex min-w-0 items-center gap-1.5">
             <span
               data-session-name
@@ -835,8 +839,8 @@ function SessionLink({
               showLabel
               className="min-w-0 text-meta text-text-2"
             />
-            {/* An interrupted session's Resume button sits here, outside the link. */}
-            {!interrupted && (
+            {/* An interrupted session's Resume button sits here, outside the link; Archive too. */}
+            {!interrupted && !ended && (
               <span
                 title={TOKEN_ESTIMATE_HINT}
                 className="tabular shrink-0 font-mono text-meta text-text-2"
@@ -848,6 +852,9 @@ function SessionLink({
         </span>
       </Link>
       {interrupted && <RowResume session={session} />}
+      {ended && (
+        <ArchiveButton session={session} className="absolute top-1/2 right-2 -translate-y-1/2" />
+      )}
       {/* Outside the link: it is a control of its own. Indented to the row's text (padding, not
           a margin, so its max-width still ends at the column's edge). */}
       <div className="pl-12">

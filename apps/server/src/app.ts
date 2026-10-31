@@ -5,15 +5,19 @@ import {
   AccountUsage,
   type ActivityEvent,
   type ApprovalDecision,
+  type ClaudeSession,
   type DashboardLinkResponse,
   type HealthResponse,
   HISTORY_WINDOW_MS,
+  isArchivedSession,
   type LibraryResponse,
   LOCAL_ROUTES,
   type Project,
   ProjectId,
   type ServerStatus,
+  type SessionHistoryEntry,
   type SessionHistoryResponse,
+  sessionDisplayName,
   UI_WS_PROTOCOL,
   WS_UNAUTHORIZED,
 } from '@yardmaster/protocol';
@@ -27,6 +31,7 @@ import { FolderTrust, TRUSTED_FOLDERS_KEY } from './claude/folder-trust.js';
 import { HookIngest, registerHookRoute } from './claude/hook-ingest.js';
 import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
+import { createSessionListActions } from './claude/session-list-actions.js';
 import { registerStatuslineRoute } from './claude/statusline-ingest.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
@@ -455,6 +460,10 @@ export async function buildServer(
       ...stubActionHandlers(),
       ...editorActions,
       ...sessionActions,
+      ...createSessionListActions({
+        store,
+        ...(options.demo ? { rename: async () => {} } : {}),
+      }),
       ...createLaunchActions({
         store,
         library,
@@ -770,11 +779,8 @@ export async function buildServer(
     if (worstHistory) return { sessions: worstHistory } satisfies SessionHistoryResponse;
     if (!store.state.projects[projectId]) return reply.code(404).send({ error: 'unknown_project' });
     // Sessions on the board are listed there, not here.
-    const onBoard = new Set(
-      Object.values(store.state.sessions)
-        .filter((s) => s.projectId === projectId)
-        .map((s) => s.id),
-    );
+    const own = Object.values(store.state.sessions).filter((s) => s.projectId === projectId);
+    const onBoard = new Set(own.map((s) => s.id));
     const listed = demo
       ? demo.sessionHistory(projectId)
       : ((await discovery?.freshHistory(projectId, onBoard)) ?? []);
@@ -785,7 +791,9 @@ export async function buildServer(
       tokens:
         entry.tokens ?? store.state.sessions[entry.id]?.tokens ?? stored.get(entry.id) ?? null,
     }));
-    return { sessions } satisfies SessionHistoryResponse;
+    // Archived ones have left the board's lists, so History lists them, by their board name.
+    const archived = own.filter(isArchivedSession).map(archivedHistoryEntry);
+    return { sessions: [...archived, ...sessions] } satisfies SessionHistoryResponse;
   });
 
   if (options.webRoot !== undefined && !registerStatic(app, options.webRoot)) {
@@ -809,12 +817,39 @@ export async function buildServer(
  */
 export function restoreBoardSessions(store: BoardStore, records: readonly SessionRecord[]): void {
   for (const { run, ...record } of records) {
-    if (record.origin !== 'board' || !run || record.endedAt !== null) continue;
-    store.upsertSession({
-      ...record,
-      status: { kind: 'interrupted', turnRunning: run === 'turn' },
-    });
+    if (record.origin === 'board' && run && record.endedAt === null) {
+      store.upsertSession({
+        ...record,
+        status: { kind: 'interrupted', turnRunning: run === 'turn' },
+      });
+    } else if (
+      // Only the board holds these marks. A session still alive is found again as a resume.
+      (record.boardTitle || record.archivedAt) &&
+      store.state.projects[record.projectId ?? '']
+    ) {
+      store.upsertSession({
+        ...record,
+        status: { kind: 'ended' },
+        endedAt: record.endedAt ?? record.updatedAt,
+      });
+    }
   }
+}
+
+function archivedHistoryEntry(session: ClaudeSession): SessionHistoryEntry {
+  return {
+    id: session.id,
+    projectId: session.projectId ?? '',
+    title: sessionDisplayName(session),
+    firstPrompt: session.title,
+    cwd: session.cwd,
+    gitBranch: session.branch ?? null,
+    createdAt: session.startedAt,
+    updatedAt: session.updatedAt,
+    fileSize: null,
+    tokens: session.tokens,
+    archived: true,
+  };
 }
 
 /**

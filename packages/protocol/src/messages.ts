@@ -281,6 +281,9 @@ export const UiAction = z.discriminatedUnion('kind', [
   action('session.resumeInEditor', { projectId: ProjectId, sessionId: SessionId }),
   action('session.interrupt', { sessionId: SessionId }),
   action('session.close', { sessionId: SessionId }),
+  /** Board sessions: through Claude Code. Terminal sessions: a board-side name; empty clears it. */
+  action('session.rename', { sessionId: SessionId, title: z.string().max(512) }),
+  action('session.archive', { sessionId: SessionId, archived: z.boolean() }),
   action('session.setModel', { sessionId: SessionId, model: z.string().min(1).max(128) }),
   action('session.setPermissionMode', { sessionId: SessionId, permissionMode: PermissionMode }),
   /** Types a line into a terminal session's linked terminal (F14, `claude.terminalReply`). */

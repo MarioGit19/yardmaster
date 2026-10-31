@@ -3,6 +3,7 @@ import {
   isAutomaticSessionName,
   isAutomaticTerminalName,
   nextSessionOrdinal,
+  projectSessionName,
   sessionDisplayName,
   sessionSubtitle,
   terminalDisplayName,
@@ -155,5 +156,28 @@ describe('nextSessionOrdinal', () => {
       row('self', 1),
     ];
     expect(nextSessionOrdinal(rows, { id: 'self', projectId: 'p' })).toBe(1);
+  });
+});
+
+describe('session names in lists', () => {
+  const base = { title: 'fix the cart', ordinal: 2 };
+
+  it('prefers a given name, then the generated title, then the number', () => {
+    expect(sessionDisplayName(base)).toBe('Claude 2');
+    expect(sessionDisplayName({ ...base, aiTitle: 'Cart fix' })).toBe('Cart fix');
+    expect(sessionDisplayName({ ...base, aiTitle: 'Cart fix', customTitle: 'cart' })).toBe('cart');
+    expect(
+      sessionDisplayName({ ...base, aiTitle: 'Cart fix', customTitle: 'cart', boardTitle: 'Mine' }),
+    ).toBe('Mine');
+  });
+
+  it('adds nothing as a subtitle when the title already is the name', () => {
+    expect(sessionSubtitle({ title: 'Cart fix', aiTitle: 'Cart fix' })).toBeNull();
+  });
+
+  it('prefixes the project', () => {
+    expect(projectSessionName('acme-shop', { title: null, aiTitle: 'Cart fix' })).toBe(
+      'acme-shop · Cart fix',
+    );
   });
 });

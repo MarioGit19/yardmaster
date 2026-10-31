@@ -152,6 +152,8 @@ const INTERRUPTED_EXIT = 130;
  */
 export const DEMO_LONG_HISTORY = 800;
 
+export const DEMO_FINISHED_SESSION = '00000000-0000-4000-8000-00000000f1d0';
+
 export interface DemoSimulatorOptions {
   store: BoardStore;
   seed?: number;
@@ -444,6 +446,26 @@ export class DemoSimulator {
 
   // Setup
 
+  /** One finished session with a generated title, so a list has something to tidy. */
+  private seedFinishedSession(ts: number): void {
+    const project = this.projects.find((p) => p.def.name === 'ledger-sync');
+    if (!project || this.defs !== DEMO_PROJECTS) return;
+    const title = 'Retry queue cleanup';
+    this.store.upsertSession({
+      id: DEMO_FINISHED_SESSION,
+      origin: 'terminal',
+      projectId: project.id,
+      cwd: project.def.path,
+      branch: project.def.branch,
+      status: { kind: 'ended' },
+      title,
+      aiTitle: title,
+      startedAt: ts - 3 * 3_600_000,
+      updatedAt: ts - 2 * 3_600_000,
+      endedAt: ts - 2 * 3_600_000,
+    });
+  }
+
   private seedBoard(): void {
     const ts = this.now();
     const windowIds = DEMO_WINDOWS.map(() => `demo-window-${this.rng.hex(8)}`);
@@ -469,6 +491,7 @@ export class DemoSimulator {
         lastActivityAt: ts - this.rng.int(10, 600) * 1000 - (quiet(def) ? QUIET_MS : 0),
       });
     }
+    this.seedFinishedSession(ts);
 
     DEMO_WINDOWS.forEach((app, index) => {
       const members = this.projects.filter((p) => p.def.window === index);

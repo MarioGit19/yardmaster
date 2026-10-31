@@ -105,8 +105,8 @@ describe('buildCommands', () => {
     expect(byId(commands, 'project:p-acme')?.run).toEqual({ kind: 'navigate', href: '/p/p-acme' });
     expect(byId(commands, 'session:s-1')).toMatchObject({
       // Unnamed: "Claude", with its automatic title as context.
-      label: 'Claude',
-      hint: 'acme-shop · Waiting for approval · Checkout fix',
+      label: 'acme-shop · Claude',
+      hint: 'Waiting for approval · Checkout fix',
       tone: 'wait',
       run: { kind: 'navigate', href: '/p/p-acme/s/s-1' },
     });

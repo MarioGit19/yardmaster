@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { ChatMessage } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import {
+  aiTitleOf,
   entryUuid,
   gitBranchOf,
   MAX_INPUT_STRING,
@@ -181,5 +182,13 @@ describe('UsageTracker', () => {
       cacheCreation: 0,
     });
     expect(toUsage(undefined)).toBeNull();
+  });
+});
+
+describe('aiTitleOf', () => {
+  it('reads a generated title and skips any other line', () => {
+    expect(aiTitleOf({ type: 'ai-title', aiTitle: '  Cart   fix ' })).toBe('Cart fix');
+    expect(aiTitleOf({ type: 'ai-title', aiTitle: 42 })).toBeNull();
+    expect(aiTitleOf({ type: 'custom-title', customTitle: 'x' })).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import {
   type Approval,
   type ClaudeSession,
+  isArchivedSession,
   isAutomaticSessionName,
   toolFamily,
 } from '@yardmaster/protocol';
@@ -40,8 +41,28 @@ const SESSION_RANK: Record<ClaudeSession['status']['kind'], number> = {
   ended: 0,
 };
 
-/** Live sessions, most urgent first, then newest. */
+/** Running sessions are all active now: they hold their order instead of swapping every tool. */
+const lastActivity = (session: ClaudeSession) =>
+  isBusy(session.status.kind) ? 0 : session.updatedAt;
+
+/**
+ * Live sessions for a list: most urgent first, so a capped list never hides one that needs you,
+ * then by most recent activity.
+ */
 export function podSessions(sessions: readonly ClaudeSession[]): ClaudeSession[] {
+  return sessions
+    .filter((s) => s.status.kind !== 'ended')
+    .sort(
+      (a, b) =>
+        SESSION_RANK[b.status.kind] - SESSION_RANK[a.status.kind] ||
+        lastActivity(b) - lastActivity(a) ||
+        b.startedAt - a.startedAt ||
+        a.id.localeCompare(b.id),
+    );
+}
+
+/** Live sessions for a scene: a seat doesn't change with activity, so nobody swaps desks. */
+export function stationSessions(sessions: readonly ClaudeSession[]): ClaudeSession[] {
   return sessions
     .filter((s) => s.status.kind !== 'ended')
     .sort(
@@ -50,6 +71,13 @@ export function podSessions(sessions: readonly ClaudeSession[]): ClaudeSession[]
         b.startedAt - a.startedAt ||
         a.id.localeCompare(b.id),
     );
+}
+
+/** Finished sessions still on the lists, most recently active first. */
+export function endedSessions(sessions: readonly ClaudeSession[]): ClaudeSession[] {
+  return sessions
+    .filter((s) => s.status.kind === 'ended' && !isArchivedSession(s))
+    .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
 }
 
 export type CaptionTone = 'active' | 'wait' | 'err' | 'rest';

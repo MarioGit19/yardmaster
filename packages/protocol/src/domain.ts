@@ -401,6 +401,10 @@ export const ClaudeSession = z.object({
   title: z.string().nullable(),
   /** A name the user gave the session (`/rename`), shown as its name. */
   customTitle: z.string().max(512).nullable().optional(),
+  /** The title Claude Code generated (`session_title`, or an `ai-title` transcript line). */
+  aiTitle: z.string().max(512).nullable().optional(),
+  /** A name given on the board to a terminal session; Claude Code itself doesn't know it. */
+  boardTitle: z.string().max(512).nullable().optional(),
   /** "Claude 2": the session's number among its project's unnamed live sessions, kept for life. */
   ordinal: z.number().int().positive().nullable().optional(),
   /** A fork: the session it branched off, and when; earlier messages are the parent's. */
@@ -428,8 +432,18 @@ export const ClaudeSession = z.object({
   startedAt: Timestamp,
   updatedAt: Timestamp,
   endedAt: Timestamp.nullable(),
+  /** Taken off the lists; it counts until the session runs again and ends anew. */
+  archivedAt: Timestamp.nullable().optional(),
 });
 export type ClaudeSession = z.infer<typeof ClaudeSession>;
+
+/** Archived and not run since: a resumed session returns to the lists by itself. */
+export function isArchivedSession(
+  session: Pick<ClaudeSession, 'status' | 'endedAt' | 'archivedAt'>,
+): boolean {
+  const { status, endedAt, archivedAt } = session;
+  return status.kind === 'ended' && archivedAt != null && archivedAt >= (endedAt ?? 0);
+}
 
 /** Why a session can't take a reply in its terminal, or null when it can (F14). */
 export type TerminalReplyBlock = 'not_terminal_session' | 'no_linked_terminal' | 'session_busy';

@@ -316,7 +316,7 @@ function subagentDescription(session: ClaudeSession, agentId: string | undefined
 /** Claude Code's generated title replaces the first-prompt stand-in once it exists. */
 function withHookTitle(session: ClaudeSession, title: string | undefined): ClaudeSession {
   const clipped = clipLine(title, TITLE_MAX);
-  return clipped === null ? session : { ...session, title: clipped };
+  return clipped === null ? session : { ...session, title: clipped, aiTitle: clipped };
 }
 
 function withAssistantText(

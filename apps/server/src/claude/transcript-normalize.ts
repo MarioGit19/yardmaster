@@ -89,6 +89,15 @@ export function entryUuid(raw: unknown): string | null {
   return typeof uuid === 'string' && uuid.length > 0 ? uuid : null;
 }
 
+const AiTitleEntry = z.looseObject({ type: z.literal('ai-title'), aiTitle: z.string().max(512) });
+
+/** The title Claude Code generated on an `ai-title` line, or null for any other line. */
+export function aiTitleOf(raw: unknown): string | null {
+  const parsed = AiTitleEntry.safeParse(raw);
+  if (!parsed.success) return null;
+  return parsed.data.aiTitle.replace(/\s+/g, ' ').trim() || null;
+}
+
 const CustomTitleEntry = z.looseObject({
   type: z.literal('custom-title'),
   customTitle: z.string().max(512),

@@ -1,7 +1,7 @@
 import type { BoardState, ClaudeSession, SessionStatus } from '@yardmaster/protocol';
 import { terminalSession } from '../../data/selectors.js';
 import { laneExecution, laneView } from '../../lanes/lane.js';
-import { podSessions } from '../../pod/model.js';
+import { endedSessions, podSessions } from '../../pod/model.js';
 import { sessionHref, terminalHref } from '../../routes.js';
 import { stackOrder } from '../../terminal/stack.js';
 
@@ -41,7 +41,7 @@ export function sessionGroup(status: SessionStatus): HubGroup {
 
 /**
  * Every Claude session and terminal of the project as hub cards, grouped Needs you, Running,
- * Idle. Live sessions come first in each group (most urgent, then newest), then ended ones, then
+ * Idle. Live sessions come first in each group (most urgent, then newest), then ended ones not archived, then
  * terminals in the stack's order. A terminal running a live Claude session folds into its card.
  */
 export function hubItems(
@@ -57,12 +57,7 @@ export function hubItems(
     const session = terminalSession(board, terminal.id);
     if (session) terminalOf.set(session.id, terminal.id);
   }
-  const ordered: ClaudeSession[] = [
-    ...podSessions(sessions),
-    ...sessions
-      .filter((s) => s.status.kind === 'ended')
-      .sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id)),
-  ];
+  const ordered: ClaudeSession[] = [...podSessions(sessions), ...endedSessions(sessions)];
   const items: HubItem[] = ordered.map((session) => ({
     kind: 'session',
     key: `s:${session.id}`,

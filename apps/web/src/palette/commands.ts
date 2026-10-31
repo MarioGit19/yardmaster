@@ -1,9 +1,10 @@
 import {
   type BoardState,
   type ClaudeSession,
+  isArchivedSession,
   isSafeCommandLine,
   type Project,
-  sessionDisplayName,
+  projectSessionName,
   sessionSubtitle,
   type UiAction,
   visibleCommandLine,
@@ -173,9 +174,11 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
     commands.push({
       id: `session:${session.id}`,
       group: 'Sessions',
-      label: sessionDisplayName(session),
+      label: projectSessionName(project.name, session),
       // The automatic name or summary is context, so "Claude" sessions stay findable by it.
-      hint: [project.name, status.label, sessionSubtitle(session)].filter(Boolean).join(' · '),
+      hint: [isArchivedSession(session) ? 'Archived' : status.label, sessionSubtitle(session)]
+        .filter(Boolean)
+        .join(' · '),
       icon: 'session',
       tone: status.tone,
       searchOnly: session.status.kind === 'ended',
@@ -277,7 +280,7 @@ function projectActions(
     commands.push({
       id: `interrupt:${session.id}`,
       group: 'Actions',
-      label: `Interrupt ${sessionDisplayName(session)}`,
+      label: `Interrupt ${projectSessionName(project.name, session)}`,
       hint: project.name,
       icon: 'interrupt',
       run: { kind: 'action', action, done: 'Interrupted' },

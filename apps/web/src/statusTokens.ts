@@ -1,6 +1,7 @@
 import {
   type BoardState,
   type ClaudeSession,
+  isArchivedSession,
   isBoardTerminal,
   LONG_COMMAND_MS,
   type SeenResponse,
@@ -82,7 +83,9 @@ export function sessionStaleReason(session: ClaudeSession, ctx: StatusContext): 
 export function sessionToken(session: ClaudeSession, ctx: StatusContext): StatusToken {
   return sessionStatusToken(session.status.kind, {
     background: runningBackground(session) > 0,
-    unseen: isUnseen(ctx.seen, seenKey.session(session.id), session.lastAssistantAt),
+    unseen:
+      !isArchivedSession(session) &&
+      isUnseen(ctx.seen, seenKey.session(session.id), session.lastAssistantAt),
     stale: sessionStaleReason(session, ctx) !== null,
   });
 }

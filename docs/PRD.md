@@ -102,6 +102,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - F15 Git panel: branch, changed files, ahead/behind, and recent commits per project.
 - F16 Pulse timeline: a cross-project activity stream with filters.
 - F17 Session history browser per project (SDK `listSessions`), with "resume in board" or "resume in Cursor terminal".
+- F17a Session names and tidy lists: a session goes by the name given to it, else Claude Code's generated title, else "Claude N", with the project as a prefix in lists that span projects. Board sessions rename through the Agent SDK; a terminal session's name is stored on the board only, and the rename form says so. Finished sessions can be archived with undo: they leave the lists, stay in History and ⌘K search, and come back when resumed. Lists sort by urgency, then most recent activity.
 - F18 Daily stats: sessions, tokens and tool calls per project (from transcripts).
 - F19 Board-owned terminals (node-pty) for projects with no editor window open: fully interactive, started from the board or the phone.
 - F25 **Project library and launch:** the user picks root folders (for example `~/Desktop`). The overview shows only **active** projects; the "Open project" picker lists the roots' folders, and launching one can open it in Cursor, start a Claude session and start terminals, in one step.

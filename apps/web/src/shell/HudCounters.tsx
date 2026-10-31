@@ -1,4 +1,4 @@
-import { sessionDisplayName } from '@yardmaster/protocol';
+import { projectSessionName } from '@yardmaster/protocol';
 import {
   type ComponentPropsWithoutRef,
   forwardRef,
@@ -143,9 +143,10 @@ function HudItems({ bucket, onPick }: { bucket: 'failed' | 'active'; onPick: () 
         const id = item.kind === 'session' ? item.session.id : item.terminal.id;
         const projectId =
           item.kind === 'session' ? item.session.projectId : item.terminal.projectId;
+        const project = (projectId && projects[projectId]?.name) || 'No project';
         const name =
           item.kind === 'session'
-            ? sessionDisplayName(item.session)
+            ? projectSessionName(project, item.session)
             : terminalDisplay(item.terminal, selectLaneExecution(item.terminal)(state)).name;
         const detail =
           item.kind === 'session'
@@ -162,7 +163,7 @@ function HudItems({ bucket, onPick }: { bucket: 'failed' | 'active'; onPick: () 
             <span className="min-w-0 flex-1">
               <span className="block truncate text-body-sm text-text-1">{name}</span>
               <span className="block truncate text-label text-text-2">
-                {(projectId && projects[projectId]?.name) || 'No project'} · {detail}
+                {item.kind === 'session' ? detail : `${project} · ${detail}`}
               </span>
             </span>
           </>

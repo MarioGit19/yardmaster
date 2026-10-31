@@ -228,6 +228,8 @@ describe('sessionReducer fields', () => {
       event('user-prompt-submit', { prompt: 'and tax', session_title: 'Cart totals fix' }),
     );
     expect(titled.title).toBe('Cart totals fix');
+    expect(fromPrompt.aiTitle).toBeUndefined();
+    expect(titled.aiTitle).toBe('Cart totals fix');
   });
 
   it('creates a terminal session from the common fields', () => {

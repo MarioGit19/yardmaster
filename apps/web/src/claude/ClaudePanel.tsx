@@ -25,6 +25,7 @@ import { SessionComposer } from './Composer.js';
 import { ChatDensityContext, chatColumn, useCompactChat } from './density.js';
 import { OriginBadge } from './OriginBadge.js';
 import { useRestingCrew } from './RestingCrew.js';
+import { SessionTools } from './SessionTools.js';
 import { streamingTail } from './transcript.js';
 import { useTranscript } from './useTranscript.js';
 import { VerbosityToggle } from './VerbosityToggle.js';
@@ -100,9 +101,10 @@ export function ClaudePanel({
           <header className="claude-head flex min-w-0 shrink-0 items-center gap-3 border-line border-b px-5 pt-5 pb-3">
             {/* The name keeps room for a few characters; the subtitle gives way first. */}
             <div className="flex min-w-24 flex-1 items-baseline gap-2">
-              <h2 className="max-w-full shrink-0 truncate font-medium text-body text-text-1 leading-7">
+              <h2 className="min-w-0 truncate font-medium text-body text-text-1 leading-7">
                 {sessionDisplayName(session)}
               </h2>
+              <SessionTools session={session} />
               {session.forkedFrom ? (
                 <ForkedFrom parentId={session.forkedFrom.sessionId} />
               ) : (
@@ -110,7 +112,7 @@ export function ClaudePanel({
                   <p
                     dir="auto"
                     data-session-subtitle
-                    className="min-w-0 truncate text-meta text-text-2"
+                    className="min-w-0 shrink-[100] truncate text-meta text-text-2"
                     title={subtitle}
                   >
                     {subtitle}
@@ -146,7 +148,8 @@ export function ClaudePanel({
           </header>
         )}
         {!compact && !header && (
-          <div className="flex shrink-0 justify-end border-line border-b px-4 py-1">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-line border-b px-4 py-1">
+            <SessionTools session={session} labelled />
             <VerbosityToggle />
           </div>
         )}

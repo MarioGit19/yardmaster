@@ -19,6 +19,7 @@ import { type ReadResult, RingBuffer } from '../ring-buffer.js';
 import type { BoardStore } from '../store.js';
 import { JsonlTail } from './jsonl-tail.js';
 import {
+  aiTitleOf,
   customTitleOf,
   entryUuid,
   gitBranchOf,
@@ -298,10 +299,12 @@ export class TranscriptService {
     let usageChanged = false;
     let model: string | null = null;
     let customTitle: string | null = null;
+    let aiTitle: string | null = null;
     let branch: string | null = null;
     const notes: TaskNotification[] = [];
     for (const entry of entries) {
       customTitle = customTitleOf(entry) ?? customTitle;
+      aiTitle = aiTitleOf(entry) ?? aiTitle;
       branch = gitBranchOf(entry) ?? branch;
       notes.push(...taskNotificationsOf(entry));
       const uuid = entryUuid(entry);
@@ -322,7 +325,7 @@ export class TranscriptService {
         for (const listener of this.listeners) listener(streamId, seq, chunk);
       }
     }
-    this.publish(t, usageChanged, model, customTitle, branch);
+    this.publish(t, usageChanged, model, customTitle, aiTitle, branch);
     if (notes.length > 0) this.finishBackground(t.id, notes);
   }
 
@@ -340,6 +343,7 @@ export class TranscriptService {
     usageChanged: boolean,
     model: string | null,
     customTitle: string | null,
+    aiTitle: string | null,
     branch: string | null,
   ): void {
     const session = this.store.state.sessions[t.id];
@@ -349,6 +353,7 @@ export class TranscriptService {
       contextTokens?: number | null;
       model?: string;
       customTitle?: string;
+      aiTitle?: string;
       branch?: string;
     } = {};
     if (usageChanged) {
@@ -358,6 +363,7 @@ export class TranscriptService {
     if (model !== null && model !== session.model) fields.model = model;
     if (customTitle !== null && customTitle !== session.customTitle)
       fields.customTitle = customTitle;
+    if (aiTitle !== null && aiTitle !== session.aiTitle) fields.aiTitle = aiTitle;
     if (branch !== null && branch !== session.branch) fields.branch = branch;
     if (Object.keys(fields).length === 0) return;
     // Transcript reads aren't session activity: keep `updatedAt` as the hooks set it.

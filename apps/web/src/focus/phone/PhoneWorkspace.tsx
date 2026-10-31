@@ -47,7 +47,7 @@ import { DraftMarker } from '../../drafts/DraftMarker.js';
 import { draftKey } from '../../drafts/drafts.js';
 import { GitPanel } from '../../git/GitPanel.js';
 import { useSessionHistory } from '../../history/api.js';
-import { pastSessions } from '../../history/model.js';
+import { historyRefreshKey, listedSessionIds, pastSessions } from '../../history/model.js';
 import { SessionHistory } from '../../history/SessionHistory.js';
 import { laneView, selectLaneExecution, terminalDisplay } from '../../lanes/lane.js';
 import { PortChip, portProcess } from '../../lanes/PortChip.js';
@@ -620,9 +620,8 @@ function HubCard({ item, projectId, last }: { item: HubItem; projectId: string; 
 function PageRows({ project }: { project: Project }) {
   const ports = useBoardList(selectPortsByProject(project.id));
   const sessions = useBoardList(selectSessionsByProject(project.id));
-  const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
-  const ended = sessions.filter((s) => s.status.kind === 'ended').length;
-  const { state } = useSessionHistory(project.id, ended);
+  const knownIds = useMemo(() => listedSessionIds(sessions), [sessions]);
+  const { state } = useSessionHistory(project.id, historyRefreshKey(sessions));
   const past = state.status === 'ready' ? pastSessions(state.sessions, knownIds).length : null;
   const git = project.git;
   const rows = [
@@ -1000,14 +999,13 @@ function SubPage({
 
 function HistoryPage({ project }: { project: Project }) {
   const sessions = useBoardList(selectSessionsByProject(project.id));
-  const knownIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
-  const ended = sessions.filter((s) => s.status.kind === 'ended').length;
+  const knownIds = useMemo(() => listedSessionIds(sessions), [sessions]);
   return (
     <SessionHistory
       page
       projectId={project.id}
       knownIds={knownIds}
-      refreshKey={ended}
+      refreshKey={historyRefreshKey(sessions)}
       branch={project.git?.branch ?? null}
     />
   );

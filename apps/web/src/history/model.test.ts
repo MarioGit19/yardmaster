@@ -1,6 +1,13 @@
 import type { SessionHistoryEntry } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
-import { historyTitle, historyTokens, pastSessions } from './model.js';
+import { makeSession } from '../test/board.js';
+import {
+  historyRefreshKey,
+  historyTitle,
+  historyTokens,
+  listedSessionIds,
+  pastSessions,
+} from './model.js';
 
 const entry = (id: string, updatedAt: number): SessionHistoryEntry => ({
   id,
@@ -36,5 +43,19 @@ describe('historyTokens', () => {
     expect(historyTokens({ tokens: { input: 1, output: 2, cacheRead: 3, cacheCreation: 4 } })).toBe(
       10,
     );
+  });
+});
+
+describe('archived sessions', () => {
+  const ended = { ...makeSession('a', 'p', { kind: 'ended' }), endedAt: 1 };
+  const archived = { ...ended, archivedAt: 2 };
+
+  it('counts them as not listed, so History shows them', () => {
+    expect([...listedSessionIds([ended])]).toEqual(['a']);
+    expect([...listedSessionIds([archived])]).toEqual([]);
+  });
+
+  it('reloads History when one is archived', () => {
+    expect(historyRefreshKey([archived])).not.toBe(historyRefreshKey([ended]));
   });
 });
