@@ -59,6 +59,11 @@
   --bg-2: color-mix(in srgb, var(--grid-neon) 8%, #fff);
 }
 
+/* Daylight's grey-blue ground leaves syntax colors short of AA on a diff's tints. */
+[data-theme="light"] .focus[data-layout="grid"] .diff {
+  background: #fff;
+}
+
 /* Title bars and column titles in Geist Mono caps. */
 .focus[data-layout="grid"] :is(.gs-titlebar, [data-column-heading]) {
   font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;

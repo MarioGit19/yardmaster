@@ -1646,15 +1646,16 @@
   border-color: color-mix(in srgb, var(--orb-task) 45%, transparent);
 }
 
-/* DiffView: tinted rows, stronger tint on the words that changed. */
+/* DiffView: tinted rows, and a tint plus an underline on the words that changed. Syntax colors sit
+   on both tints, so the two together stay light enough for AA; the underline does the marking. */
 .diff-row {
   min-height: 20px;
 }
 .diff-add {
-  background: color-mix(in srgb, var(--st-ok) 9%, transparent);
+  background: color-mix(in srgb, var(--st-ok) 6%, transparent);
 }
 .diff-del {
-  background: color-mix(in srgb, var(--st-err) 9%, transparent);
+  background: color-mix(in srgb, var(--st-err) 6%, transparent);
 }
 .diff-empty {
   background: repeating-linear-gradient(
@@ -1665,11 +1666,15 @@
 }
 .diff-add .diff-mark {
   border-radius: 2px;
-  background: color-mix(in srgb, var(--st-ok) 26%, transparent);
+  background: color-mix(in srgb, var(--st-ok) 7%, transparent);
+  text-decoration: underline 1px var(--st-ok-ink);
+  text-underline-offset: 3px;
 }
 .diff-del .diff-mark {
   border-radius: 2px;
-  background: color-mix(in srgb, var(--st-err) 26%, transparent);
+  background: color-mix(in srgb, var(--st-err) 7%, transparent);
+  text-decoration: underline 1px var(--st-err-ink);
+  text-underline-offset: 3px;
 }
 .diff-no {
   color: var(--text-3);
