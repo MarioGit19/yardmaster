@@ -10,11 +10,15 @@ export const routes = {
   // The phone shell's tabs (DESIGN.md §11); the overview is the first.
   projects: '/projects',
   attention: '/attention',
+  /** One item of the inbox: where an approval's notification lands. */
+  attentionItem: '/attention/:item',
   pulse: '/pulse',
   more: '/more',
   welcome: '/welcome',
   tokens: '/_tokens',
 } as const;
+
+export const attentionItemHref = (item: string) => `/attention/${encodeURIComponent(item)}`;
 
 export const projectHref = (projectId: string) => `/p/${encodeURIComponent(projectId)}`;
 

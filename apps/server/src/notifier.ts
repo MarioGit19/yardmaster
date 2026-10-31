@@ -124,6 +124,8 @@ export function formatDuration(ms: number): string {
 const encode = encodeURIComponent;
 const sessionUrl = (projectId: string | null, sessionId: string) =>
   projectId ? `/#/p/${encode(projectId)}/s/${encode(sessionId)}` : '/#/attention';
+/** An approval opens as its item in the inbox, where it can be read in full and decided. */
+const approvalUrl = (approvalId: string) => `/#/attention/${encode(approvalId)}`;
 const terminalUrl = (projectId: string | null, terminalId: string) =>
   projectId ? `/#/p/${encode(projectId)}/t/${encode(terminalId)}` : '/';
 
@@ -373,7 +375,6 @@ export class Notifier {
 
   private needsEvent(session: ClaudeSession, approval: Approval | null): NotifyEventData {
     const name = sessionDisplayName(session);
-    const url = sessionUrl(session.projectId, session.id);
     if (approval) {
       return {
         kind: 'needs_you',
@@ -381,7 +382,7 @@ export class Notifier {
         headline: `${name} wants to run ${approval.tool}`,
         body: toolInputDetail(approval.input)?.trim() ?? '',
         vague: 'needs you',
-        url,
+        url: approvalUrl(approval.id),
         request: approval.id,
         approvalId: approval.id,
         level: 'warning',
@@ -394,7 +395,7 @@ export class Notifier {
       headline: input ? `${name} is waiting for you` : `${name} needs your approval`,
       body: input ? firstLine(session.lastAssistantText) : 'Answer the prompt in its terminal.',
       vague: 'needs you',
-      url,
+      url: sessionUrl(session.projectId, session.id),
       request: `session:${session.id}`,
       approvalId: null,
       level: 'warning',

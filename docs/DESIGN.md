@@ -192,7 +192,9 @@ Above the overview in every layout, on the phone too, a strip lists everything w
 ### 4.5a Attention Center
 
 - A right-side sheet (or a bottom sheet on narrow screens), sliding in with `smooth`.
-- Each approval card shows the project chip, session orb, tool name, and the exact payload: the command in mono with syntax highlight, or for Edit a mini diff. Actions: **Allow** (A), **Always allow** (⇧A), **Deny…** (D, with an optional reason). Keyboard first.
+- One inbox for every project: approvals and sessions to answer in place share one list, oldest first. ⌘K, the Needs you counter and the phone's Attention tab all open it. An approval's notification opens that item here; the phone's installed app opens on this tab when anything is pending, unless it was opened on a link to somewhere else.
+- Each approval card shows the project chip, session orb, tool name, how long it has waited, the session's one-line summary, and the exact payload: the command in mono with syntax highlight, or for Edit a mini diff. Actions: **Allow** (A), **Always allow** (⇧A), **Deny…** (D, with an optional reason). Keyboard first: ↑↓ or J/K move, Enter opens the session, and after a decision the next item takes focus.
+- An item can also **Open** its session, **Interrupt** it (a request mid-turn; not a session waiting for a reply) and switch its permission mode. A board session switches at once and its request stays open. A terminal session has only the hook's answer, so the pill reads **Allow and switch**, offers Ask first, Accept edits and Plan only, and allows the request; a terminal's own prompt has no switch.
 - Resolved cards collapse with a height animation (`layout`) and a check sweep.
 
 ### 4.6 Focus view (project)

@@ -9,6 +9,7 @@ import {
   EditorApp,
   EditorCapabilities,
   ExecutionId,
+  HookPermissionMode,
   PermissionMode,
   Pid,
   ProjectId,
@@ -301,9 +302,20 @@ export type UiAction = z.infer<typeof UiAction>;
 export type UiActionKind = UiAction['kind'];
 
 export const ApprovalDecision = z.discriminatedUnion('decision', [
-  z.object({ approvalId: ApprovalId, decision: z.literal('allow') }),
+  z.object({
+    approvalId: ApprovalId,
+    decision: z.literal('allow'),
+    /** Away-mode requests only: the terminal session's mode from here on. */
+    mode: HookPermissionMode.optional(),
+  }),
   z.object({ approvalId: ApprovalId, decision: z.literal('allowAlways') }),
-  z.object({ approvalId: ApprovalId, decision: z.literal('deny'), reason: ShortText.optional() }),
+  z.object({
+    approvalId: ApprovalId,
+    decision: z.literal('deny'),
+    reason: ShortText.optional(),
+    /** Away-mode requests only: also stops the turn, as Esc would. */
+    interrupt: z.boolean().optional(),
+  }),
 ]);
 export type ApprovalDecision = z.infer<typeof ApprovalDecision>;
 

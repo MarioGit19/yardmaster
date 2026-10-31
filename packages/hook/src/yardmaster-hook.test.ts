@@ -488,6 +488,37 @@ describe('yardmaster-hook-permission', () => {
     });
   });
 
+  it.each([
+    ['acceptEdits', [{ type: 'setMode', mode: 'acceptEdits', destination: 'session' }]],
+    ['plan', [{ type: 'setMode', mode: 'plan', destination: 'session' }]],
+  ])('allows and switches to %s for the session', async (mode, updatedPermissions) => {
+    await withBoard({ away: AWAY_ON, decide: answer({ decision: 'allow', mode }) }, async () => {
+      expect(JSON.parse((await runPermission()).stdout)).toEqual(
+        output({ behavior: 'allow', updatedPermissions }),
+      );
+    });
+  });
+
+  it.each(['bypassPermissions', 'dontAsk', 'auto', 7])(
+    'allows without switching to a mode off its list: %s',
+    async (mode) => {
+      await withBoard({ away: AWAY_ON, decide: answer({ decision: 'allow', mode }) }, async () => {
+        expect(JSON.parse((await runPermission()).stdout)).toEqual(output({ behavior: 'allow' }));
+      });
+    },
+  );
+
+  it('denies and stops the turn on deny_and_stop', async () => {
+    await withBoard(
+      { away: AWAY_ON, decide: answer({ decision: 'deny_and_stop', reason: null }) },
+      async () => {
+        expect(JSON.parse((await runPermission()).stdout)).toEqual(
+          output({ behavior: 'deny', message: 'Denied from Yardmaster.', interrupt: true }),
+        );
+      },
+    );
+  });
+
   it('prints nothing when the board has no decision (204)', async () => {
     await withBoard({ away: AWAY_ON, decide: (res) => res.writeHead(204).end() }, async () => {
       expect(await runPermission()).toMatchObject({ code: 0, stdout: '', stderr: '' });

@@ -289,6 +289,14 @@ export const PermissionMode = z.enum([
 ]);
 export type PermissionMode = z.infer<typeof PermissionMode>;
 
+/**
+ * The modes a terminal session can switch to while the board allows a request. The hook checks
+ * this list again, and nothing wider than Claude Code's own edit mode is on it.
+ */
+export const HOOK_PERMISSION_MODES = ['default', 'acceptEdits', 'plan'] as const;
+export const HookPermissionMode = z.enum(HOOK_PERMISSION_MODES);
+export type HookPermissionMode = z.infer<typeof HookPermissionMode>;
+
 export const TokenUsage = z.object({
   input: z.number().int().nonnegative(),
   output: z.number().int().nonnegative(),

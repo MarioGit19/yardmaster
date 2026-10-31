@@ -1,13 +1,14 @@
 import { Activity, Bell, Ellipsis, FolderKanban, LayoutGrid, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { attentionOpen } from '../attention/attention.js';
+import { attentionOpen, landsOnAttention, selectWaitingSessions } from '../attention/attention.js';
 import { Logomark } from '../brand/Logo.js';
-import { selectConnection, selectHydrated, useBoard } from '../data/index.js';
+import { selectConnection, selectHydrated, useBoard, useBoardStore } from '../data/index.js';
 import { dur, ease, spring, tabGlide } from '../motion.js';
 import { paletteOpen } from '../palette/palette.js';
 import { countOf, plural } from '../plural.js';
+import { isStandalone } from '../push/push.js';
 import { routes } from '../routes.js';
 import { cx } from '../ui/cx.js';
 import { Tooltip } from '../ui/Tooltip.js';
@@ -49,6 +50,7 @@ export function PhoneShell({ children, stage }: { children: ReactNode; stage?: R
   const workspace = isWorkspace(location);
   const reconnecting = useBoard(selectConnection).status === 'reconnecting';
   const hydrated = useBoard(selectHydrated);
+  const store = useBoardStore();
   useVisualViewport();
   useToastLift(workspace);
 
@@ -63,6 +65,17 @@ export function PhoneShell({ children, stage }: { children: ReactNode; stage?: R
     open();
     return attentionOpen.subscribe(open);
   }, [navigate]);
+
+  // The installed app opens on what needs you; a link into anywhere else keeps its place.
+  const landed = useRef(false);
+  useEffect(() => {
+    if (!hydrated || landed.current) return;
+    landed.current = true;
+    const waiting = selectWaitingSessions(store.getState()).length;
+    if (landsOnAttention({ standalone: isStandalone(), location, waiting })) {
+      navigate(routes.attention);
+    }
+  }, [hydrated, location, navigate, store]);
 
   return (
     <div

@@ -162,7 +162,7 @@ describe('Notifier events', () => {
         title: 'acme-shop · Claude wants to run Bash',
         body: 'rm -rf dist',
         tag: `project:${PROJECT}`,
-        url: `/#/p/${PROJECT}/s/${SESSION}`,
+        url: '/#/attention/ap-1',
         request: 'ap-1',
         approvalId: null,
       }),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HookPermissionMode } from './domain.js';
 
 // The local channel (PRD §8): a Unix domain socket in the data dir that only this user can
 // reach. The extension and the hooks talk to the server only through it, so no other local
@@ -22,13 +23,15 @@ export const LOCAL_ONLY_ROUTES: readonly string[] = Object.values(LOCAL_ROUTES);
 /**
  * `POST /api/hooks/permission` (socket, token): the board's minimal decision on a
  * `PermissionRequest`. The hook builds Claude Code's output itself, taking "always allow"
- * rules only from Claude Code's own `permission_suggestions`, so the server can't inject any.
- * 204 means no decision: the terminal prompt shows.
+ * rules only from Claude Code's own `permission_suggestions`, so the server can't inject any. A
+ * mode switch is one of `HOOK_PERMISSION_MODES`, checked again by the hook; `deny_and_stop` also
+ * ends the turn. 204 means no decision: the terminal prompt shows.
  */
 export const PermissionHookAnswer = z.discriminatedUnion('decision', [
-  z.object({ decision: z.literal('allow') }),
+  z.object({ decision: z.literal('allow'), mode: HookPermissionMode.optional() }),
   z.object({ decision: z.literal('allow_always') }),
   z.object({ decision: z.literal('deny'), reason: z.string().max(500).nullable() }),
+  z.object({ decision: z.literal('deny_and_stop'), reason: z.string().max(500).nullable() }),
 ]);
 export type PermissionHookAnswer = z.infer<typeof PermissionHookAnswer>;
 

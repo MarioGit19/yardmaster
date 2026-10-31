@@ -1,9 +1,20 @@
-import type { Approval, ApprovalState, ClaudeSession, Project } from '@yardmaster/protocol';
+import {
+  type Approval,
+  type ApprovalState,
+  type ClaudeSession,
+  HOOK_PERMISSION_MODES,
+  type HookPermissionMode,
+  type PermissionMode,
+  type Project,
+  type UiAction,
+} from '@yardmaster/protocol';
 import { toast } from 'sonner';
 import type { BoardClient } from '../data/client.js';
 import type { BoardStoreState } from '../data/store.js';
 import type { MotionLevel } from '../motion.js';
 import { createPreference, type KeyValueStorage } from '../prefs.js';
+import { routes } from '../routes.js';
+import { ESC } from '../terminal/claudeTerminal.js';
 import { actionErrorText } from '../terminal/stack.js';
 
 // Whether the sheet is open lives only in memory: a reload starts with it closed.
@@ -43,15 +54,125 @@ export const selectWaitingWithoutApproval = (s: BoardStoreState): ClaudeSession[
     return !id || s.board.approvals[id]?.state !== 'pending';
   });
 
+/** One row of the inbox: a request the board can decide, or a session to answer in place. */
+export type InboxItem =
+  | { kind: 'approval'; key: string; since: number; approval: Approval }
+  | { kind: 'session'; key: string; since: number; session: ClaudeSession };
+
+/** Everything waiting across projects, oldest first. */
+export function inboxItems(
+  pending: readonly Approval[],
+  waiting: readonly ClaudeSession[],
+): InboxItem[] {
+  return [
+    ...pending.map(
+      (approval): InboxItem => ({
+        kind: 'approval',
+        key: approval.id,
+        since: approval.createdAt,
+        approval,
+      }),
+    ),
+    ...waiting.map(
+      (session): InboxItem => ({
+        kind: 'session',
+        key: `s:${session.id}`,
+        since: session.updatedAt,
+        session,
+      }),
+    ),
+  ].sort((a, b) => a.since - b.since || a.key.localeCompare(b.key));
+}
+
+const targetListeners = new Set<() => void>();
+let target: string | null = null;
+
+/**
+ * The item the inbox should select when it can: it may not be on the board yet when a notification
+ * opens the app. Lives in memory, like the sheet.
+ */
+export const inboxTarget = {
+  get: () => target,
+  set(next: string | null) {
+    target = next;
+    for (const listener of targetListeners) listener();
+  },
+  subscribe(listener: () => void) {
+    targetListeners.add(listener);
+    return () => {
+      targetListeners.delete(listener);
+    };
+  },
+};
+
+/** Opens the inbox on one item (the Attention tab on a phone). */
+export function openInboxItem(key: string): void {
+  inboxTarget.set(key);
+  attentionOpen.set('open');
+}
+
+/** Whether a phone's installed app should open on the Attention tab rather than the overview. */
+export const landsOnAttention = (env: {
+  standalone: boolean;
+  location: string;
+  waiting: number;
+}): boolean => env.standalone && env.location === routes.overview && env.waiting > 0;
+
+/**
+ * How to stop a session from outside. Board sessions stop through the SDK; a terminal's Claude
+ * Code stops on Esc, like its own key.
+ */
+export function sessionInterruptAction(
+  session: Pick<ClaudeSession, 'id' | 'origin' | 'terminalId'>,
+): UiAction | null {
+  if (session.origin === 'board') return { kind: 'session.interrupt', sessionId: session.id };
+  return session.terminalId
+    ? { kind: 'terminal.sendText', terminalId: session.terminalId, text: ESC, execute: false }
+    : null;
+}
+
+/**
+ * What Interrupt does on an inbox item. A request held by the hook is answered with a stop: Esc
+ * would reach a terminal that shows no prompt. Without one, only a session mid-turn has anything
+ * to stop; one waiting for a reply has already ended its turn.
+ */
+export function inboxInterrupt(
+  session: ClaudeSession,
+  approval: Pick<Approval, 'source'> | null,
+): { kind: 'stopRequest' } | { kind: 'action'; action: UiAction } | null {
+  if (approval?.source === 'hook') return { kind: 'stopRequest' };
+  if (session.status.kind !== 'waiting_permission') return null;
+  const action = sessionInterruptAction(session);
+  return action ? { kind: 'action', action } : null;
+}
+
+/**
+ * How an item can change the session's permission mode. A board session switches through the SDK
+ * and its request stays open. A terminal session has no way in except the hook's answer, so there
+ * the switch comes with allowing the request, and a terminal prompt with no hook behind it has none.
+ */
+export function inboxModeSwitch(
+  session: Pick<ClaudeSession, 'origin' | 'permissionMode'>,
+  approval: Pick<Approval, 'source'> | null,
+): { kind: 'session' } | { kind: 'allowWith'; modes: readonly HookPermissionMode[] } | null {
+  if (approval?.source === 'hook') {
+    const current: PermissionMode = session.permissionMode ?? 'default';
+    return { kind: 'allowWith', modes: HOOK_PERMISSION_MODES.filter((m) => m !== current) };
+  }
+  return session.origin === 'board' ? { kind: 'session' } : null;
+}
+
 export type AttentionDecision = 'allow' | 'allowAlways' | 'deny';
 
 export type AttentionKey =
   | { kind: 'decide'; decision: AttentionDecision }
-  | { kind: 'move'; by: 1 | -1 };
+  | { kind: 'move'; by: 1 | -1 }
+  | { kind: 'open' };
 
 /**
- * The sheet's keyboard: A allows, ⇧A always allows, D starts a denial, and ↑↓ (or K/J) move
- * between cards. Null for everything else, including chords with ⌘, Ctrl or Alt.
+ * The sheet's keyboard: A allows, ⇧A always allows, D starts a denial, ↑↓ (or K/J) move between
+ * items and Enter opens the session. Null for everything else, including chords with ⌘, Ctrl or
+ * Alt.
  */
 export function attentionKey(event: {
   key: string;
@@ -74,6 +195,8 @@ export function attentionKey(event: {
     case 'ArrowUp':
     case 'k':
       return { kind: 'move', by: -1 };
+    case 'Enter':
+      return { kind: 'open' };
     default:
       return null;
   }
@@ -85,12 +208,16 @@ export async function decideApproval(
   approvalId: string,
   decision: AttentionDecision,
   reason?: string,
+  extra: { interrupt?: boolean; mode?: HookPermissionMode } = {},
 ): Promise<boolean> {
+  const { interrupt, mode } = extra;
   const result = await client.request(
     'approval.decide',
     decision === 'deny'
-      ? { approvalId, decision, ...(reason ? { reason } : {}) }
-      : { approvalId, decision },
+      ? { approvalId, decision, ...(reason ? { reason } : {}), ...(interrupt ? { interrupt } : {}) }
+      : decision === 'allow' && mode
+        ? { approvalId, decision, mode }
+        : { approvalId, decision },
   );
   if (!result.ok) toast.error(actionErrorText(result.error, 'The decision did not go through'));
   return result.ok;

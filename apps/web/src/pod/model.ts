@@ -120,14 +120,20 @@ export function sessionCaption(session: ClaudeSession, approval?: Approval | nul
         tone: 'rest',
       };
     case 'idle': {
-      // What the last turn produced, else its title; Claude Code's automatic `<folder>-<code>`
-      // name says nothing.
-      const title = session.title?.trim();
-      const named = title && !isAutomaticSessionName(title, session.cwd) ? title : null;
-      const text = lastLine(session.lastAssistantText) ?? named ?? 'Ready';
-      return { glyph: null, text: clipCaption(text), tone: 'rest' };
+      return { glyph: null, text: sessionSummary(session) ?? 'Ready', tone: 'rest' };
     }
   }
+}
+
+/**
+ * What the session's last turn produced, else its title; Claude Code's automatic `<folder>-<code>`
+ * name says nothing.
+ */
+export function sessionSummary(session: ClaudeSession): string | null {
+  const title = session.title?.trim();
+  const named = title && !isAutomaticSessionName(title, session.cwd) ? title : null;
+  const text = lastLine(session.lastAssistantText) ?? named;
+  return text ? clipCaption(text) : null;
 }
 
 const clipCaption = (text: string) =>

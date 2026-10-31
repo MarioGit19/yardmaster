@@ -152,11 +152,17 @@ export class AwayApprovals {
     if (!pending) return { ok: false, error: UNKNOWN_APPROVAL };
     if (decision.decision === 'deny') {
       const reason = clip(decision.reason);
-      this.settle(decision.approvalId, 'denied', reason, { decision: 'deny', reason });
+      this.settle(decision.approvalId, 'denied', reason, {
+        decision: decision.interrupt ? 'deny_and_stop' : 'deny',
+        reason,
+      });
+    } else if (decision.decision === 'allowAlways' && pending.suggestions.length > 0) {
+      this.settle(decision.approvalId, 'allowed', null, { decision: 'allow_always' });
     } else {
-      const always = decision.decision === 'allowAlways' && pending.suggestions.length > 0;
+      const mode = decision.decision === 'allow' ? decision.mode : undefined;
       this.settle(decision.approvalId, 'allowed', null, {
-        decision: always ? 'allow_always' : 'allow',
+        decision: 'allow',
+        ...(mode ? { mode } : {}),
       });
     }
     return { ok: true };
@@ -191,10 +197,12 @@ export class AwayApprovals {
         approval.sessionId,
         state === 'allowed'
           ? { kind: 'tool', tool: approval.tool, toolUseId: null }
-          : state === 'denied'
-            ? { kind: 'working' }
-            : // Still waiting, now on the terminal's own prompt.
-              { kind: 'waiting_permission', approvalId: null },
+          : answer?.decision === 'deny_and_stop'
+            ? { kind: 'idle' }
+            : state === 'denied'
+              ? { kind: 'working' }
+              : // Still waiting, now on the terminal's own prompt.
+                { kind: 'waiting_permission', approvalId: null },
         ts,
       );
     }

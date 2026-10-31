@@ -8,7 +8,7 @@ import {
   type UiAction,
   visibleCommandLine,
 } from '@yardmaster/protocol';
-import { isWaiting } from '../attention/attention.js';
+import { isWaiting, sessionInterruptAction } from '../attention/attention.js';
 import { terminalSession } from '../data/selectors.js';
 import type { Phosphor } from '../fx/FaultyTerminal.js';
 import { laneExecution, terminalDisplay } from '../lanes/lane.js';
@@ -19,7 +19,6 @@ import { DENSITIES, DENSITY_NAME, type Density } from '../pod/density.js';
 import { PHOSPHOR_LABEL, PHOSPHORS } from '../retro/phosphor.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { sessionStatusView, type Tone } from '../status.js';
-import { ESC } from '../terminal/claudeTerminal.js';
 import type { ThemeSetting } from '../theme/theme.js';
 import { type FuzzyMatch, fuzzyMatch } from './fuzzy.js';
 
@@ -232,7 +231,7 @@ export function buildCommands(board: BoardState, context: PaletteContext): Palet
   }
 
   commands.push(...projectActions(board, context, projects));
-  commands.push(...boardActions(context));
+  commands.push(...boardActions(context, waitingCount(board)));
   return commands;
 }
 
@@ -273,13 +272,7 @@ function projectActions(
     if (!isBusy(session)) continue;
     const project = scope.find((p) => p.id === session.projectId);
     if (!project) continue;
-    // Board sessions stop through the SDK; a terminal's Claude Code stops on Esc, like its own key.
-    const action: UiAction | null =
-      session.origin === 'board'
-        ? { kind: 'session.interrupt', sessionId: session.id }
-        : session.terminalId
-          ? { kind: 'terminal.sendText', terminalId: session.terminalId, text: ESC, execute: false }
-          : null;
+    const action = sessionInterruptAction(session);
     if (!action) continue;
     commands.push({
       id: `interrupt:${session.id}`,
@@ -375,7 +368,11 @@ function projectActions(
   return commands;
 }
 
-function boardActions(context: PaletteContext): PaletteCommand[] {
+function waitingCount(board: BoardState): number {
+  return Object.values(board.sessions).filter(isWaiting).length;
+}
+
+function boardActions(context: PaletteContext, waiting: number): PaletteCommand[] {
   const commands: PaletteCommand[] = [];
   if (context.projectId !== null) {
     commands.push({
@@ -401,6 +398,7 @@ function boardActions(context: PaletteContext): PaletteCommand[] {
       id: 'attention',
       group: 'Actions',
       label: 'Open the Attention Center',
+      ...(waiting > 0 ? { hint: `${waiting} waiting`, tone: 'wait' as const } : {}),
       icon: 'attention',
       run: { kind: 'attention' },
     },

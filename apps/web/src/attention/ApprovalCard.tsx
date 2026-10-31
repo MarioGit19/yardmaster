@@ -1,6 +1,7 @@
 import {
   type Approval,
   type ApprovalState,
+  type HookPermissionMode,
   parseToolCall,
   redactDeep,
   sessionDisplayName,
@@ -10,6 +11,7 @@ import {
 import { X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { useNow } from '../anim/clock.js';
 import { langFor, type TokenLine, useHighlight } from '../claude/highlight.js';
 import { DiffView } from '../claude/tools/DiffView.js';
 import { buildHunk } from '../claude/tools/diff.js';
@@ -18,8 +20,11 @@ import { selectProject, selectSession, useBoard } from '../data/index.js';
 import { dur, ease, slide, spring, useMotionLevel } from '../motion.js';
 import { ClaudeOrb } from '../orb/ClaudeOrb.js';
 import { finishCountdown, orbStateFor } from '../orb/model.js';
+import { sessionSummary } from '../pod/model.js';
 import { reveal, useMasked, useRedactOn } from '../redact/reveal.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
+import { STALE_TICK_MS } from '../statusTokens.js';
+import { formatWaited } from '../time.js';
 import { Button } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { DrawnCheck } from '../ui/DrawnCheck.js';
@@ -33,6 +38,7 @@ import {
   RESOLVED_LABEL,
   relativeToProject,
 } from './attention.js';
+import { InboxControls } from './InboxControls.js';
 
 /** The protocol's limit on a deny reason. */
 const MAX_REASON = 1_000;
@@ -49,11 +55,18 @@ export interface ApprovalCardProps {
   onDecide(decision: AttentionDecision, reason?: string): void;
   onDenyStart(): void;
   onDenyCancel(): void;
+  /** In the inbox: the session's summary and what else can be done from here. */
+  inbox?: {
+    onOpen(): void;
+    onStopRequest(): void;
+    onAllowWithMode(mode: HookPermissionMode): void;
+  };
 }
 
 /**
- * One permission request, DESIGN.md §4.5: project chip, session orb, tool name and the exact
- * payload, with Allow (A), Always allow (⇧A) and Deny… (D, with an optional reason).
+ * One permission request, DESIGN.md §4.5a: project chip, session orb, tool name, the session's
+ * one-line summary, how long it has waited and the exact payload, with Allow (A), Always allow
+ * (⇧A) and Deny… (D, with an optional reason).
  */
 export function ApprovalCard({
   approval,
@@ -65,11 +78,14 @@ export function ApprovalCard({
   onDecide,
   onDenyStart,
   onDenyCancel,
+  inbox,
 }: ApprovalCardProps) {
   const session = useBoard(selectSession(approval.sessionId));
   const project = useBoard(selectProject(session?.projectId ?? ''));
   const title = session ? sessionDisplayName(session) : null;
   const subtitle = session ? sessionSubtitle(session) : null;
+  const summary = inbox && session ? sessionSummary(session) : null;
+  const now = useNow(STALE_TICK_MS);
   const always = canAlwaysAllow(approval);
   const accent = project ? `var(--accent-${project.accent})` : undefined;
   const headingId = `approval-${approval.id}`;
@@ -136,6 +152,10 @@ export function ApprovalCard({
           </span>
           <span id={headingId} className="text-label text-st-wait-ink">
             Wants to run <span className="font-mono">{approval.tool}</span>
+            <span data-waited className="text-text-3">
+              <span aria-hidden>&nbsp;·&nbsp;</span>
+              {formatWaited(Math.max(0, now - approval.createdAt))}
+            </span>
           </span>
         </span>
         {session && (
@@ -156,6 +176,11 @@ export function ApprovalCard({
             exit={{ opacity: 0, transition: { duration: dur.fast, ease: ease.out } }}
             className="flex flex-col gap-2.5"
           >
+            {summary && (
+              <p data-summary title={summary} className="truncate text-meta text-text-2">
+                {summary}
+              </p>
+            )}
             <MaskedPayload approval={approval} projectPath={project?.path} />
             {approval.blockedPath && (
               <p className="text-meta text-text-2">
@@ -200,25 +225,36 @@ export function ApprovalCard({
           onCancel={onDenyCancel}
         />
       ) : (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => onDecide('allow')}>
-            Allow
-            {selected && <Shortcut keys="A" dark />}
-          </Button>
-          <Button
-            size="sm"
-            disabled={busy || !always}
-            title={always ? undefined : 'No rule to save for this request'}
-            onClick={() => onDecide('allowAlways')}
-          >
-            Always allow
-            {selected && always && <Shortcut keys="⇧A" />}
-          </Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={onDenyStart}>
-            Deny…
-            {selected && <Shortcut keys="D" />}
-          </Button>
-        </div>
+        <>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => onDecide('allow')}>
+              Allow
+              {selected && <Shortcut keys="A" dark />}
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy || !always}
+              title={always ? undefined : 'No rule to save for this request'}
+              onClick={() => onDecide('allowAlways')}
+            >
+              Always allow
+              {selected && always && <Shortcut keys="⇧A" />}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={onDenyStart}>
+              Deny…
+              {selected && <Shortcut keys="D" />}
+            </Button>
+          </div>
+          {inbox && session && (
+            <InboxControls
+              session={session}
+              approval={approval}
+              busy={busy}
+              selected={selected}
+              {...inbox}
+            />
+          )}
+        </>
       )}
     </motion.article>
   );

@@ -1,4 +1,4 @@
-import type { Browser, Page } from '@playwright/test';
+import type { Browser, Locator, Page } from '@playwright/test';
 import { startDemoBoard } from './board.js';
 import { expect, openRoute, signedInState, test } from './fixtures.js';
 
@@ -98,6 +98,99 @@ test('a new request shows a toast that opens the Attention Center', async ({ bro
     await expect(sheet.locator('article[data-approval]').first()).toBeVisible();
     // The Center lists the same approvals, so their toasts are put away.
     await expect(toast).toHaveCount(0);
+  } finally {
+    await stop();
+  }
+});
+
+/** Opens the sheet once at least `count` approvals are listed; the demo keeps raising them. */
+async function openRequests(page: Page, count: number) {
+  await page.locator('[data-hud="needs-you"]').click();
+  const sheet = page.getByRole('complementary', { name: /Needs you/ });
+  await expect(sheet.locator('article[data-approval]').nth(count - 1)).toBeVisible({
+    timeout: 90_000,
+  });
+  return sheet;
+}
+
+const selectedItem = (sheet: Locator) =>
+  sheet.locator('[data-inbox-item]:has([data-selected])').getAttribute('data-inbox-item');
+
+const approvalIds = async (sheet: Locator) =>
+  sheet
+    .locator('article[data-approval]:not([data-resolved])')
+    .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-approval') ?? ''));
+
+test('the inbox moves with J and K, and the next item takes focus after a decision', async ({
+  browser,
+}) => {
+  test.slow();
+  const { page, stop } = await openBoard(browser);
+  try {
+    const sheet = await openRequests(page, 2);
+    const [first] = await approvalIds(sheet);
+    // Walk to the first approval: a session waiting for a reply can sit above it.
+    await sheet.locator(`article[data-approval="${first}"]`).click({ position: { x: 8, y: 8 } });
+    await expect.poll(() => selectedItem(sheet)).toBe(first);
+    await page.keyboard.press('j');
+    const below = await selectedItem(sheet);
+    expect(below).not.toBe(first);
+    await page.keyboard.press('k');
+    await expect.poll(() => selectedItem(sheet)).toBe(first);
+
+    await expect(sheet.locator(`[data-inbox-item="${first}"] [data-waited]`)).toBeVisible();
+    await page.keyboard.press('a');
+    await expect(sheet.locator(`[data-inbox-item="${first}"]`)).toHaveCount(0);
+    await expect.poll(() => selectedItem(sheet)).toBe(below);
+    await expect(sheet.locator(`[data-inbox-item="${below}"]`)).toBeFocused();
+  } finally {
+    await stop();
+  }
+});
+
+test('Enter opens the selected item in its session', async ({ browser }) => {
+  test.slow();
+  const { page, stop } = await openBoard(browser);
+  try {
+    await openFirstRequest(page);
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/p\/.+\/s\//);
+    await expect(page.locator('[data-attention-scrim]')).toHaveCount(0);
+  } finally {
+    await stop();
+  }
+});
+
+test('an item interrupts the session or allows and switches its mode', async ({ browser }) => {
+  test.slow();
+  const { page, stop } = await openBoard(browser);
+  try {
+    const sheet = await openRequests(page, 2);
+    const [first, second] = await approvalIds(sheet);
+    const card = (id: string | undefined) => sheet.locator(`article[data-approval="${id}"]`);
+    await card(first).locator('[data-inbox-interrupt]').click();
+    await expect(card(first)).toHaveAttribute('data-resolved', 'denied');
+    await card(second).getByLabel('Allow and switch mode').selectOption('acceptEdits');
+    await expect(card(second)).toHaveAttribute('data-resolved', 'allowed');
+  } finally {
+    await stop();
+  }
+});
+
+test('a notification link opens that item in the inbox', async ({ browser }) => {
+  test.slow();
+  const { page, stop } = await openBoard(browser);
+  try {
+    const sheet = await openRequests(page, 2);
+    const [, second] = await approvalIds(sheet);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await page.evaluate((item) => {
+      location.hash = `#/attention/${encodeURIComponent(item ?? '')}`;
+    }, second);
+    await expect(sheet).toBeVisible();
+    await expect.poll(() => selectedItem(sheet)).toBe(second);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/');
   } finally {
     await stop();
   }

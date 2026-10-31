@@ -69,7 +69,7 @@ Subscribed events: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse
 
 We use `command` hooks rather than `http` ones so the hook can attach `$PPID` for terminal linking, read the token from a file, and fail silently when the board is off.
 
-**Away-mode permission hook** (`packages/hook/bin/yardmaster-hook-permission.mjs`, synchronous, run by the absolute Node path the installer writes): exits at once with no output unless the board reports away mode. When it is on, the hook posts the request over the socket and long-polls for the board's decision (120 s by default): allow, always allow, or deny with a reason. It writes the `PermissionRequest` output itself, taking "always allow" rules only from Claude Code's own `permission_suggestions` and never emitting `updatedInput`. On a timeout or an error it exits quietly, and the normal terminal prompt appears.
+**Away-mode permission hook** (`packages/hook/bin/yardmaster-hook-permission.mjs`, synchronous, run by the absolute Node path the installer writes): exits at once with no output unless the board reports away mode. When it is on, the hook posts the request over the socket and long-polls for the board's decision (120 s by default): allow, always allow, deny with a reason, or deny and stop the turn. An allow can carry a mode switch for the session, which the hook takes only from its own short list (`default`, `acceptEdits`, `plan`). It writes the `PermissionRequest` output itself, taking "always allow" rules only from Claude Code's own `permission_suggestions` and never emitting `updatedInput`. On a timeout or an error it exits quietly, and the normal terminal prompt appears.
 
 ### Claude session status
 

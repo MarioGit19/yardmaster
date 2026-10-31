@@ -36,16 +36,23 @@ export function pushSupport(env: PushEnvironment): PushSupport {
   return 'unsupported';
 }
 
-export function browserPushEnvironment(): PushEnvironment {
+/** Whether the board runs as the installed app, not in a browser tab. */
+export function isStandalone(): boolean {
   const nav = navigator as Navigator & { standalone?: boolean };
+  return (
+    nav.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true
+  );
+}
+
+export function browserPushEnvironment(): PushEnvironment {
+  const nav = navigator;
   return {
     isSecureContext: window.isSecureContext,
     userAgent: nav.userAgent,
     hasServiceWorker: 'serviceWorker' in nav,
     hasPushManager: 'PushManager' in window,
     hasNotification: typeof Notification !== 'undefined',
-    standalone:
-      nav.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true,
+    standalone: isStandalone(),
   };
 }
 

@@ -105,6 +105,9 @@ function parseJson(text) {
   }
 }
 
+// The board can switch a session to these and no others, whatever it answers.
+const HOOK_MODES = new Set(['default', 'acceptEdits', 'plan']);
+
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Claude Code's own suggestions from this hook's input; the board's answer never adds any. */
@@ -119,16 +122,22 @@ function hookOutput(answer, input) {
   if (!isObject(answer)) return null;
   let decision;
   if (answer.decision === 'allow') {
-    decision = { behavior: 'allow' };
+    decision = HOOK_MODES.has(answer.mode)
+      ? {
+          behavior: 'allow',
+          updatedPermissions: [{ type: 'setMode', mode: answer.mode, destination: 'session' }],
+        }
+      : { behavior: 'allow' };
   } else if (answer.decision === 'allow_always') {
     const suggestions = suggestionsOf(input);
     decision =
       suggestions.length > 0
         ? { behavior: 'allow', updatedPermissions: suggestions }
         : { behavior: 'allow' };
-  } else if (answer.decision === 'deny') {
+  } else if (answer.decision === 'deny' || answer.decision === 'deny_and_stop') {
     const reason = typeof answer.reason === 'string' ? answer.reason.trim() : '';
     decision = { behavior: 'deny', message: reason ? reason.slice(0, REASON_MAX) : DENY_MESSAGE };
+    if (answer.decision === 'deny_and_stop') decision.interrupt = true;
   } else {
     return null;
   }

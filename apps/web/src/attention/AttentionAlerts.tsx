@@ -7,10 +7,9 @@ import {
   approvalHeadline,
   attentionOpen,
   notificationsPreference,
+  openInboxItem,
   relativeToProject,
 } from './attention.js';
-
-const open = () => attentionOpen.set('open');
 
 /**
  * Tells the user about new approvals wherever they are, DESIGN.md §8: a toast (unless the
@@ -57,7 +56,7 @@ export function AttentionAlerts() {
           toast.warning(headline, {
             id: approval.id,
             description: detail,
-            action: { label: 'Review', onClick: open },
+            action: { label: 'Review', onClick: () => openInboxItem(approval.id) },
             onDismiss: () => shown.current.delete(approval.id),
             onAutoClose: () => shown.current.delete(approval.id),
           });
@@ -85,7 +84,7 @@ function notify(tag: string, title: string, body: string | undefined): void {
     const notification = new Notification(title, { body, tag });
     notification.onclick = () => {
       window.focus();
-      open();
+      openInboxItem(tag);
       notification.close();
     };
   } catch {

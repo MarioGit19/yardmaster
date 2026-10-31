@@ -1,4 +1,4 @@
-import type { Approval } from '@yardmaster/protocol';
+import type { Approval, ClaudeSession } from '@yardmaster/protocol';
 import { describe, expect, it } from 'vitest';
 import type { BoardStoreState } from '../data/store.js';
 import { makeProject, makeSession, sampleBoard } from '../test/board.js';
@@ -7,6 +7,10 @@ import {
   attentionKey,
   canAlwaysAllow,
   EXPIRE_FINISH_MS,
+  inboxInterrupt,
+  inboxItems,
+  inboxModeSwitch,
+  landsOnAttention,
   lingerFor,
   relativeToProject,
   selectWaitingWithoutApproval,
@@ -51,13 +55,17 @@ describe('attentionKey', () => {
     expect(key('k')).toEqual({ kind: 'move', by: -1 });
   });
 
+  it('opens the session on Enter', () => {
+    expect(key('Enter')).toEqual({ kind: 'open' });
+  });
+
   it('leaves chords and other keys alone', () => {
     expect(key('a', { meta: true })).toBeNull();
     expect(key('a', { ctrl: true })).toBeNull();
     expect(key('d', { alt: true })).toBeNull();
     expect(key('D', { shift: true })).toBeNull();
     expect(key('x')).toBeNull();
-    expect(key('Enter')).toBeNull();
+    expect(key('Enter', { meta: true })).toBeNull();
   });
 });
 
@@ -123,5 +131,89 @@ describe('lingerFor', () => {
     for (const state of ['allowed', 'denied', 'expired'] as const) {
       expect(lingerFor(state, 'off')).toBe(0);
     }
+  });
+});
+
+describe('inboxItems', () => {
+  it('merges approvals and waiting sessions, oldest first', () => {
+    const items = inboxItems(
+      [
+        { ...approval('a-new', 's-1', 'pending'), createdAt: 300 },
+        { ...approval('a-old', 's-2', 'pending'), createdAt: 100 },
+      ],
+      [{ ...makeSession('s-3', 'p-1', { kind: 'waiting_input' }), updatedAt: 200 }],
+    );
+    expect(items.map((item) => item.key)).toEqual(['a-old', 's:s-3', 'a-new']);
+  });
+});
+
+describe('inboxInterrupt', () => {
+  const waiting = { kind: 'waiting_permission', approvalId: 'a' } as const;
+  const on = (
+    origin: 'board' | 'terminal',
+    terminalId: string | null,
+    status: ClaudeSession['status'] = waiting,
+  ) => ({ ...makeSession('s-1', 'p-1', status), origin, terminalId });
+
+  it('answers a request the hook holds with a stop', () => {
+    const session = on('terminal', 't-1');
+    expect(inboxInterrupt(session, { source: 'hook' })).toEqual({ kind: 'stopRequest' });
+  });
+
+  it('stops a board session through the SDK', () => {
+    const session = on('board', null);
+    expect(inboxInterrupt(session, { source: 'sdk' })).toEqual({
+      kind: 'action',
+      action: { kind: 'session.interrupt', sessionId: 's-1' },
+    });
+  });
+
+  it('presses Esc at a terminal prompt with no request behind it', () => {
+    const session = on('terminal', 't-1');
+    expect(inboxInterrupt(session, null)).toMatchObject({
+      action: { kind: 'terminal.sendText', terminalId: 't-1', execute: false },
+    });
+  });
+
+  it('has nothing to stop in a session waiting for a reply', () => {
+    const session = on('board', null, { kind: 'waiting_input' });
+    expect(inboxInterrupt(session, null)).toBeNull();
+  });
+
+  it('has no way into a terminal session without a terminal', () => {
+    const session = on('terminal', null);
+    expect(inboxInterrupt(session, null)).toBeNull();
+  });
+});
+
+describe('inboxModeSwitch', () => {
+  it('switches a board session directly', () => {
+    expect(inboxModeSwitch({ origin: 'board', permissionMode: null }, { source: 'sdk' })).toEqual({
+      kind: 'session',
+    });
+  });
+
+  it('offers a terminal session only the hook modes it is not in', () => {
+    expect(
+      inboxModeSwitch({ origin: 'terminal', permissionMode: 'acceptEdits' }, { source: 'hook' }),
+    ).toEqual({ kind: 'allowWith', modes: ['default', 'plan'] });
+  });
+
+  it('never offers a terminal prompt with no hook behind it', () => {
+    expect(inboxModeSwitch({ origin: 'terminal', permissionMode: null }, null)).toBeNull();
+  });
+});
+
+describe('landsOnAttention', () => {
+  const env = { standalone: true, location: '/', waiting: 1 };
+
+  it('sends the installed app to the Attention tab when anything is pending', () => {
+    expect(landsOnAttention(env)).toBe(true);
+  });
+
+  it('stays put in a browser tab, on a deep link, or with nothing pending', () => {
+    expect(landsOnAttention({ ...env, standalone: false })).toBe(false);
+    expect(landsOnAttention({ ...env, location: '/p/acme' })).toBe(false);
+    expect(landsOnAttention({ ...env, waiting: 0 })).toBe(false);
   });
 });

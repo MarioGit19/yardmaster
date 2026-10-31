@@ -5,7 +5,7 @@ import { useHashLocation } from 'wouter/use-hash-location';
 import { AmbientField } from './ambient/AmbientField.js';
 import { useBackdropTaken } from './ambient/backdrop.js';
 import { AttentionAlerts } from './attention/AttentionAlerts.js';
-import { AttentionCenter, AttentionPage } from './attention/AttentionCenter.js';
+import { AttentionCenter, AttentionItemLink, AttentionPage } from './attention/AttentionCenter.js';
 import { SignInScreen } from './auth/SignInScreen.js';
 import { useSignedOut } from './auth/session.js';
 import { LiveFavicon } from './brand/LiveFavicon.js';
@@ -114,6 +114,9 @@ function OtherScreens() {
       </Route>
       <Route path={routes.attention}>
         <AttentionPage />
+      </Route>
+      <Route path={routes.attentionItem}>
+        {(params) => <AttentionItemLink item={params.item} />}
       </Route>
       <Route path={routes.pulse}>
         <PulsePage />

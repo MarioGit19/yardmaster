@@ -186,6 +186,22 @@ for (const profile of PROFILES) {
       // No desktop sheet on a phone.
       await expect(page.locator('aside[aria-labelledby="attention-title"]')).toHaveCount(0);
     });
+
+    test('the installed app opens on the Attention tab when something is pending', async ({
+      page,
+    }) => {
+      // The shared demo board has had time to raise a request; a browser tab stays on the overview.
+      await openRoute(page, '/');
+      await expect(
+        page.locator('[data-phone-topbar] [data-hud="needs-you"] [data-value]'),
+      ).not.toHaveAttribute('data-value', '0', { timeout: 30_000 });
+      expect(await hash(page)).toBe('#/');
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'standalone', { value: true });
+      });
+      await page.reload();
+      await expect.poll(() => hash(page)).toBe('#/attention');
+    });
   });
 }
 

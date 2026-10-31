@@ -196,6 +196,29 @@ describe('away-mode routes', () => {
     });
   });
 
+  it('carries a mode switch to the hook, and a stop that ends the turn', async () => {
+    const { app: server, token } = await boot();
+    await call('PUT', '/api/settings', token, { awayMode: true });
+
+    const allow = call('POST', PERMISSION_ROUTE, token, hookFixture('permission-request'));
+    const first = await pendingApproval(server);
+    server.awayApprovals.decide({ approvalId: first.id, decision: 'allow', mode: 'acceptEdits' });
+    expect(PermissionHookAnswer.parse((await allow).json())).toEqual({
+      decision: 'allow',
+      mode: 'acceptEdits',
+    });
+
+    const stop = call('POST', PERMISSION_ROUTE, token, hookFixture('permission-request'));
+    const second = await pendingApproval(server);
+    server.awayApprovals.decide({ approvalId: second.id, decision: 'deny', interrupt: true });
+    expect(PermissionHookAnswer.parse((await stop).json())).toEqual({
+      decision: 'deny_and_stop',
+      reason: null,
+    });
+    expect(server.store.state.approvals[second.id]?.state).toBe('denied');
+    expect(server.store.state.sessions[FIXTURE_SESSION_ID]?.status).toEqual({ kind: 'idle' });
+  });
+
   it('answers 204 for a malformed request, and in demo mode', async () => {
     const { token } = await boot();
     await call('PUT', '/api/settings', token, { awayMode: true });
