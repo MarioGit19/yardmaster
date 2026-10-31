@@ -38,10 +38,12 @@ export default defineConfig({
     // The PRD §9 load (`--demo-stress`). Full Chromium (new headless) renders with the GPU; the
     // headless shell falls back to software WebGL, which says nothing about the target machine.
     // It runs after the transcript checks: its GPU browser's teardown would land in their window.
+    // One worker, or `--repeat-each` runs the copies side by side and they load each other.
     {
       name: 'perf-stress',
       testMatch: /stress\.spec\.ts$/,
       fullyParallel: false,
+      workers: 1,
       use: { channel: 'chromium' },
       dependencies: ['perf-messages'],
     },

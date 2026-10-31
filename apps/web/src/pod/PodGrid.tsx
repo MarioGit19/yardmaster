@@ -88,7 +88,8 @@ export function PodGrid() {
     projectOrder.save(next);
     setMoved(`${name} moved to place ${next.indexOf(id) + 1} of ${next.length}`);
   };
-  // Only a reorder measures the slots; any other re-render would measure every pod on the page.
+  // `layoutDependency` keeps a reorder's glide to real reorders, but a slot with `drag` measures on
+  // every render regardless, so everything here has to stay still between reorders.
   const density = usePreference(densityPreference);
   const quiet = useQuietProjects(live);
   const orderKey = order.join('|');

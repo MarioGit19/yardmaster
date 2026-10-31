@@ -1,6 +1,6 @@
 import { worktreeParent } from '@yardmaster/protocol';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
-import { useBoard } from '../data/index.js';
+import { useBoard, useBoardStore } from '../data/index.js';
 import type { BoardStoreState } from '../data/store.js';
 import { keepOrder } from '../order.js';
 import type { KeyValueStorage } from '../prefs.js';
@@ -112,9 +112,9 @@ export function nudgeProject(
   return next;
 }
 
-/** Project ids, most recently active first, as a joined key (no projects until the board loads). */
-export function selectRecentKey(s: BoardStoreState): string {
-  if (!s.hydrated) return '';
+/** Project ids, most recently active first (no projects until the board loads). */
+export function recentIds(s: BoardStoreState): string[] {
+  if (!s.hydrated) return [];
   return Object.values(s.board.projects)
     .sort(
       (a, b) =>
@@ -122,8 +122,7 @@ export function selectRecentKey(s: BoardStoreState): string {
         a.name.localeCompare(b.name) ||
         a.id.localeCompare(b.id),
     )
-    .map((p) => p.id)
-    .join('\n');
+    .map((p) => p.id);
 }
 
 /** Each linked worktree with its main checkout, as `child parent` lines of ids. */
@@ -154,17 +153,18 @@ export const usePinnedProjects = (): readonly string[] =>
 
 /**
  * Every project in overview order, worktrees behind their main checkout. Whichever list asks first
- * on a load fixes the default.
+ * on a load fixes the default. The selector settles the order, so a project overtaking another in
+ * recency, many times a second on a busy board, re-renders nothing when the order stands.
  */
 export function useProjectOrder(): readonly string[] {
-  const key = useBoard(selectRecentKey);
+  const store = useBoardStore();
   const held = useSyncExternalStore(projectOrder.subscribe, projectOrder.get);
   const pinned = usePinnedProjects();
   const links = useBoard(selectWorktreeLinks);
-  const recent = useMemo(() => (key === '' ? [] : key.split('\n')), [key]);
-  useEffect(() => projectOrder.latch(recent), [recent]);
-  return useMemo(
-    () => besideParents(arrangeProjects(recent, held, pinned), links),
-    [recent, held, pinned, links],
+  const key = useBoard((s) =>
+    besideParents(arrangeProjects(recentIds(s), held, pinned), links).join('\n'),
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a newcomer always changes `key`
+  useEffect(() => projectOrder.latch(recentIds(store.getState())), [key, store]);
+  return useMemo(() => (key === '' ? [] : key.split('\n')), [key]);
 }

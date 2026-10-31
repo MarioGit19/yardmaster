@@ -6,7 +6,7 @@ import {
   createProjectOrder,
   nudgeProject,
   placeInOrder,
-  selectRecentKey,
+  recentIds,
 } from './projectOrder.js';
 
 function memoryStorage(initial: Record<string, string> = {}): KeyValueStorage {
@@ -96,7 +96,7 @@ describe('nudgeProject', () => {
   });
 });
 
-describe('selectRecentKey', () => {
+describe('recentIds', () => {
   const project = (id: string, name: string, lastActivityAt: number | null) => ({
     id,
     name,
@@ -111,12 +111,12 @@ describe('selectRecentKey', () => {
       d: project('d', 'never', null),
     };
     const state = { hydrated: true, board: { projects } } as never;
-    expect(selectRecentKey(state).split('\n')).toEqual(['c', 'b', 'a', 'd']);
+    expect(recentIds(state)).toEqual(['c', 'b', 'a', 'd']);
   });
 
   it('has nothing to order before the board loads', () => {
     const state = { hydrated: false, board: { projects: { a: project('a', 'a', 1) } } } as never;
-    expect(selectRecentKey(state)).toBe('');
+    expect(recentIds(state)).toEqual([]);
   });
 });
 
