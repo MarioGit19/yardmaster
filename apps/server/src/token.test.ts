@@ -1,8 +1,15 @@
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ensureToken, generateToken, isValidToken, tokenPath, tokensEqual } from './token.js';
+import {
+  ensureToken,
+  generateToken,
+  isValidToken,
+  tokenPath,
+  tokensEqual,
+  writeToken,
+} from './token.js';
 
 let root: string;
 
@@ -58,6 +65,38 @@ describe('ensureToken', () => {
   it('returns the same token to concurrent callers', async () => {
     const tokens = await Promise.all([ensureToken(root), ensureToken(root), ensureToken(root)]);
     expect(new Set(tokens).size).toBe(1);
+  });
+
+  it('agrees on one complete token however many callers race to create it', async () => {
+    for (let round = 0; round < 25; round++) {
+      const home = join(root, `home-${round}`);
+      const tokens = await Promise.all(Array.from({ length: 16 }, () => ensureToken(home)));
+      expect(new Set(tokens).size).toBe(1);
+      expect((await readFile(tokenPath(home), 'utf8')).trim()).toBe(tokens[0]);
+      expect(await readdir(home)).toEqual(['token']);
+    }
+  });
+
+  it('never sees a half-written file while the token is being replaced', async () => {
+    const first = await ensureToken(root);
+    const next = generateToken();
+    const seen = await Promise.all([
+      writeToken(root, next),
+      ...Array.from({ length: 16 }, () => ensureToken(root)),
+    ]);
+    expect(new Set([first, next])).toEqual(new Set([first, next, ...seen.slice(1)]));
+    expect(await readdir(root)).toEqual(['token']);
+  });
+});
+
+describe('writeToken', () => {
+  it('replaces the token with a 0600 file and leaves nothing else behind', async () => {
+    await writeFile(tokenPath(root), 'old\n', { mode: 0o644 });
+    const token = generateToken();
+    await writeToken(root, token);
+    expect(await readFile(tokenPath(root), 'utf8')).toBe(`${token}\n`);
+    expect(await mode(tokenPath(root))).toBe(0o600);
+    expect(await readdir(root)).toEqual(['token']);
   });
 });
 

@@ -5,6 +5,7 @@
 - Worktrees sit behind their main checkout in every project list, and the git panel lists them.
 - Review changes: a file-by-file diff against what the branch came from, with viewed marks, Commit, Discard and Ask Claude to fix, on desktop and phone.
 - A read-only pull request and checks badge when `gh` is signed in, and New parallel session through `claude --worktree`.
+- Starting twice at once on a fresh install, or rotating the token while another start reads it, can no longer leave the two with different tokens.
 
 ## 0.1.0 (2026-10-30)
 

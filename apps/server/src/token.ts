@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const TOKEN_FILE = 'token';
@@ -38,17 +38,28 @@ async function readExisting(path: string): Promise<string | undefined> {
   }
 }
 
-export async function writeToken(home: string, token: string): Promise<void> {
+/** Writes a complete token beside the real file, so it can appear there in one atomic step. */
+async function writeTempToken(home: string, token: string): Promise<string> {
   await mkdir(home, { recursive: true, mode: 0o700 });
-  const path = tokenPath(home);
-  await writeFile(path, `${token}\n`, { mode: 0o600 });
-  // writeFile's mode only applies on create, so tighten an existing file too.
-  await chmod(path, 0o600);
+  const temp = join(home, `${TOKEN_FILE}.${randomBytes(6).toString('hex')}.tmp`);
+  await writeFile(temp, `${token}\n`, { mode: 0o600, flag: 'wx' });
+  return temp;
+}
+
+export async function writeToken(home: string, token: string): Promise<void> {
+  const temp = await writeTempToken(home, token);
+  try {
+    await rename(temp, tokenPath(home));
+  } finally {
+    await rm(temp, { force: true });
+  }
 }
 
 /**
  * Returns the install token from `<home>/token`, creating it (0600) when missing.
  * A file with unusable content is replaced; one with loose permissions is tightened.
+ * The file only ever appears with its full content, so concurrent starts can't read
+ * it half-written, and they all settle on whichever token was linked first.
  */
 export async function ensureToken(home: string): Promise<string> {
   const path = tokenPath(home);
@@ -58,19 +69,24 @@ export async function ensureToken(home: string): Promise<string> {
     return existing;
   }
 
-  await mkdir(home, { recursive: true, mode: 0o700 });
   const token = generateToken();
-  if (existing === undefined) {
-    try {
-      await writeFile(path, `${token}\n`, { mode: 0o600, flag: 'wx' });
-      return token;
-    } catch (err) {
-      // Another process created it between our read and write; use theirs.
-      if (!isErrno(err, 'EEXIST')) throw err;
-      const raced = await readExisting(path);
-      if (raced !== undefined && isValidToken(raced)) return raced;
-    }
+  if (existing !== undefined) {
+    await writeToken(home, token);
+    return token;
   }
-  await writeToken(home, token);
-  return token;
+
+  const temp = await writeTempToken(home, token);
+  try {
+    // Unlike rename, link refuses to replace a token another process just created.
+    await link(temp, path);
+    return token;
+  } catch (err) {
+    if (!isErrno(err, 'EEXIST')) throw err;
+    const raced = await readExisting(path);
+    if (raced !== undefined && isValidToken(raced)) return raced;
+    await writeToken(home, token);
+    return token;
+  } finally {
+    await rm(temp, { force: true });
+  }
 }
