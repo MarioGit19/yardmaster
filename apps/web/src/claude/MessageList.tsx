@@ -123,6 +123,8 @@ export interface MessageListProps {
   verbosity?: Verbosity;
   /** Shown after the last row while the session rests (its crew member). */
   rest?: ReactNode;
+  /** Opens at this row, marked, instead of at the latest message. */
+  jumpTo?: string | null;
 }
 
 /**
@@ -137,6 +139,7 @@ export function MessageList({
   forkedAt = null,
   verbosity = 'normal',
   rest = null,
+  jumpTo = null,
 }: MessageListProps) {
   const still = useMotionLevel() !== 'full';
   const compact = useCompactChat();
@@ -235,10 +238,29 @@ export function MessageList({
     };
   }, [toEnd]);
 
+  // Like the jump to the end: rows measured on the way in move the target, so it re-aims.
+  const toRow = useCallback(
+    (index: number) => {
+      cancelAnimationFrame(settling.current);
+      stuck.current = false;
+      virtualizer.scrollToIndex(index, { align: 'center' });
+      let frames = 0;
+      const check = () => {
+        if (++frames > SETTLE_FRAMES) return;
+        virtualizer.scrollToIndex(index, { align: 'center' });
+        settling.current = requestAnimationFrame(check);
+      };
+      settling.current = requestAnimationFrame(check);
+    },
+    [virtualizer],
+  );
+
   // A conversation opens at its latest message; `anchorTo: 'end'` keeps it there afterwards.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on mount
   useLayoutEffect(() => {
-    toEnd();
+    const target = jumpTo === null ? -1 : items.findIndex((item) => item.id === jumpTo);
+    if (target >= 0) toRow(target);
+    else toEnd();
   }, []);
 
   // `followOnAppend` only follows when the last key changes, and a live tail or caption keeps
@@ -330,6 +352,7 @@ export function MessageList({
                   ref={virtualizer.measureElement}
                   data-index={v.index}
                   data-row={item.kind}
+                  data-jump-target={item.id === jumpTo ? '' : undefined}
                   data-inherited={parentRow ? '' : undefined}
                   className={cx('absolute top-0 left-0 w-full', column.gutter)}
                   style={{ transform: `translateY(${v.start}px)` }}

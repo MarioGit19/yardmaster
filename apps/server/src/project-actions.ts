@@ -142,6 +142,8 @@ export interface CloseActionsOptions {
   closeWindows: (projectId: string) => Promise<ActionResult>;
   /** Drops the project from the overview's pins. */
   unpin: (projectId: string) => void;
+  /** Removes the project's sessions from the transcript index. */
+  forgetIndexed?: (project: Project) => void;
   now?: () => number;
 }
 
@@ -172,6 +174,8 @@ export function createCloseActions(
     'project.forget': async ({ projectId, closeWindow }) => {
       const closed = await close(projectId, closeWindow === true);
       if (!closed.ok && closed.error === ROUTE_ERRORS.unknownProject) return closed;
+      const project = store.state.projects[projectId];
+      if (project) options.forgetIndexed?.(project);
       store.removeProject(projectId);
       return closed;
     },

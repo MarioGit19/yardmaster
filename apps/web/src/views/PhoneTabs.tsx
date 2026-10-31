@@ -1,5 +1,5 @@
 import type { ActivityEvent, Project } from '@yardmaster/protocol';
-import { Check, ChevronRight, FolderOpen, FolderX, Settings } from 'lucide-react';
+import { Check, ChevronRight, FolderOpen, FolderX, Search, Settings } from 'lucide-react';
 import { animate, motion, useMotionValue } from 'motion/react';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -371,6 +371,14 @@ export function MorePage() {
     <Page width="narrow">
       <PageHeader title="More" />
       <div className="flex flex-col gap-8">
+        <Link
+          href={routes.search}
+          data-more="search"
+          className={cx(ROW, 'rounded-panel border border-line bg-bg-1 text-text-1 shadow-raised')}
+        >
+          <Search aria-hidden className="size-5 shrink-0 text-text-2" strokeWidth={1.5} />
+          <span className="min-w-0 flex-1 truncate text-body">Search history</span>
+        </Link>
         <section aria-labelledby="more-layout" className="flex flex-col gap-3">
           <h2 id="more-layout" className="px-1 font-medium text-body-sm text-text-2">
             Layout

@@ -20,6 +20,7 @@ import {
   DEFAULT_IDLE_HIDE_MIN,
   DEFAULT_NOTIFY_EVENTS,
   DEFAULT_RETENTION_DAYS,
+  DEFAULT_SEARCH_MAX_MB,
   DEFAULT_USAGE_WARN_PERCENT,
   EditorCliPath,
   HooksInstallRequest,
@@ -34,6 +35,7 @@ import {
   NotifyEvent,
   ProjectId,
   RetentionDays,
+  SearchMaxMb,
   UsageWarnPercent,
 } from '@yardmaster/protocol';
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -61,6 +63,10 @@ export const USAGE_WARN_FIVE_HOUR_KEY = 'usage.warnFiveHour';
 export const USAGE_WARN_SEVEN_DAY_KEY = 'usage.warnSevenDay';
 /** The last limits a statusline reported, so the usage chip survives a restart. */
 export const USAGE_KEY = 'usage.last';
+export const SEARCH_MAX_MB_KEY = 'search.maxMb';
+export const SEARCH_TOOLS_KEY = 'search.includeTools';
+/** When the transcript index was cleared: nothing older goes back in until a rebuild. */
+export const SEARCH_FLOOR_KEY = 'search.floor';
 
 /**
  * Settings only this machine may change: they reach the disk, the editor or who may connect, or
@@ -71,6 +77,8 @@ export const LOCAL_ONLY_SETTINGS = [
   'libraryRoots',
   'remoteAllowedHosts',
   'retentionDays',
+  'searchIncludeTools',
+  'searchMaxMb',
 ] as const satisfies readonly (keyof BoardSettings)[];
 
 /** Claude's settings.json as the hooks routes see it. Demo mode swaps in an in-memory one. */
@@ -220,6 +228,18 @@ export function notifySettings(settings: Record<string, unknown>): {
   };
 }
 
+/** The stored transcript index settings: 500 MB, tool inputs and outputs left out. */
+export function searchSettings(settings: Record<string, unknown>): {
+  searchMaxMb: SearchMaxMb;
+  searchIncludeTools: boolean;
+} {
+  const max = SearchMaxMb.safeParse(settings[SEARCH_MAX_MB_KEY]);
+  return {
+    searchMaxMb: max.success ? max.data : DEFAULT_SEARCH_MAX_MB,
+    searchIncludeTools: settings[SEARCH_TOOLS_KEY] === true,
+  };
+}
+
 export function retentionMs(days: RetentionDays): number {
   return days * DAY_MS;
 }
@@ -234,6 +254,8 @@ export interface SettingsRoutesOptions {
    * a fresh session secret for the calling browser, if it had one.
    */
   rotateToken: ((caller: RotateCaller) => Promise<{ session?: string }>) | null;
+  /** The transcript index's size limit changed. */
+  onSearchLimit?: () => void;
 }
 
 /** Who asked for a rotation (on this machine): their browser session is replaced, not ended. */
@@ -265,6 +287,7 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     ...notifySettings(settings),
     usageWarnFiveHour: usageWarn(settings[USAGE_WARN_FIVE_HOUR_KEY]),
     usageWarnSevenDay: usageWarn(settings[USAGE_WARN_SEVEN_DAY_KEY]),
+    ...searchSettings(settings),
   });
   const save = (key: string, value: unknown) => {
     persistence.setSetting(key, value);
@@ -317,6 +340,13 @@ export function registerSettingsRoutes(app: FastifyInstance, options: SettingsRo
     }
     if (patch.data.notifyMutedProjects !== undefined) {
       save(NOTIFY_MUTED_KEY, [...new Set(patch.data.notifyMutedProjects)]);
+    }
+    if (patch.data.searchIncludeTools !== undefined) {
+      save(SEARCH_TOOLS_KEY, patch.data.searchIncludeTools);
+    }
+    if (patch.data.searchMaxMb !== undefined) {
+      save(SEARCH_MAX_MB_KEY, patch.data.searchMaxMb);
+      options.onSearchLimit?.();
     }
     return current();
   });

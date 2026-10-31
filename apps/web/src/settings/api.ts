@@ -14,6 +14,9 @@ import {
   PortSharesResponse,
   PushInfoResponse,
   RotateTokenResponse,
+  SearchIndexStatus,
+  SearchResponse,
+  SearchTranscriptResponse,
   SeenResponse,
   type SeenUpdate,
   ServerStatus,
@@ -94,5 +97,21 @@ export const api = {
   push: (signal?: AbortSignal) => request(PushInfoResponse, 'GET', '/api/push', undefined, signal),
   removePushDevice: (id: string) =>
     request(OkResponse, 'DELETE', `/api/push/subscriptions/${encodeURIComponent(id)}`),
+  search: (query: URLSearchParams, signal?: AbortSignal) =>
+    request(SearchResponse, 'GET', `/api/search?${query}`, undefined, signal),
+  searchIndex: (signal?: AbortSignal) =>
+    request(SearchIndexStatus, 'GET', '/api/search/index', undefined, signal),
+  rebuildSearchIndex: () => request(OkResponse, 'POST', '/api/search/index/rebuild', {}),
+  clearSearchIndex: () => request(OkResponse, 'DELETE', '/api/search/index'),
+  searchTranscript: (sessionId: string, around?: string, signal?: AbortSignal) =>
+    request(
+      SearchTranscriptResponse,
+      'GET',
+      `/api/search/sessions/${encodeURIComponent(sessionId)}${
+        around ? `?around=${encodeURIComponent(around)}` : ''
+      }`,
+      undefined,
+      signal,
+    ),
   testPush: (id: string) => request(OkResponse, 'POST', '/api/push/test', { id }),
 };

@@ -17,24 +17,34 @@ export interface TailRead {
  * returned: a partial last line stays unread until its newline arrives.
  */
 export class JsonlTail {
-  private position = 0;
+  private position: number;
 
-  constructor(readonly path: string) {}
+  constructor(
+    readonly path: string,
+    offset = 0,
+  ) {
+    this.position = offset;
+  }
 
   get offset(): number {
     return this.position;
   }
 
-  /** Reads every complete line past the offset. A missing file reads as empty. */
-  async read(): Promise<TailRead> {
-    const size = await fileSize(this.path);
-    if (size === null) return { lines: [], reset: false };
+  /**
+   * Reads every complete line past the offset, or those within the next `limit` bytes. A missing
+   * file reads as empty.
+   */
+  async read(limit = Number.POSITIVE_INFINITY): Promise<TailRead> {
+    const fileEnd = await fileSize(this.path);
+    if (fileEnd === null) return { lines: [], reset: false };
+    let size = fileEnd;
     let reset = false;
     if (size < this.position) {
       this.position = 0;
       reset = true;
     }
     if (size === this.position) return { lines: [], reset };
+    size = Math.min(size, this.position + limit);
 
     const lines: string[] = [];
     const handle = await open(this.path, 'r');

@@ -33,6 +33,8 @@ const host = '127.0.0.1:4317';
 const LIBRARY_DEFAULTS = {
   usageWarnFiveHour: 80,
   usageWarnSevenDay: 80,
+  searchMaxMb: 500,
+  searchIncludeTools: false,
   libraryRoots: [],
   libraryIdleHideMin: 30,
   pinnedProjects: [],

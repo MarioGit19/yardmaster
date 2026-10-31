@@ -233,8 +233,9 @@ describe('routes', () => {
     expect(heading()).toBe('Settings');
     // Layout (5), density (3), theme (3), motion (4), ambient (4), Retro phosphor (6), five notification
     // events (2 each), hide details (2), redact (2), away mode (2), retention (4), terminal reply
-    // (2), both usage warnings (5 each) the idle window (5) and the recap (4). This test browser has no notifications at all.
-    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(66);
+    // (2), both usage warnings (5 each) the idle window (5), the recap (4), the search limit (4) and
+    // tool calls in the index (2). This test browser has no notifications at all.
+    expect(container.querySelectorAll('fieldset button[aria-pressed]').length).toBe(72);
     act(() => root.render(null));
     render('/does/not/exist');
     expect(container.textContent).toContain('Nothing here');

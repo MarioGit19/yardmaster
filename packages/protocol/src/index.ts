@@ -15,6 +15,7 @@ export * from './project.js';
 export * from './push.js';
 export * from './redact.js';
 export * from './review.js';
+export * from './search.js';
 export * from './status-token.js';
 export * from './statusline.js';
 export * from './tools.js';

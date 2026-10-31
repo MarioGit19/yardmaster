@@ -1912,6 +1912,17 @@
   color: var(--text-1);
   font-weight: 600;
 }
+/* Search: the matched words, and the row a result opened at. */
+.search-snippet mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--st-work) 16%, transparent);
+  color: var(--text-1);
+  font-weight: 500;
+}
+[data-jump-target] {
+  background: color-mix(in srgb, var(--st-work) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--st-work);
+}
 .palette-item .palette-enter {
   opacity: 0;
 }

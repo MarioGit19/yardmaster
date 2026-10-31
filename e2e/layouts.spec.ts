@@ -34,7 +34,7 @@ test('the layout switches from shortcuts, ⌘K and Settings, and survives a relo
   const palette = page.locator('[data-palette]');
   await expect(palette).toBeVisible();
   await page.keyboard.type('Layout: Grid');
-  await expect(palette.getByRole('option', { name: /Layout: Grid/ })).toBeVisible();
+  await expect(palette.getByRole('option', { name: /^Layout: Grid/ })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(palette).toHaveCount(0);
   await expect(layout(page)).toHaveAttribute('data-layout', 'grid');

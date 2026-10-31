@@ -1,4 +1,9 @@
-import { type ChatMessage, sessionIdFromStream, transcriptStreamId } from '@yardmaster/protocol';
+import {
+  type ChatMessage,
+  decodeChatMessage,
+  sessionIdFromStream,
+  transcriptStreamId,
+} from '@yardmaster/protocol';
 import type { TranscriptFeed } from '../claude/runner.js';
 import { normalizeEntry } from '../claude/transcript-normalize.js';
 import { type ReadResult, RingBuffer } from '../ring-buffer.js';
@@ -77,6 +82,20 @@ export class DemoTranscripts implements StreamSource, TranscriptFeed {
     const model = this.models.get(fromId);
     if (model !== undefined) this.models.set(toId, model);
     for (const { chunk } of ring.read(0).chunks) this.publishChunk(toId, chunk);
+  }
+
+  /** Every message of a session, or null when it has none. */
+  messages(sessionId: string): ChatMessage[] | null {
+    const ring = this.rings.get(sessionId);
+    if (!ring) return null;
+    return ring.read(0).chunks.flatMap(({ chunk }) => decodeChatMessage(chunk) ?? []);
+  }
+
+  /** Every message held, for the search index, which starts after the demo has seeded these. */
+  forEachMessage(visit: (sessionId: string, message: ChatMessage) => void): void {
+    for (const sessionId of this.rings.keys()) {
+      for (const message of this.messages(sessionId) ?? []) visit(sessionId, message);
+    }
   }
 
   private publish(sessionId: string, message: ChatMessage): void {

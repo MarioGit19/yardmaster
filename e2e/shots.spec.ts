@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { devices, type WebSocketRoute } from '@playwright/test';
 import { startBoard } from './board.js';
 import {
@@ -567,6 +568,33 @@ test.describe('names', () => {
         });
       });
     }
+  }
+});
+
+// Search: results with highlighted snippets, and a transcript opened at a result.
+test.describe('search', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  for (const { name, viewport } of [
+    { name: 'desktop', viewport: { width: 1280, height: 800 } },
+    { name: 'phone', viewport: { width: 390, height: 844 } },
+  ]) {
+    test(`search ${name}`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport);
+      await openRoute(page, '/search');
+      await page.locator('[data-search-input]').fill('lookup table');
+      await expect(page.locator('[data-search-hit]').first()).toBeVisible();
+      await page.screenshot({
+        path: fileURLToPath(new URL(`search-${name}-${testInfo.project.name}.png`, OUT_DIR)),
+      });
+      await page.locator('[data-search-hit]').first().click();
+      await expect(page.locator('[data-jump-target]')).toBeVisible();
+      await page.waitForTimeout(800);
+      await page.screenshot({
+        path: fileURLToPath(
+          new URL(`search-transcript-${name}-${testInfo.project.name}.png`, OUT_DIR),
+        ),
+      });
+    });
   }
 });
 

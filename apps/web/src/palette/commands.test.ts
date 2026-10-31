@@ -7,6 +7,7 @@ import {
   type PaletteCommand,
   type PaletteContext,
   searchCommands,
+  withHistorySearch,
 } from './commands.js';
 
 const T0 = 1_760_000_000_000;
@@ -324,5 +325,20 @@ describe('searchCommands', () => {
 
   it('returns nothing when nothing matches', () => {
     expect(searchCommands(commands, 'qqqzzz')).toEqual([]);
+  });
+});
+
+describe('withHistorySearch', () => {
+  it('offers typed words a search of the transcripts, last', () => {
+    const sections = withHistorySearch([{ group: 'Projects', results: [] }], ' cart ');
+    expect(sections.map((s) => s.group)).toEqual(['Projects', 'History']);
+    expect(sections[1]?.results[0]?.command).toMatchObject({
+      label: 'Search history for “cart”',
+      run: { kind: 'searchHistory', query: 'cart' },
+    });
+  });
+
+  it('adds nothing to an empty query', () => {
+    expect(withHistorySearch([], '  ')).toEqual([]);
   });
 });

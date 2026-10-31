@@ -13,7 +13,7 @@ export const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 export const WRITE_DELAY_MS = 250;
 export const MAX_WRITE_BATCH = 500;
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MAX_SETTING_KEY = 128;
 
 /**
@@ -164,6 +164,11 @@ export class Persistence {
       this.pruneTimer = setInterval(() => this.prune(), pruneIntervalMs);
       this.pruneTimer.unref();
     }
+  }
+
+  /** The open database, for the transcript index, which keeps its tables here. */
+  get database(): DatabaseSync {
+    return this.db;
   }
 
   // Boot
@@ -492,18 +497,7 @@ function boardRun(session: ClaudeSession): SessionRecord['run'] {
   return IDLE_RUN.has(status.kind) ? 'idle' : null;
 }
 
-function migrate(db: DatabaseSync): void {
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 2000;');
-  const row = db.prepare('PRAGMA user_version').get();
-  const version = Number(row?.user_version ?? 0);
-  if (version > SCHEMA_VERSION) {
-    throw new Error(
-      `board.db schema v${version} is newer than this Yardmaster (v${SCHEMA_VERSION})`,
-    );
-  }
-  if (version === SCHEMA_VERSION) return;
-  db.exec(`
-    BEGIN;
+const BOARD_TABLES = `
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       data TEXT NOT NULL,
@@ -536,6 +530,62 @@ function migrate(db: DatabaseSync): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+`;
+
+/** The transcript index: one row per transcript, one per message, the text in `search_fts`. */
+const SEARCH_TABLES = `
+    CREATE TABLE IF NOT EXISTS search_sessions (
+      session_id TEXT PRIMARY KEY,
+      project_id TEXT,
+      cwd TEXT,
+      path TEXT,
+      custom_title TEXT,
+      ai_title TEXT,
+      first_prompt TEXT,
+      offset INTEGER NOT NULL DEFAULT 0,
+      floor INTEGER NOT NULL DEFAULT 0,
+      started_at INTEGER,
+      updated_at INTEGER NOT NULL,
+      messages INTEGER NOT NULL DEFAULT 0,
+      bytes INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS search_sessions_project ON search_sessions (project_id);
+    CREATE INDEX IF NOT EXISTS search_sessions_age ON search_sessions (updated_at);
+    CREATE TABLE IF NOT EXISTS search_messages (
+      id INTEGER PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      ts INTEGER,
+      UNIQUE (session_id, message_id)
+    );
+    CREATE TABLE IF NOT EXISTS search_skipped (
+      dir TEXT PRIMARY KEY,
+      project_path TEXT NOT NULL
+    );
+`;
+
+/** Recreated to clear the index: dropping it frees the space at once, deleting rows doesn't. */
+export const SEARCH_FTS_TABLE = `
+    CREATE VIRTUAL TABLE IF NOT EXISTS search_fts
+      USING fts5(body, tokenize = 'unicode61 remove_diacritics 2');
+`;
+
+function migrate(db: DatabaseSync): void {
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 2000;');
+  const row = db.prepare('PRAGMA user_version').get();
+  const version = Number(row?.user_version ?? 0);
+  if (version > SCHEMA_VERSION) {
+    throw new Error(
+      `board.db schema v${version} is newer than this Yardmaster (v${SCHEMA_VERSION})`,
+    );
+  }
+  if (version === SCHEMA_VERSION) return;
+  db.exec(`
+    BEGIN;
+    ${BOARD_TABLES}
+    ${SEARCH_TABLES}
+    ${SEARCH_FTS_TABLE}
     PRAGMA user_version = ${SCHEMA_VERSION};
     COMMIT;
   `);

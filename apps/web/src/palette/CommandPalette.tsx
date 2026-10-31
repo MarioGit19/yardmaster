@@ -41,7 +41,8 @@ import { densityPreference } from '../pod/density.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { togglePulse } from '../pulse/prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
-import { inProject, projectHref } from '../routes.js';
+import { inProject, projectHref, routes } from '../routes.js';
+import { searchDraft } from '../search/model.js';
 import { ProjectAvatar } from '../shell/ProjectAvatar.js';
 import { NARROW_QUERY, railPreference } from '../shell/prefs.js';
 import { newTerminalRequest } from '../terminal/newTerminal.js';
@@ -59,6 +60,7 @@ import {
   type PaletteResult,
   type PaletteRun,
   searchCommands,
+  withHistorySearch,
 } from './commands.js';
 import { highlightRuns } from './fuzzy.js';
 import { isPaletteShortcut, paletteOpen } from './palette.js';
@@ -77,6 +79,7 @@ const ICONS: Record<Exclude<PaletteIcon, 'project' | 'session'>, LucideIcon> = {
   phosphor: SwatchBook,
   settings: Settings,
   attention: BellDot,
+  search: Search,
   rail: PanelLeft,
   pulse: Activity,
   overview: LayoutGrid,
@@ -233,7 +236,7 @@ function PaletteBody({
     [board, focus?.projectId, motion, theme, layout, density, phosphor, narrow],
   );
   const sections = useMemo(
-    () => (page.kind === 'root' ? searchCommands(commands, query) : []),
+    () => (page.kind === 'root' ? withHistorySearch(searchCommands(commands, query), query) : []),
     [commands, query, page.kind],
   );
   const ids = sections.flatMap((s) => s.results.map((r) => r.command.id));
@@ -316,6 +319,12 @@ function PaletteBody({
         keepFocus();
         close();
         attentionOpen.set('open');
+        return;
+      case 'searchHistory':
+        keepFocus();
+        close();
+        if (action.query) searchDraft.set({ query: action.query });
+        navigate(routes.search);
         return;
       case 'pulse':
         togglePulse();

@@ -35,6 +35,7 @@ import { SessionRunner, type SessionRunnerOptions } from './claude/runner.js';
 import { SessionDiscovery, type SessionDiscoveryOptions } from './claude/session-discovery.js';
 import { createSessionListActions } from './claude/session-list-actions.js';
 import { registerStatuslineRoute } from './claude/statusline-ingest.js';
+import { TranscriptIndex } from './claude/transcript-index.js';
 import { TranscriptService, type TranscriptServiceOptions } from './claude/transcript-service.js';
 import type { ServerConfig } from './config.js';
 import { secureDataDir } from './data-dir.js';
@@ -99,6 +100,7 @@ import {
   webPushSender,
 } from './push.js';
 import { LEGACY_DEVICES_KEY, registerRemoteRoutes, remoteHosts } from './remote.js';
+import { registerSearchRoutes } from './search-routes.js';
 import { registerSecurity, signInUrl } from './security.js';
 import { SessionLinker } from './session-linker.js';
 import {
@@ -125,6 +127,8 @@ import {
   retentionDays,
   retentionMs,
   rotateTokenFile,
+  SEARCH_FLOOR_KEY,
+  searchSettings,
   terminalReplyEnabled,
   USAGE_KEY,
 } from './settings-routes.js';
@@ -199,6 +203,8 @@ export interface BuildOptions {
 /** How often lapsed phone sessions are ended while nothing asks for them. */
 const SESSION_SWEEP_MS = 60 * 60 * 1000;
 
+const MB = 1024 * 1024;
+
 /** Tools whose completion can change a repository's state. */
 const GIT_TOUCHING_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit', 'Bash']);
 
@@ -214,6 +220,7 @@ declare module 'fastify' {
     hookIngest: HookIngest;
     awayApprovals: AwayApprovals;
     transcripts: TranscriptService | null;
+    transcriptIndex: TranscriptIndex;
     sessionRunner: SessionRunner;
     sessionDiscovery: SessionDiscovery | null;
     processScanner: ProcessScanner | null;
@@ -306,6 +313,8 @@ export async function buildServer(
     await editorGateway.idle();
     await hookIngest.idle();
     await transcripts?.close();
+    transcriptIndex.close();
+    await transcriptIndex.idle();
     // Emit any changes made since the last microtask so they reach the database.
     store.flush();
     persistence.close();
@@ -384,6 +393,33 @@ export async function buildServer(
         ...options.transcripts,
       });
   app.decorate('transcripts', transcripts);
+  const transcriptIndex = new TranscriptIndex({
+    db: persistence.database,
+    store,
+    logger: logger.child({ component: 'search' }),
+    settings: () => ({
+      maxBytes: searchSettings(settings).searchMaxMb * MB,
+      includeTools: searchSettings(settings).searchIncludeTools,
+    }),
+    floor: () => (typeof settings[SEARCH_FLOOR_KEY] === 'number' ? settings[SEARCH_FLOOR_KEY] : 0),
+    setFloor: (ts) => {
+      settings[SEARCH_FLOOR_KEY] = ts;
+      persistence.setSetting(SEARCH_FLOOR_KEY, ts);
+    },
+    // The demo's transcripts are in memory: it never reads the real ones.
+    ...(demo
+      ? {
+          claudeConfigDir: null,
+          delayMs: 0,
+          replay: (add) => demo?.transcripts.forEachMessage(add),
+          readMessages: (sessionId) => demo?.transcripts.messages(sessionId) ?? null,
+        }
+      : options.transcripts?.claudeConfigDir
+        ? { claudeConfigDir: options.transcripts.claudeConfigDir }
+        : {}),
+  });
+  transcriptIndex.follow(transcripts ?? (demo as DemoSimulator).transcripts);
+  app.decorate('transcriptIndex', transcriptIndex);
   // Demo board sessions run the real runner over a scripted query and the demo transcripts.
   const demoTranscripts = demo?.transcripts;
   const folderTrust = new FolderTrust({
@@ -536,6 +572,7 @@ export async function buildServer(
           settings[PINNED_KEY] = next;
           persistence.setSetting(PINNED_KEY, next);
         },
+        forgetIndexed: (project) => transcriptIndex.forgetProject(project),
       }),
       // Demo windows have no socket, so the simulator plays the editor's part.
       ...demo?.editorActions(),
@@ -709,6 +746,7 @@ export async function buildServer(
   registerSettingsRoutes(app, {
     persistence,
     settings,
+    onSearchLimit: () => transcriptIndex.trim(),
     hookSettings:
       options.hookSettings ?? (options.demo ? memoryHookSettings() : diskHookSettings()),
     // The demo board may run on a real home: never touch its token.
@@ -731,6 +769,7 @@ export async function buildServer(
         },
   });
 
+  registerSearchRoutes(app, transcriptIndex);
   registerRemoteRoutes(app, { sessions, hosts: allowedRemoteHosts });
   registerSessionRoutes(app, sessions);
 
@@ -921,5 +960,6 @@ export async function startServer(
   const app = await buildServer(config, options);
   await app.listen({ port: config.port, host: config.host });
   await app.localChannel.listen(config.home);
+  app.transcriptIndex.start();
   return app;
 }

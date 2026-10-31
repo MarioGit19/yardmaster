@@ -24,7 +24,8 @@ import type { ThemeSetting } from '../theme/theme.js';
 import { type FuzzyMatch, fuzzyMatch } from './fuzzy.js';
 
 export const PALETTE_GROUPS = ['Projects', 'Sessions', 'Terminals', 'Actions'] as const;
-export type PaletteGroup = (typeof PALETTE_GROUPS)[number];
+/** `History` isn't filtered: it is what to do with the words themselves. */
+export type PaletteGroup = (typeof PALETTE_GROUPS)[number] | 'History';
 
 /** What selecting a command does. The palette component carries it out. */
 export type PaletteRun =
@@ -39,6 +40,7 @@ export type PaletteRun =
   | { kind: 'density'; next: Density }
   | { kind: 'phosphor'; next: Phosphor }
   | { kind: 'attention' }
+  | { kind: 'searchHistory'; query: string }
   | { kind: 'openProject' }
   | { kind: 'closeProject'; projectId: string; forget: boolean }
   | { kind: 'rail' }
@@ -60,6 +62,7 @@ export type PaletteIcon =
   | 'phosphor'
   | 'settings'
   | 'attention'
+  | 'search'
   | 'rail'
   | 'pulse'
   | 'overview'
@@ -398,6 +401,14 @@ function boardActions(context: PaletteContext, waiting: number): PaletteCommand[
       run: { kind: 'openProject' },
     },
     {
+      id: 'search-history',
+      group: 'Actions',
+      label: 'Search history…',
+      hint: 'every transcript',
+      icon: 'search',
+      run: { kind: 'searchHistory', query: '' },
+    },
+    {
       id: 'attention',
       group: 'Actions',
       label: 'Open the Attention Center',
@@ -494,6 +505,23 @@ function boardActions(context: PaletteContext, waiting: number): PaletteCommand[
     });
   }
   return commands;
+}
+
+/** Typed words can always go to a full search of the transcripts, whatever else they match. */
+export function withHistorySearch(
+  sections: readonly PaletteSection[],
+  query: string,
+): PaletteSection[] {
+  const words = query.trim();
+  if (words === '') return [...sections];
+  const command: PaletteCommand = {
+    id: 'search-history-for',
+    group: 'History',
+    label: `Search history for “${words}”`,
+    icon: 'search',
+    run: { kind: 'searchHistory', query: words },
+  };
+  return [...sections, { group: 'History', results: [{ command, indices: [] }] }];
 }
 
 export interface PaletteResult {

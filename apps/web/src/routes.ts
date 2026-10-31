@@ -9,6 +9,9 @@ export const routes = {
   /** A linked worktree's review (`GitWorktree.id`); the project's own is its `review` page. */
   reviewWorktree: '/p/:projectId/review/:worktree',
   settings: '/settings',
+  search: '/search',
+  /** A past or live transcript, opened at one message of it. */
+  searchSession: '/search/:sessionId/:messageId?',
   // The phone shell's tabs (DESIGN.md §11); the overview is the first.
   projects: '/projects',
   attention: '/attention',
@@ -19,6 +22,12 @@ export const routes = {
   welcome: '/welcome',
   tokens: '/_tokens',
 } as const;
+
+/** Message ids end in `:<block>`; the colon stays, as route params don't decode an escaped one. */
+export const searchSessionHref = (sessionId: string, messageId?: string) =>
+  `/search/${encodeURIComponent(sessionId)}${
+    messageId ? `/${encodeURIComponent(messageId).replaceAll('%3A', ':')}` : ''
+  }`;
 
 export const attentionItemHref = (item: string) => `/attention/${encodeURIComponent(item)}`;
 

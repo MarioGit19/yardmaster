@@ -40,6 +40,7 @@ import { NotificationSettings } from '../settings/NotificationSettings.js';
 import { PhoneSettings } from '../settings/PhoneSettings.js';
 import { redactPreference } from '../settings/prefs.js';
 import { onRemoteHost } from '../settings/remoteHost.js';
+import { SearchIndexRows } from '../settings/SearchIndexSettings.js';
 import { SessionsRow } from '../settings/SessionsSettings.js';
 import { useHooksStatus, useServerStatus } from '../settings/useServerStatus.js';
 import { THEME_SETTINGS, type ThemeSetting, useTheme } from '../theme/theme.js';
@@ -224,11 +225,14 @@ export function SettingsView() {
           {remote ? (
             <SettingRow
               title="Managed on your Mac"
-              description="Project folders, the editor command, allowed hosts, the hooks, activity history and the access token can only be changed on the Mac."
+              description="Project folders, the editor command, allowed hosts, the hooks, activity history, the search index and the access token can only be changed on the Mac."
               data="mac-only"
             />
           ) : (
-            <RetentionRow server={server} />
+            <>
+              <RetentionRow server={server} />
+              <SearchIndexRows server={server} />
+            </>
           )}
           <SessionsRow />
           {!remote && <TokenRow demo={demo} />}

@@ -37,6 +37,8 @@ beforeEach(() => {
     retentionDays: 7,
     usageWarnFiveHour: 80,
     usageWarnSevenDay: 80,
+    searchMaxMb: 500,
+    searchIncludeTools: false,
     awayMode: false,
     awayTimeoutSec: 120,
     terminalReply: true,

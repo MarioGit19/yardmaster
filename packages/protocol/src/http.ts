@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SessionHistoryEntry } from './claude-sessions.js';
 import { EditorApp, ProjectId, Timestamp } from './domain.js';
 import { NotifyEvent, NotifyMutedProjects } from './push.js';
+import { SearchMaxMb } from './search.js';
 
 // JSON bodies of the server's HTTP routes, shared by the CLI, the web app and tests.
 
@@ -152,6 +153,10 @@ export const BoardSettings = z.object({
   /** `usage.warnFiveHour`, `usage.warnSevenDay`: where the usage chip turns to the warning colour. */
   usageWarnFiveHour: UsageWarnPercent,
   usageWarnSevenDay: UsageWarnPercent,
+  /** `search.maxMb`: the transcript index drops its oldest sessions past this size. */
+  searchMaxMb: SearchMaxMb,
+  /** `search.includeTools`: also index tool inputs and outputs, off by default. */
+  searchIncludeTools: z.boolean(),
 });
 export type BoardSettings = z.infer<typeof BoardSettings>;
 

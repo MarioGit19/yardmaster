@@ -304,6 +304,22 @@ describe('Persistence', () => {
     expect(() => openDb()).toThrow(/newer/);
   });
 
+  it('adds the search tables to a database from before search', () => {
+    openDb().close();
+    const raw = new DatabaseSync(join(home, DB_FILE));
+    raw.exec(`
+      DROP TABLE search_fts; DROP TABLE search_messages;
+      DROP TABLE search_sessions; DROP TABLE search_skipped;
+      INSERT INTO settings (key, value) VALUES ('kept', '1');
+      PRAGMA user_version = 1;
+    `);
+    raw.close();
+    const db = openDb();
+    expect(db.loadSettings()).toEqual({ kept: 1 });
+    expect(db.database.prepare('SELECT COUNT(*) AS n FROM search_fts').get()?.n).toBe(0);
+    db.close();
+  });
+
   it('flushes pending writes on close', () => {
     let db = openDb({ writeDelayMs: 60_000 });
     db.saveProject(project('acme-shop'));

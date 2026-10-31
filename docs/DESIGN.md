@@ -222,7 +222,9 @@ A collapsible bottom rail: a horizontal time axis covering the last 15 min. Each
 
 ### 4.8 Command palette (⌘K)
 
-Built on cmdk, inside a glass modal with a scale 0.96→1 and blur-in. Groups: Projects, Sessions, Terminals, Actions. Fuzzy search highlights matched characters. Selecting a destination triggers its normal transition.
+Built on cmdk, inside a glass modal with a scale 0.96→1 and blur-in. Groups: Projects, Sessions, Terminals, Actions. Fuzzy search highlights matched characters. Selecting a destination triggers its normal transition. Typed words also offer "Search history for …" as the last result, which opens the Search view with them.
+
+**Search view.** A narrow page: the search field, then project, date and status filters. Each result names its session and project, says who spoke and when, and shows a two-line snippet with the matched words tinted in `--st-work`. Redaction masks a snippet like any other text. A result opens the transcript read-only, at its message, with that row tinted and edged in `--st-work` and no animation; live sessions link to their focus view, past ones offer Resume.
 
 ### 4.9 Brand and icons
 

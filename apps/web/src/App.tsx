@@ -24,6 +24,8 @@ import { PulseRail } from './pulse/PulseRail.js';
 import { PushPresence } from './push/push.js';
 import { RecapHost } from './recap/Recap.js';
 import { routes } from './routes.js';
+import { SearchTranscriptView } from './search/SearchTranscriptView.js';
+import { SearchView } from './search/SearchView.js';
 import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
 import { Toasts } from './ui/Toasts.js';
@@ -106,6 +108,14 @@ function OtherScreens() {
     <Switch>
       <Route path={routes.settings}>
         <SettingsView />
+      </Route>
+      <Route path={routes.search}>
+        <SearchView />
+      </Route>
+      <Route path={routes.searchSession}>
+        {(params) => (
+          <SearchTranscriptView sessionId={params.sessionId} messageId={params.messageId} />
+        )}
       </Route>
       <Route path={routes.welcome}>
         <WelcomeView />
