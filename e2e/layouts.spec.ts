@@ -297,19 +297,31 @@ test.describe('the Office building', () => {
       const session = page.locator('[data-room] [data-scene-actor^="s:"]').first();
       await expect(session).toBeVisible();
       const actorId = (await session.getAttribute('data-scene-actor')) as string;
-      // Every drawn character has a name in the room without hovering; side desks share one.
-      const named = await page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>('[data-room]')].every((room) => {
-          const seated = room.querySelectorAll(
-            '[data-office-at]:not([data-office-at="side-desk"])',
-          );
-          const lines = room.querySelectorAll(
-            '[data-office-plate]:not([data-office-plate="side-desk"]) .office-plate-line',
-          );
-          return seated.length === lines.length;
-        }),
-      );
-      expect(named).toBe(true);
+      // Every drawn character has a name in the room without hovering; side desks share one. A
+      // character leaving the demo fades out after its plate has gone, so this waits for one
+      // without a plate to clear; a plate that's really missing keeps failing.
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            [...document.querySelectorAll<HTMLElement>('[data-room]')].flatMap((room) => {
+              const named = new Set(
+                [
+                  ...room.querySelectorAll(
+                    '[data-office-plate]:not([data-office-plate="side-desk"]) [data-office-open]',
+                  ),
+                ].map((line) => line.getAttribute('data-office-open')),
+              );
+              return [
+                ...room.querySelectorAll<HTMLElement>(
+                  '[data-office-at]:not([data-office-at="side-desk"])',
+                ),
+              ]
+                .map((actor) => actor.getAttribute('data-office-actor'))
+                .filter((id) => !named.has(id));
+            }),
+          ),
+        )
+        .toEqual([]);
 
       await page.locator(`[data-office-open="${actorId}"]`).click();
       await expect(page).toHaveURL(new RegExp(`#/p/[^/]+/s/${actorId.slice(2)}$`));
