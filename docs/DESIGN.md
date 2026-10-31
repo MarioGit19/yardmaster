@@ -197,6 +197,12 @@ Above the overview in every layout, on the phone too, a strip lists everything w
 - An item can also **Open** its session, **Interrupt** it (a request mid-turn; not a session waiting for a reply) and switch its permission mode. A board session switches at once and its request stays open. A terminal session has only the hook's answer, so the pill reads **Allow and switch**, offers Ask first, Accept edits and Plan only, and allows the request; a terminal's own prompt has no switch.
 - Resolved cards collapse with a height animation (`layout`) and a check sweep.
 
+### 4.5b While you were away
+
+A recap for coming back after the board was hidden or idle (Settings, default 20 minutes, kept per device; a phone counts opening the app). It shows only if something needed you, failed or finished in the meantime. Sections, in order: **Needs you**, **Failed** (exit code and the last lines), **Finished** (the one-line outcome, and the project's changed files by git status), **Still running**. Each row opens its session or terminal and closes the recap. It reads what the board already holds and calls nothing.
+
+On desktop it's a panel at the top right that takes no focus and blocks nothing, since the user may already be typing; Esc or Dismiss closes it. On a phone it's a bottom sheet. It rises 8 px with `smooth` and leaves at `dur.fast`, with no stagger; Reduced fades, Off appears at rest. **Mark all seen** clears the Done, unseen marks and offers Undo in a toast. Failures keep their mark until opened, and neither action touches the Needs you strip or inbox.
+
 ### 4.6 Focus view (project)
 
 - A shared-element transition from the pod. The background dims and blurs other content.

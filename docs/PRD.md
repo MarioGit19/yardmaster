@@ -90,6 +90,7 @@ The status must also degrade gracefully: if no hook has arrived for a live proce
 - F6 Headless Claude sessions from the board (Agent SDK): new session per project, multi-turn chat, streaming, interrupt, model and permission-mode switch, resume past sessions.
 - F7 Approvals: board sessions through `canUseTool`, with Allow once / Always allow (from suggestions) / Deny with reason.
 - F8 Attention Center, one inbox for every pending approval and question across projects, plus notifications (in-app toasts, optional browser notifications). No sound. From an item the user can also interrupt the session or switch its permission mode; a terminal session's mode changes only through the away-mode hook's answer, limited to `HOOK_PERMISSION_MODES`.
+- F8a While you were away: coming back after the board was hidden or idle for a while (20 minutes by default, per device), or opening the phone app after that long, shows a recap if something happened: needs you, failed, finished, still running. It uses only what the board already holds and spends no tokens. "Mark all seen" clears the Done, unseen marks, with undo; dismissing it hides nothing that still needs you.
 - F9 Ports and processes: listening ports per terminal and project; CPU/mem per terminal subtree.
 - F10 Command palette (⌘K) for navigation and every action.
 - F11 Onboarding plus `doctor`: guided setup (server, hooks, extension) with health checks.

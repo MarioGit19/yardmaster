@@ -40,6 +40,18 @@ describe('createSeenItems', () => {
     expect(remote.save).toHaveBeenCalledWith({ a: 100, b: 50 });
   });
 
+  it('undoes a batch of marks, even before it was sent', async () => {
+    const remote = transport({ a: 1 });
+    const seen = createSeenItems(remote, () => 100);
+    await seen.load();
+    const undo = seen.markAll({ a: 50, b: 60 });
+    expect(seen.get().marks).toEqual({ a: 50, b: 60 });
+    undo();
+    expect(seen.get().marks).toEqual({ a: 1 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(remote.save).toHaveBeenCalledWith({}, { a: 1, b: null });
+  });
+
   it('survives a server that says no', async () => {
     const seen = createSeenItems(
       {

@@ -425,6 +425,21 @@ test.describe('hud', () => {
           });
           await page.keyboard.press('Escape');
         });
+        test('recap', async ({ page }) => {
+          test.slow();
+          await openRoute(page, '/');
+          await expect(page.locator('[data-strip-item]').first()).toBeVisible({ timeout: 30_000 });
+          await page.evaluate(() => {
+            localStorage.setItem('yardmaster.recap.lastActive', String(Date.now() - 30 * 60_000));
+            document.dispatchEvent(new Event('visibilitychange'));
+          });
+          await expect(page.locator('[data-recap]')).toBeVisible();
+          await page.waitForTimeout(800);
+          await page.screenshot({
+            path: new URL(`recap-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+            animations: 'disabled',
+          });
+        });
       });
     }
   }

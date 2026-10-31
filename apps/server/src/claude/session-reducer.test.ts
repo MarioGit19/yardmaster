@@ -517,3 +517,14 @@ describe('sessionReducer fields', () => {
     expect(after.updatedAt).toBe(T0 + 50_000);
   });
 });
+
+describe('PostCompact summary', () => {
+  it('keeps what the compaction said, and ignores a blank one', () => {
+    const session = { ...newSession(FIXTURE_SESSION_ID, T0), status: { kind: 'idle' as const } };
+    const summary = (compact_summary: string) => event('post-compact', { compact_summary });
+    const once = sessionReducer(session, summary('Moved the cart to the new API'));
+    expect(once?.compactSummary).toBe('Moved the cart to the new API');
+    const again = sessionReducer(once, summary('  '));
+    expect(again?.compactSummary).toBe('Moved the cart to the new API');
+  });
+});

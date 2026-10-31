@@ -26,6 +26,7 @@ import { hooksInstalled } from '../onboarding/model.js';
 import { countOf } from '../plural.js';
 import { DENSITIES, DENSITY_NAME, densityPreference } from '../pod/density.js';
 import { usePreference } from '../prefs.js';
+import { RECAP_AFTER, RECAP_AFTER_LABEL, recapAfterPreference } from '../recap/away.js';
 import { PHOSPHOR_LABEL, PHOSPHORS, phosphorPreference } from '../retro/phosphor.js';
 import { routes } from '../routes.js';
 import { api } from '../settings/api.js';
@@ -70,6 +71,7 @@ export function SettingsView() {
   const motion = usePreference(motionPreference);
   const layout = usePreference(layoutPreference);
   const density = usePreference(densityPreference);
+  const recapAfter = usePreference(recapAfterPreference);
   const ambient = usePreference(ambientStylePreference);
   const phosphor = usePreference(phosphorPreference);
   const redact = usePreference(redactPreference);
@@ -159,6 +161,19 @@ export function SettingsView() {
 
         <SettingsSection title="Notifications">
           <NotificationSettings server={server} />
+          <SettingRow
+            title="While you were away"
+            data="recap"
+            description="Show what happened when you come back after the board has been hidden or idle this long, or open the phone app after it. Kept on this device."
+          >
+            <Segmented
+              label="While you were away"
+              options={RECAP_AFTER}
+              labels={RECAP_AFTER_LABEL}
+              value={recapAfter}
+              onChange={recapAfterPreference.set}
+            />
+          </SettingRow>
         </SettingsSection>
 
         <SettingsSection title="Privacy and approvals">

@@ -865,6 +865,42 @@ const SCENARIOS = {
     });
   },
 
+  async recap(r: Recorder) {
+    const { page } = r;
+    await openOverview(page);
+    await page.locator('[data-strip-item]').first().waitFor({ timeout: 30_000 });
+    const panel = page.locator('[data-recap]');
+    const comeBack = async () => {
+      await page.evaluate(() => {
+        const away = Date.now() - 30 * 60_000;
+        localStorage.setItem('yardmaster.recap.lastActive', String(away));
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await panel.waitFor();
+    };
+    await r.moment('open', 'transition', 'coming back: the recap rises in', async () => {
+      await comeBack();
+      await page.waitForTimeout(700);
+    });
+    await r.moment('dismiss', 'transition', 'Esc dismisses it', async () => {
+      await page.keyboard.press('Escape');
+      await panel.waitFor({ state: 'hidden' });
+      await page.waitForTimeout(400);
+    });
+    await r.moment('reopen', 'transition', 'coming back again', async () => {
+      await comeBack();
+      await page.waitForTimeout(700);
+    });
+    const markAll = page.locator('[data-recap-mark-all]');
+    if (await markAll.isVisible()) {
+      await r.moment('mark-seen', 'transition', 'Mark all seen and its Undo toast', async () => {
+        await markAll.click();
+        await panel.waitFor({ state: 'hidden' });
+        await page.waitForTimeout(600);
+      });
+    }
+  },
+
   async chrome(r: Recorder) {
     const { page } = r;
     await openOverview(page);

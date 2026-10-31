@@ -21,6 +21,7 @@ theme, motion level Full. Each scripted moment becomes a contact sheet in `artif
 | `focus`    | `open` (pod → focus), `session-switch`, `tool-finish`, `done` (when the demo gets there), `claude-tab`, `claude-raw` (chat ↔ raw), `new-terminal`, `close` (Esc) |
 | `panels`   | `rail` (fold and unfold the session list), `side` (fold and unfold the side panel), `tabs` (Terminals ↔ Changes), `verbosity` (Summary → Verbose → Normal) |
 | `chrome`   | `palette-open`, `palette-close`, `toast`, `attention-open`, `approval-allow`, `approval-deny`, `attention-close`, `pulse-expand`, `pulse-collapse` |
+| `recap`    | `open` (coming back after a while: the recap rises in), `dismiss` (Esc), `reopen`, `mark-seen` (Mark all seen, its Undo toast) |
 | `crew`     | `loop` (2 s), `idle` (10 s), cropped to the `/#/_tokens` character sheet     |
 | `fx`       | `text` (decrypt, glitch, split-flap), `darkveil`, `softaurora`, `faultyterminal` (energy 0.1 → 1), `ripplegrid`, `lighttunnel` (dive and surge), `phone` (swipe and hold), cropped to the `/#/_tokens` fx sections |
 | `phone`    | `entrance`, `scroll`, `tabs` (the tab bar's gliding pill), `focus-open` (tap), `hub-item` (a hub card opens its page, a swipe to the next item, back), `focus-close` (back), `inspector-sheet` (tap a crew, pull the sheet down), `project-swipe` (a Projects row swiped open and shut, then closed) |

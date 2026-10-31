@@ -184,11 +184,15 @@ export class BrowserSessions {
   }
 
   /** Records what a browser opened, newest time winning. False for an unknown session. */
-  markSeen(id: string, marks: SeenMarks): boolean {
+  markSeen(id: string, marks: SeenMarks, restore: SeenUpdate['restore'] = {}): boolean {
     const session = this.sessions.find((s) => s.id === id);
     if (!session) return false;
     const merged = { ...session.seen };
     for (const [key, at] of Object.entries(marks)) merged[key] = Math.max(merged[key] ?? 0, at);
+    for (const [key, at] of Object.entries(restore)) {
+      if (at === null) delete merged[key];
+      else merged[key] = at;
+    }
     const newest = Object.entries(merged)
       .sort((a, b) => b[1] - a[1])
       .slice(0, MAX_SEEN_MARKS);
@@ -294,7 +298,7 @@ export function registerSessionRoutes(app: FastifyInstance, sessions: BrowserSes
     const body = SeenUpdate.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: 'bad_request' });
     const id = request.browserSession();
-    if (id === null || !sessions.markSeen(id, body.data.marks)) {
+    if (id === null || !sessions.markSeen(id, body.data.marks, body.data.restore)) {
       return reply.code(403).send({ error: 'browser_session_required' });
     }
     return { ok: true };

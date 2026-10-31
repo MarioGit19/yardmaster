@@ -22,6 +22,7 @@ import { CommandPalette } from './palette/CommandPalette.js';
 import { PortShareDialog } from './ports/PortShareDialog.js';
 import { PulseRail } from './pulse/PulseRail.js';
 import { PushPresence } from './push/push.js';
+import { RecapHost } from './recap/Recap.js';
 import { routes } from './routes.js';
 import { AppShell } from './shell/AppShell.js';
 import { useTheme } from './theme/theme.js';
@@ -172,6 +173,7 @@ export function App({ locationHook = useHashLocation }: { locationHook?: BaseLoc
           <TrustFolderDialog />
           <PortShareDialog />
           <EditorLaunchWatcher />
+          <RecapHost />
         </Router>
         <Toasts />
         <AttentionAlerts />

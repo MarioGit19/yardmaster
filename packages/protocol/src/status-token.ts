@@ -112,5 +112,10 @@ export type SeenResponse = z.infer<typeof SeenResponse>;
 /** `POST /api/seen`. */
 export const SeenUpdate = z.object({
   marks: SeenMarks.refine((marks) => Object.keys(marks).length <= MAX_SEEN_UPDATE),
+  /** Puts marks back as they were, for an undo; null removes one. Applied after `marks`. */
+  restore: z
+    .record(z.string().max(300), z.number().int().nonnegative().nullable())
+    .refine((marks) => Object.keys(marks).length <= MAX_SEEN_UPDATE)
+    .optional(),
 });
 export type SeenUpdate = z.infer<typeof SeenUpdate>;

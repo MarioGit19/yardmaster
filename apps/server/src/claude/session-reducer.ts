@@ -5,6 +5,7 @@ import {
   backgroundLaunchKind,
   backgroundTaskIdOf,
   type ClaudeSession,
+  COMPACT_SUMMARY_MAX,
   endBackground,
   type HookCommon,
   type KnownHookEvent,
@@ -196,6 +197,9 @@ export function sessionReducer(
       return to({ kind: 'compacting', previous: status });
 
     case 'PostCompact':
+      if (hook.compact_summary?.trim()) {
+        next = { ...next, compactSummary: hook.compact_summary.slice(0, COMPACT_SUMMARY_MAX) };
+      }
       return status.kind === 'compacting' ? to(status.previous) : next;
 
     case 'SubagentStart':

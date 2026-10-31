@@ -389,6 +389,8 @@ export const BackgroundTask = z.object({
 });
 export type BackgroundTask = z.infer<typeof BackgroundTask>;
 
+export const COMPACT_SUMMARY_MAX = 2_000;
+
 export const ClaudeSession = z.object({
   id: SessionId,
   origin: SessionOrigin,
@@ -427,6 +429,8 @@ export const ClaudeSession = z.object({
   lastAssistantText: z.string().nullable(),
   /** When `lastAssistantText` was set, so a client can tell it from a newer turn's prompt. */
   lastAssistantAt: Timestamp.nullable().optional(),
+  /** What the last compaction said the session had done, from `PostCompact`. Not persisted. */
+  compactSummary: z.string().max(COMPACT_SUMMARY_MAX).nullable().optional(),
   /** Board sessions: the assistant text still streaming in, until its message lands. */
   draft: z.string().max(100_000).nullable().optional(),
   startedAt: Timestamp,

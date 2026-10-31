@@ -189,6 +189,14 @@ describe('seen items', () => {
     await app.close();
   });
 
+  it('puts marks back as they were on an undo', () => {
+    const sessions = new BrowserSessions({ load: () => [], save: () => {} });
+    const { id } = sessions.create('local', undefined).session;
+    sessions.markSeen(id, { a: 10, b: 20 });
+    sessions.markSeen(id, {}, { a: 3, b: null });
+    expect(sessions.seen(id)?.marks).toEqual({ a: 3 });
+  });
+
   it('keeps the newest time for a key and drops the oldest past the cap', () => {
     const sessions = new BrowserSessions({ load: () => [], save: () => {} });
     const { id } = sessions.create('local', undefined).session;
