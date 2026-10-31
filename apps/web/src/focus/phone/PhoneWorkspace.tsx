@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  FileDiff,
   GitBranch,
   History,
   Plug,
@@ -59,6 +60,7 @@ import { countOf } from '../../plural.js';
 import { LiveCaption } from '../../pod/LiveCaption.js';
 import { type Caption, sessionCaption } from '../../pod/model.js';
 import { createPreference, usePreference } from '../../prefs.js';
+import { ReviewView } from '../../review/ReviewView.js';
 import { projectHref, projectPageHref, terminalHref } from '../../routes.js';
 import { ProjectAvatar } from '../../shell/ProjectAvatar.js';
 import { historyTrack, leaveWorkspace } from '../../shell/phoneNav.js';
@@ -104,6 +106,7 @@ const hintPreference = createPreference('yardmaster.hubHint', ['show', 'hidden']
 
 const PAGE_TITLE: Record<HubPage, string> = {
   git: 'Git',
+  review: 'Review changes',
   history: 'History',
   ports: 'Ports',
   new: 'New session',
@@ -114,6 +117,8 @@ export interface PhoneWorkspaceProps {
   sessionId?: string;
   terminalId?: string;
   page?: string;
+  /** The linked worktree the `review` page shows. */
+  worktree?: string;
   headingRef: RefObject<HTMLHeadingElement | null>;
   /** The skin's crew beside the project's name in the hub (Office, DESIGN.md §10.8). */
   HubCrew?: ComponentType<HubCrewProps>;
@@ -136,6 +141,7 @@ export function PhoneWorkspace({
   sessionId,
   terminalId,
   page,
+  worktree,
   headingRef,
   HubCrew,
 }: PhoneWorkspaceProps) {
@@ -221,7 +227,13 @@ export function PhoneWorkspace({
             className="absolute inset-0 z-10 flex min-h-0 flex-col bg-bg-1"
           >
             {subPage ? (
-              <SubPage project={project} page={subPage} items={items} onBack={back} />
+              <SubPage
+                project={project}
+                page={subPage}
+                worktree={worktree}
+                items={items}
+                onBack={back}
+              />
             ) : item ? (
               <ItemPage
                 project={project}
@@ -634,6 +646,15 @@ function PageRows({ project }: { project: Project }) {
           ? `${git.branch ?? 'detached'} · ${git.dirty > 0 ? `${git.dirty} changed` : 'clean'}`
           : 'Not a git repository',
     },
+    ...(git && !git.statusSkipped
+      ? [
+          {
+            page: 'review' as const,
+            icon: <FileDiff />,
+            detail: git.dirty > 0 ? `${git.dirty} changed` : 'Against the branch point',
+          },
+        ]
+      : []),
     {
       page: 'history' as const,
       icon: <History />,
@@ -963,11 +984,13 @@ function MissingItem({
 function SubPage({
   project,
   page,
+  worktree,
   items,
   onBack,
 }: {
   project: Project;
   page: HubPage;
+  worktree?: string | undefined;
   items: readonly HubItem[];
   onBack: () => void;
 }) {
@@ -982,10 +1005,14 @@ function SubPage({
       </header>
       {page === 'new' ? (
         <NewSessionPanel project={project} header={false} />
+      ) : page === 'review' ? (
+        <div className="min-h-0 flex-1">
+          <ReviewView project={project} worktree={worktree} phone onClose={onBack} />
+        </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-[max(16px,env(safe-area-inset-bottom))]">
           {page === 'git' ? (
-            <GitPanel git={project.git} now={Date.now()} />
+            <GitPanel git={project.git} now={Date.now()} projectId={project.id} />
           ) : page === 'history' ? (
             <HistoryPage project={project} />
           ) : (

@@ -1,3 +1,4 @@
+import { worktreeParent } from '@yardmaster/protocol';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useBoard } from '../data/index.js';
 import type { BoardStoreState } from '../data/store.js';
@@ -125,15 +126,45 @@ export function selectRecentKey(s: BoardStoreState): string {
     .join('\n');
 }
 
+/** Each linked worktree with its main checkout, as `child parent` lines of ids. */
+export function selectWorktreeLinks(s: BoardStoreState): string {
+  const { projects } = s.board;
+  return Object.values(projects)
+    .flatMap((project) => {
+      const parent = worktreeParent(project, projects);
+      return parent ? [`${project.id} ${parent.id}`] : [];
+    })
+    .join('\n');
+}
+
+/** `order` with each linked worktree moved right behind its main checkout. */
+export function besideParents(order: readonly string[], links: string): readonly string[] {
+  if (links === '') return order;
+  const parents = new Map(links.split('\n').map((line) => line.split(' ') as [string, string]));
+  const present = new Set(order);
+  const nested = (id: string) => present.has(parents.get(id) ?? '');
+  return order.flatMap((id) => {
+    if (nested(id)) return [];
+    return [id, ...order.filter((child) => nested(child) && parents.get(child) === id)];
+  });
+}
+
 export const usePinnedProjects = (): readonly string[] =>
   useSyncExternalStore(boardSettings.subscribe, boardSettings.get)?.pinnedProjects ?? NO_PINS;
 
-/** Every project in overview order. Whichever list asks first on a load fixes the default. */
+/**
+ * Every project in overview order, worktrees behind their main checkout. Whichever list asks first
+ * on a load fixes the default.
+ */
 export function useProjectOrder(): readonly string[] {
   const key = useBoard(selectRecentKey);
   const held = useSyncExternalStore(projectOrder.subscribe, projectOrder.get);
   const pinned = usePinnedProjects();
+  const links = useBoard(selectWorktreeLinks);
   const recent = useMemo(() => (key === '' ? [] : key.split('\n')), [key]);
   useEffect(() => projectOrder.latch(recent), [recent]);
-  return useMemo(() => arrangeProjects(recent, held, pinned), [recent, held, pinned]);
+  return useMemo(
+    () => besideParents(arrangeProjects(recent, held, pinned), links),
+    [recent, held, pinned, links],
+  );
 }

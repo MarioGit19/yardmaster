@@ -8,6 +8,7 @@ import type {
   Project,
   Terminal,
 } from '@yardmaster/protocol';
+import { groupWorktrees } from '@yardmaster/protocol';
 import type { BoardStoreState } from './store.js';
 
 // Plain selectors over the store. Single-entity ones return the stored object, so they
@@ -36,7 +37,9 @@ const byName = (a: Project, b: Project) => a.name.localeCompare(b.name) || a.id.
 const newestFirst = <T extends { startedAt: number; id: string }>(a: T, b: T) =>
   b.startedAt - a.startedAt || a.id.localeCompare(b.id);
 
-export const selectProjects = (s: S): Project[] => Object.values(s.board.projects).sort(byName);
+/** By name, with each linked worktree right behind its main checkout. */
+export const selectProjects = (s: S): Project[] =>
+  groupWorktrees(Object.values(s.board.projects).sort(byName));
 /** The project count alone: projects change on every bit of activity, the count rarely. */
 export const selectProjectCount = (s: S) => Object.keys(s.board.projects).length;
 export const selectWindowCount = (s: S) => Object.keys(s.board.windows).length;

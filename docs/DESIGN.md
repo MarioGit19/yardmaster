@@ -203,6 +203,10 @@ A recap for coming back after the board was hidden or idle (Settings, default 20
 
 On desktop it's a panel at the top right that takes no focus and blocks nothing, since the user may already be typing; Esc or Dismiss closes it. On a phone it's a bottom sheet. It rises 8 px with `smooth` and leaves at `dur.fast`, with no stagger; Reduced fades, Off appears at rest. **Mark all seen** clears the Done, unseen marks and offers Undo in a toast. Failures keep their mark until opened, and neither action touches the Needs you strip or inbox.
 
+### 4.5c Review changes
+
+A page in place of the focus view's columns, which stay mounted, hidden, behind it; on a phone, a page of the project hub. Desktop has the file list and commit box on the left (at most 20rem) and one file's diff on the right; a phone shows the list, then one diff at a time, always unified. Marking the open file viewed moves to the next unread one. A newer state of the files never replaces the diff being read: a bar offers to show it, so what gets committed is what was read. Discard asks inline, in the file's header, and says what can't be undone. No motion of its own beyond the shared press and color transitions.
+
 ### 4.6 Focus view (project)
 
 - A shared-element transition from the pod. The background dims and blurs other content.

@@ -11,6 +11,7 @@ export default defineProject({
     env: {
       CLAUDE_CONFIG_DIR: join(tmpdir(), 'yardmaster-test-no-claude'),
       YARDMASTER_CLAUDE_BIN: join(tmpdir(), 'yardmaster-test-no-claude', 'claude'),
+      YARDMASTER_GH_BIN: join(tmpdir(), 'yardmaster-test-no-claude', 'gh'),
     },
   },
 });

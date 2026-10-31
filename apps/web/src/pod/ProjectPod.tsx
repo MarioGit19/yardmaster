@@ -40,6 +40,7 @@ import { PodLine } from './PodLine.js';
 import { PodMenu } from './PodMenu.js';
 import { SessionRow } from './SessionRow.js';
 import { useMascotState } from './useMascotState.js';
+import { WorktreeOf } from './WorktreeOf.js';
 
 /** Lanes shown per pod before the rest collapse into a count. */
 const MAX_LANES = 4;
@@ -245,6 +246,7 @@ export function ProjectPod({
               </span>
               <div className="pod-title flex min-w-0 flex-1 flex-col">
                 <span className="flex min-w-0 items-center gap-2">
+                  <WorktreeOf project={project} />
                   <Link
                     href={projectHref(project.id)}
                     title={project.name}

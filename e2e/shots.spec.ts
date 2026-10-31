@@ -425,6 +425,21 @@ test.describe('hud', () => {
           });
           await page.keyboard.press('Escape');
         });
+        test('review', async ({ page }) => {
+          await page.goto('/#/');
+          const href = await page
+            .locator('[data-pod] a[href^="#/p/"]')
+            .first()
+            .getAttribute('href');
+          await openRoute(page, `${href?.slice(1)}/review`);
+          await expect(
+            page.locator('[data-review-totals], [data-review-error]').first(),
+          ).toBeVisible({ timeout: 15_000 });
+          await page.screenshot({
+            path: new URL(`review-${viewport.width}-${theme}.png`, OUT_DIR).pathname,
+          });
+        });
+
         test('recap', async ({ page }) => {
           test.slow();
           await openRoute(page, '/');

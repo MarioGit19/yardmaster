@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { KeyValueStorage } from '../prefs.js';
 import {
   arrangeProjects,
+  besideParents,
   createProjectOrder,
   nudgeProject,
   placeInOrder,
@@ -116,5 +117,21 @@ describe('selectRecentKey', () => {
   it('has nothing to order before the board loads', () => {
     const state = { hydrated: false, board: { projects: { a: project('a', 'a', 1) } } } as never;
     expect(selectRecentKey(state)).toBe('');
+  });
+});
+
+describe('besideParents', () => {
+  it('moves a worktree right behind its main checkout', () => {
+    expect(besideParents(['tax', 'orbit', 'shop', 'promo'], 'tax shop\npromo shop')).toEqual([
+      'orbit',
+      'shop',
+      'tax',
+      'promo',
+    ]);
+  });
+
+  it('leaves a worktree alone while its main checkout is not listed', () => {
+    expect(besideParents(['tax', 'orbit'], 'tax shop')).toEqual(['tax', 'orbit']);
+    expect(besideParents(['a', 'b'], '')).toEqual(['a', 'b']);
   });
 });

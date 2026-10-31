@@ -1,13 +1,15 @@
 import { execFile } from 'node:child_process';
-import { GitInfo } from '@yardmaster/protocol';
+import { GitInfo, worktreeContaining } from '@yardmaster/protocol';
 import type { FastifyBaseLogger } from 'fastify';
 import {
   configRunsCommands,
   GIT_CONFIG_ARGS,
   GIT_LOG_ARGS,
   GIT_STATUS_ARGS,
+  GIT_WORKTREE_ARGS,
   parseGitLog,
   parseGitStatus,
+  parseGitWorktrees,
   sameGitInfo,
 } from './git.js';
 import type { BoardStore } from './store.js';
@@ -153,7 +155,12 @@ export class GitScanner {
         return this.failed(err, path);
       }
     }
-    const parsed = GitInfo.safeParse({ ...status, commits, updatedAt: this.now() });
+    const parsed = GitInfo.safeParse({
+      ...status,
+      commits,
+      ...(await this.worktrees(path)),
+      updatedAt: this.now(),
+    });
     if (!parsed.success) {
       this.warnOnce(
         `invalid:${path}`,
@@ -163,6 +170,18 @@ export class GitScanner {
       return undefined;
     }
     return parsed.data;
+  }
+
+  /** The repository's other checkouts. They only add to the status, so a failure costs nothing. */
+  private async worktrees(path: string): Promise<Pick<GitInfo, 'worktrees' | 'mainWorktree'>> {
+    const listed = await this.run(path, GIT_WORKTREE_ARGS).then(parseGitWorktrees, () => []);
+    if (listed.length < 2) return {};
+    const here = worktreeContaining(listed, path);
+    const main = listed.find((worktree) => worktree.main);
+    return {
+      worktrees: listed,
+      mainWorktree: here && !here.main ? (main?.path ?? null) : null,
+    };
   }
 
   private skipped(): GitInfo {
@@ -218,32 +237,32 @@ function errorStderr(err: unknown): string {
  * own git commands, `core.fsmonitor` is off so a repository's config can't make us run a
  * program, and the system config is skipped.
  */
-export const runGit: GitRunner = (dir, args) =>
-  new Promise((resolve, reject) => {
-    execFile(
-      'git',
-      [
-        '--no-optional-locks',
-        '-c',
-        'core.fsmonitor=false',
-        '-c',
-        'color.ui=false',
-        '-C',
-        dir,
-        ...args,
-      ],
-      {
-        timeout: COMMAND_TIMEOUT_MS,
-        maxBuffer: MAX_OUTPUT,
-        encoding: 'utf8',
-        env: gitEnv(),
-      },
-      (err, stdout, stderr) => {
-        if (err) reject(Object.assign(err, { stderr }));
-        else resolve(stdout);
-      },
-    );
-  });
+export const runGit: GitRunner = gitRunner({ timeout: COMMAND_TIMEOUT_MS, maxBuffer: MAX_OUTPUT });
+
+/** A read-only `GitRunner` with its own limits, for commands slower than a status. */
+export function gitRunner(limits: { timeout: number; maxBuffer: number }): GitRunner {
+  return (dir, args) =>
+    new Promise((resolve, reject) => {
+      execFile(
+        'git',
+        [
+          '--no-optional-locks',
+          '-c',
+          'core.fsmonitor=false',
+          '-c',
+          'color.ui=false',
+          '-C',
+          dir,
+          ...args,
+        ],
+        { ...limits, encoding: 'utf8', env: gitEnv() },
+        (err, stdout, stderr) => {
+          if (err) reject(Object.assign(err, { stderr }));
+          else resolve(stdout);
+        },
+      );
+    });
+}
 
 /** The environment `runGit` gives git. */
 export function gitEnv(): NodeJS.ProcessEnv {

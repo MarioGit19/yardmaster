@@ -3,10 +3,11 @@ import type { EditorApp, FolderTrustReview, UiAction, UiActionKind } from '@yard
 /**
  * `sessionId`: the session an action started (`session.create`, a forked resume). `editor`: the
  * editor `project.openInEditor` launched. `trust`: what a board session's folder needs trusted for.
+ * `detail`: git's own words about a commit or discard that failed.
  */
 export type ActionResult =
   | { ok: true; sessionId?: string; editor?: EditorApp }
-  | { ok: false; error: string; trust?: FolderTrustReview };
+  | { ok: false; error: string; detail?: string; trust?: FolderTrustReview };
 
 export type ActionOf<K extends UiActionKind> = Extract<UiAction, { kind: K }>;
 
@@ -42,6 +43,9 @@ export function stubActionHandlers(): ActionHandlers {
     'session.setModel': notImplemented,
     'session.setPermissionMode': notImplemented,
     'session.replyInTerminal': notImplemented,
+    'session.parallel': notImplemented,
+    'git.commit': notImplemented,
+    'git.discard': notImplemented,
     'project.add': notImplemented,
     'project.close': notImplemented,
     'project.forget': notImplemented,

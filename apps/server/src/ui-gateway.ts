@@ -219,6 +219,7 @@ export class UiGateway {
           ...(result.ok && result.sessionId !== undefined ? { sessionId: result.sessionId } : {}),
           ...(result.ok && result.editor !== undefined ? { editor: result.editor } : {}),
           ...(!result.ok && result.trust !== undefined ? { trust: result.trust } : {}),
+          ...(!result.ok && result.detail ? { detail: result.detail } : {}),
         });
         return;
       }
@@ -331,13 +332,24 @@ export class UiGateway {
     id: string | undefined,
     ok: boolean,
     error?: string,
-    extra: { sessionId?: string; editor?: EditorApp; trust?: FolderTrustReview } = {},
+    extra: {
+      sessionId?: string;
+      editor?: EditorApp;
+      trust?: FolderTrustReview;
+      detail?: string;
+    } = {},
   ): void {
     if (id === undefined) return;
     const payload =
       error === undefined
         ? { id, ok, ...extra }
-        : { id, ok, error: error.slice(0, 1_000), ...(extra.trust ? { trust: extra.trust } : {}) };
+        : {
+            id,
+            ok,
+            error: error.slice(0, 1_000),
+            ...(extra.trust ? { trust: extra.trust } : {}),
+            ...(extra.detail ? { detail: extra.detail.slice(0, 1_000) } : {}),
+          };
     this.send(client, this.message('action.result', payload));
   }
 

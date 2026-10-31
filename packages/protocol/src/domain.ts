@@ -59,6 +59,21 @@ export type GitCommit = z.infer<typeof GitCommit>;
 export const GIT_MAX_FILES = 200;
 export const GIT_MAX_COMMITS = 5;
 
+/** Worktrees listed per repository; a repository past this is rare enough to cut off. */
+export const GIT_MAX_WORKTREES = 32;
+
+/** One checkout of a repository, from `git worktree list`. */
+export const GitWorktree = z.object({
+  /** `projectIdFromPath` of its folder: how the board names it without sending the path back. */
+  id: ProjectId,
+  path: z.string().min(1),
+  branch: z.string().nullable(),
+  head: z.string().nullable(),
+  /** The repository's main checkout. */
+  main: z.boolean(),
+});
+export type GitWorktree = z.infer<typeof GitWorktree>;
+
 export const GitInfo = z.object({
   branch: z.string().nullable(),
   head: z.string().nullable(),
@@ -72,6 +87,10 @@ export const GitInfo = z.object({
   files: z.array(GitFileChange).max(GIT_MAX_FILES).default([]),
   /** Newest first. */
   commits: z.array(GitCommit).max(GIT_MAX_COMMITS).default([]),
+  /** Every checkout of the repository, main first. Empty when there is only the one. */
+  worktrees: z.array(GitWorktree).max(GIT_MAX_WORKTREES).optional(),
+  /** The main checkout's folder, when this project's own folder is a linked worktree. */
+  mainWorktree: z.string().nullable().optional(),
   /** The repository's own config can run programs, so its status isn't read (PRD §8). */
   statusSkipped: z.boolean().optional(),
   updatedAt: Timestamp,

@@ -107,7 +107,11 @@ describe('GitScanner', () => {
     expect(store.state.projects['p-shop']?.git).toBeNull();
     state.active = true;
     await scanner.tick();
-    expect(calls).toEqual(['/home/dev/shop status', '/home/dev/shop log']);
+    expect(calls).toEqual([
+      '/home/dev/shop status',
+      '/home/dev/shop log',
+      '/home/dev/shop worktree',
+    ]);
   });
 
   it('writes nothing when the repository is unchanged', async () => {
@@ -125,7 +129,7 @@ describe('GitScanner', () => {
       fresh: { status: z('# branch.oid (initial)', '# branch.head main') },
     });
     await scanner.tick();
-    expect(calls).toEqual(['/home/dev/fresh status']);
+    expect(calls).toEqual(['/home/dev/fresh status', '/home/dev/fresh worktree']);
     expect(store.state.projects['p-fresh']?.git).toMatchObject({ head: null, commits: [] });
   });
 
@@ -182,7 +186,11 @@ describe('GitScanner', () => {
     scanner.request('p-shop');
     scanner.request('p-shop');
     await vi.runOnlyPendingTimersAsync();
-    expect(calls).toEqual(['/home/dev/shop status', '/home/dev/shop log']);
+    expect(calls).toEqual([
+      '/home/dev/shop status',
+      '/home/dev/shop log',
+      '/home/dev/shop worktree',
+    ]);
     expect(store.state.projects['p-shop']?.git?.branch).toBe('main');
   });
 
@@ -208,6 +216,7 @@ describe('GitScanner', () => {
       run: async (_dir, args) => {
         if (args[0] === 'config') return '';
         if (args[0] === 'log') return LOG;
+        if (args[0] === 'worktree') return '';
         statusCalls += 1;
         if (statusCalls === 1) await new Promise<void>((resolve) => (release = resolve));
         return STATUS;
@@ -266,7 +275,11 @@ describe('GitScanner', () => {
     );
     const { store, scanner, calls } = setup({ shop: { status: STATUS, log: LOG, config } });
     await scanner.tick();
-    expect(calls).toEqual(['/home/dev/shop status', '/home/dev/shop log']);
+    expect(calls).toEqual([
+      '/home/dev/shop status',
+      '/home/dev/shop log',
+      '/home/dev/shop worktree',
+    ]);
     expect(store.state.projects['p-shop']?.git?.statusSkipped).toBeUndefined();
   });
 });
@@ -320,7 +333,7 @@ describe('runGit', () => {
 
     await git('config', '--unset', 'filter.evil.clean');
     await scanner.tick();
-    expect(calls).toEqual(['config', 'config', 'status']);
+    expect(calls).toEqual(['config', 'config', 'status', 'worktree']);
     expect(store.state.projects['p-evil']?.git).toMatchObject({ dirty: 2 });
     expect(store.state.projects['p-evil']?.git?.statusSkipped).toBeUndefined();
   });

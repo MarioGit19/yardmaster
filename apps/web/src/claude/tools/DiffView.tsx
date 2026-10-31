@@ -171,13 +171,22 @@ export interface DiffViewProps {
   gapLabel?: (index: number) => string;
   /** Overrides the global layout, e.g. unified in a narrow sheet. */
   layout?: DiffLayout;
+  /** Show every row up front (a review, where the diff is the page). */
+  full?: boolean;
 }
 
 /**
  * A syntax-highlighted line diff, unified or side by side (a global preference). Long diffs show
  * their first lines and a "Show all" button.
  */
-export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffViewProps) {
+export function DiffView({
+  id,
+  hunks,
+  lang,
+  gapLabel,
+  layout: forced,
+  full = false,
+}: DiffViewProps) {
   const preferred = usePreference(diffLayoutPreference);
   const layout = forced ?? preferred;
   const [all, toggleAll] = useStickyFlag(`${id}:all`, false);
@@ -188,7 +197,7 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
     ...hunks.flatMap((h) => h.lines.map((l) => Math.max(l.oldNo ?? 0, l.newNo ?? 0))),
   );
   const gutter = String(maxNo).length + 2;
-  const budget = Math.min(all ? total : CLAMP_ROWS, MAX_ROWS);
+  const budget = Math.min(all || full ? total : CLAMP_ROWS, MAX_ROWS);
 
   let left = budget;
   const shown: { hunk: Hunk; limit: number }[] = [];
@@ -234,7 +243,12 @@ export function DiffView({ id, hunks, lang, gapLabel, layout: forced }: DiffView
         </div>
       ))}
       {total === 0 && <p className="px-3 py-1.5 font-sans text-meta text-text-2">No changes</p>}
-      {(hidden > 0 || (all && total > CLAMP_ROWS)) && (
+      {full && hidden > 0 && (
+        <p className="px-3 py-1.5 font-sans text-meta text-text-2">
+          {countOf(hidden, 'line')} too many to show
+        </p>
+      )}
+      {!full && (hidden > 0 || (all && total > CLAMP_ROWS)) && (
         <button
           type="button"
           onClick={toggleAll}

@@ -15,6 +15,7 @@ import { formatDateTime, formatWhen } from '../time.js';
 import { StatusDot } from '../ui/StatusDot.js';
 import { LiveCaption } from './LiveCaption.js';
 import { sessionCaption, staleCaption } from './model.js';
+import { WorktreeOf } from './WorktreeOf.js';
 
 /** How many sessions and terminals a project has running, drawn only when there are some. */
 export function PodCounts({ sessions, terminals }: { sessions: number; terminals: number }) {
@@ -109,6 +110,7 @@ export function PodLine({
       <span className="pod-dim flex shrink-0">
         <ProjectAvatar project={project} size="sm" />
       </span>
+      <WorktreeOf project={project} />
       <Link
         href={projectHref(project.id)}
         title={project.name}

@@ -111,6 +111,14 @@ const ERRORS: Record<string, string> = {
   pty_unavailable: 'Board terminals are off: node-pty did not load (see yardmaster doctor)',
   too_many_terminals: 'Already 16 board terminals running. End one first',
   pty_spawn_failed: 'The shell could not be started',
+  review_changed: 'The files changed since this review. Look at the new diff first',
+  nothing_to_commit: 'Nothing to commit',
+  commit_conflicts: 'Resolve the conflicts before committing',
+  commit_failed: 'Git refused the commit',
+  not_discardable: 'That file has nothing to discard',
+  discard_failed: 'Git could not discard that file',
+  config_runs_commands: 'Skipped: this repository’s config runs commands',
+  no_worktree_flag: 'This version of Claude Code has no --worktree option',
 };
 
 /** A server error code as a sentence for a toast. */

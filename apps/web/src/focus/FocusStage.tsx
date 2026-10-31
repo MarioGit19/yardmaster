@@ -16,6 +16,8 @@ export interface FocusRoute {
   terminalId?: string;
   /** A phone workspace page (`/p/:projectId/:page`): git, history, ports or a new session. */
   page?: string;
+  /** The linked worktree the `review` page shows. */
+  worktree?: string;
 }
 
 /** The project (and session or terminal) of a focus route, or null elsewhere. */
@@ -24,10 +26,14 @@ export function useFocusRoute(): FocusRoute | null {
   const [inTerminal, terminal] = useRoute(routes.terminal);
   const [inProject, project] = useRoute(routes.project);
   const [inPage, page] = useRoute(routes.projectPage);
+  const [inWorktree, worktree] = useRoute(routes.reviewWorktree);
   if (inSession) return { projectId: session.projectId, sessionId: session.sessionId };
   if (inTerminal) return { projectId: terminal.projectId, terminalId: terminal.terminalId };
   if (inProject) return { projectId: project.projectId };
   if (inPage) return { projectId: page.projectId, page: page.page };
+  if (inWorktree) {
+    return { projectId: worktree.projectId, page: 'review', worktree: worktree.worktree };
+  }
   return null;
 }
 
@@ -131,6 +137,7 @@ export function FocusStage({ focus }: { focus: FocusRoute | null }) {
               sessionId={focus.sessionId}
               terminalId={focus.terminalId}
               page={focus.page}
+              worktree={focus.worktree}
               shared={shared}
               fade={fade}
             />

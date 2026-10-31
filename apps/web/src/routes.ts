@@ -6,6 +6,8 @@ export const routes = {
   terminal: '/p/:projectId/t/:terminalId',
   /** A phone workspace's page beside its items: git, history, ports, or a new session. */
   projectPage: '/p/:projectId/:page',
+  /** A linked worktree's review (`GitWorktree.id`); the project's own is its `review` page. */
+  reviewWorktree: '/p/:projectId/review/:worktree',
   settings: '/settings',
   // The phone shell's tabs (DESIGN.md §11); the overview is the first.
   projects: '/projects',
@@ -30,6 +32,9 @@ export const terminalHref = (projectId: string, terminalId: string) =>
 
 export const projectPageHref = (projectId: string, page: string) =>
   `${projectHref(projectId)}/${encodeURIComponent(page)}`;
+
+export const reviewHref = (projectId: string, worktree?: string | null) =>
+  `${projectPageHref(projectId, 'review')}${worktree ? `/${encodeURIComponent(worktree)}` : ''}`;
 
 /** Whether `location` is the project's focus view (any of its sessions included). */
 export const inProject = (location: string, projectId: string) => {

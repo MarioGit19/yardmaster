@@ -1,10 +1,13 @@
 import {
   GIT_MAX_COMMITS,
   GIT_MAX_FILES,
+  GIT_MAX_WORKTREES,
   type GitCommit,
   type GitFileChange,
   type GitFileStatus,
   type GitInfo,
+  type GitWorktree,
+  projectIdFromPath,
 } from '@yardmaster/protocol';
 
 /**
@@ -84,9 +87,9 @@ export interface GitStatus {
 
 /**
  * Parses `git status --porcelain=v2 --branch -z`. Unknown or malformed records are
- * skipped; files beyond `GIT_MAX_FILES` are counted but not listed.
+ * skipped; files beyond `maxFiles` are counted but not listed.
  */
-export function parseGitStatus(stdout: string): GitStatus {
+export function parseGitStatus(stdout: string, maxFiles: number = GIT_MAX_FILES): GitStatus {
   const status: GitStatus = {
     branch: null,
     head: null,
@@ -122,7 +125,7 @@ export function parseGitStatus(stdout: string): GitStatus {
     }
     if (!file) continue;
     status.dirty += 1;
-    if (status.files.length < GIT_MAX_FILES) status.files.push(file);
+    if (status.files.length < maxFiles) status.files.push(file);
   }
   return status;
 }
@@ -218,6 +221,50 @@ export function parseGitLog(stdout: string): GitCommit[] {
   return commits;
 }
 
+/** Arguments for `git worktree list`: NUL-terminated attribute lines, a blank one per worktree. */
+export const GIT_WORKTREE_ARGS = ['worktree', 'list', '--porcelain', '-z'] as const;
+
+/**
+ * Parses `GIT_WORKTREE_ARGS`, main checkout first as git lists it. A bare main checkout has no
+ * files, and a prunable entry no folder, so neither is listed.
+ */
+export function parseGitWorktrees(stdout: string): GitWorktree[] {
+  const worktrees: GitWorktree[] = [];
+  let current: { path: string; branch: string | null; head: string | null } | null = null;
+  let skip = false;
+  let first = true;
+  const finish = () => {
+    if (current && !skip && worktrees.length < GIT_MAX_WORKTREES) {
+      worktrees.push({ id: projectIdFromPath(current.path), ...current, main: first });
+    }
+    if (current) first = false;
+    current = null;
+    skip = false;
+  };
+  for (const line of stdout.split('\0')) {
+    if (line === '') {
+      finish();
+      continue;
+    }
+    const space = line.indexOf(' ');
+    const key = space < 0 ? line : line.slice(0, space);
+    const value = space < 0 ? '' : line.slice(space + 1);
+    if (key === 'worktree' && value.startsWith('/')) {
+      finish();
+      current = { path: value, branch: null, head: null };
+    } else if (!current) {
+    } else if (key === 'HEAD') {
+      current.head = /^[0-9a-f]{7,64}$/.test(value) ? value : null;
+    } else if (key === 'branch') {
+      current.branch = value.replace(/^refs\/heads\//, '') || null;
+    } else if (key === 'bare' || key === 'prunable') {
+      skip = true;
+    }
+  }
+  finish();
+  return worktrees;
+}
+
 /** Same repository state, ignoring `updatedAt`. */
 export function sameGitInfo(a: GitInfo | null, b: GitInfo | null): boolean {
   if (a === null || b === null) return a === b;
@@ -233,7 +280,25 @@ export function sameGitInfo(a: GitInfo | null, b: GitInfo | null): boolean {
     a.files.length === b.files.length &&
     a.files.every((file, i) => sameFile(file, b.files[i])) &&
     a.commits.length === b.commits.length &&
-    a.commits.every((commit, i) => sameCommit(commit, b.commits[i]))
+    a.commits.every((commit, i) => sameCommit(commit, b.commits[i])) &&
+    (a.mainWorktree ?? null) === (b.mainWorktree ?? null) &&
+    sameWorktrees(a.worktrees ?? [], b.worktrees ?? [])
+  );
+}
+
+function sameWorktrees(a: readonly GitWorktree[], b: readonly GitWorktree[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((worktree, i) => {
+      const other = b[i];
+      return (
+        other !== undefined &&
+        worktree.path === other.path &&
+        worktree.branch === other.branch &&
+        worktree.head === other.head &&
+        worktree.main === other.main
+      );
+    })
   );
 }
 

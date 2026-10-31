@@ -66,8 +66,10 @@ export function SessionRow({
   const rowRef = useRef<HTMLLIElement>(null);
   const onScreen = useInView(rowRef);
   const when = sessionWhen(session, approval, now);
-  const worktree = worktreeName(session.cwd);
-  const branch = session.branch && (worktree || session.branch !== projectBranch);
+  const reported = session.meter?.worktree ?? null;
+  const worktree = reported?.name ?? worktreeName(session.cwd);
+  const sessionBranch = reported?.branch ?? session.branch;
+  const branch = sessionBranch && (worktree || sessionBranch !== projectBranch);
   const tokens = totalTokens(session);
   const streaming = isStreaming(session);
   const tool = session.status.kind === 'tool' ? session.status.tool : null;

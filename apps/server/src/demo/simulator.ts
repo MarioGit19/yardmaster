@@ -52,6 +52,7 @@ import {
   SHELL_COMMANDS,
   typedCommand,
 } from './logs.js';
+import { DEMO_WORKTREE_PROJECT, DemoReview, demoWorktrees } from './review.js';
 import { Rng } from './rng.js';
 import { firehoseLines, STRESS_TOOLS_PER_SECOND, stressProjects } from './stress.js';
 import {
@@ -176,6 +177,8 @@ interface ProjectCtx {
   def: DemoProject;
   windowId: string;
   dirty: number;
+  /** Files the demo's review discarded, left out of its status. */
+  cleaned: Set<string>;
   /** Fixed reference time for the synthetic commit history. */
   seededAt: number;
   scenarioCursor: number;
@@ -221,6 +224,7 @@ interface SessionCtx {
  */
 export class DemoSimulator {
   readonly transcripts: DemoTranscripts;
+  readonly review: DemoReview;
   private readonly store: BoardStore;
   private readonly rng: Rng;
   /** Transcript wording only, so it doesn't shift the simulation's own random sequence. */
@@ -249,6 +253,11 @@ export class DemoSimulator {
 
   constructor(options: DemoSimulatorOptions) {
     this.store = options.store;
+    this.review = new DemoReview({
+      store: this.store,
+      commitFiles: (projectId) => this.commitFiles(projectId),
+      discardFile: (projectId, path) => this.discardFile(projectId, path),
+    });
     this.rng = new Rng(options.seed ?? 0xc0ffee);
     this.textRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x5eed);
     this.pastRng = new Rng((options.seed ?? 0xc0ffee) ^ 0x9a57);
@@ -383,6 +392,7 @@ export class DemoSimulator {
       // Not the seeded random sequence: opening a folder mustn't shift the rest of the demo.
       windowId: `demo-window-${project.id}`,
       dirty: 0,
+      cleaned: new Set(),
       seededAt: project.createdAt,
       scenarioCursor: 0,
     };
@@ -476,6 +486,7 @@ export class DemoSimulator {
         def,
         windowId: windowIds[def.window] ?? `demo-window-${def.window}`,
         dirty: this.rng.int(0, 4),
+        cleaned: new Set(),
         seededAt: ts,
         scenarioCursor: 0,
       };
@@ -1539,23 +1550,24 @@ export class DemoSimulator {
 
   private markDirty(project: ProjectCtx): void {
     project.dirty = Math.min(project.dirty + 1, 24);
-    const current = this.store.state.projects[project.id];
-    if (current?.git)
-      this.store.upsertProject({ ...current, git: this.gitInfo(project, this.now()) });
+    this.refreshGit(project);
   }
 
   private gitInfo(project: ProjectCtx, ts: number): GitInfo {
     const { def } = project;
     const pool = [...def.testFiles, ...DEMO_CHANGED_FILES];
-    const files = pool.slice(0, Math.min(project.dirty, GIT_MAX_FILES)).map(
-      (path, index): GitFileChange => ({
-        path,
-        origPath: null,
-        status: index === pool.length - 1 ? 'untracked' : index % 4 === 3 ? 'added' : 'modified',
-        staged: index % 3 === 0,
-        unstaged: index % 3 !== 0 || index === pool.length - 1,
-      }),
-    );
+    const files = pool
+      .slice(0, Math.min(project.dirty, GIT_MAX_FILES))
+      .map(
+        (path, index): GitFileChange => ({
+          path,
+          origPath: null,
+          status: index === pool.length - 1 ? 'untracked' : index % 4 === 3 ? 'added' : 'modified',
+          staged: index % 3 === 0,
+          unstaged: index % 3 !== 0 || index === pool.length - 1,
+        }),
+      )
+      .filter((file) => !project.cleaned.has(file.path));
     const offset = def.name.length % DEMO_COMMITS.length;
     const commits = Array.from({ length: GIT_MAX_COMMITS }, (_, index) => {
       const commit = DEMO_COMMITS[(offset + index) % DEMO_COMMITS.length] ?? DEMO_COMMITS[0];
@@ -1571,14 +1583,41 @@ export class DemoSimulator {
       branch: def.branch,
       head: commits[0]?.hash ?? null,
       detached: false,
-      dirty: project.dirty,
+      dirty: Math.max(0, project.dirty - project.cleaned.size),
       upstream: `origin/${def.branch}`,
       ahead: def.branch === 'main' ? 0 : 2,
       behind: def.name === 'orbit-api' ? 1 : 0,
       files,
       commits,
+      ...(def.name === DEMO_WORKTREE_PROJECT
+        ? { worktrees: demoWorktrees(def.path, def.branch), mainWorktree: null }
+        : {}),
       updatedAt: ts,
     };
+  }
+
+  /** The review's Commit: everything changed goes, so the project reads clean. */
+  commitFiles(projectId: string): void {
+    const project = this.projects.find((p) => p.id === projectId);
+    if (!project) return;
+    project.dirty = 0;
+    project.cleaned.clear();
+    this.refreshGit(project);
+  }
+
+  /** The review's Discard. */
+  discardFile(projectId: string, path: string): void {
+    const project = this.projects.find((p) => p.id === projectId);
+    if (!project) return;
+    project.cleaned.add(path);
+    this.refreshGit(project);
+  }
+
+  private refreshGit(project: ProjectCtx): void {
+    const current = this.store.state.projects[project.id];
+    if (current?.git) {
+      this.store.upsertProject({ ...current, git: this.gitInfo(project, this.now()) });
+    }
   }
 
   private pastSessions(project: ProjectCtx): SessionHistoryEntry[] {

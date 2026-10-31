@@ -3,8 +3,9 @@ import {
   type Project,
   sessionDisplayName,
   sessionSubtitle,
+  sessionWorktree,
 } from '@yardmaster/protocol';
-import { LoaderCircle, PanelLeftClose, PanelLeftOpen, Play, Plus } from 'lucide-react';
+import { GitBranch, LoaderCircle, PanelLeftClose, PanelLeftOpen, Play, Plus } from 'lucide-react';
 import { AnimatePresence, type HTMLMotionProps, motion, type Transition } from 'motion/react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -39,6 +40,7 @@ import { endedSessions, podSessions } from '../pod/model.js';
 import { type CrewView, SessionCrew } from '../pod/SessionCrew.js';
 import { useMediaQuery, usePreference } from '../prefs.js';
 import { phosphorPreference } from '../retro/phosphor.js';
+import { ReviewView } from '../review/ReviewView.js';
 import { projectHref, routes, sessionHref } from '../routes.js';
 import { NARROW_QUERY } from '../shell/prefs.js';
 import {
@@ -91,6 +93,8 @@ export interface FocusViewProps {
   terminalId?: string;
   /** A phone workspace page (git, history, ports, new); the columns ignore it. */
   page?: string;
+  /** The linked worktree the `review` page shows. */
+  worktree?: string;
   /** Morph out of (and back into) the project's pod. Off for a direct load of the route. */
   shared: boolean;
   /** Cross-fade in and out instead (opened from a layout without pods, or at Reduced). */
@@ -103,6 +107,7 @@ export function FocusView({
   sessionId,
   terminalId,
   page,
+  worktree,
   shared,
   fade = false,
 }: FocusViewProps) {
@@ -144,6 +149,7 @@ export function FocusView({
       sessionId={sessionId}
       terminalId={terminalId}
       page={page}
+      worktree={worktree}
       shared={shared}
       fade={fade}
     />
@@ -186,6 +192,7 @@ function ProjectFocus({
   sessionId,
   terminalId,
   page,
+  worktree,
   shared,
   fade,
 }: {
@@ -194,6 +201,7 @@ function ProjectFocus({
   sessionId?: string;
   terminalId?: string;
   page?: string;
+  worktree?: string;
   shared: boolean;
   fade: boolean;
 }) {
@@ -228,6 +236,7 @@ function ProjectFocus({
     setReleased(id);
     if (sessionId === id) navigate(projectHref(project.id));
   };
+  const reviewing = page === 'review';
   const accent = `var(--accent-${project.accent})`;
   const tabs = useMediaQuery(FOCUS_TABS_QUERY);
   // A terminal picked in ⌘K, or a new one asked for there or in the pod's menu.
@@ -334,7 +343,7 @@ function ProjectFocus({
       {...(tabs ? {} : { actionsSlot: sidePanel === 'terminals' ? actionsSlot : null })}
     />
   );
-  const changesColumn = <GitPanel git={project.git} now={Date.now()} />;
+  const changesColumn = <GitPanel git={project.git} now={Date.now()} projectId={project.id} />;
   const sideCounts = { terminals: terminals.length, changes: project.git?.dirty ?? 0 };
 
   return (
@@ -360,6 +369,7 @@ function ProjectFocus({
             sessionId={sessionId}
             terminalId={terminalId}
             page={page}
+            worktree={worktree}
             headingRef={headingRef}
             HubCrew={skin.skin.HubCrew}
           />
@@ -372,8 +382,23 @@ function ProjectFocus({
           />
         )}
 
+        {/* The columns stay mounted under the review, so terminals keep their screens. */}
+        {!phone && reviewing && (
+          <div data-review-layer className="min-h-0 flex-1">
+            <ReviewView
+              project={project}
+              worktree={worktree}
+              phone={false}
+              onClose={() => navigate(projectHref(project.id))}
+            />
+          </div>
+        )}
         {!phone && (
-          <motion.div {...body} className="flex min-h-0 flex-1 flex-col">
+          <motion.div
+            {...body}
+            inert={reviewing}
+            className={cx('min-h-0 flex-1 flex-col', reviewing ? 'hidden' : 'flex')}
+          >
             {tabs ? (
               <FocusTabs
                 settle={settle}
@@ -770,6 +795,7 @@ function SessionLink({
 }) {
   const status = useSessionView(session);
   const word = useStatusWord();
+  const worktree = useBoard((s) => sessionWorktree(session, s.board.projects[projectId]?.git));
   const approvalId =
     session.status.kind === 'waiting_permission' ? session.status.approvalId : null;
   const approval = useBoard(selectApproval(approvalId ?? ''));
@@ -828,6 +854,16 @@ function SessionLink({
             <DraftMarker draft={draftKey.session(session.id)} />
             {session.origin === 'board' && <OriginBadge origin="board" compact />}
           </span>
+          {worktree && (
+            <span
+              data-session-worktree
+              title={worktree.path}
+              className="flex min-w-0 items-center gap-1 font-mono text-meta text-text-2"
+            >
+              <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{worktree.branch ?? worktree.head?.slice(0, 7)}</span>
+            </span>
+          )}
           <span className="flex min-w-0 items-center justify-between gap-2">
             <StatusDot
               tone={status.tone}

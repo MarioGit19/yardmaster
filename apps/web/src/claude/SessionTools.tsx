@@ -2,12 +2,15 @@ import {
   type ClaudeSession,
   isArchivedSession,
   sessionDisplayName,
+  sessionWorktree,
   type UiAction,
 } from '@yardmaster/protocol';
-import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, FileDiff, Pencil } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useBoardClient } from '../data/index.js';
+import { useLocation } from 'wouter';
+import { useBoard, useBoardClient } from '../data/index.js';
+import { reviewHref } from '../routes.js';
 import { actionErrorText } from '../terminal/stack.js';
 import { Button } from '../ui/Button.js';
 import { IconButton } from '../ui/IconButton.js';
@@ -180,6 +183,23 @@ export function RenameSession({
 }
 
 /** Rename, and Archive once the session has finished. */
+/** Opens the review of the folder this session works in: its worktree, or the project's. */
+function ReviewSessionButton({ session }: { session: ClaudeSession }) {
+  const [, navigate] = useLocation();
+  const { projectId } = session;
+  const git = useBoard((s) => (projectId ? s.board.projects[projectId]?.git : null));
+  if (!projectId || !git || git.statusSkipped) return null;
+  return (
+    <IconButton
+      label="Review changes"
+      size="sm"
+      data-session-review
+      icon={<FileDiff className="size-3.5" strokeWidth={1.5} />}
+      onClick={() => navigate(reviewHref(projectId, sessionWorktree(session, git)?.id))}
+    />
+  );
+}
+
 export function SessionTools({
   session,
   labelled = false,
@@ -190,6 +210,8 @@ export function SessionTools({
   return (
     <span className="flex shrink-0 items-center gap-0.5 self-center">
       <RenameSession session={session} labelled={labelled} />
+      {/* Phones reach it from the project hub: their chat strip has no room for the words. */}
+      {!labelled && <ReviewSessionButton session={session} />}
       {session.status.kind === 'ended' && !isArchivedSession(session) && (
         <ArchiveButton session={session} labelled={labelled} />
       )}

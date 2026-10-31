@@ -24,7 +24,7 @@ export type HubItem =
   | { kind: 'terminal'; key: string; group: HubGroup; terminalId: string };
 
 /** The workspace's sub-pages beside the items. `new` is a blank new-session chat. */
-export const HUB_PAGES = ['git', 'history', 'ports', 'new'] as const;
+export const HUB_PAGES = ['git', 'review', 'history', 'ports', 'new'] as const;
 export type HubPage = (typeof HUB_PAGES)[number];
 
 export const isHubPage = (page: string): page is HubPage =>

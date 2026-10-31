@@ -20,6 +20,7 @@ import {
   WindowId,
 } from './domain.js';
 import { PatchOp } from './patch.js';
+import { GitReviewRevision, MAX_COMMIT_MESSAGE } from './review.js';
 import { FolderTrustReview } from './trust.js';
 
 // Wire messages, PRD §7. Every message is an envelope `{ v: 1, type, id?, ts, payload }`.
@@ -226,6 +227,8 @@ export const ActionResult = envelope(
     id: MessageId,
     ok: z.boolean(),
     error: ShortText.optional(),
+    /** What git itself said about a failed `git.commit` or `git.discard`. */
+    detail: ShortText.optional(),
     /** The session the action started: `session.create`, or a forked `session.resume`. */
     sessionId: SessionId.optional(),
     /** The editor `project.openInEditor` launched. */
@@ -288,6 +291,22 @@ export const UiAction = z.discriminatedUnion('kind', [
   action('session.setPermissionMode', { sessionId: SessionId, permissionMode: PermissionMode }),
   /** Types a line into a terminal session's linked terminal (F14, `claude.terminalReply`). */
   action('session.replyInTerminal', { sessionId: SessionId, text: Text.min(1) }),
+  /** Opens a terminal running the user's `claude --worktree`, which makes the worktree itself. */
+  action('session.parallel', { projectId: ProjectId }),
+  /** Commits every uncommitted file of the review `revision` names, with the user's git config. */
+  action('git.commit', {
+    projectId: ProjectId,
+    worktree: ProjectId.optional(),
+    revision: GitReviewRevision,
+    message: z.string().trim().min(1).max(MAX_COMMIT_MESSAGE),
+  }),
+  /** Throws away one file's uncommitted changes, as shown in the review `revision` names. */
+  action('git.discard', {
+    projectId: ProjectId,
+    worktree: ProjectId.optional(),
+    revision: GitReviewRevision,
+    path: z.string().min(1).max(4096),
+  }),
   action('project.add', { path: Path }),
   /**
    * Closes a project: stops what the board runs there and hides it until something new

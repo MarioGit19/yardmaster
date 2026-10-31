@@ -1,12 +1,21 @@
-import type { GitCommit, GitFileChange, GitFileStatus, GitInfo } from '@yardmaster/protocol';
-import { ArrowDown, ArrowUp, Check, GitBranch } from 'lucide-react';
+import type {
+  GitCommit,
+  GitFileChange,
+  GitFileStatus,
+  GitInfo,
+  GitWorktree,
+} from '@yardmaster/protocol';
+import { ArrowDown, ArrowUp, Check, FileDiff, GitBranch } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { ColumnHeading } from '../focus/ColumnHeading.js';
+import { reviewHref } from '../routes.js';
 import { formatDateTime, formatWhen } from '../time.js';
+import { buttonClass } from '../ui/Button.js';
 import { cx } from '../ui/cx.js';
 import { GIT_SKIPPED, groupFiles, splitPath, syncState, unlistedCount } from './model.js';
 
-const FILE_MARK: Record<GitFileStatus, { mark: string; className: string }> = {
+export const FILE_MARK: Record<GitFileStatus, { mark: string; className: string }> = {
   modified: { mark: 'M', className: 'text-st-work-ink' },
   added: { mark: 'A', className: 'text-st-ok-ink' },
   deleted: { mark: 'D', className: 'text-st-err-ink' },
@@ -24,10 +33,12 @@ export interface GitPanelProps {
   git: GitInfo | null;
   /** Clock for the commit times. */
   now: number;
+  /** Links the panel to the project's review; it stays a plain read-out without it. */
+  projectId?: string;
 }
 
 /** Branch, upstream sync, changed files by status and the latest commits (F15). */
-export function GitPanel({ git, now }: GitPanelProps) {
+export function GitPanel({ git, now, projectId }: GitPanelProps) {
   if (!git) {
     return (
       <section aria-label="Git" data-git-panel>
@@ -52,6 +63,16 @@ export function GitPanel({ git, now }: GitPanelProps) {
         <ColumnHeading meta={git.dirty ? `${git.dirty} changed` : undefined}>Git</ColumnHeading>
         <BranchLine git={git} />
       </div>
+      {projectId && (
+        <Link
+          href={reviewHref(projectId)}
+          data-review-open
+          className={cx(buttonClass('secondary', 'sm'), 'self-start')}
+        >
+          <FileDiff aria-hidden className="size-3.5" strokeWidth={1.5} />
+          Review changes
+        </Link>
+      )}
       {git.dirty === 0 ? (
         <p className="flex items-center gap-1.5 text-body-sm text-text-3">
           <Check aria-hidden className="size-3.5 text-st-ok-ink" strokeWidth={1.75} />
@@ -59,6 +80,9 @@ export function GitPanel({ git, now }: GitPanelProps) {
         </p>
       ) : (
         <ChangedFiles git={git} />
+      )}
+      {(git.worktrees?.length ?? 0) > 1 && (
+        <Worktrees worktrees={git.worktrees ?? []} projectId={projectId} />
       )}
       {git.commits.length > 0 && <Commits commits={git.commits} now={now} />}
     </section>
@@ -177,6 +201,49 @@ function FileRow({ file }: { file: GitFileChange }) {
         </span>
       )}
     </li>
+  );
+}
+
+/** The repository's other checkouts, each with its own review. */
+function Worktrees({
+  worktrees,
+  projectId,
+}: {
+  worktrees: readonly GitWorktree[];
+  projectId: string | undefined;
+}) {
+  const linked = worktrees.filter((worktree) => !worktree.main);
+  return (
+    <div data-git-worktrees>
+      <h3 className="mb-1 flex items-baseline gap-1.5 text-label text-text-2">
+        Worktrees
+        <span className="tabular">{linked.length}</span>
+      </h3>
+      <ul className="flex flex-col gap-0.5 font-mono text-label">
+        {linked.map((worktree) => {
+          const label = worktree.branch ?? worktree.head?.slice(0, 7) ?? 'detached';
+          return (
+            <li key={worktree.id} className="min-w-0" title={worktree.path}>
+              {projectId ? (
+                <Link
+                  href={reviewHref(projectId, worktree.id)}
+                  data-worktree={worktree.id}
+                  className="flex min-w-0 items-center gap-1.5 rounded-control text-text-1 transition-colors duration-fast hover:text-text-2 touch:min-h-11"
+                >
+                  <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate">{label}</span>
+                </Link>
+              ) : (
+                <span className="flex min-w-0 items-center gap-1.5 text-text-1">
+                  <GitBranch aria-hidden className="size-3 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate">{label}</span>
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

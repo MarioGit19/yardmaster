@@ -14,6 +14,8 @@ import {
   LOCAL_ROUTES,
   type Project,
   ProjectId,
+  type PullRequestResponse,
+  REVIEW_ERRORS,
   type ServerStatus,
   type SessionHistoryEntry,
   type SessionHistoryResponse,
@@ -55,7 +57,14 @@ import {
   type EditorGatewayOptions,
   registerEditorGateway,
 } from './editor-gateway.js';
-import { EditorRouter } from './editor-router.js';
+import { EditorRouter, ROUTE_ERRORS } from './editor-router.js';
+import {
+  createReviewActions,
+  GitReviewer,
+  type GitReviewerOptions,
+  type ReviewSource,
+  worktreeFlagProbe,
+} from './git-review.js';
 import { GitScanner, type GitScannerOptions } from './git-scanner.js';
 import { type LibrarySource, ProjectLibrary } from './library.js';
 import { LocalChannel } from './local-channel.js';
@@ -74,6 +83,7 @@ import {
   createCloseActions,
   createLaunchActions,
   createProjectActions,
+  libraryGuard,
 } from './project-actions.js';
 import { loadNodePty } from './pty.js';
 import { PtyManager, type PtyManagerOptions } from './pty-manager.js';
@@ -163,6 +173,8 @@ export interface BuildOptions {
   processes?: Omit<ProcessScannerOptions, 'store' | 'logger'> | false;
   /** Git info tuning, or false to turn it off. Not started in demo mode. */
   git?: Omit<GitScannerOptions, 'store' | 'logger' | 'active'> | false;
+  /** Git review tuning: tests inject runners, so they never commit or call `gh` for real. */
+  review?: Pick<GitReviewerOptions, 'read' | 'write' | 'gh' | 'parallel'>;
   /** Claude's settings.json for the hooks routes. Defaults to the real one, or a synthetic one in demo mode. */
   hookSettings?: HookSettingsFile;
   /** The project library behind `GET /api/library`. Defaults to the disk, or a synthetic one in demo mode. */
@@ -219,6 +231,15 @@ declare module 'fastify' {
 }
 
 const ProjectParams = z.object({ projectId: ProjectId });
+const ReviewQuery = z.object({ worktree: ProjectId.optional() });
+
+const REVIEW_STATUS: Record<string, number> = {
+  [ROUTE_ERRORS.unknownProject]: 404,
+  [REVIEW_ERRORS.unknownWorktree]: 404,
+  [REVIEW_ERRORS.notRepo]: 409,
+  [REVIEW_ERRORS.configRunsCommands]: 409,
+  [REVIEW_ERRORS.tooLarge]: 413,
+};
 
 export async function buildServer(
   config: ServerConfig,
@@ -446,9 +467,23 @@ export async function buildServer(
     ...options.pty,
   });
   app.decorate('ptyManager', ptyManager);
+  const roots = () => librarySettings(settings).libraryRoots;
+  const parallelFlag = options.review?.parallel ?? (demo ? async () => true : worktreeFlagProbe());
+  const reviewSource: ReviewSource =
+    demo?.review ??
+    new GitReviewer({
+      store,
+      logger: logger.child({ component: 'review' }),
+      parallel: parallelFlag,
+      onChanged: (projectId) => gitScanner?.request(projectId),
+      guard: async (projectId) =>
+        store.state.projects[projectId]?.source === 'manual'
+          ? libraryGuard({ store, library, roots })(projectId)
+          : null,
+      ...options.review,
+    });
   const actions = options.actions ?? defaultActions();
   function defaultActions(): ActionHandlers {
-    const roots = () => librarySettings(settings).libraryRoots;
     const editorActions = createEditorActions({
       router: editorRouter,
       send: editorGateway.sendCommand.bind(editorGateway),
@@ -517,6 +552,11 @@ export async function buildServer(
     };
     return {
       ...handlers,
+      ...createReviewActions({
+        source: reviewSource,
+        parallel: parallelFlag,
+        terminalCreate: handlers['terminal.create'],
+      }),
       ...createTerminalReply({
         state: () => store.state,
         enabled: () => terminalReplyEnabled(settings),
@@ -794,6 +834,24 @@ export async function buildServer(
     // Archived ones have left the board's lists, so History lists them, by their board name.
     const archived = own.filter(isArchivedSession).map(archivedHistoryEntry);
     return { sessions: [...archived, ...sessions] } satisfies SessionHistoryResponse;
+  });
+
+  app.get('/api/projects/:projectId/review', async (request, reply) => {
+    const params = ProjectParams.safeParse(request.params);
+    const query = ReviewQuery.safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: 'bad_request' });
+    reply.header('cache-control', 'no-store');
+    const read = await reviewSource.read(params.data.projectId, query.data.worktree ?? null);
+    if (!read.ok) return reply.code(REVIEW_STATUS[read.error] ?? 500).send({ error: read.error });
+    return read.review;
+  });
+
+  app.get('/api/projects/:projectId/review/pr', async (request, reply) => {
+    const params = ProjectParams.safeParse(request.params);
+    const query = ReviewQuery.safeParse(request.query);
+    if (!params.success || !query.success) return reply.code(400).send({ error: 'bad_request' });
+    const pr = await reviewSource.pullRequest(params.data.projectId, query.data.worktree ?? null);
+    return { pr } satisfies PullRequestResponse;
   });
 
   if (options.webRoot !== undefined && !registerStatic(app, options.webRoot)) {

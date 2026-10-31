@@ -54,6 +54,8 @@ export interface BoardClientOptions {
 export const BASE_DELAY_MS = 500;
 export const MAX_DELAY_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 15_000;
+/** A commit runs the user's hooks and signing, which the server allows two minutes. */
+export const COMMIT_TIMEOUT_MS = 130_000;
 /** Per open stream, how much recent output a late listener gets replayed (UTF-16 units). */
 export const STREAM_HISTORY_CHARS = 2_000_000;
 /** Longest `terminal.input` message; a bigger paste goes in several. */
@@ -87,7 +89,7 @@ export type ChunkListener = (chunk: string, info: ChunkInfo) => void;
  */
 export type RequestResult =
   | { ok: true; sessionId?: string; editor?: EditorApp }
-  | { ok: false; error: string; trust?: FolderTrustReview };
+  | { ok: false; error: string; detail?: string; trust?: FolderTrustReview };
 
 /** Asks the user to trust a folder; resolves `true` to trust it and retry. */
 export type TrustGate = (review: FolderTrustReview) => Promise<boolean>;
@@ -305,10 +307,16 @@ export class BoardClient {
       return Promise.resolve({ ok: false, error: 'invalid_message' });
     }
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        resolve({ ok: false, error: 'timeout' });
-      }, this.requestTimeoutMs);
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          resolve({ ok: false, error: 'timeout' });
+        },
+        Math.max(
+          this.requestTimeoutMs,
+          'kind' in payload && payload.kind === 'git.commit' ? COMMIT_TIMEOUT_MS : 0,
+        ),
+      );
       this.pending.set(id, { resolve, timer });
     });
   }
@@ -420,7 +428,7 @@ export class BoardClient {
         if (!pending) return;
         this.pending.delete(message.payload.id);
         clearTimeout(pending.timer);
-        const { ok, error, sessionId, editor, trust } = message.payload;
+        const { ok, error, detail, sessionId, editor, trust } = message.payload;
         pending.resolve(
           ok
             ? {
@@ -428,7 +436,12 @@ export class BoardClient {
                 ...(sessionId !== undefined ? { sessionId } : {}),
                 ...(editor !== undefined ? { editor } : {}),
               }
-            : { ok: false, error: error ?? 'action_failed', ...(trust ? { trust } : {}) },
+            : {
+                ok: false,
+                error: error ?? 'action_failed',
+                ...(detail ? { detail } : {}),
+                ...(trust ? { trust } : {}),
+              },
         );
         return;
       }

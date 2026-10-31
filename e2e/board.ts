@@ -93,6 +93,7 @@ export async function startBoard({
       YARDMASTER_LOG_LEVEL: 'warn',
       CLAUDE_CONFIG_DIR: claudeDir,
       YARDMASTER_CLAUDE_BIN: join(claudeDir, 'no-claude'),
+      YARDMASTER_GH_BIN: join(claudeDir, 'no-gh'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
